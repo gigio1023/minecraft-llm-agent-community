@@ -6,6 +6,23 @@
 - [📚 Analysis of Prior Projects](https://naem1023.github.io/minecraft-llm-agent-community/docs/Analysis-of-Prior-Projects)
   - [Simple Analysis of Voyager](https://naem1023.github.io/minecraft-llm-agent-community/docs/Analysis-of-Prior-Projects/voyager)
 
+## Current Migration Direction
+
+This repo is now a migration staging area for a zero-based headless mineflayer
+agent-loop probe. Read these first:
+
+- [Agent Search Index](docs/docs/Agent-Search-Index.md)
+- [Agent Loop Migration](docs/docs/Migration/agent-loop-migration.md)
+- [Headless Mineflayer Setup](docs/docs/Migration/headless-mineflayer-setup.md)
+- [OpenAI Codex Provider](docs/docs/Migration/openai-codex-provider.md)
+- [Minimal Probe Goal](docs/docs/Migration/minimal-probe-goal.md)
+- [Handoff For GPT 5.4 Copilot](docs/docs/Migration/handoff-gpt54-copilot.md)
+
+The old Voyager baseline remains useful background, but it is not the active
+architecture. The next useful proof is a tiny local server plus two mineflayer
+bots that observe, move, talk, wait, and write a transcript without requiring a
+manual Minecraft client.
+
 This project aims to observe how agents in the Minecraft world autonomously form groups and create villages. It is still in its early stages, and if valuable insights can be derived, it will be used as a research topic.
 
 This project seeks to expand the research to include how multi-agents form groups, in addition to autonomously learning skills and exploring items, based on [Voyager](https://github.com/MineDojo/Voyager).
