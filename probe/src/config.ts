@@ -7,6 +7,14 @@ export type ProbeConfig = {
   probeId: string;
   evidenceDir: string;
   composeFile: string;
+  liveDialogue: {
+    providerId: "openai-codex";
+    authStorePath: string;
+    model: "gpt-5.4-mini";
+    reasoning: "low";
+    maxRetries: 1;
+    delayStartMs: 30000;
+  };
   server: {
     image: string;
     version: string;
@@ -28,6 +36,14 @@ export function loadProbeConfig(): ProbeConfig {
     probeId: "agent_loop_probe_v0",
     evidenceDir: path.resolve(here, "../../data/evidence"),
     composeFile: path.resolve(here, "../compose.yaml"),
+    liveDialogue: {
+      providerId: "openai-codex",
+      authStorePath: path.resolve(here, "../../build/provider-auth/openai-codex-auth.json"),
+      model: "gpt-5.4-mini",
+      reasoning: "low",
+      maxRetries: 1,
+      delayStartMs: 30_000
+    },
     server: {
       image: "itzg/minecraft-server:java21",
       version: "1.21.11",
@@ -43,6 +59,10 @@ export function loadProbeConfig(): ProbeConfig {
     },
     memoryLimit: 8
   };
+}
+
+export function loadMutualProbeConfig(): ProbeConfig {
+  return loadProbeConfig();
 }
 
 export function buildServerEnv(config: ProbeConfig) {

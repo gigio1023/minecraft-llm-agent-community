@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
+import { buildDialogueContext } from "../src/mutual/dialogueContext.js";
+import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
@@ -65,6 +67,100 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
   });
 
   assert.throws(() => validateProposal({ tool: "drop_database", args: {} }), /Unsupported tool/);
+});
+
+test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
+  const persona = {
+    name: "npc_a",
+    role: "runner",
+    style: "brief",
+    objective: "coordinate the marker handoff"
+  };
+  const observation = {
+    visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+    lastActionResult: { status: "available" }
+  };
+  const memory = ["marker paper should stay near the chest"];
+  const recentTranscript = [
+    {
+      actor: "npc_b",
+      tool: "converse",
+      args: { utterance: "I am ready." }
+    }
+  ];
+
+  const context = buildDialogueContext({
+    actorId: "npc_a",
+    persona,
+    observation,
+    memory,
+    recentTranscript
+  });
+
+  persona.role = "changed";
+  observation.visibleActors[0]!.busy = true;
+  memory.push("mutated");
+  recentTranscript[0]!.args.utterance = "mutated";
+
+  assert.deepEqual(context, {
+    actorId: "npc_a",
+    persona: {
+      name: "npc_a",
+      role: "runner",
+      style: "brief",
+      objective: "coordinate the marker handoff"
+    },
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+      lastActionResult: { status: "available" }
+    },
+    memory: ["marker paper should stay near the chest"],
+    recentTranscript: [
+      {
+        actor: "npc_b",
+        tool: "converse",
+        args: { utterance: "I am ready." }
+      }
+    ],
+    rules: {
+      oneToolPerTurn: true,
+      allowedTools: ["converse", "observe_world", "move_to", "wait", "remember", "drop_item"],
+      noInventedObservations: true,
+      preferObserveWorldWhenUncertain: true
+    }
+  });
+});
+
+test("parseProviderAction accepts converse, defaults args, and rejects invalid actions", () => {
+  assert.deepEqual(
+    parseProviderAction({
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, can you check the shared chest?"
+      },
+      why: "I need Jun to confirm the marker location."
+    }),
+    {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, can you check the shared chest?"
+      },
+      why: "I need Jun to confirm the marker location."
+    }
+  );
+
+  assert.deepEqual(parseProviderAction({ tool: "wait" }), {
+    tool: "wait",
+    args: {}
+  });
+
+  assert.throws(() => parseProviderAction("nope"), /Provider action must be an object/);
+  assert.throws(
+    () => parseProviderAction({ tool: "sing", args: {} }),
+    /Unsupported mutual tool: sing/
+  );
 });
 
 test("deterministic provider follows the planned runtime contract sequence", () => {

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
-import { buildServerEnv, loadProbeConfig } from "../src/config.js";
+import { buildServerEnv, loadMutualProbeConfig, loadProbeConfig } from "../src/config.js";
 import { getComposeCommandTimeouts } from "../src/server/dockerServer.js";
 
 test("loads probe config and builds vanilla server env", () => {
@@ -35,4 +36,18 @@ test("uses a longer timeout for docker compose up while keeping compose port and
   assert.equal(timeouts.startupMs, config.server.pingTimeoutMs);
   assert.equal(timeouts.managementMs, 10_000);
   assert.ok(timeouts.startupMs > timeouts.managementMs);
+});
+
+test("loads locked live dialogue provider settings for the mutual probe", () => {
+  const config = loadMutualProbeConfig();
+
+  assert.equal(config.liveDialogue.providerId, "openai-codex");
+  assert.equal(config.liveDialogue.model, "gpt-5.4-mini");
+  assert.equal(config.liveDialogue.reasoning, "low");
+  assert.equal(config.liveDialogue.maxRetries, 1);
+  assert.equal(config.liveDialogue.delayStartMs, 30_000);
+  assert.equal(
+    config.liveDialogue.authStorePath,
+    path.resolve("../build/provider-auth/openai-codex-auth.json")
+  );
 });
