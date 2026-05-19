@@ -12,6 +12,8 @@ import {
 } from "../src/mutual/dialogueContext.js";
 import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
+import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
+import { converse } from "../src/mutual/tools/converse.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -271,6 +273,43 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
     note: "npc_b answered"
   });
   assert.deepEqual(memory.list(), ["saw npc_b near spawn", "npc_b answered"]);
+});
+
+test("converse sends directed speech, supports self-talk, and records heard messages", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const target = createFakeBot("npc_b", 2);
+
+  const directed = await converse({
+    actor,
+    runtimeState,
+    targetId: target.username,
+    utterance: "Jun, check the marker by the chest."
+  });
+  const aloud = await converse({
+    actor,
+    runtimeState,
+    utterance: "I should wait by the chest."
+  });
+
+  assert.equal(directed.status, "said_to_target");
+  assert.equal(aloud.status, "said_aloud");
+  assert.deepEqual(actor.chatLog, [
+    "Jun, check the marker by the chest.",
+    "I should wait by the chest."
+  ]);
+  assert.deepEqual(target.chatLog, []);
+  assert.deepEqual(
+    runtimeState.recentUtterances().map((entry) => entry.text),
+    ["Jun, check the marker by the chest.", "I should wait by the chest."]
+  );
+  assert.equal(
+    runtimeState.consumeHeardMessages("npc_b")[0]?.text,
+    "Jun, check the marker by the chest."
+  );
 });
 
 test("agent loop records six steps and succeeds when remember changes the next action", async () => {
