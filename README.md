@@ -23,6 +23,16 @@ PROBE_BOTS="npc1,npc2,npc3" bun run src/cli.ts
 
 Transcripts are written to `data/evidence/` after each run.
 
+## Authentication
+
+The probe uses the OpenAI Codex provider with `gpt-5.4-mini` by default. Authentication is managed through a local auth store at:
+
+```
+build/provider-auth/openai-codex-auth.json
+```
+
+This file is gitignored. The runtime reads and refreshes tokens internally -- do not inspect or print raw token values. If auth is missing, expired, or rejected, the probe will fail on startup.
+
 ## Architecture
 
 The probe replaces the legacy Voyager eval-loop with a strictly bounded runtime:
