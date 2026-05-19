@@ -229,6 +229,49 @@ test("loadOpenAICodexAuth reads auth metadata without exposing raw secrets in JS
   await rm(authPath, { force: true });
 });
 
+test("loadOpenAICodexAuth rejects an empty access token", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "",
+      expiresAt: new Date(Date.now() + 60_000).toISOString()
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+
+  await assert.rejects(
+    loadOpenAICodexAuth(authPath),
+    /OpenAI Codex auth store accessToken must be a non-empty string/
+  );
+
+  await rm(authPath, { force: true });
+});
+
+test("loadOpenAICodexAuth rejects an expired auth store", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "top-secret-access-token",
+      expiresAt: new Date(Date.now() - 60_000).toISOString()
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+
+  await assert.rejects(loadOpenAICodexAuth(authPath), /OpenAI Codex auth store is expired/);
+
+  await rm(authPath, { force: true });
+});
+
 test("createOpenAICodexProvider retries malformed JSON once before returning a parsed action", async () => {
   const responses = [
     { output_text: "not json" },
@@ -295,6 +338,98 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
     }
   });
   assert.equal(proposal.tool, "converse");
+});
+
+test("createOpenAICodexProvider stops after exhausting malformed JSON retries", async () => {
+  let fetchCount = 0;
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+  const provider = createOpenAICodexProvider({
+    accessToken: "test-token",
+    maxRetries: 2,
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return new Response(JSON.stringify({ output_text: "not json" }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      });
+    }
+  });
+
+  await assert.rejects(
+    Promise.resolve(
+      provider.next({
+        actorId: "npc_a",
+        persona: mutualPersonas.npc_a,
+        observation: {
+          visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+          lastActionResult: { status: "available" }
+        },
+        memory: [],
+        recentTranscript: [],
+        rules: {
+          oneToolPerTurn: true,
+          allowedTools: ["converse", "wait"],
+          noInventedObservations: true,
+          preferObserveWorldWhenUncertain: true
+        }
+      })
+    ),
+    SyntaxError
+  );
+
+  assert.equal(fetchCount, 3);
+});
+
+test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", async () => {
+  let fetchCount = 0;
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+  const provider = createOpenAICodexProvider({
+    accessToken: "test-token",
+    maxRetries: 3,
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            tool: "sing",
+            args: {}
+          })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+  });
+
+  await assert.rejects(
+    Promise.resolve(
+      provider.next({
+        actorId: "npc_a",
+        persona: mutualPersonas.npc_a,
+        observation: {
+          visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+          lastActionResult: { status: "available" }
+        },
+        memory: [],
+        recentTranscript: [],
+        rules: {
+          oneToolPerTurn: true,
+          allowedTools: ["converse", "wait"],
+          noInventedObservations: true,
+          preferObserveWorldWhenUncertain: true
+        }
+      })
+    ),
+    /Unsupported mutual tool: sing/
+  );
+
+  assert.equal(fetchCount, 1);
 });
 
 test("deterministic provider follows the planned runtime contract sequence", () => {
