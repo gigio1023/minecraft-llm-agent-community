@@ -82,7 +82,7 @@ export function createOpenAICodexProvider({
 
   return {
     async next(input: ProviderInput) {
-      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      for (let attempt = 0; ; attempt += 1) {
         const payload = await requestResponse(fetchImpl, accessToken, input);
 
         try {
@@ -95,8 +95,6 @@ export function createOpenAICodexProvider({
           throw error;
         }
       }
-
-      throw new Error("OpenAI Codex provider exhausted retries");
     }
   };
 }

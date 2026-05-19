@@ -11,6 +11,7 @@ import {
   type DialogueTranscriptEntry,
   mutualPersonas
 } from "../src/mutual/dialogueContext.js";
+import type { ProviderInput } from "../src/mutual/provider.js";
 import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
@@ -64,6 +65,13 @@ function createFakeBot(username: string, x: number) {
     }
   };
 }
+
+type AssertTrue<T extends true> = T;
+type ProviderInputRequiresPersona = AssertTrue<
+  undefined extends ProviderInput["persona"] ? false : true
+>;
+const providerInputRequiresPersona: ProviderInputRequiresPersona = true;
+void providerInputRequiresPersona;
 
 test("dialogue state exposes busy then available and rejects unsupported tools", () => {
   const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 1 });
@@ -237,7 +245,7 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
   const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
   const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
   const provider = createOpenAICodexProvider({
-    accessToken: "top-secret-access-token",
+    accessToken: "test-token",
     maxRetries: 1,
     fetchImpl: async (url, init) => {
       fetchCalls.push({ url: String(url), init });
@@ -256,6 +264,7 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
 
   const proposal = await provider.next({
     actorId: "npc_a",
+    persona: mutualPersonas.npc_a,
     observation: {
       visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
       lastActionResult: { status: "available" }
@@ -272,6 +281,19 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
 
   assert.equal(fetchCalls.length, 2);
   assert.equal(fetchCalls[0]?.url, "https://api.openai.com/v1/responses");
+  const firstRequest = fetchCalls[0]?.init;
+  assert.ok(firstRequest, "expected the first provider request");
+  assert.equal(new Headers(firstRequest.headers).get("authorization"), "Bearer test-token");
+  const firstRequestBody = JSON.parse(String(firstRequest.body));
+  assert.equal(firstRequestBody.model, "gpt-5.4-mini");
+  assert.deepEqual(firstRequestBody.reasoning, {
+    effort: "low"
+  });
+  assert.deepEqual(firstRequestBody.text, {
+    format: {
+      type: "json_object"
+    }
+  });
   assert.equal(proposal.tool, "converse");
 });
 

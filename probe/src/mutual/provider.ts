@@ -8,7 +8,7 @@ import type { Proposal } from "./types.js";
 
 export type ProviderInput = {
   actorId: MutualActorId;
-  persona?: DialoguePersona;
+  persona: DialoguePersona;
   observation: DialogueObservation;
   memory: string[];
   recentTranscript: DialogueTranscriptEntry[];
