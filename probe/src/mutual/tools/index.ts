@@ -1,3 +1,4 @@
+import { toToolResult, withActionWrapper } from "./wrapper.js";
 import type { ProbeBots } from "../../runtime/createBots.js";
 import { createMemory } from "../../runtime/memory.js";
 import { moveTo } from "../../tools/moveTo.js";
@@ -9,7 +10,8 @@ import type {
   MutualActorId,
   MutualJsonValue,
   MutualStepRecord,
-  Proposal
+  Proposal,
+  ToolResult
 } from "../types.js";
 import { converse } from "./converse.js";
 import { dropItem } from "./dropItem.js";
@@ -150,11 +152,11 @@ export async function executeMutualTool({
   observation,
   transcript,
   handlers = {}
-}: ExecuteMutualToolArgs) {
-  try {
+}: ExecuteMutualToolArgs): Promise<ToolResult> {
+  return withActionWrapper(async () => {
     const validated = validateProposal(proposal);
     const actorArgs = toOptionalJsonRecord(validated.args);
-    const result =
+    const actionResult =
       validated.tool === "converse"
         ? await converse({
             actor,
@@ -167,7 +169,7 @@ export async function executeMutualTool({
             runtimeState,
             args: validated.args
           });
-    const memoryNote = readMemoryNote(validated.tool, result);
+    const memoryNote = readMemoryNote(validated.tool, actionResult as MutualJsonValue);
 
     transcript?.recordStep({
       actor: actor.username,
@@ -176,27 +178,11 @@ export async function executeMutualTool({
       ...(actorArgs ? { actorArgs } : {}),
       ...(memoryNote ? { memoryNote } : {}),
       ...(validated.why ? { providerMeta: { why: validated.why } } : {}),
-      result: toJsonValue(result)
+      result: toJsonValue(actionResult)
     });
 
-    return result;
-  } catch (error) {
-    const actorArgs = toOptionalJsonRecord(proposal.args);
-
-    transcript?.recordStep({
-      actor: actor.username,
-      observation: toJsonValue(observation),
-      actorAction: { tool: proposal.tool },
-      ...(actorArgs ? { actorArgs } : {}),
-      ...(proposal.why ? { providerMeta: { why: proposal.why } } : {}),
-      failure: { message: error instanceof Error ? error.message : String(error) },
-      result: {
-        status: "failed"
-      }
-    });
-
-    throw error;
-  }
+    return actionResult;
+  }, { tool: proposal.tool });
 }
 
 async function executeHandler(
@@ -399,10 +385,16 @@ export function createMutualTools({ runtimeState, memories }: CreateMutualToolsA
         runtimeState,
         memories
       });
-      runtimeState.recordLastResult(input.actorId, {
-        tool: input.proposal.tool,
-        status: step.targetResponse?.result ?? step.actorAction.result ?? "unknown"
-      });
+      runtimeState.recordToolResult(
+        input.actorId,
+        toToolResult(
+          {
+            tool: input.proposal.tool,
+            status: step.targetResponse?.result ?? step.actorAction.result ?? "unknown"
+          },
+          input.proposal.tool
+        )
+      );
       return step;
     }
   };

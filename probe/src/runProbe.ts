@@ -7,11 +7,16 @@ import { runAgentLoop } from "./runtime/agentLoop.js";
 import { createTranscript } from "./runtime/transcript.js";
 import { startDockerServer, type ServerHandle } from "./server/dockerServer.js";
 import { validateProposal } from "./tools/index.js";
+import { withActionWrapper } from "./mutual/tools/wrapper.js";
 import { moveTo } from "./tools/moveTo.js";
 import { observe } from "./tools/observe.js";
 import { remember } from "./tools/remember.js";
 import { say } from "./tools/say.js";
 import { wait } from "./tools/wait.js";
+import { collectLogs } from "./tools/collectLogs.js";
+import { craftItem } from "./tools/craftItem.js";
+import { createSharedStorageLedger } from "./gameplay/storage/sharedStorageLedger.js";
+import { createTeamBulletin } from "./npc/social/teamBulletin.js";
 
 export type ProbeRunResult = {
   transcriptPath: string;
@@ -112,6 +117,8 @@ export async function runProbe(): Promise<ProbeRunResult> {
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable
     });
     const provider = createDeterministicProvider();
+    const sharedStorageLedger = createSharedStorageLedger();
+    const teamBulletin = createTeamBulletin();
     const transcript = createTranscript({
       evidenceDir: config.evidenceDir,
       probeId: config.probeId,
@@ -127,27 +134,84 @@ export async function runProbe(): Promise<ProbeRunResult> {
         observe: ({ actor, target }) =>
           observe({ actor, target, dialogueState, memory }),
         move_to: ({ actor, target, args }) => {
-          const targetId = readStringArg(args, "target");
-          assertTarget(targetId, target.username);
-
-          return moveTo({ actor, target, targetId });
+          return withActionWrapper(
+            () => {
+              const targetId = readStringArg(args, "target");
+              assertTarget(targetId, target.username);
+              return moveTo({ actor, target, targetId });
+            },
+            { tool: "move_to" }
+          );
+        },
+        collect_logs: ({ actor }) => {
+          return withActionWrapper(
+            () => collectLogs({ bot: actor }),
+            { tool: "collect_logs" }
+          );
+        },
+        craft_item: ({ actor, args }) => {
+          return withActionWrapper(
+            () => craftItem({ bot: actor, itemName: readStringArg(args, "itemName") }),
+            { tool: "craft_item" }
+          );
+        },
+        inspect_chest: () => {
+          return withActionWrapper(
+            () => ({
+              status: "unavailable",
+              chestId: "shared-chest-1",
+              message: "shared chest runtime is not wired in live probe yet"
+            }),
+            { tool: "inspect_chest" }
+          );
+        },
+        deposit_shared: () => {
+          return withActionWrapper(
+            () => {
+              void sharedStorageLedger;
+              void teamBulletin;
+              return {
+                status: "unavailable",
+                chestId: "shared-chest-1",
+                message: "shared chest runtime is not wired in live probe yet"
+              };
+            },
+            { tool: "deposit_shared" }
+          );
+        },
+        withdraw_shared: () => {
+          return withActionWrapper(
+            () => ({
+              status: "unavailable",
+              chestId: "shared-chest-1",
+              message: "shared chest runtime is not wired in live probe yet"
+            }),
+            { tool: "withdraw_shared" }
+          );
         },
         say: ({ actor, target, args }) => {
-          const targetId = readStringArg(args, "target");
-          const text = readStringArg(args, "text");
-          assertTarget(targetId, target.username);
-
-          return say({ actor, target, dialogueState, text });
+          return withActionWrapper(
+            () => {
+              const targetId = readStringArg(args, "target");
+              const text = readStringArg(args, "text");
+              assertTarget(targetId, target.username);
+              return say({ actor, target, dialogueState, text });
+            },
+            { tool: "say" }
+          );
         },
-        wait: ({ args }) =>
-          wait({
-            ticks: readTicksArg(args)
-          }),
-        remember: ({ args }) =>
-          remember({
-            memory,
-            note: readStringArg(args, "note")
-          })
+        wait: ({ args }) => {
+          return withActionWrapper(
+            () => wait({ ticks: readTicksArg(args) }),
+            { tool: "wait" }
+          );
+        },
+        remember: ({ args }) => {
+          return withActionWrapper(
+            () => remember({ memory, note: readStringArg(args, "note") }),
+            { tool: "remember" }
+          );
+        }
       }
     });
 

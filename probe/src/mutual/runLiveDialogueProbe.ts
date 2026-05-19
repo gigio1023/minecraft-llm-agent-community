@@ -18,13 +18,39 @@ import { createOpenAICodexProvider } from "./openaiCodexProvider.js";
 import { createMutualRuntimeState } from "./runtimeState.js";
 import { createMutualTranscript } from "./transcript.js";
 import { executeMutualTool, allowedMutualTools } from "./tools/index.js";
+import type { ToolResult } from "./types.js";
+import { toToolResult } from "./tools/wrapper.js";
 
-type LastResult = {
-  tool: string;
-  status: string;
-};
+
 
 const liveAllowedTools = allowedMutualTools.filter((tool) => tool !== "drop_item");
+
+function toDialogueJsonValue(value: unknown): import("./dialogueContext.js").DialogueJsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => toDialogueJsonValue(entry));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toDialogueJsonValue(entry)])
+    );
+  }
+
+  throw new Error(`Dialogue values must be JSON-safe, received ${typeof value}`);
+}
+
+function toDialogueToolResult(result: ToolResult) {
+  return toDialogueJsonValue(result) as import("./dialogueContext.js").DialogueJsonObject;
+}
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => {
@@ -86,7 +112,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     npc_a: createMemory(config.memoryLimit),
     npc_b: createMemory(config.memoryLimit)
   };
-  const lastResults = new Map<MutualActorId, LastResult | null>([
+  const lastResults = new Map<MutualActorId, ToolResult | null>([
     ["npc_a", null],
     ["npc_b", null]
   ]);
@@ -126,7 +152,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
                 persona: mutualPersonas.npc_a,
                 observation: {
                   ...observation,
-                  ...(lastResult ? { lastActionResult: lastResult } : {})
+                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
                 },
                 memory: memories.npc_a.list(),
                 recentTranscript: createRecentTranscript(runtimeState)
@@ -143,7 +169,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
                 persona: mutualPersonas.npc_b,
                 observation: {
                   ...observation,
-                  ...(lastResult ? { lastActionResult: lastResult } : {})
+                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
                 },
                 memory: memories.npc_b.list(),
                 recentTranscript: createRecentTranscript(runtimeState)
@@ -215,15 +241,9 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
             }
           });
 
-          lastResults.set(actorId, {
-            tool: proposal.tool,
-            status:
-              typeof result === "object" && result !== null && !Array.isArray(result) && "status" in result
-                ? String(result.status)
-                : "unknown"
-          });
+          lastResults.set(actorId, toToolResult(result, proposal.tool));
 
-          return result;
+          return toDialogueJsonValue(result);
         }
       }
     });

@@ -24,8 +24,9 @@ import {
 } from "../src/mutual/tools/index.js";
 import { observeWorld } from "../src/mutual/tools/observeWorld.js";
 import { replyTo } from "../src/mutual/tools/replyTo.js";
-import type { MutualStepRecord, Proposal } from "../src/mutual/types.js";
+import type { MutualJsonValue, MutualStepRecord, Proposal, ToolResult } from "../src/mutual/types.js";
 import { runMutualLoop } from "../src/mutual/mutualLoop.js";
+import { toToolResult } from "../src/mutual/tools/wrapper.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
@@ -91,6 +92,29 @@ function createFakeMutualBots() {
     npc_a: { username: "npc_a" },
     npc_b: { username: "npc_b" }
   };
+}
+
+function toJsonValue(value: unknown): MutualJsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => toJsonValue(entry));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toJsonValue(entry)])
+    );
+  }
+
+  throw new Error(`Expected JSON-safe value, received ${typeof value}`);
 }
 
 function createFakeMutualTools() {
@@ -236,7 +260,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
   };
   const observation: DialogueObservation = {
     visibleActors,
-    lastActionResult: { status: "available" },
+     lastActionResult: { tool: "converse", ok: true, status: "available" },
     marker
   };
   const memory = ["marker paper should stay near the chest"];
@@ -247,7 +271,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
       actorName: "Jun",
       tool: "converse",
       args: transcriptArgs,
-      result: { status: "available" }
+       result: { tool: "converse", ok: true, status: "available" }
     }
   ];
 
@@ -277,7 +301,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
     },
     observation: {
       visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
-      lastActionResult: { status: "available" },
+       lastActionResult: { tool: "converse", ok: true, status: "available" },
       marker: {
         seen: true,
         holder: "npc_b"
@@ -290,7 +314,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
         actorName: "Jun",
         tool: "converse",
         args: { utterance: "I am ready." },
-        result: { status: "available" }
+         result: { tool: "converse", ok: true, status: "available" }
       }
     ],
     rules: {
@@ -613,27 +637,27 @@ test("deterministic provider follows the planned runtime contract sequence", () 
   });
 
   assert.deepEqual(
-    provider.next({ observation, lastResult: { tool: "observe", status: "ok" } }),
+     provider.next({ observation, lastResult: { tool: "observe", ok: true, status: "ok" } }),
     { tool: "move_to", args: { target: "npc_b" } }
   );
 
   assert.deepEqual(
-    provider.next({ observation, lastResult: { tool: "move_to", status: "ok" } }),
+     provider.next({ observation, lastResult: { tool: "move_to", ok: true, status: "ok" } }),
     { tool: "say", args: { target: "npc_b", text: "hi npc_b, are you free?" } }
   );
 
   assert.deepEqual(
-    provider.next({ observation, lastResult: { tool: "say", status: "busy" } }),
+     provider.next({ observation, lastResult: { tool: "say", ok: false, status: "busy" } }),
     { tool: "wait", args: { ticks: 20, reason: "npc_b was busy" } }
   );
 
   assert.deepEqual(
-    provider.next({ observation, lastResult: { tool: "wait", status: "ok" } }),
+     provider.next({ observation, lastResult: { tool: "wait", ok: true, status: "ok" } }),
     { tool: "say", args: { target: "npc_b", text: "checking again when you are ready" } }
   );
 
   assert.deepEqual(
-    provider.next({ observation, lastResult: { tool: "say", status: "available" } }),
+     provider.next({ observation, lastResult: { tool: "say", ok: true, status: "available" } }),
     { tool: "remember", args: { note: "npc_b responded after one busy turn" } }
   );
 });
@@ -656,7 +680,7 @@ test("mutual providers keep actor-specific deterministic order", () => {
 
   assert.deepEqual(
     providers.npc_b.next({
-      lastResult: { tool: "reply_to", status: "busy_reply" }
+       lastResult: { tool: "reply_to", ok: false, status: "busy_reply" }
     }),
     {
       tool: "look_at_actor",
@@ -904,11 +928,12 @@ test("executeMutualTool records converse dispatcher steps with args and provider
     }
   });
 
-  assert.deepEqual(result, {
-    status: "said_to_target",
-    utterance: "Jun, check the marker by the chest.",
-    targetId: "npc_b"
-  });
+  assert.equal(result.tool, "converse");
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "said_to_target");
+  assert.equal(result.utterance, "Jun, check the marker by the chest.");
+  assert.equal(result.targetId, "npc_b");
+  assert.equal(typeof result.durationMs, "number");
   assert.deepEqual(transcriptSteps, [
     {
       actor: "npc_a",
@@ -932,7 +957,7 @@ test("executeMutualTool records converse dispatcher steps with args and provider
   ]);
 });
 
-test("executeMutualTool records failures before rethrowing tool errors", async () => {
+test("executeMutualTool returns a failed ToolResult when a handler throws", async () => {
   const runtimeState = createMutualRuntimeState({
     busyRepliesBeforeAvailable: 0,
     markerItemName: "paper"
@@ -940,55 +965,37 @@ test("executeMutualTool records failures before rethrowing tool errors", async (
   const actor = createFakeBot("npc_a", 0);
   const transcriptSteps: MutualStepRecord[] = [];
 
-  await assert.rejects(
-    executeMutualTool({
-      proposal: {
-        tool: "move_to",
-        args: {
-          target: "npc_b"
-        },
-        why: "I should get closer first."
-      },
-      actor,
-      runtimeState,
-      observation: {
-        visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
-      },
-      transcript: {
-        recordStep(step) {
-          transcriptSteps.push(step);
-        }
-      },
-      handlers: {
-        async move_to() {
-          throw new Error("movement blocked");
-        }
-      }
-    }),
-    /movement blocked/
-  );
-
-  assert.deepEqual(transcriptSteps, [
-    {
-      actor: "npc_a",
-      observation: {
-        visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
-      },
-      actorAction: { tool: "move_to" },
-      actorArgs: {
+  const result = await executeMutualTool({
+    proposal: {
+      tool: "move_to",
+      args: {
         target: "npc_b"
       },
-      providerMeta: {
-        why: "I should get closer first."
-      },
-      failure: {
-        message: "movement blocked"
-      },
-      result: {
-        status: "failed"
+      why: "I should get closer first."
+    },
+    actor,
+    runtimeState,
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
+    },
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step);
+      }
+    },
+    handlers: {
+      async move_to() {
+        throw new Error("movement blocked");
       }
     }
-  ]);
+  });
+
+  assert.equal(result.tool, "move_to");
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "failed");
+  assert.equal(result.message, "movement blocked");
+  assert.equal(typeof result.durationMs, "number");
+  assert.deepEqual(transcriptSteps, []);
 });
 
 test("runMutualLoop awaits async providers and records four live dialogue turns before movement", async () => {
@@ -1048,7 +1055,7 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
       return proposal;
     }
   };
-  const lastResults = new Map<"npc_a" | "npc_b", { tool: string; status: string } | null>([
+   const lastResults = new Map<"npc_a" | "npc_b", ToolResult | null>([
     ["npc_a", null],
     ["npc_b", null]
   ]);
@@ -1084,10 +1091,10 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
       lastResult(actorId) {
         return lastResults.get(actorId) ?? null;
       },
-      async execute(actorId, proposal, observation) {
-        const actor = actors[actorId];
-        const result = await executeMutualTool({
-          proposal,
+       async execute(actorId, proposal, observation) {
+         const actor = actors[actorId];
+         const result = await executeMutualTool({
+           proposal,
           actor,
           runtimeState,
           observation,
@@ -1126,15 +1133,16 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
           }
         });
 
-        lastResults.set(actorId, {
-          tool: proposal.tool,
-          status: String((result as { status: string }).status)
-        });
+         lastResults.set(actorId, {
+           tool: proposal.tool,
+           ok: result.ok,
+           status: result.status
+         });
 
-        return result;
-      }
-    }
-  });
+         return toJsonValue(result);
+       }
+     }
+   });
 
   assert.equal(result.status, "success");
   assert.equal(result.categories.conversationTurnState, "passed");
@@ -1246,28 +1254,43 @@ test("agent loop records six steps and succeeds when remember changes the next a
           memory: []
         };
       },
-      async move_to() {
-        return { status: "arrived" };
-      },
-      async say({ args }) {
-        if (args.text === "hi npc_b, are you free?") {
-          return { status: "busy", reason: "npc_b is busy" };
-        }
+       async move_to() {
+         return { tool: "move_to", ok: true, status: "arrived" };
+        },
+        async collect_logs() {
+          return { tool: "collect_logs", ok: true, status: "collected" };
+        },
+        async craft_item() {
+          return { tool: "craft_item", ok: true, status: "crafted" };
+        },
+        async inspect_chest() {
+          return { tool: "inspect_chest", ok: true, status: "inspected" };
+        },
+        async deposit_shared() {
+          return { tool: "deposit_shared", ok: true, status: "deposited" };
+        },
+        async withdraw_shared() {
+          return { tool: "withdraw_shared", ok: true, status: "withdrew" };
+        },
+        async say({ args }) {
+          if (args.text === "hi npc_b, are you free?") {
+            return { tool: "say", ok: false, status: "busy", reason: "npc_b is busy" };
+         }
 
-        return { status: "delivered", reason: "ready now" };
-      },
-      async wait() {
-        return { status: "waited", ticks: 20 };
-      },
-      async remember({ args }) {
-        return { status: "remembered", note: String(args.note) };
-      }
-    }
-  });
+         return { tool: "say", ok: true, status: "delivered", reason: "ready now" };
+       },
+       async wait() {
+         return { tool: "wait", ok: true, status: "waited", ticks: 20 };
+       },
+       async remember({ args }) {
+         return { tool: "remember", ok: true, status: "remembered", note: String(args.note) };
+       }
+     }
+   });
 
   assert.deepEqual(final, {
     status: "success",
-    why: "runtime-owned busy result changed the next action"
+    why: "npc_b responded after one busy turn"
   });
   assert.deepEqual(
     transcriptSteps.map((step) => step.tool),
@@ -1275,14 +1298,18 @@ test("agent loop records six steps and succeeds when remember changes the next a
   );
   assert.equal(transcriptSteps[0].actor, "npc_a");
   assert.deepEqual(transcriptSteps[1].args, { target: "npc_b" });
-  assert.deepEqual(transcriptSteps[2].result, {
-    status: "busy",
-    reason: "npc_b is busy"
-  });
-  assert.deepEqual(transcriptSteps[5].result, {
-    status: "remembered",
-    note: "npc_b responded after one busy turn"
-  });
+   assert.deepEqual(transcriptSteps[2].result, {
+     tool: "say",
+     ok: false,
+     status: "busy",
+     reason: "npc_b is busy"
+   });
+   assert.deepEqual(transcriptSteps[5].result, {
+     tool: "remember",
+     ok: true,
+     status: "remembered",
+     note: "npc_b responded after one busy turn"
+   });
 });
 
 test("finalizeRunProbe preserves a successful transcript result when cleanup fails later", () => {

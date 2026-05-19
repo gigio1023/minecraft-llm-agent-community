@@ -1,4 +1,6 @@
-export const allowedTools = ["observe", "move_to", "say", "wait", "remember"] as const;
+import { runtimePrimitiveIds } from "../gameplay/primitives/registry.js";
+
+export const allowedTools = runtimePrimitiveIds;
 
 export type AllowedTool = (typeof allowedTools)[number];
 

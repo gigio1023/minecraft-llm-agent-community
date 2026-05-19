@@ -24,10 +24,16 @@ export type Proposal = {
   why?: string;
 };
 
-export type LastResult = {
+export type ToolResultStatus = "done" | "blocked" | "invalid" | "unavailable" | "transient" | "failed" | string;
+
+export type ToolResult = {
   tool: string;
-  status: string;
-  ok?: boolean;
+  ok: boolean;
+  status: ToolResultStatus;
+  message?: string;
+  observation?: unknown;
+  durationMs?: number;
+  [key: string]: unknown;
 };
 
 export type MutualStepRecord = {
