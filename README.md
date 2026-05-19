@@ -49,11 +49,13 @@ The published [Installation Document](https://naem1023.github.io/minecraft-llm-a
 still describes the older Voyager/Fabric/manual-server path. It is useful as
 background only and does not describe the active headless probe setup below.
 
-## Headless Mineflayer Probe
+## Headless Mineflayer Probes
 
 The active direction is a tiny headless probe, not the old Voyager eval loop.
 
 Prerequisites: Bun and Docker with Compose available locally.
+
+### Probe v0: single bounded loop
 
 ```sh
 bun install --cwd probe
@@ -68,6 +70,34 @@ a transcript JSON artifact under `data/evidence/`.
 
 No manual Minecraft client, Fabric, Forge, or live OpenAI provider is required
 for this first proof.
+
+### Probe v1: mutual NPC interaction
+
+```sh
+bun install --cwd probe
+bun run --cwd probe typecheck
+./scripts/run-mutual-interaction-probe.sh
+```
+
+This second proof keeps the deterministic provider, but extends the runtime so
+both bots act. The live transcript now checks three categories:
+
+1. conversation and turn state
+2. spatial attention and approach
+3. material handoff through a dropped `paper` marker
+
+The latest successful live proof wrote:
+
+`data/evidence/mutual_npc_interaction_probe_v1-1779166592708.json`
+
+That run finished with:
+
+- `conversationTurnState: passed`
+- `spatialAttentionApproach: passed`
+- `materialEnvironmentHandoff: passed`
+
+The detailed review handoff and preserved transcript copy live under
+`docs/superpowers/reports/`.
 
 ## Live NPC Dialogue Probe
 

@@ -1,18 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import type { MutualJsonValue, MutualStepRecord } from "./types.js";
-
-type TranscriptFinal = Record<string, MutualJsonValue> & {
-  status: string;
-  why: string;
-};
-
-type CreateMutualTranscriptOptions = {
-  evidenceDir: string;
-  probeId: string;
-  bots: string[];
-};
+import type {
+  CreateMutualTranscriptOptions,
+  MutualCategories,
+  MutualStepRecord,
+  TranscriptFinal
+} from "./types.js";
 
 function snapshot<T>(value: T): T {
   return structuredClone(value);
@@ -21,22 +15,28 @@ function snapshot<T>(value: T): T {
 export function createMutualTranscript({
   evidenceDir,
   probeId,
-  bots
+  bots,
+  personas
 }: CreateMutualTranscriptOptions) {
-  const transcriptBots = snapshot(bots);
+  const transcriptBots = bots ? snapshot(bots) : undefined;
+  const transcriptPersonas = personas ? snapshot(personas) : undefined;
   const steps: MutualStepRecord[] = [];
 
   return {
     recordStep(step: MutualStepRecord) {
       steps.push(snapshot(step));
     },
-    async write(final: TranscriptFinal) {
+    async write(categoriesOrFinal: MutualCategories | TranscriptFinal, maybeFinal?: TranscriptFinal) {
       await fs.mkdir(evidenceDir, { recursive: true });
 
       const outputPath = path.join(evidenceDir, `${probeId}-${Date.now()}.json`);
+      const categories = maybeFinal ? snapshot(categoriesOrFinal as MutualCategories) : undefined;
+      const final = maybeFinal ? maybeFinal : (categoriesOrFinal as TranscriptFinal);
       const payload = {
         probe: probeId,
-        bots: transcriptBots,
+        ...(transcriptBots ? { bots: transcriptBots } : {}),
+        ...(transcriptPersonas ? { personas: transcriptPersonas } : {}),
+        ...(categories ? { categories } : {}),
         steps,
         final: snapshot(final)
       };

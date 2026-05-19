@@ -170,7 +170,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
             recentUtterances: runtimeState.recentUtterances(),
             marker: {
               seen: true,
-              itemName: runtimeState.markerItemName
+              itemName: runtimeState.markerItemName()
             }
           };
         },

@@ -1,3 +1,12 @@
+export type MutualActorId = "npc_a" | "npc_b";
+
+export type InteractionCategory =
+  | "conversationTurnState"
+  | "spatialAttentionApproach"
+  | "materialEnvironmentHandoff";
+
+export type CategoryVerdict = "passed" | "failed";
+
 export type MutualJsonValue =
   | string
   | number
@@ -6,21 +15,34 @@ export type MutualJsonValue =
   | MutualJsonValue[]
   | { [key: string]: MutualJsonValue };
 
+export type JsonValue = MutualJsonValue;
+export type JsonObject = { [key: string]: JsonValue };
+
 export type Proposal = {
   tool: string;
   args?: Record<string, unknown>;
   why?: string;
 };
 
+export type LastResult = {
+  tool: string;
+  status: string;
+  ok?: boolean;
+};
+
 export type MutualStepRecord = {
-  actor: string;
-  observation: MutualJsonValue;
+  category?: InteractionCategory;
+  actor?: string;
+  observation?: MutualJsonValue;
   actorAction: {
+    actor?: MutualActorId | string;
     tool: string;
+    result?: string;
   };
-  result: MutualJsonValue;
+  result?: MutualJsonValue;
   actorArgs?: Record<string, MutualJsonValue>;
   memoryNote?: {
+    actor?: MutualActorId | string;
     note: string;
   };
   providerMeta?: {
@@ -30,4 +52,29 @@ export type MutualStepRecord = {
     message: string;
     [key: string]: MutualJsonValue;
   };
+  targetObservation?: JsonObject;
+  targetResponse?: {
+    actor: MutualActorId;
+    tool: string;
+    result: string;
+  };
+  worldStateChange?: JsonObject;
+  causedNext?: {
+    actor: MutualActorId;
+    tool: string;
+  };
+};
+
+export type TranscriptFinal = Record<string, MutualJsonValue> & {
+  status: string;
+  why: string;
+};
+
+export type MutualCategories = Record<InteractionCategory, CategoryVerdict>;
+
+export type CreateMutualTranscriptOptions = {
+  evidenceDir: string;
+  probeId: string;
+  bots?: string[];
+  personas?: Record<MutualActorId, string>;
 };

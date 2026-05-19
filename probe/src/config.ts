@@ -62,7 +62,10 @@ export function loadProbeConfig(): ProbeConfig {
 }
 
 export function loadMutualProbeConfig(): ProbeConfig {
-  return loadProbeConfig();
+  return {
+    ...loadProbeConfig(),
+    probeId: "mutual_npc_interaction_probe_v1"
+  };
 }
 
 export function buildServerEnv(config: ProbeConfig) {

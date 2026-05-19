@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
 
+import minecraftData from "minecraft-data";
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
 import {
   buildDialogueContext,
@@ -9,15 +10,23 @@ import {
   type DialogueContextOutput,
   type DialogueObservation,
   type DialogueTranscriptEntry,
-  mutualPersonas
+  mutualPersonas as dialogueMutualPersonas
 } from "../src/mutual/dialogueContext.js";
-import type { ProviderInput } from "../src/mutual/provider.js";
+import { mutualPersonas as scenarioMutualPersonas } from "../src/mutual/personas.js";
+import { createMutualProviders } from "../src/mutual/provider.js";
 import { parseProviderAction } from "../src/mutual/providerSchema.js";
-import { finalizeRunProbe } from "../src/runProbe.js";
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 import { converse } from "../src/mutual/tools/converse.js";
-import { executeMutualTool } from "../src/mutual/tools/index.js";
+import { dropItem } from "../src/mutual/tools/dropItem.js";
+import {
+  executeMutualTool,
+  validateMutualProposal
+} from "../src/mutual/tools/index.js";
+import { observeWorld } from "../src/mutual/tools/observeWorld.js";
+import { replyTo } from "../src/mutual/tools/replyTo.js";
+import type { MutualStepRecord, Proposal } from "../src/mutual/types.js";
 import { runMutualLoop } from "../src/mutual/mutualLoop.js";
+import { finalizeRunProbe } from "../src/runProbe.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -43,11 +52,21 @@ function createFakeBot(username: string, x: number) {
   const chatLog: string[] = [];
   const lookTargets: Array<{ x: number; y: number; z: number }> = [];
   const controls: Array<{ control: string; state: boolean }> = [];
+  const entities: Record<string, { name?: string; displayName?: string; metadata?: unknown[] }> = {};
   const position = createPosition(x);
+  const registry = {
+    itemsByName: {
+      paper: {
+        id: minecraftData("1.21.11").itemsByName.paper.id
+      }
+    }
+  };
 
   return {
     username,
     entity: { position },
+    entities,
+    registry,
     chatLog,
     lookTargets,
     controls,
@@ -67,12 +86,128 @@ function createFakeBot(username: string, x: number) {
   };
 }
 
-type AssertTrue<T extends true> = T;
-type ProviderInputRequiresPersona = AssertTrue<
-  undefined extends ProviderInput["persona"] ? false : true
->;
-const providerInputRequiresPersona: ProviderInputRequiresPersona = true;
-void providerInputRequiresPersona;
+function createFakeMutualBots() {
+  return {
+    npc_a: { username: "npc_a" },
+    npc_b: { username: "npc_b" }
+  };
+}
+
+function createFakeMutualTools() {
+  let executionCount = 0;
+
+  return {
+    lastResult() {
+      return null;
+    },
+    validateProposal(proposal: Proposal) {
+      return proposal;
+    },
+    async observe_world() {
+      return {
+        status: "ok",
+        heardMessages: [],
+        markerEntitySeen: executionCount >= 2
+      };
+    },
+    async execute(): Promise<MutualStepRecord> {
+      executionCount += 1;
+
+      if (executionCount === 1) {
+        return {
+          category: "conversationTurnState",
+          actorAction: { actor: "npc_a", tool: "say", result: "said" },
+          targetResponse: { actor: "npc_b", tool: "reply_to", result: "busy_reply" }
+        };
+      }
+
+      if (executionCount === 2) {
+        return {
+          category: "spatialAttentionApproach",
+          actorAction: { actor: "npc_b", tool: "look_at_actor", result: "looked_at_target" },
+          worldStateChange: { arrived: true }
+        };
+      }
+
+      return {
+        category: "materialEnvironmentHandoff",
+        actorAction: { actor: "npc_a", tool: "drop_item", result: "dropped" },
+        targetObservation: { markerEntitySeen: true },
+        targetResponse: { actor: "npc_b", tool: "reply_to", result: "replied" },
+        worldStateChange: { itemName: "paper" },
+        causedNext: { actor: "npc_b", tool: "reply_to" }
+      };
+    }
+  };
+}
+
+function createPathfindingBot(username: string, x: number) {
+  const position = createPosition(x);
+  const goals: string[] = [];
+
+  return {
+    username,
+    entity: { position },
+    goals,
+    async lookAt() {
+      throw new Error("moveTo should use pathfinder when available");
+    },
+    setControlState() {
+      throw new Error("moveTo should not fall back to manual controls in this test");
+    },
+    pathfinder: {
+      async goto() {
+        goals.push("goal-near");
+        position.x = 1.5;
+      }
+    }
+  };
+}
+
+function createInventoryFakeBot(username: string, options?: { delayedEntityMs?: number }) {
+  const inventoryCalls: Array<{ slot: number; item: unknown }> = [];
+  const tossCalls: Array<{ itemId: number; count: number }> = [];
+  const entities: Record<string, { name?: string; displayName?: string; metadata?: unknown[] }> = {};
+
+  return {
+    username,
+    version: "1.21.11",
+    entities,
+    inventoryCalls,
+    tossCalls,
+    creative: {
+      async setInventorySlot(slot: number, item: unknown) {
+        inventoryCalls.push({ slot, item });
+      }
+    },
+    async toss(itemId: number, _metadata: unknown, count: number) {
+      tossCalls.push({ itemId, count });
+      const addEntity = () => {
+        entities.marker = {
+          name: "item",
+          displayName: "Item",
+          metadata: [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            { itemId, itemCount: count }
+          ]
+        };
+      };
+
+      if (options?.delayedEntityMs) {
+        setTimeout(addEntity, options.delayedEntityMs);
+      } else {
+        addEntity();
+      }
+    }
+  };
+}
 
 test("dialogue state exposes busy then available and rejects unsupported tools", () => {
   const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 1 });
@@ -92,7 +227,7 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
 test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
   const allowedTools = ["converse", "wait"];
   const persona: { name: string; role: string; style: string; objective: string } = {
-    ...mutualPersonas.npc_a
+    ...dialogueMutualPersonas.npc_a
   };
   const visibleActors = [{ id: "npc_b", distance: 2, busy: false }];
   const marker = {
@@ -331,7 +466,7 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
 
   const proposal = await provider.next({
     actorId: "npc_a",
-    persona: mutualPersonas.npc_a,
+    persona: dialogueMutualPersonas.npc_a,
     observation: {
       visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
       lastActionResult: { status: "available" }
@@ -385,7 +520,7 @@ test("createOpenAICodexProvider stops after exhausting malformed JSON retries", 
     Promise.resolve(
       provider.next({
         actorId: "npc_a",
-        persona: mutualPersonas.npc_a,
+        persona: dialogueMutualPersonas.npc_a,
         observation: {
           visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
           lastActionResult: { status: "available" }
@@ -447,7 +582,7 @@ test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", 
     Promise.resolve(
       provider.next({
         actorId: "npc_a",
-        persona: mutualPersonas.npc_a,
+        persona: dialogueMutualPersonas.npc_a,
         observation: {
           visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
           lastActionResult: { status: "available" }
@@ -503,6 +638,155 @@ test("deterministic provider follows the planned runtime contract sequence", () 
   );
 });
 
+test("mutual providers keep actor-specific deterministic order", () => {
+  const providers = createMutualProviders();
+
+  assert.equal(scenarioMutualPersonas.npc_a.name, "Mara");
+  assert.equal(scenarioMutualPersonas.npc_b.name, "Jun");
+
+  assert.deepEqual(providers.npc_a.next({ lastResult: null }), {
+    tool: "observe_world",
+    args: {}
+  });
+
+  assert.deepEqual(providers.npc_b.next({ lastResult: null }), {
+    tool: "reply_to",
+    args: { source: "npc_a", text: "Busy. Give me a second." }
+  });
+
+  assert.deepEqual(
+    providers.npc_b.next({
+      lastResult: { tool: "reply_to", status: "busy_reply" }
+    }),
+    {
+      tool: "look_at_actor",
+      args: { target: "npc_a" }
+    }
+  );
+});
+
+test("runtime state owns heard chat, busy replies, and marker visibility", () => {
+  const state = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 1,
+    markerItemName: "paper"
+  });
+
+  state.recordHeardMessage("npc_b", {
+    from: "npc_a",
+    text: "Jun, can you confirm the marker?"
+  });
+
+  assert.deepEqual(state.consumeHeardMessages("npc_b"), [
+    {
+      from: "npc_a",
+      text: "Jun, can you confirm the marker?"
+    }
+  ]);
+  assert.equal(state.consumeHeardMessages("npc_b").length, 0);
+  assert.deepEqual(state.requestReply("npc_b", "npc_a"), {
+    status: "busy",
+    reason: "npc_b is busy"
+  });
+  state.markDroppedItem("npc_a", "paper");
+  assert.equal(state.hasDroppedMarker(), true);
+  assert.equal(state.markerItemName(), "paper");
+});
+
+test("mutual proposal validation rejects unsupported tools", () => {
+  assert.deepEqual(validateMutualProposal({ tool: "reply_to", args: { source: "npc_a" } }), {
+    tool: "reply_to",
+    args: { source: "npc_a" }
+  });
+  assert.throws(
+    () => validateMutualProposal({ tool: "drop_database", args: {} }),
+    /Unsupported mutual tool/
+  );
+});
+
+test("mutual observe and reply tools expose heard chat and busy reply behavior", async () => {
+  const actor = createFakeBot("npc_b", 2);
+  const source = createFakeBot("npc_a", 0);
+  const memory = createMemory(4);
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 1,
+    markerItemName: "paper"
+  });
+
+  actor.entities.marker = {
+    name: "item",
+    displayName: "paper"
+  };
+  runtimeState.recordHeardMessage("npc_b", {
+    from: "npc_a",
+    text: "Jun, can you confirm the marker?"
+  });
+
+  assert.deepEqual(
+    observeWorld({ actor, target: source, runtimeState, memory }),
+    {
+      status: "ok",
+      visibleActors: [{ id: "npc_a", distance: 2 }],
+      heardMessages: [{ from: "npc_a", text: "Jun, can you confirm the marker?" }],
+      markerEntitySeen: true,
+      memory: []
+    }
+  );
+
+  assert.deepEqual(
+    await replyTo({
+      actor,
+      source,
+      runtimeState,
+      text: "Busy. Give me a second."
+    }),
+    {
+      status: "busy_reply",
+      reason: "npc_b is busy"
+    }
+  );
+  assert.deepEqual(actor.chatLog, ["Busy. Give me a second."]);
+});
+
+test("observeWorld detects a dropped paper item from entity metadata", () => {
+  const actor = createFakeBot("npc_b", 2);
+  const source = createFakeBot("npc_a", 0);
+  const memory = createMemory(4);
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 1,
+    markerItemName: "paper"
+  });
+  const paperId = minecraftData("1.21.11").itemsByName.paper.id;
+
+  actor.entities.marker = {
+    name: "item",
+    displayName: "Item",
+    metadata: [null, null, null, null, null, null, null, null, { itemId: paperId, itemCount: 1 }]
+  };
+
+  assert.equal(
+    observeWorld({ actor, target: source, runtimeState, memory }).markerEntitySeen,
+    true
+  );
+});
+
+test("mutual loop makes npc_b act after npc_a changes chat or world state", async () => {
+  const transcriptSteps: MutualStepRecord[] = [];
+
+  const result = await runMutualLoop({
+    bots: createFakeMutualBots(),
+    providers: createMutualProviders(),
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step);
+      }
+    },
+    tools: createFakeMutualTools()
+  });
+
+  assert.equal(result.status, "success");
+  assert.ok(transcriptSteps.some((step) => step.targetResponse?.actor === "npc_b"));
+});
+
 test("tool modules expose observation, movement, dialogue, waiting, and memory behavior", async () => {
   const actor = createFakeBot("npc_a", 0);
   const target = createFakeBot("npc_b", 2);
@@ -519,7 +803,13 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
 
   assert.deepEqual(
     await moveTo({ actor, target, targetId: "npc_b", durationMs: 0 }),
-    { status: "arrived", distance: 0.75 }
+    {
+      status: "arrived",
+      distance: 0.75,
+      beforeDistance: 2,
+      afterDistance: 0.75,
+      arrived: true
+    }
   );
   assert.deepEqual(actor.controls, [
     { control: "forward", state: true },
@@ -591,14 +881,7 @@ test("executeMutualTool records converse dispatcher steps with args and provider
     markerItemName: "paper"
   });
   const actor = createFakeBot("npc_a", 0);
-  const transcriptSteps: Array<{
-    actor: string;
-    observation: unknown;
-    actorAction: { tool: string };
-    actorArgs?: Record<string, unknown>;
-    providerMeta?: { why: string };
-    result: unknown;
-  }> = [];
+  const transcriptSteps: MutualStepRecord[] = [];
 
   const result = await executeMutualTool({
     proposal: {
@@ -655,12 +938,7 @@ test("executeMutualTool records failures before rethrowing tool errors", async (
     markerItemName: "paper"
   });
   const actor = createFakeBot("npc_a", 0);
-  const transcriptSteps: Array<{
-    actorAction: { tool: string };
-    actorArgs?: Record<string, unknown>;
-    failure?: { message: string };
-    result: unknown;
-  }> = [];
+  const transcriptSteps: MutualStepRecord[] = [];
 
   await assert.rejects(
     executeMutualTool({
@@ -722,12 +1000,7 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
     npc_a: createFakeBot("npc_a", 0),
     npc_b: createFakeBot("npc_b", 2)
   };
-  const transcriptSteps: Array<{
-    actor: string;
-    actorAction: { tool: string };
-    actorArgs?: Record<string, unknown>;
-    result: unknown;
-  }> = [];
+  const transcriptSteps: MutualStepRecord[] = [];
   const liveProposals = [
     {
       tool: "converse",
@@ -884,6 +1157,63 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
       "Understood. I will watch for it."
     ]
   );
+});
+
+test("moveTo prefers pathfinder and returns before and after distance details", async () => {
+  const actor = createPathfindingBot("npc_a", 0);
+  const target = createPathfindingBot("npc_b", 3);
+
+  assert.deepEqual(await moveTo({ actor, target, targetId: "npc_b" }), {
+    status: "arrived",
+    distance: 1.5,
+    beforeDistance: 3,
+    afterDistance: 1.5,
+    arrived: true
+  });
+  assert.deepEqual(actor.goals, ["goal-near"]);
+});
+
+test("dropItem seeds the marker item and records dropped marker state", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 1,
+    markerItemName: "paper"
+  });
+  const actor = createInventoryFakeBot("npc_a");
+  const expectedPaperId = minecraftData(actor.version).itemsByName.paper.id;
+
+  assert.deepEqual(
+    await dropItem({
+      actor,
+      runtimeState,
+      itemName: "paper",
+      count: 1
+    }),
+    {
+      status: "dropped",
+      itemName: "paper",
+      count: 1
+    }
+  );
+  assert.equal(runtimeState.hasDroppedMarker(), true);
+  assert.equal(actor.inventoryCalls.length, 1);
+  assert.deepEqual(actor.tossCalls, [{ itemId: expectedPaperId, count: 1 }]);
+});
+
+test("dropItem waits until the dropped marker becomes visible before resolving", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 1,
+    markerItemName: "paper"
+  });
+  const actor = createInventoryFakeBot("npc_a", { delayedEntityMs: 30 });
+
+  await dropItem({
+    actor,
+    runtimeState,
+    itemName: "paper",
+    count: 1
+  });
+
+  assert.equal(actor.entities.marker?.name, "item");
 });
 
 test("agent loop records six steps and succeeds when remember changes the next action", async () => {

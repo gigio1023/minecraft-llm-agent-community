@@ -198,3 +198,51 @@ test("writes mutual transcript steps from dispatcher execution including memory 
 
   await fs.rm(evidenceDir, { recursive: true, force: true });
 });
+
+test("writes a mutual transcript artifact with personas, category verdicts, and causal steps", async () => {
+  const evidenceDir = path.resolve(
+    "probe/test-artifacts",
+    `mutual-transcript-personas-${process.pid}-${Date.now()}`
+  );
+
+  await fs.rm(evidenceDir, { recursive: true, force: true });
+
+  const transcript = createMutualTranscript({
+    evidenceDir,
+    probeId: "mutual_npc_interaction_probe_v1",
+    personas: {
+      npc_a: "Mara, anxious quartermaster",
+      npc_b: "Jun, distracted runner"
+    }
+  });
+
+  transcript.recordStep({
+    category: "conversationTurnState",
+    actorAction: { actor: "npc_a", tool: "say", result: "said" },
+    targetObservation: { actor: "npc_b", heardText: "Jun, can you confirm the marker?" },
+    targetResponse: { actor: "npc_b", tool: "reply_to", result: "busy_reply" },
+    causedNext: { actor: "npc_a", tool: "wait" }
+  });
+
+  const outputPath = await transcript.write(
+    {
+      conversationTurnState: "passed",
+      spatialAttentionApproach: "passed",
+      materialEnvironmentHandoff: "passed"
+    },
+    {
+      status: "success",
+      why: "both NPCs responded to each other's dialogue and world actions"
+    }
+  );
+
+  const output = JSON.parse(await fs.readFile(outputPath, "utf8"));
+
+  assert.equal(output.probe, "mutual_npc_interaction_probe_v1");
+  assert.equal(output.personas.npc_a, "Mara, anxious quartermaster");
+  assert.equal(output.categories.materialEnvironmentHandoff, "passed");
+  assert.equal(output.steps[0].targetResponse.tool, "reply_to");
+  assert.equal(output.final.status, "success");
+
+  await fs.rm(evidenceDir, { recursive: true, force: true });
+});
