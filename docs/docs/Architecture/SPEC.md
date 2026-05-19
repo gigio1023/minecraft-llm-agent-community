@@ -4,88 +4,48 @@ sidebar_position: 1
 
 # Architecture Specification
 
-**Date:** 2026-05-20
+**Dream of One** is designed to simulate an emergent NPC society. This document outlines the technical pillars required to move beyond simple chatbots and create agents with real **Gameplay Competence** and **Social Pressure**.
 
-## 1. Goal
+## 1. Design Philosophy
 
-Build a minimal viable "living NPC society" in Minecraft using a headless probe. Success requires three pillars:
-1. **Gameplay Competence:** Play Minecraft like an expert.
-2. **Social Pressure:** Drive behavior via roles, resources, shared storage, danger, and obligations.
-3. **Resilient Architecture:** Survive long simulations using robust transcripts, memory, and compaction.
+A believable society cannot be built with "Persona Prompts" alone. It requires:
+- **Expert Play**: Agents must handle Minecraft's mechanics like skilled players.
+- **Material Scarcity**: Cooperation and conflict should emerge from the need for finite resources (wood, coal, iron).
+- **Social Framework**: Roles, shared storage, and social obligations provide the "glue" for long-term interactions.
 
-Adding more persona prompts will not achieve this.
+## 2. Core Subsystems
 
-## 2. Core Decisions
+### A. The Bounded Runtime
+To ensure stability, the runtime (built on **Mineflayer**) owns the "Reality" of the world. It validates every action, handles timeouts, and records every state change.
+- **Single Active Action**: Only one physical action (like mining or moving) can be active at a time per agent to prevent race conditions.
+- **Post-Action Refresh**: After every action, the runtime provides a fresh observation of the agent's inventory and surroundings.
 
-**Why past attempts failed:** The runtime didn't treat Minecraft like a game. There was no concrete curriculum, no trusted gameplay primitives, weak anti-repeat policies, and no social pressure (like shared storage or scarcity).
+### B. Pressure & Intent Loop
+Instead of open-ended planning, our agents operate on a **Pressure-Intent** model:
+1. **Pressures**: The environment generates internal "pressures" (e.g., *Hunger*, *Shared Stash Shortage*, *Hostile Nearby*).
+2. **Intents**: The LLM compiles these pressures into a high-level **Intent** (e.g., "Collect wood for the shared chest").
+3. **Execution**: The intent is carried out using a strictly validated registry of **Tools** (e.g., `collectLogs`, `craftItem`).
 
-**The new direction:** NPCs must gather, craft, store, divide roles, cooperate, and occasionally conflict, all while maintaining long-term memory.
+### C. Social Simulation
+- **Role Contracts**: NPCs have specific roles (Gatherer, Crafter, Scout, Guard) with corresponding permissions and priorities.
+- **Shared Storage**: The settlement uses shared chests, creating a mutual dependency between NPCs.
+- **Hostile Entities**: A single, bounded hostile NPC act as a source of "dramatic pressure," forcing the cooperative NPCs to react to danger.
 
-## 3. Research Takeaways
+## 3. Memory & Transcripts
 
-- **Voyager:** Take its one-task-at-a-time curriculum, trusted primitives, task verification, and early-game progression.
-- **mc-multimodal-agent:** Take its post-action refresh, layered memory, blocker tracking, and loop detection.
-- **mineflayer-chatgpt:** Take its event-driven brain, role restrictions, team bulletin, and strictly bounded hostile roles.
-- **mindcraft-ce:** Take its single-action gate, interruption policies, and busy-aware conversation scheduling.
-- **opencode & codex:** Take the part-based transcript, thread-store abstraction, compaction checkpoints, and explicit tool records.
+Long-running simulations require a sophisticated memory architecture:
+- **Part-Based Transcripts**: Every turn is recorded as a structured record (Observation + Intent + Tool Call + Result).
+- **Compaction**: As the session grows, the runtime "compacts" old history into a summary while keeping a "raw tail" of recent events to stay within the LLM's context window.
+- **Memory Layers**:
+    - **Episodic**: Recent experiences and successes/failures.
+    - **Procedural**: Knowledge of how to perform specific workflows (e.g., smelting iron).
+    - **Semantic**: Shared knowledge (e.g., "Where is the main storage?").
 
-## 4. Target State
+## 4. Key References
 
-A minimal society consists of:
-- **3-4 Cooperative NPCs:** Roles include gatherer, crafter, scout, and guard.
-- **1 Hostile NPC:** Bounded by strict cooldowns, short leashes, and role-based attack policies.
-- **Social Requirements:** Shared storage, public/private resource distinction, obligations, scarcity, and busy/idle-aware interactions.
-
-## 5. Architectural Principles
-
-1. **Gameplay First, Persona Second:** Reliable seed skills, primitives, and resource models must precede persona text.
-2. **Runtime Owns Reality:** The runtime handles validation, timeouts, storage ledgers, and hostility bounds. The LLM only handles intent, short-term plans, and utterance style.
-3. **Society Emerges From Pressure:** Cooperation stems from shared stash upkeep and crafting dependencies, not prompts.
-4. **Real Session Architecture:** Long runs require part-based transcripts, canonical replay history, and replacement-history compaction checkpoints.
-
-## 6. Domain Model
-
-- **Agent Thread:** Independent thread per NPC (role, current task, recent events, mailbox).
-- **Shared Settlement State:** Known shared chests, workstation registry, resource summary, and tension state.
-- **Transcript Parts:** Structured execution records (validated args, diffs, status).
-- **Memory Layers:** Episodic (recent experiences), Procedural (known workflows), Semantic (world anchors), and Working (current blockers).
-
-## 7. Gameplay Competence
-
-- **Bootstrap/Recovery Scaffold:** Progression spines (e.g., `Collect 4 logs`, `Craft wooden pickaxe`) trigger during fresh starts or severe scarcity. 
-- **Pressure & Intent Loop:** The runtime calculates compact pressures (e.g., shared shortage, hostile risk). The LLM selects a single, multi-turn intent executed via bounded skills.
-- **Primitives & Skills:** Strictly TypeScript-owned helpers (`mineBlock`, `craftItem`) and curated seed skills (`collectLogs`, `depositSharedItems`).
-
-## 8. Social Simulation
-
-- **Role Contracts:** Define allowed tools, keep-item policies, and hostility bounds.
-- **Team Bulletin:** A shared ledger showing current tasks, blockers, and recent events.
-- **Conversation Scheduler:** Enforces busy/idle delays and batches inbound messages.
-- **Hostile Policy:** One hostile agent only. Strictly limited by short patrol radii and retreat conditions.
-
-## 9. Runtime Loop
-
-Event-driven execution: 
-`Observe state -> Merge mailbox/bulletin -> Choose intent -> Execute via single-action gate -> Attach post-action diffs -> Update memory -> Compact/Checkpoint`
-
-Only one action is active at a time. The runtime attaches a strict post-action refresh (inventory/position diffs) after every skill.
-
-## 10. Transcript & Memory
-
-- **Compaction:** Uses replacement-history checkpoints containing the overall mission, shared state, and active blockers, while preserving a short recent raw tail.
-- **Offline Extraction:** Hot loops are deterministic and replay-safe. Long-term memory extraction (social patterns, reputation) happens offline.
-
-## 11. Implementation Phases
-
-1. **Gameplay Foundation:** Pressure engine, intent selector, primitives, and task verification.
-2. **Role Society:** Shared storage, role contracts, team bulletin, and obligation routing.
-3. **Memory Architecture:** Thread stores, canonical replays, and compaction checkpoints.
-4. **Bounded Hostile:** Introduce the single hostile NPC with patrol/retreat logic.
-5. **Long-run Stability:** Mailbox phases and offline memory extraction.
-
-## 12. Anti-Patterns (Do Not Do)
-
-- Expanding persona prompts without gameplay logic.
-- Reintroducing open-ended JS `eval` loops.
-- Simulating a full village economy immediately.
-- Giving all NPCs combat authority.
+Our design draws lessons from several pioneering Minecraft AI projects:
+- **Voyager**: Adopted structured curriculum and primitive validation.
+- **mc-multimodal-agent**: Adopted post-action refreshes and layered memory.
+- **mineflayer-chatgpt**: Adopted event-driven multi-bot brains and role restrictions.
+- **mindcraft-ce**: Adopted single-action gating and busy-aware conversation.
+- **Opencode/Codex**: Adopted advanced transcript compaction and replay architectures.

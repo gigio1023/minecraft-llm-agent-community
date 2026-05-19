@@ -2,33 +2,31 @@
 sidebar_position: 1
 ---
 
-# Introduction: Dream of One
+# Welcome to Dream of One
 
-**Dream of One** is a multi-bot Minecraft social simulation probe. We use Minecraft as a deterministic physics engine to prove that LLMs can sustain stable, long-running societies when constrained by strict rules.
+**Dream of One** is an experimental project focused on creating **Social NPCs** in Minecraft using Large Language Models (LLMs). We aim to build a stable, multi-agent society where NPCs cooperate, manage resources, and follow social rules within a deterministic game environment.
 
-## Core Philosophy
+## Why Minecraft?
 
-We abandon open-ended, hallucination-prone prompts in favor of:
+Minecraft provides a robust physics and state engine, making it an ideal "sandbox" for AI research. By placing agents in a world with material scarcity and survival needs, we can observe emergent behaviors that go beyond simple chat interactions.
 
-1. **Pressure-Driven Behavior**: Actions stem from biological needs (hunger) and material scarcity.
-2. **Material Scarcity**: True society requires shared resources, dependencies, and collaboration.
-3. **Social Obligations**: NPCs form roles, respect boundaries, and share tasks.
+## Key Concepts
 
-## Architecture: The Headless Probe
+Our agents aren't just chatbots; they are **Embodied Agents** driven by:
 
-- **Zero-Based & Headless**: Runs on a local Dockerized Vanilla server (`itzg/minecraft-server`). No UI, no manual client setup.
-- **Bounded Tool Loop**: Agents do not write arbitrary code. They select from a strictly validated registry of static TypeScript skills.
-- **Pressure-Intent Lifecycle**: The runtime analyzes the world to generate "Pressures". The LLM processes these into actionable "Intents".
-- **Deterministic Evidence**: Relies on structured JSON transcripts for evaluation, not human visual inspection.
+- **Survival & Scarcity**: NPCs must gather resources (food, wood, iron) to survive. Cooperation emerges naturally when resources are shared or limited.
+- **Roles & Responsibilities**: Each NPC has a clear purpose—whether they are a gatherer, a crafter, or a guard.
+- **Social Obligations**: Cooperation is built on promises and shared storage, not just persona text.
 
-## Tech Stack
+## Technical Foundation
 
-- **Language:** TypeScript
-- **Runtime:** Bun
-- **Minecraft Interface:** Mineflayer
-- **Infrastructure:** Docker Compose (headless server, DBs)
-- **Configuration:** `probe-config.yaml` with RCON dynamic control.
+To ensure stability and safety, we use a **Headless Runtime** architecture:
 
-## Documentation Scope
+- **Headless Environment**: The simulation runs on a local Minecraft server via Docker. No manual setup or graphical client is required.
+- **Mineflayer-Based Bots**: We use [Mineflayer](https://github.com/PrismarineJS/mineflayer) to create lightweight, programmable bots that interact with the world via TypeScript.
+- **Bounded Tool Loop**: Instead of letting AI write risky code, we provide a strictly validated set of tools (e.g., `mineBlock`, `say`, `craftItem`).
+- **Deterministic Evaluation**: Every session is recorded as a structured JSON transcript, allowing us to analyze agent decisions and social interactions with high precision.
 
-This documentation focuses on active specs, architectural decisions, and research reports. All legacy Voyager-era setups have been archived.
+## Getting Started
+
+Check out our [Architecture Specification](/docs/Architecture/SPEC) for a deep dive into how our agents think, or head over to the [Setup Guide](/docs/Setup/Headless-Server) to run your first multi-bot simulation.
