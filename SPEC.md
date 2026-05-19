@@ -1,6 +1,6 @@
 # SPEC
 
-작성 기준 시점: 2026-05-19
+작성 기준 시점: 2026-05-20
 
 ## 1. 목표
 
@@ -38,6 +38,19 @@
 > 어떻게 하면 NPC가 Minecraft 안에서 실제 플레이어처럼 자원을 모으고,
 > 제작하고, 저장하고, 역할을 나누고, 서로 돕거나 제한적으로 적대하면서,
 > 장기적으로도 일관된 기억과 행동을 유지할 수 있는가?
+
+### 현재 branch-local 설계 묶음
+
+이번 branch의 pressure/intent/lifecycle 확장 설계는 아래 문서 묶음에서
+유지한다.
+
+- `docs/plans/2026-05-20-pressure-intent-lifecycle/README.md`
+- `docs/plans/2026-05-20-pressure-intent-lifecycle/architecture.md`
+- `docs/plans/2026-05-20-pressure-intent-lifecycle/implementation-phases.md`
+- `docs/plans/2026-05-20-pressure-intent-lifecycle/pressure-data-model.md`
+
+`SPEC.md`는 canonical 방향만 유지하고, branch-local 상세 설계는 위 문서
+묶음에 쌓는다.
 
 ## 3. 리서치 결론 요약
 
@@ -131,7 +144,7 @@
 
 persona text는 마지막 층이다. 먼저 아래가 있어야 한다.
 
-- curriculum
+- bootstrap/recovery scaffold
 - primitives
 - seed skills
 - verification
@@ -156,6 +169,8 @@ LLM이 소유하는 것:
 
 - next intent
 - short plan
+- intent switching and delegation
+- obligation triage
 - utterance style
 - role-consistent prioritization
 
@@ -264,11 +279,18 @@ shared society state는 별도 구조로 둔다.
 
 ## 7. Gameplay Competence Layer
 
-### 7.1 Curriculum
+### 7.1 Bootstrap And Recovery Scaffold
 
-curriculum은 one-task-at-a-time이어야 한다.
+초기 progression spine은 중요하지만 영구 스크립트가 되어서는 안 된다.
 
-초기 task format 예시:
+이 scaffold는 다음 상황에서 foreground로 올라와야 한다.
+
+- 새 world bootstrap
+- death와 gear loss 이후 recovery
+- shared storage/station collapse
+- severe scarcity
+
+초기 bootstrap/recovery objective 예시:
 
 - `Collect 4 logs`
 - `Craft planks and sticks`
@@ -282,12 +304,42 @@ curriculum은 one-task-at-a-time이어야 한다.
 - `Inspect village chest`
 - `Deposit shared materials`
 
-각 task는 다음을 가져야 한다.
+이 scaffold는 LLM의 행동을 직접 강제하지 않는다. runtime은 current
+world, memory, bulletin, role, recent failure를 바탕으로 pressure를
+계산하고, LLM은 그 pressure 위에서 current intent를 고른다.
+
+settlement가 안정되면 bootstrap pressure는 약해져야 한다. 반대로 death,
+scarcity, gear loss, storage collapse가 오면 recovery pressure와 함께 다시
+강해져야 한다.
+
+각 bootstrap/recovery objective는 다음을 가져야 한다.
 
 - reason
 - machine-checkable success condition
 - blockers
 - preferred actor roles
+
+### 7.1.1 Pressure And Intent Loop
+
+runtime은 각 actor에 대해 compact pressure set을 계산해야 한다.
+
+pressure 예시:
+
+- bootstrap missing progress
+- shared shortage
+- blocked teammate
+- public obligation due
+- nearby opportunity
+- hostile risk
+- recovery after death
+
+LLM은 direct next task 대신 one current intent를 선택해야 한다.
+
+그 intent는:
+
+- 여러 turn에 걸쳐 유지될 수 있고
+- stronger interrupting pressure가 오면 교체될 수 있으며
+- bounded skill/tool 집합으로만 실행되어야 한다
 
 ### 7.2 Gameplay Primitives
 
@@ -563,7 +615,9 @@ probe/src/
 
 ### Phase 1. Gameplay competence foundation
 
-- deterministic curriculum 도입
+- bootstrap/recovery scaffold 도입
+- pressure engine 도입
+- intent selector 도입
 - gameplay primitives 도입
 - early-game seed skills 도입
 - task verification 도입
@@ -575,6 +629,8 @@ probe/src/
 - role contracts
 - keep-items policy
 - team bulletin
+- obligation routing
+- intent-to-skill role filtering
 - cooperative handoff skills
 
 ### Phase 3. Transcript and memory architecture
@@ -603,14 +659,16 @@ probe/src/
 
 다음 작업의 최소 완료 기준은 아래다.
 
-1. NPC들이 random wandering이 아니라 early-game progression task를 수행한다.
-2. 최소 3개 이상의 cooperative role이 shared storage와 obligations를 통해 상호작용한다.
-3. 1개의 hostile NPC가 bounded policy 안에서만 적대 행동을 한다.
-4. 대화는 busy/idle, recent events, shared bulletin을 반영한다.
-5. 각 agent는 private memory와 shared settlement state를 구분해 사용한다.
-6. canonical replay transcript와 compaction checkpoint가 존재한다.
-7. 긴 세션에서도 recent raw tail + compact summary 구조로 재개 가능하다.
-8. transcript만 읽어도 누가 무엇을 왜 했는지 재구성 가능하다.
+1. NPC들이 random wandering이 아니라 early-game progression bootstrap을 수행한다.
+2. NPC들이 bootstrap/recovery progression을 필요할 때 수행하고, 더 강한
+   shared or personal pressure가 있을 때는 이를 유연하게 뒤로 미룰 수 있다.
+3. 최소 3개 이상의 cooperative role이 shared storage와 obligations를 통해 상호작용한다.
+4. 1개의 hostile NPC가 bounded policy 안에서만 적대 행동을 한다.
+5. 대화는 busy/idle, recent events, shared bulletin을 반영한다.
+6. 각 agent는 private memory와 shared settlement state를 구분해 사용한다.
+7. canonical replay transcript와 compaction checkpoint가 존재한다.
+8. 긴 세션에서도 recent raw tail + compact summary 구조로 재개 가능하다.
+9. transcript만 읽어도 누가 무엇을 왜 했는지 재구성 가능하다.
 
 ## 15. 당장 하지 말아야 할 것
 
@@ -623,11 +681,10 @@ probe/src/
 
 ## 16. 즉시 다음 구현 슬라이스 제안
 
-가장 먼저 해야 할 구현 슬라이스는 다음이다.
+현재 branch의 즉시 다음 구현 슬라이스는 아래 3단계다.
 
-1. `gameplay/curriculum` + `gameplay/primitives` + `verification` 추가
-2. `shared storage ledger` + `role contract` + `team bulletin` 추가
-3. `canonical transcript parts` + `checkpoint/compaction skeleton` 추가
-4. 그 위에 cooperative 3-role + hostile 1-role의 작은 social probe 설계
+1. `pressure engine` + `lifecycle state` + `intent selector`
+2. `bounded seed skills` + `intent-to-skill compiler` + `role obligation routing`
+3. `memory/transcript wiring` + `bootstrap/recovery reinjection` + `checkpoint-ready lifecycle summary`
 
-이 순서를 어기고 social prompt부터 키우면 다시 같은 실패를 반복할 가능성이 높다.
+상세 설계는 `docs/plans/2026-05-20-pressure-intent-lifecycle/` 아래 문서 묶음을 기준으로 유지한다.

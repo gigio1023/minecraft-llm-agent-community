@@ -110,6 +110,60 @@ export function finalizeRunProbe({
   throw new Error("Probe ended unexpectedly");
 }
 
+async function teleportBotsToRequestedSpawn(
+  bots: Record<string, import("mineflayer").Bot>,
+  spawnConfig: { x: number; y: number; z: number }
+) {
+  const { x, y, z } = spawnConfig;
+
+  if (![x, y, z].every(Number.isFinite)) {
+    console.warn("Invalid spawn config:", spawnConfig);
+    return;
+  }
+
+  const { exec } = await import("child_process");
+  const util = await import("util");
+  const execAsync = util.promisify(exec);
+
+  try {
+    console.log("Setting server world spawn via RCON...");
+    await execAsync(`docker exec skill-village-manual-mc-1 rcon-cli -- setworldspawn ${x} ${y} ${z}`);
+  } catch (error) {
+    console.warn("Failed to set world spawn via RCON (is the container named skill-village-manual-mc-1?). Error:", error);
+  }
+
+  const actorIds = Object.keys(bots);
+  const offsets = [
+    [0, 0, 0],
+    [2, 0, 0],
+    [-2, 0, 0],
+    [0, 0, 2],
+    [0, 0, -2]
+  ];
+
+  console.log("Waiting for 2 seconds to ensure bots are ready for commands...");
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  await Promise.all(
+    actorIds.map(async (actorId, index) => {
+      const [dx, dy, dz] = offsets[index % offsets.length];
+      const bot = bots[actorId];
+      const tpCmd = `tp ${bot.username} ${x + dx} ${y + dy} ${z + dz}`;
+      console.log(`[${actorId}] Sending teleport via RCON: ${tpCmd}`);
+      
+      try {
+        await execAsync(`docker exec skill-village-manual-mc-1 rcon-cli -- ${tpCmd}`);
+      } catch (error) {
+        console.warn(`[${actorId}] RCON teleport failed, trying bot.chat fallback...`);
+        bot.chat(`/tp @s ${x + dx} ${y + dy} ${z + dz}`);
+      }
+    })
+  );
+
+  console.log("Waiting for 2 seconds for teleport to take effect...");
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+}
+
 export async function runProbe(): Promise<ProbeRunResult> {
   const config = loadProbeConfig();
   let server: ServerHandle | null = null;
@@ -119,17 +173,17 @@ export async function runProbe(): Promise<ProbeRunResult> {
   const cleanupErrors: unknown[] = [];
 
   try {
-    server = await startDockerServer(config);
+    // server = await startDockerServer(config);
+    server = { host: "127.0.0.1", port: Number(process.env.MC_PORT || 32769), stop: async () => {} };
     bots = await createBots(config, {
       host: server.host,
       port: server.port
     });
-    const actorIds = Object.keys(bots);
-    const primaryActorId = selectPrimaryActorId(actorIds);
-    const primaryTargetId = selectPrimaryTargetId(actorIds, primaryActorId);
+    
+    await teleportBotsToRequestedSpawn(bots, config.spawn);
+    
     const activeBots = bots;
-    const actor = activeBots[primaryActorId];
-    const target = activeBots[primaryTargetId];
+    const actorIds = Object.keys(bots);
 
     const memory = createMemory(config.memoryLimit);
     const dialogueState = createDialogueState({
@@ -144,17 +198,21 @@ export async function runProbe(): Promise<ProbeRunResult> {
       probeId: config.probeId,
       bots: actorIds.map((actorId) => activeBots[actorId].username)
     });
-    const actorRole: RoleId = defaultActorRoles(actorIds)[primaryActorId] ?? "gatherer";
-    const sharedChest = createMineflayerSharedChestAccessor(actor);
+    const loops = actorIds.map(async (actorId) => {
+      const actor = activeBots[actorId];
+      const targetId = selectPrimaryTargetId(actorIds, actorId);
+      const target = activeBots[targetId];
+      const actorRole: RoleId = defaultActorRoles(actorIds)[actorId] ?? "gatherer";
+      const sharedChest = createMineflayerSharedChestAccessor(actor);
 
-    function readActorInventory() {
-      return actor.inventory?.items().map((item) => ({
-        name: item.name,
-        count: item.count
-      })) ?? [];
-    }
+      function readActorInventory() {
+        return actor.inventory?.items().map((item) => ({
+          name: item.name,
+          count: item.count
+        })) ?? [];
+      }
 
-    const final = await runAgentLoop({
+      return runAgentLoop({
       bots: { actor, target },
       provider,
       transcript,
@@ -291,12 +349,17 @@ export async function runProbe(): Promise<ProbeRunResult> {
         }
       }
     });
+    });
 
-    const transcriptPath = await transcript.write(final);
+    const finals = await Promise.all(loops);
+    const transcriptPath = await transcript.write(finals[0]);
     result = { transcriptPath };
   } catch (error) {
     caughtError = error;
   } finally {
+    console.log("Waiting 15 seconds before disconnecting bots so you can observe them...");
+    await new Promise((r) => setTimeout(r, 15000));
+    
     if (bots) {
       try {
         await closeBots(bots);

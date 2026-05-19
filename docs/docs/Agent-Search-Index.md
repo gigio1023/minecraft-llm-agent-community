@@ -5,7 +5,7 @@ sidebar_position: 2
 # Agent Search Index
 
 Status: active migration index
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 Use this file first. It exists so the next agent does not rediscover the same
 server, client, provider, and architecture decisions from chat history.
@@ -21,6 +21,7 @@ server, client, provider, and architecture decisions from chat history.
 | `MINECRAFT_LLM_OBSERVATION_LOOP`, `observation-action feedback`, `mineflayer agent context` | `../reports/2026-05-19-minecraft-llm-agent-observation-loop-research.md` | `../../probe/src/mutual/skillVillageCli.ts`, `../../probe/src/mutual/skillVillage/` |
 | `SKILL_VILLAGE_FAILURE`, `failed social simulation`, `dirt digging loop` | `../reports/2026-05-19-skill-village-failure-report.md` | `../reports/2026-05-19-local-minecraft-agent-repo-analysis.md` |
 | `MINECRAFT_GAMEPLAY_MODEL`, `Voyager seed skills`, `Minecraft progression prompt` | `../reports/2026-05-19-local-minecraft-agent-repo-analysis.md` | `../reports/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`, `../../probe/src/mutual/skillVillage/` |
+| `PRESSURE_INTENT_LIFECYCLE`, `pressure engine`, `intent selector`, `bootstrap lifecycle`, `freer npc` | `../plans/2026-05-20-pressure-intent-lifecycle/README.md` | `../plans/2026-05-20-pressure-intent-lifecycle/architecture.md`, `../plans/2026-05-20-pressure-intent-lifecycle/pressure-data-model.md` |
 | `NO_VOYAGER_EVAL_LOOP`, `Voyager`, `old repo`, `eval` | `Migration/agent-loop-migration.md` | `Analysis-of-Prior-Projects/voyager.md` |
 | `legacy install`, `old architecture`, `old progress` | `Archived/Documents/Installation.md` | `Archived/Documents/Architecture-of-Project.md` |
 | `OPENAI_CODEX_PROVIDER`, `openai-codex`, `Codex provider` | `Migration/openai-codex-provider.md` | `Migration/minimal-probe-goal.md` |

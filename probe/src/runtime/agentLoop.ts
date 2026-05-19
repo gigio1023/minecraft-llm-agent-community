@@ -5,6 +5,7 @@ import { toToolResult } from "../mutual/tools/wrapper.js";
 import { selectDeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
 import { verifyTask, type TaskVerification } from "../gameplay/verification/verifyTask.js";
 import { createAntiRepeatPolicy } from "./antiRepeat.js";
+import { buildPressureIntentContext, type IntentRecord, type PressureIntentContext } from "./pressureIntent.js";
 
 type JsonValue =
   | string
@@ -29,6 +30,7 @@ type TranscriptRecorder = {
     actor: string;
     observation: JsonValue;
     task?: JsonValue;
+    pressureContext?: JsonValue;
     tool: AllowedTool;
     args?: Record<string, JsonValue>;
     result: JsonValue;
@@ -69,7 +71,7 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
   initialCompletedTaskIds?: string[];
 };
 
-const MAX_STEPS = 8;
+const MAX_STEPS = 10;
 
 function toJsonRecord(args: Record<string, unknown>) {
   return Object.fromEntries(
@@ -146,6 +148,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   const actor = bots.actor;
   const target = bots.target;
   let lastResult: ToolResult | null = null;
+  let previousIntent: IntentRecord | undefined;
   const antiRepeat = createAntiRepeatPolicy();
   const completedTaskIds = new Set<string>(initialCompletedTaskIds);
 
@@ -160,6 +163,17 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       ...(observation.sharedChest ? { sharedChest: observation.sharedChest } : {}),
       completedTaskIds: [...completedTaskIds]
     });
+
+    const pressureContext = buildPressureIntentContext({
+      actorId: actor.username,
+      turn: step + 1,
+      observation,
+      currentTask,
+      completedTaskIds: [...completedTaskIds],
+      previousIntent
+    });
+    previousIntent = pressureContext.currentIntent;
+
     const proposal = provider.next({ observation, lastResult, currentTask });
     const validated = tools.validateProposal(proposal);
     const result = await executePhaseOneTool({
@@ -178,6 +192,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       actor: actor.username,
       observation: toJsonValue(observation),
       ...(currentTask ? { task: toJsonValue(currentTask) } : {}),
+      pressureContext: toJsonValue(pressureContext),
       tool: validated.tool,
       args: Object.keys(validated.args).length > 0 ? toJsonRecord(validated.args) : undefined,
       result: toJsonValue(result),
@@ -189,6 +204,8 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     if (currentTask && verification?.status === "passed") {
       completedTaskIds.add(currentTask.id);
     }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     if (validated.tool === "remember") {
       return {

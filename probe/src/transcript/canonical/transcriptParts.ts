@@ -59,6 +59,13 @@ export type CanonicalTranscriptPart =
       turn: number;
       actorId: string;
       summary: CanonicalJsonValue;
+    }
+  | {
+      kind: "turn_context";
+      threadId: string;
+      turn: number;
+      actorId: string;
+      data: CanonicalJsonValue;
     };
 
 function snapshot<T>(value: T): T {

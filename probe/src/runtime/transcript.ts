@@ -96,8 +96,12 @@ export function createTranscript({
         summary: buildCheckpointSummary({
           agentId: transcriptBots[0] ?? "npc_a",
           roleId: "quartermaster",
+          lifecycleMode: "normal",
           currentTask: null,
+          currentIntent: null,
+          topPressures: [],
           workingMemory: {},
+          privateMemorySummary: [],
           sharedSettlement: {}
         })
       });

@@ -17,6 +17,8 @@ export function projectDebugTimeline(parts: CanonicalTranscriptPart[]) {
         return `${part.turn}:${part.actorId}:memory:${part.layer}`;
       case "checkpoint":
         return `${part.turn}:${part.actorId}:checkpoint`;
+      case "turn_context":
+        return `${part.turn}:${part.actorId}:turn_context`;
     }
   });
 }

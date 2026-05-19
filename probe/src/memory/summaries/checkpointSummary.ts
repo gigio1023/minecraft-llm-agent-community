@@ -1,3 +1,5 @@
+import type { LifecycleMode, IntentRecord, PressureRecord } from "../../runtime/pressureIntent.js";
+
 type JsonValue =
   | string
   | number
@@ -29,18 +31,37 @@ function toJsonValue(value: unknown): JsonValue {
   throw new Error(`Checkpoint summary values must be JSON-safe, received ${typeof value}`);
 }
 
+export type CheckpointAgentSummary = {
+  agentId: string;
+  roleId: string;
+  lifecycleMode: LifecycleMode;
+  currentTask: string | null;
+  currentIntent: IntentRecord | null;
+  topPressures: PressureRecord[];
+  workingMemory: Record<string, unknown>;
+  privateMemorySummary: string[];
+};
+
 export function buildCheckpointSummary(input: {
   agentId: string;
   roleId: string;
+  lifecycleMode: LifecycleMode;
   currentTask: string | null;
+  currentIntent: IntentRecord | null;
+  topPressures: PressureRecord[];
   workingMemory: Record<string, unknown>;
+  privateMemorySummary: string[];
   sharedSettlement: Record<string, unknown>;
 }) {
   return {
     agentId: input.agentId,
     roleId: input.roleId,
+    lifecycleMode: input.lifecycleMode,
     currentTask: input.currentTask,
+    currentIntent: input.currentIntent ? toJsonValue(input.currentIntent) : null,
+    topPressures: toJsonValue(input.topPressures.slice(0, 3)),
     workingMemory: toJsonValue(input.workingMemory),
+    privateMemorySummary: [...input.privateMemorySummary],
     sharedSettlement: toJsonValue(input.sharedSettlement)
   };
 }
