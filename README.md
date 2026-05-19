@@ -1,141 +1,44 @@
-# ⛏️ minecraft-llm-agent-community
+# ⛏️ minecraft-llm-agent-community: Minecraft LLM Agent Social Simulation
 
-- [🤖 Documentation Blog](https://naem1023.github.io/minecraft-llm-agent-community/)
-  - [Legacy Architecture](https://naem1023.github.io/minecraft-llm-agent-community/docs/Archived/Documents/Architecture-of-Project)
-  - [Legacy Installation Guide](https://naem1023.github.io/minecraft-llm-agent-community/docs/Archived/Documents/Installation)
-- [📚 Analysis of Prior Projects](https://naem1023.github.io/minecraft-llm-agent-community/docs/Analysis-of-Prior-Projects)
-  - [Simple Analysis of Voyager](https://naem1023.github.io/minecraft-llm-agent-community/docs/Analysis-of-Prior-Projects/voyager)
+![Cover Image](assets/cover-image.jpeg)
 
-## Current Migration Direction
+**minecraft-llm-agent-community** is a next-generation multi-bot Minecraft social simulation probe. We use a strictly bounded, headless agent runtime powered by TypeScript and Mineflayer to simulate an emergent **multi-NPC society**.
 
-This repo is now a migration staging area for a zero-based headless mineflayer
-agent-loop probe. Read these first:
+- [📚 Documentation Blog](https://gigio1023.github.io/minecraft-llm-agent-community/)
 
-- [Agent Search Index](docs/docs/Agent-Search-Index.md)
-- [Agent Loop Migration](docs/docs/Migration/agent-loop-migration.md)
-- [Headless Mineflayer Setup](docs/docs/Migration/headless-mineflayer-setup.md)
-- [OpenAI Codex Provider](docs/docs/Migration/openai-codex-provider.md)
-- [Minimal Probe Goal](docs/docs/Migration/minimal-probe-goal.md)
-- [Handoff For GPT 5.4 Copilot](docs/docs/Migration/handoff-gpt54-copilot.md)
+## 🎯 Vision
 
-The old Voyager baseline remains useful background, but it is not the active
-architecture. The active path is a tiny headless probe: a local vanilla server,
-two mineflayer bots, a bounded observe/move/say/wait/remember loop, and a
-small transcript artifact for evidence.
+Our goal is to prove that language models can maintain long-running, multi-agent interactions when bounded by strict runtime validation, biological pressures (like gathering wood or food), and memory compaction. We focus on **pressure-driven behavior**, **material scarcity**, and **social obligations**.
 
-Longer-term social simulation ideas remain background motivation, but the first
-slice is intentionally smaller: prove the constrained NPC tool loop works
-without a manual Minecraft client or the old Voyager-style eval runtime.
+## 🏗️ Architecture: The Headless Probe
 
+We have transitioned away from legacy bridge servers and raw eval loops. Our architecture is **Zero-Based**, **Headless**, and **Deterministic**:
 
-<p align="center">
-  <img src="assets/cover-image.jpeg" width="512">
-</p>
+1. **Headless Environment**: Runs entirely on a local Vanilla Minecraft server via Docker. No manual client required.
+2. **Mineflayer Runtime**: Multiple NPCs connect simultaneously via TypeScript bots.
+3. **Pressure-Intent Lifecycle**: Agents operate under needs ("Pressures") compiled into structured "Intents".
+4. **Bounded Tools**: Agents use a strict, runtime-validated seed skill registry (e.g., `collect_logs`).
+5. **RCON & Config Management**: Environment enforced externally via Docker RCON and `probe-config.yaml`.
 
-## Legacy background
+## ⚙️ Usage
 
-Voyager-era notes and backlog remain useful background, but they are not the
-current execution path. The main README now tracks only the headless probe
-workflow; older Fabric/Python/manual-client setup material should be read as
-historical context, not as the default way to run this repository.
+The project is built with **TypeScript**, executed via **Bun**, and uses **Docker Compose**.
 
-## Architecture
-It's a sample architecture of executing a bot. It's not a final architecture.
-![](docs/docs/Documents/img/sample-architecture.png)
+```bash
+# 1. Start the headless Minecraft server
+docker compose up -d
 
-## Legacy installation guides
+# 2. Install dependencies
+cd probe
+bun install
 
-The published [Installation Document](https://naem1023.github.io/minecraft-llm-agent-community/docs/Archived/Documents/Installation)
-still describes the older Voyager/Fabric/manual-server path. It is useful as
-background only and does not describe the active headless probe setup below.
-
-## Headless Mineflayer Probes
-
-The active direction is a tiny headless probe, not the old Voyager eval loop.
-
-Prerequisites: Bun and Docker with Compose available locally.
-
-### Probe v0: single bounded loop
-
-```sh
-bun install --cwd probe
-bun run --cwd probe typecheck
-./scripts/run-agent-loop-probe.sh
+# 3. Run the Agent Loop Probe
+PROBE_BOTS="npc1,npc2,npc3" bun run src/cli.ts
 ```
 
-The proof command starts a local vanilla Docker server, waits for Minecraft
-ping readiness, connects `npc_a` and `npc_b` with offline auth, runs the
-deterministic `observe` / `move` / `say` / `wait` / `remember` loop, and writes
-a transcript JSON artifact under `data/evidence/`.
+*Every run outputs a deterministic Transcript JSON in `data/evidence/` for evaluation.*
 
-No manual Minecraft client, Fabric, Forge, or live OpenAI provider is required
-for this first proof.
+## 📂 Structure
 
-### Probe v1: mutual NPC interaction
-
-```sh
-bun install --cwd probe
-bun run --cwd probe typecheck
-./scripts/run-mutual-interaction-probe.sh
-```
-
-This second proof keeps the deterministic provider, but extends the runtime so
-both bots act. The live transcript now checks three categories:
-
-1. conversation and turn state
-2. spatial attention and approach
-3. material handoff through a dropped `paper` marker
-
-The latest successful live proof wrote:
-
-`data/evidence/mutual_npc_interaction_probe_v1-1779166592708.json`
-
-That run finished with:
-
-- `conversationTurnState: passed`
-- `spatialAttentionApproach: passed`
-- `materialEnvironmentHandoff: passed`
-
-The detailed review handoff and preserved transcript copy live under
-`docs/superpowers/reports/`.
-
-## Live NPC Dialogue Probe
-
-The live dialogue path keeps the same bounded runtime, but lets the
-`openai-codex` provider choose one validated mutual tool per turn. It is meant
-for short evidence runs where the NPCs talk first, then perform a later world
-action such as movement.
-
-Provider auth is read from the ignored local store:
-
-```text
-build/provider-auth/openai-codex-auth.json
-```
-
-Run it with:
-
-```sh
-bun install --cwd probe
-bun run --cwd probe typecheck
-./scripts/run-live-mutual-dialogue-probe.sh
-```
-
-The command writes a transcript under `probe/data/evidence/`. Do not use this
-path as a Voyager-style eval loop; the runtime still owns tool validation,
-budgets, execution, and failure reporting.
-
-# Contribution
-## Check lint
-```sh
-make lint
-```
-
-# Citation
-```bibtex
-@article{wang2023voyager,
-  title   = {Voyager: An Open-Ended Embodied Agent with Large Language Models},
-  author  = {Guanzhi Wang and Yuqi Xie and Yunfan Jiang and Ajay Mandlekar and Chaowei Xiao and Yuke Zhu and Linxi Fan and Anima Anandkumar},
-  year    = {2023},
-  journal = {arXiv preprint arXiv: Arxiv-2305.16291}
-}
-```
+- `probe/`: The core bounded agent loop, skills, NPC logic, and memory system.
+- `docs/`: Technical reports, specifications (see `docs/docs/Architecture/SPEC.md`), and the project blog.

@@ -3,16 +3,14 @@ import type { Bot } from "mineflayer";
 import { pathfinder } from "mineflayer-pathfinder";
 
 import type { ProbeConfig } from "../config.js";
+import { normalizeActorIds } from "./actorRoster.js";
 
 type ServerEndpoint = {
   host: string;
   port: number;
 };
 
-export type ProbeBots = {
-  npc_a: Bot;
-  npc_b: Bot;
-};
+export type ProbeBots = Record<string, Bot>;
 
 function createOfflineBot(
   config: ProbeConfig,
@@ -79,27 +77,23 @@ export async function createBots(
   config: ProbeConfig,
   server: ServerEndpoint
 ): Promise<ProbeBots> {
-  const [npcAName, npcBName] = config.bots;
-  let npcA: Bot | null = null;
-  let npcB: Bot | null = null;
+  const actorIds = normalizeActorIds(config.bots);
+  const createdBots: ProbeBots = {};
 
   try {
-    npcA = createOfflineBot(config, server, npcAName);
-    await waitForSpawn(npcA);
+    for (const actorId of actorIds) {
+      const bot = createOfflineBot(config, server, actorId);
+      createdBots[actorId] = bot;
+      await waitForSpawn(bot);
+    }
 
-    npcB = createOfflineBot(config, server, npcBName);
-    await waitForSpawn(npcB);
-
-    return {
-      npc_a: npcA,
-      npc_b: npcB
-    };
+    return createdBots;
   } catch (error) {
-    await closeBotList([npcA, npcB]);
+    await closeBotList(Object.values(createdBots));
     throw error;
   }
 }
 
 export async function closeBots(bots: ProbeBots) {
-  await closeBotList([bots.npc_a, bots.npc_b]);
+  await closeBotList(Object.values(bots));
 }

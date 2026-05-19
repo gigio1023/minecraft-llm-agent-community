@@ -108,12 +108,12 @@ const config = {
               },
               {
                 label: 'GitHub',
-                href: 'https://github.com/naem1023/minecraft-llm-agent-community',
+                href: 'https://github.com/gigio1023/minecraft-llm-agent-community',
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} minecraft-llm-agent-community. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} minecraft-llm-agent-community Project. Built with Docusaurus.`,
       },
       prism: {
         theme: prismThemes.github,
@@ -123,3 +123,4 @@ const config = {
 };
 
 export default config;
+ config;

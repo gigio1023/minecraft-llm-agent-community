@@ -4,29 +4,29 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Migration docs',
+    title: 'Headless & Deterministic',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Start with the migration docs for the active headless probe direction.
+        Runs on a local Docker server. Bounded tool loops and strict validation replace unsafe `eval` loops.
       </>
     ),
   },
   {
-    title: 'Probe runtime',
+    title: 'Pressure-Driven Intent',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        The current slice is a local Docker server, two bots, and a bounded tool loop.
+        No more aimless wandering. Actions emerge from material scarcity, social obligations, and biological pressure.
       </>
     ),
   },
   {
-    title: 'Archived references',
+    title: 'Long-Term Memory',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        Older Voyager-era setup notes remain available as archived background material.
+        Survives extended simulations through replacement-history compaction and separated memory layers.
       </>
     ),
   },

@@ -8,7 +8,8 @@ import { remember } from "../tools/remember.js";
 import { wait } from "../tools/wait.js";
 import {
   buildDialogueContext,
-  mutualPersonas,
+  buildDialoguePersonas,
+  getDialoguePersona,
   type DialogueTranscriptEntry,
   type MutualActorId
 } from "./dialogueContext.js";
@@ -18,13 +19,39 @@ import { createOpenAICodexProvider } from "./openaiCodexProvider.js";
 import { createMutualRuntimeState } from "./runtimeState.js";
 import { createMutualTranscript } from "./transcript.js";
 import { executeMutualTool, allowedMutualTools } from "./tools/index.js";
+import type { ToolResult } from "./types.js";
+import { toToolResult } from "./tools/wrapper.js";
 
-type LastResult = {
-  tool: string;
-  status: string;
-};
+
 
 const liveAllowedTools = allowedMutualTools.filter((tool) => tool !== "drop_item");
+
+function toDialogueJsonValue(value: unknown): import("./dialogueContext.js").DialogueJsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => toDialogueJsonValue(entry));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toDialogueJsonValue(entry)])
+    );
+  }
+
+  throw new Error(`Dialogue values must be JSON-safe, received ${typeof value}`);
+}
+
+function toDialogueToolResult(result: ToolResult) {
+  return toDialogueJsonValue(result) as import("./dialogueContext.js").DialogueJsonObject;
+}
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => {
@@ -59,7 +86,7 @@ function readTicksArg(args: Record<string, unknown>, fallbackTicks: number) {
 function createRecentTranscript(runtimeState: ReturnType<typeof createMutualRuntimeState>) {
   return runtimeState.recentUtterances().map<DialogueTranscriptEntry>((entry) => ({
     actorId: entry.actorId,
-    actorName: mutualPersonas[entry.actorId as MutualActorId].name,
+    actorName: getDialoguePersona(entry.actorId).name,
     tool: "converse",
     args: {
       utterance: entry.text,
@@ -78,18 +105,6 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     accessToken: auth.accessToken,
     maxRetries: config.liveDialogue.maxRetries
   });
-  const runtimeState = createMutualRuntimeState({
-    busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable,
-    markerItemName: "paper"
-  });
-  const memories: Record<MutualActorId, ReturnType<typeof createMemory>> = {
-    npc_a: createMemory(config.memoryLimit),
-    npc_b: createMemory(config.memoryLimit)
-  };
-  const lastResults = new Map<MutualActorId, LastResult | null>([
-    ["npc_a", null],
-    ["npc_b", null]
-  ]);
 
   let server: ServerHandle | null = null;
   let bots: Awaited<ReturnType<typeof createBots>> | null = null;
@@ -103,49 +118,71 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
       host: server.host,
       port: server.port
     });
+    const activeBots = bots;
+    const actorIds = Object.keys(bots);
+    const personas = buildDialoguePersonas(actorIds);
+    const pair = actorIds.slice(0, 2) as MutualActorId[];
+    const [actorA, actorB] = pair;
 
+    if (!actorA || !actorB) {
+      throw new Error("live mutual dialogue probe requires at least two NPCs");
+    }
+
+    const memories = Object.fromEntries(
+      actorIds.map((actorId) => [actorId, createMemory(config.memoryLimit)])
+    ) as Record<MutualActorId, ReturnType<typeof createMemory>>;
+    const lastResults = new Map<MutualActorId, ToolResult | null>(
+      actorIds.map((actorId) => [actorId, null])
+    );
+    const runtimeState = createMutualRuntimeState({
+      busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable,
+      markerItemName: "paper",
+      actorIds,
+      socialContextEnabled: true
+    });
     const transcript = createMutualTranscript({
       evidenceDir: config.evidenceDir,
       probeId: "live_npc_dialogue",
-      bots: [bots.npc_a.username, bots.npc_b.username]
+      bots: actorIds.map((actorId) => activeBots[actorId].username)
     });
 
     await delay(config.liveDialogue.delayStartMs);
 
-    const activeBots = bots;
-
     const final = await runMutualLoop({
-      actors: activeBots,
+      actors: {
+        [actorA]: activeBots[actorA],
+        [actorB]: activeBots[actorB]
+      },
       providers: {
-        npc_a: {
+        [actorA]: {
           async next({ observation, lastResult }) {
             return provider.next(
               buildDialogueContext({
-                actorId: "npc_a",
+                actorId: actorA,
                 allowedTools: [...liveAllowedTools],
-                persona: mutualPersonas.npc_a,
+                persona: personas[actorA] ?? getDialoguePersona(actorA, 0),
                 observation: {
                   ...observation,
-                  ...(lastResult ? { lastActionResult: lastResult } : {})
+                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
                 },
-                memory: memories.npc_a.list(),
+                memory: memories[actorA].list(),
                 recentTranscript: createRecentTranscript(runtimeState)
               })
             );
           }
         },
-        npc_b: {
+        [actorB]: {
           async next({ observation, lastResult }) {
             return provider.next(
               buildDialogueContext({
-                actorId: "npc_b",
+                actorId: actorB,
                 allowedTools: [...liveAllowedTools],
-                persona: mutualPersonas.npc_b,
+                persona: personas[actorB] ?? getDialoguePersona(actorB, 1),
                 observation: {
                   ...observation,
-                  ...(lastResult ? { lastActionResult: lastResult } : {})
+                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
                 },
-                memory: memories.npc_b.list(),
+                memory: memories[actorB].list(),
                 recentTranscript: createRecentTranscript(runtimeState)
               })
             );
@@ -154,11 +191,12 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
       },
       tools: {
         async observe(actorId) {
+          runtimeState.beginTurn(actorId);
           const actor = activeBots[actorId];
-          const targetId = actorId === "npc_a" ? "npc_b" : "npc_a";
+          const targetId = actorId === actorA ? actorB : actorA;
           const target = activeBots[targetId];
 
-          return {
+          const observation = {
             visibleActors: [
               {
                 id: targetId,
@@ -173,13 +211,24 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
               itemName: runtimeState.markerItemName()
             }
           };
+
+          runtimeState.recordObservation(actorId, observation);
+
+          const socialContext = runtimeState.socialContext?.(actorId);
+
+          return {
+            ...observation,
+            ...(socialContext
+              ? (toDialogueJsonValue(socialContext) as import("./dialogueContext.js").DialogueJsonObject)
+              : {})
+          };
         },
         lastResult(actorId) {
           return lastResults.get(actorId) ?? null;
         },
         async execute(actorId, proposal, observation) {
           const actor = activeBots[actorId];
-          const targetId = actorId === "npc_a" ? "npc_b" : "npc_a";
+          const targetId = actorId === actorA ? actorB : actorA;
           const target = activeBots[targetId];
           const result = await executeMutualTool({
             proposal,
@@ -215,15 +264,9 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
             }
           });
 
-          lastResults.set(actorId, {
-            tool: proposal.tool,
-            status:
-              typeof result === "object" && result !== null && !Array.isArray(result) && "status" in result
-                ? String(result.status)
-                : "unknown"
-          });
+          lastResults.set(actorId, toToolResult(result, proposal.tool));
 
-          return result;
+          return toDialogueJsonValue(result);
         }
       }
     });

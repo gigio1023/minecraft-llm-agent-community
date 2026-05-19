@@ -2,28 +2,31 @@
 sidebar_position: 1
 ---
 
-# Introduction
-This documentation site tracks the active migration of
-`minecraft-llm-agent-community`.
+# Welcome to minecraft-llm-agent-community
 
-The current direction is no longer the old Voyager-style runtime. The active
-work is a small headless mineflayer probe:
+**minecraft-llm-agent-community** is an experimental project focused on creating **Social NPCs** in Minecraft using Large Language Models (LLMs). We aim to build a stable, multi-agent society where NPCs cooperate, manage resources, and follow social rules within a deterministic game environment.
 
-- a local vanilla Docker server;
-- two offline mineflayer bots;
-- a bounded `observe` / `move` / `say` / `wait` / `remember` loop;
-- a transcript artifact under `data/evidence/`.
+## Why Minecraft?
 
-The goal of this slice is simple: prove the runtime-owned NPC tool loop works
-without a manual Minecraft client, Fabric/Forge setup, or an eval-driven agent
-runtime.
+Minecraft provides a robust physics and state engine, making it an ideal "sandbox" for AI research. By placing agents in a world with material scarcity and survival needs, we can observe emergent behaviors that go beyond simple chat interactions.
 
-<!-- <div style="text-align: center;">
-  <img src="img/cover-image.jpeg" alt="Description" style="max-width: 400px; height: auto;">
-</div> -->
+## Key Concepts
 
-![](img/cover-image.jpeg)
+Our agents aren't just chatbots; they are **Embodied Agents** driven by:
 
-Older Voyager, Fabric, Python, and manual-server notes are still kept in this
-repository as reference material, but they are now archived background rather
-than the default way to run the project.
+- **Survival & Scarcity**: NPCs must gather resources (food, wood, iron) to survive. Cooperation emerges naturally when resources are shared or limited.
+- **Roles & Responsibilities**: Each NPC has a clear purpose—whether they are a gatherer, a crafter, or a guard.
+- **Social Obligations**: Cooperation is built on promises and shared storage, not just persona text.
+
+## Technical Foundation
+
+To ensure stability and safety, we use a **Headless Runtime** architecture:
+
+- **Headless Environment**: The simulation runs on a local Minecraft server via Docker. No manual setup or graphical client is required.
+- **Mineflayer-Based Bots**: We use [Mineflayer](https://github.com/PrismarineJS/mineflayer) to create lightweight, programmable bots that interact with the world via TypeScript.
+- **Bounded Tool Loop**: Instead of letting AI write risky code, we provide a strictly validated set of tools (e.g., `mineBlock`, `say`, `craftItem`).
+- **Deterministic Evaluation**: Every session is recorded as a structured JSON transcript, allowing us to analyze agent decisions and social interactions with high precision.
+
+## Getting Started
+
+Check out our [Architecture Specification](/docs/Architecture/SPEC) for a deep dive into how our agents think, or head over to the [Setup Guide](/docs/Setup/Headless-Server) to run your first multi-bot simulation.

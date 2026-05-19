@@ -10,17 +10,22 @@ import styles from './index.module.css';
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
+    <header className={clsx('hero', styles.heroBanner)}>
       <div className="container">
-        <Heading as="h1" className="hero__title">
+        <Heading as="h1" className={styles.hero__title}>
           {siteConfig.title}
         </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
+        <p className={styles.hero__subtitle}>{siteConfig.tagline}</p>
         <div className={styles.buttons}>
           <Link
+            className="button button--primary button--lg"
+            to="/docs/Architecture/SPEC">
+            Read the Specs
+          </Link>
+          <Link
             className="button button--secondary button--lg"
-            to="/docs/intro">
-            Read the docs
+            to="/blog">
+            Read the Blog
           </Link>
         </div>
       </div>
@@ -32,8 +37,8 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`${siteConfig.title} docs`}
-      description="Documentation for the headless mineflayer probe migration.">
+      title={`Welcome to ${siteConfig.title}`}
+      description="Documentation and updates for the minecraft-llm-agent-community headless probe migration.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

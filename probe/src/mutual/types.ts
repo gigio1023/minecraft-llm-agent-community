@@ -1,4 +1,4 @@
-export type MutualActorId = "npc_a" | "npc_b";
+export type MutualActorId = string;
 
 export type InteractionCategory =
   | "conversationTurnState"
@@ -24,16 +24,24 @@ export type Proposal = {
   why?: string;
 };
 
-export type LastResult = {
+export type ToolResultStatus = "done" | "blocked" | "invalid" | "unavailable" | "transient" | "failed" | string;
+
+export type ToolResult = {
   tool: string;
-  status: string;
-  ok?: boolean;
+  ok: boolean;
+  status: ToolResultStatus;
+  message?: string;
+  observation?: unknown;
+  durationMs?: number;
+  [key: string]: unknown;
 };
 
 export type MutualStepRecord = {
   category?: InteractionCategory;
   actor?: string;
   observation?: MutualJsonValue;
+  threadState?: JsonObject;
+  sharedContext?: JsonObject;
   actorAction: {
     actor?: MutualActorId | string;
     tool: string;

@@ -1,4 +1,11 @@
 import type { AllowedTool, ToolProposal, ValidatedProposal } from "../tools/index.js";
+import type { ToolResult } from "../mutual/types.js";
+import type { ObserveResult } from "../tools/observe.js";
+import { toToolResult } from "../mutual/tools/wrapper.js";
+import { selectDeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
+import { verifyTask, type TaskVerification } from "../gameplay/verification/verifyTask.js";
+import { createAntiRepeatPolicy } from "./antiRepeat.js";
+import { buildPressureIntentContext, type IntentRecord, type PressureIntentContext } from "./pressureIntent.js";
 
 type JsonValue =
   | string
@@ -12,26 +19,6 @@ type RuntimeActor = {
   username: string;
 };
 
-type LastResult = {
-  tool: AllowedTool;
-  status: string;
-};
-
-type ObserveResult = {
-  status: "ok";
-  visibleActors: Array<{
-    id: string;
-    distance: number;
-    busy: boolean;
-  }>;
-  memory: string[];
-};
-
-type ToolResult = {
-  status: string;
-  [key: string]: JsonValue;
-};
-
 type ToolContext<TActor extends RuntimeActor> = {
   actor: TActor;
   target: TActor;
@@ -42,16 +29,20 @@ type TranscriptRecorder = {
   recordStep(step: {
     actor: string;
     observation: JsonValue;
+    task?: JsonValue;
+    pressureContext?: JsonValue;
     tool: AllowedTool;
     args?: Record<string, JsonValue>;
     result: JsonValue;
+    verification?: JsonValue;
   }): void;
 };
 
 type Provider = {
   next(input: {
     observation: ObserveResult;
-    lastResult: LastResult | null;
+    lastResult: ToolResult | null;
+    currentTask?: ReturnType<typeof selectDeterministicTask>;
   }): ToolProposal;
 };
 
@@ -59,6 +50,11 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   validateProposal(proposal: ToolProposal): ValidatedProposal;
   observe(input: { actor: TActor; target: TActor }): Promise<ObserveResult> | ObserveResult;
   move_to(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  collect_logs(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  inspect_chest(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  deposit_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  withdraw_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   say(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   wait(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   remember(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -66,15 +62,16 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
 
 type AgentLoopArgs<TActor extends RuntimeActor> = {
   bots: {
-    npc_a: TActor;
-    npc_b: TActor;
+    actor: TActor;
+    target: TActor;
   };
   provider: Provider;
   tools: AgentLoopTools<TActor>;
   transcript: TranscriptRecorder;
+  initialCompletedTaskIds?: string[];
 };
 
-const MAX_STEPS = 6;
+const MAX_STEPS = 10;
 
 function toJsonRecord(args: Record<string, unknown>) {
   return Object.fromEntries(
@@ -111,12 +108,27 @@ async function executeTool<TActor extends RuntimeActor>(
   actor: TActor,
   target: TActor,
   observation: ObserveResult
-) {
+): Promise<ToolResult> {
   switch (validated.tool) {
     case "observe":
-      return observation;
+      return {
+        tool: "observe",
+        ok: true,
+        status: observation.status,
+        observation
+      };
     case "move_to":
       return tools.move_to({ actor, target, args: validated.args });
+    case "collect_logs":
+      return tools.collect_logs({ actor, target, args: validated.args });
+    case "craft_item":
+      return tools.craft_item({ actor, target, args: validated.args });
+    case "inspect_chest":
+      return tools.inspect_chest({ actor, target, args: validated.args });
+    case "deposit_shared":
+      return tools.deposit_shared({ actor, target, args: validated.args });
+    case "withdraw_shared":
+      return tools.withdraw_shared({ actor, target, args: validated.args });
     case "say":
       return tools.say({ actor, target, args: validated.args });
     case "wait":
@@ -130,38 +142,183 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   bots,
   provider,
   tools,
-  transcript
+  transcript,
+  initialCompletedTaskIds = []
 }: AgentLoopArgs<TActor>) {
-  const actor = bots.npc_a;
-  const target = bots.npc_b;
-  let lastResult: LastResult | null = null;
+  const actor = bots.actor;
+  const target = bots.target;
+  let lastResult: ToolResult | null = null;
+  let previousIntent: IntentRecord | undefined;
+  const antiRepeat = createAntiRepeatPolicy();
+  const completedTaskIds = new Set<string>(initialCompletedTaskIds);
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
     const observation = await tools.observe({ actor, target });
-    const proposal = provider.next({ observation, lastResult });
+    const currentTask = selectDeterministicTask({
+      visibleActors: observation.visibleActors.map((visibleActor) => ({
+        id: visibleActor.id,
+        distance: visibleActor.distance
+      })),
+      ...(observation.inventory ? { inventory: observation.inventory } : {}),
+      ...(observation.sharedChest ? { sharedChest: observation.sharedChest } : {}),
+      completedTaskIds: [...completedTaskIds]
+    });
+
+    const pressureContext = buildPressureIntentContext({
+      actorId: actor.username,
+      turn: step + 1,
+      observation,
+      currentTask,
+      completedTaskIds: [...completedTaskIds],
+      previousIntent
+    });
+    previousIntent = pressureContext.currentIntent;
+
+    const proposal = provider.next({ observation, lastResult, currentTask });
     const validated = tools.validateProposal(proposal);
-    const result = await executeTool(tools, validated, actor, target, observation);
+    const result = await executePhaseOneTool({
+      tools,
+      validated,
+      actor,
+      target,
+      observation,
+      currentTask,
+      actorId: actor.username,
+      antiRepeat
+    });
+    const verification = readVerification(result);
 
     transcript.recordStep({
       actor: actor.username,
-      observation,
+      observation: toJsonValue(observation),
+      ...(currentTask ? { task: toJsonValue(currentTask) } : {}),
+      pressureContext: toJsonValue(pressureContext),
       tool: validated.tool,
       args: Object.keys(validated.args).length > 0 ? toJsonRecord(validated.args) : undefined,
-      result
+      result: toJsonValue(result),
+      ...(verification ? { verification: toJsonValue(verification) } : {})
     });
 
-    lastResult = {
-      tool: validated.tool,
-      status: result.status
-    };
+    lastResult = toToolResult(result, validated.tool);
+
+    if (currentTask && verification?.status === "passed") {
+      completedTaskIds.add(currentTask.id);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     if (validated.tool === "remember") {
       return {
         status: "success" as const,
-        why: "runtime-owned busy result changed the next action" as const
+        why:
+          typeof result.note === "string"
+            ? result.note
+            : "runtime-owned curriculum reached a terminal note"
       };
     }
   }
 
   throw new Error(`Agent loop exhausted ${MAX_STEPS}-step budget without remember`);
+}
+
+function readVerification(result: ToolResult) {
+  if (typeof result.verification !== "object" || result.verification === null) {
+    return undefined;
+  }
+
+  return result.verification as TaskVerification;
+}
+
+async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
+  tools: AgentLoopTools<TActor>;
+  validated: ValidatedProposal;
+  actor: TActor;
+  target: TActor;
+  observation: ObserveResult;
+  currentTask: ReturnType<typeof selectDeterministicTask>;
+  actorId: string;
+  antiRepeat: ReturnType<typeof createAntiRepeatPolicy>;
+}) {
+  const {
+    tools,
+    validated,
+    actor,
+    target,
+    observation,
+    currentTask,
+    actorId,
+    antiRepeat
+  } = input;
+
+  if (currentTask && !currentTask.primitiveIds.includes(validated.tool)) {
+    if (validated.tool === "remember") {
+      return executeTool(tools, validated, actor, target, observation);
+    }
+
+    return {
+      tool: validated.tool,
+      ok: false,
+      status: "invalid",
+      message: `Task ${currentTask.id} does not allow ${validated.tool}`
+    } satisfies ToolResult;
+  }
+
+  const shouldVerifyCurrentTask =
+    currentTask !== null &&
+    currentTask !== undefined &&
+    validated.tool !== "observe" &&
+    validated.tool !== "wait" &&
+    validated.tool !== "remember";
+
+  if (
+    shouldVerifyCurrentTask &&
+    antiRepeat.shouldBlock({
+      actorId,
+      tool: validated.tool,
+      args: validated.args
+    })
+  ) {
+    const verification = verifyTask(currentTask, {
+      before: observation,
+      after: observation,
+      result: {
+        tool: validated.tool,
+        ok: false,
+        status: "blocked"
+      }
+    });
+
+    return {
+      tool: validated.tool,
+      ok: false,
+      status: "blocked",
+      message: `Repeated failed ${validated.tool} attempt blocked by runtime policy`,
+      verification
+    } satisfies ToolResult;
+  }
+
+  const result = await executeTool(tools, validated, actor, target, observation);
+
+  if (!shouldVerifyCurrentTask || !currentTask) {
+    return result;
+  }
+
+  const after = await tools.observe({ actor, target });
+  const verification = verifyTask(currentTask, {
+    before: observation,
+    after,
+    result
+  });
+
+  antiRepeat.record({
+    actorId,
+    tool: validated.tool,
+    args: validated.args,
+    verificationStatus: verification.status
+  });
+
+  return {
+    ...result,
+    verification
+  } satisfies ToolResult;
 }

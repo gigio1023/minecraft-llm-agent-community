@@ -1,5 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeActorIds } from "./runtime/actorRoster.js";
+
+import fs from "node:fs";
+import yaml from "yaml";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -7,6 +11,15 @@ export type ProbeConfig = {
   probeId: string;
   evidenceDir: string;
   composeFile: string;
+  world: {
+    seed: string;
+    levelType: string;
+  };
+  spawn: {
+    x: number;
+    y: number;
+    z: number;
+  };
   liveDialogue: {
     providerId: "openai-codex";
     authStorePath: string;
@@ -23,7 +36,7 @@ export type ProbeConfig = {
     publishStrategy: "ephemeral-host-port";
     pingTimeoutMs: number;
   };
-  bots: [string, string];
+  bots: string[];
   dialogue: {
     busyRepliesBeforeAvailable: number;
     waitTicks: number;
@@ -32,10 +45,34 @@ export type ProbeConfig = {
 };
 
 export function loadProbeConfig(): ProbeConfig {
+  const envBots = process.env.PROBE_BOTS?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  let yamlConfig = {
+    world: { seed: "", levelType: "default" },
+    spawn: { x: 49.9, y: -58.0, z: -119.0 }
+  };
+  try {
+    const yamlStr = fs.readFileSync(path.resolve(here, "../probe-config.yaml"), "utf8");
+    yamlConfig = yaml.parse(yamlStr);
+  } catch (error) {
+    console.warn("Could not read probe-config.yaml, using defaults.", error);
+  }
+
   return {
     probeId: "agent_loop_probe_v0",
     evidenceDir: path.resolve(here, "../../data/evidence"),
     composeFile: path.resolve(here, "../compose.yaml"),
+    world: {
+      seed: yamlConfig.world?.seed || "",
+      levelType: yamlConfig.world?.levelType || "default"
+    },
+    spawn: {
+      x: yamlConfig.spawn?.x ?? 49.9,
+      y: yamlConfig.spawn?.y ?? -58.0,
+      z: yamlConfig.spawn?.z ?? -119.0
+    },
     liveDialogue: {
       providerId: "openai-codex",
       authStorePath: path.resolve(here, "../../build/provider-auth/openai-codex-auth.json"),
@@ -52,7 +89,7 @@ export function loadProbeConfig(): ProbeConfig {
       publishStrategy: "ephemeral-host-port",
       pingTimeoutMs: 120000
     },
-    bots: ["npc_a", "npc_b"],
+    bots: normalizeActorIds(envBots),
     dialogue: {
       busyRepliesBeforeAvailable: 1,
       waitTicks: 20
@@ -76,12 +113,13 @@ export function buildServerEnv(config: ProbeConfig) {
     VERSION: config.server.version,
     TYPE: "VANILLA",
     ONLINE_MODE: "FALSE",
-    MODE: "creative",
+    MODE: "survival",
     DIFFICULTY: "peaceful",
-    LEVEL_TYPE: "FLAT",
-    GENERATE_STRUCTURES: "false",
+    LEVEL_TYPE: config.world.levelType || "default",
+    SEED: config.world.seed || "",
+    GENERATE_STRUCTURES: "true",
     SPAWN_NPCS: "true",
-    SPAWN_ANIMALS: "false",
+    SPAWN_ANIMALS: "true",
     SPAWN_MONSTERS: "false",
     VIEW_DISTANCE: "6",
     SIMULATION_DISTANCE: "6",
