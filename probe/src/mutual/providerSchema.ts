@@ -32,11 +32,7 @@ export function parseProviderAction(input: unknown): ProviderAction {
     throw new Error(`Unsupported mutual tool: ${tool}`);
   }
 
-  const args = input.args;
-
-  if (args !== undefined && !isRecord(args)) {
-    throw new Error("Provider action args must be an object");
-  }
+  const args = isRecord(input.args) ? input.args : {};
 
   if (why !== undefined && typeof why !== "string") {
     throw new Error("Provider action why must be a string");
@@ -44,7 +40,7 @@ export function parseProviderAction(input: unknown): ProviderAction {
 
   return {
     tool: tool as ProviderAction["tool"],
-    args: args ?? {},
+    args,
     ...(why ? { why } : {})
   };
 }

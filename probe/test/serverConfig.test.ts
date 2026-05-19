@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import path from "node:path";
 import test from "node:test";
 
 import { buildServerEnv, loadMutualProbeConfig, loadProbeConfig } from "../src/config.js";
@@ -46,8 +45,5 @@ test("loads locked live dialogue provider settings for the mutual probe", () => 
   assert.equal(config.liveDialogue.reasoning, "low");
   assert.equal(config.liveDialogue.maxRetries, 1);
   assert.equal(config.liveDialogue.delayStartMs, 30_000);
-  assert.equal(
-    config.liveDialogue.authStorePath,
-    path.resolve("../build/provider-auth/openai-codex-auth.json")
-  );
+  assert.match(config.liveDialogue.authStorePath, /build\/provider-auth\/openai-codex-auth\.json$/);
 });

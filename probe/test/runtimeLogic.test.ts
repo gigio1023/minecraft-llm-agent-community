@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
-import { buildDialogueContext } from "../src/mutual/dialogueContext.js";
+import {
+  buildDialogueContext,
+  type DialogueContextInput,
+  type DialogueContextOutput,
+  type DialogueObservation,
+  type DialoguePersona,
+  type DialogueTranscriptEntry
+} from "../src/mutual/dialogueContext.js";
 import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
@@ -71,18 +78,18 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
 
 test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
   const allowedTools = ["converse", "wait"];
-  const persona = {
+  const persona: DialoguePersona = {
     name: "npc_a",
     role: "runner",
     style: "brief",
     objective: "coordinate the marker handoff"
   };
-  const observation = {
+  const observation: DialogueObservation = {
     visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
     lastActionResult: { status: "available" }
   };
   const memory = ["marker paper should stay near the chest"];
-  const recentTranscript = [
+  const recentTranscript: DialogueTranscriptEntry[] = [
     {
       actor: "npc_b",
       tool: "converse",
@@ -97,7 +104,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
     observation,
     memory,
     recentTranscript
-  });
+  } satisfies DialogueContextInput);
 
   persona.role = "changed";
   observation.visibleActors[0]!.busy = true;
@@ -105,7 +112,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
   recentTranscript[0]!.args.utterance = "mutated";
   allowedTools.push("remember");
 
-  assert.deepEqual(context, {
+  const expected: DialogueContextOutput = {
     actorId: "npc_a",
     persona: {
       name: "npc_a",
@@ -131,7 +138,9 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
       noInventedObservations: true,
       preferObserveWorldWhenUncertain: true
     }
-  });
+  };
+
+  assert.deepEqual(context, expected);
 });
 
 test("parseProviderAction accepts converse, defaults args, and rejects invalid actions", () => {
@@ -155,6 +164,11 @@ test("parseProviderAction accepts converse, defaults args, and rejects invalid a
   );
 
   assert.deepEqual(parseProviderAction({ tool: "wait" }), {
+    tool: "wait",
+    args: {}
+  });
+
+  assert.deepEqual(parseProviderAction({ tool: "wait", args: "soon" }), {
     tool: "wait",
     args: {}
   });
