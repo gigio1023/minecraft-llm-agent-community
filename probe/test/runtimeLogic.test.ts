@@ -70,6 +70,7 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
 });
 
 test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
+  const allowedTools = ["converse", "wait"];
   const persona = {
     name: "npc_a",
     role: "runner",
@@ -91,6 +92,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
 
   const context = buildDialogueContext({
     actorId: "npc_a",
+    allowedTools,
     persona,
     observation,
     memory,
@@ -101,6 +103,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
   observation.visibleActors[0]!.busy = true;
   memory.push("mutated");
   recentTranscript[0]!.args.utterance = "mutated";
+  allowedTools.push("remember");
 
   assert.deepEqual(context, {
     actorId: "npc_a",
@@ -124,7 +127,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
     ],
     rules: {
       oneToolPerTurn: true,
-      allowedTools: ["converse", "observe_world", "move_to", "wait", "remember", "drop_item"],
+      allowedTools: ["converse", "wait"],
       noInventedObservations: true,
       preferObserveWorldWhenUncertain: true
     }

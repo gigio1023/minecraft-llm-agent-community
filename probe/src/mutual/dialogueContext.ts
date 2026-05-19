@@ -1,14 +1,6 @@
-const allowedTools = [
-  "converse",
-  "observe_world",
-  "move_to",
-  "wait",
-  "remember",
-  "drop_item"
-] as const;
-
 type DialogueContextInput = {
   actorId: string;
+  allowedTools: string[];
   persona: unknown;
   observation: unknown;
   memory: string[];
@@ -24,7 +16,7 @@ export function buildDialogueContext(input: DialogueContextInput) {
     recentTranscript: input.recentTranscript,
     rules: {
       oneToolPerTurn: true,
-      allowedTools: [...allowedTools],
+      allowedTools: input.allowedTools,
       noInventedObservations: true,
       preferObserveWorldWhenUncertain: true
     }
