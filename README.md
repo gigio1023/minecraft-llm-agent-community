@@ -1,6 +1,6 @@
 # ⛏️ minecraft-llm-agent-community: Minecraft LLM Agent Social Simulation
 
-![Cover Image](assets/cover-image.jpeg)
+![Cover Image](assets/cover-image.png)
 
 **minecraft-llm-agent-community** is a next-generation multi-bot Minecraft social simulation probe. We use a strictly bounded, headless agent runtime powered by TypeScript and Mineflayer to simulate an emergent **multi-NPC society**.
 
