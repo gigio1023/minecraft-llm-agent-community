@@ -33,7 +33,7 @@ test("agent loop deposits crafted resource into shared chest and stops after pub
   let craftingTableDeposited = false;
 
   const final = await runAgentLoop({
-    bots: { npc_a: actor, npc_b: target },
+    bots: { actor, target },
     provider,
     initialCompletedTaskIds: [
       "collect_4_logs",

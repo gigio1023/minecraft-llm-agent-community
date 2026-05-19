@@ -60,8 +60,8 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
 
 type AgentLoopArgs<TActor extends RuntimeActor> = {
   bots: {
-    npc_a: TActor;
-    npc_b: TActor;
+    actor: TActor;
+    target: TActor;
   };
   provider: Provider;
   tools: AgentLoopTools<TActor>;
@@ -143,8 +143,8 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   transcript,
   initialCompletedTaskIds = []
 }: AgentLoopArgs<TActor>) {
-  const actor = bots.npc_a;
-  const target = bots.npc_b;
+  const actor = bots.actor;
+  const target = bots.target;
   let lastResult: ToolResult | null = null;
   const antiRepeat = createAntiRepeatPolicy();
   const completedTaskIds = new Set<string>(initialCompletedTaskIds);

@@ -629,7 +629,9 @@ test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", 
 
 test("deterministic provider follows the planned runtime contract sequence", () => {
   const provider = createDeterministicProvider();
-  const observation = { nearby: ["npc_b"] };
+  const observation = {
+    visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+  };
 
   assert.deepEqual(provider.next({ observation, lastResult: null }), {
     tool: "observe",
@@ -1055,7 +1057,7 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
       return proposal;
     }
   };
-   const lastResults = new Map<"npc_a" | "npc_b", ToolResult | null>([
+   const lastResults = new Map<string, ToolResult | null>([
     ["npc_a", null],
     ["npc_b", null]
   ]);
@@ -1068,9 +1070,9 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
     },
     tools: {
       async observe(actorId) {
-        const actor = actors[actorId];
+        const actor = actors[actorId as keyof typeof actors];
         const targetId = actorId === "npc_a" ? "npc_b" : "npc_a";
-        const target = actors[targetId];
+        const target = actors[targetId as keyof typeof actors];
 
         return {
           visibleActors: [
@@ -1092,7 +1094,7 @@ test("runMutualLoop awaits async providers and records four live dialogue turns 
         return lastResults.get(actorId) ?? null;
       },
        async execute(actorId, proposal, observation) {
-         const actor = actors[actorId];
+         const actor = actors[actorId as keyof typeof actors];
          const result = await executeMutualTool({
            proposal,
           actor,
@@ -1236,8 +1238,8 @@ test("agent loop records six steps and succeeds when remember changes the next a
 
   const final = await runAgentLoop({
     bots: {
-      npc_a: { username: "npc_a" },
-      npc_b: { username: "npc_b" }
+      actor: { username: "npc_a" },
+      target: { username: "npc_b" }
     },
     provider,
     transcript: {

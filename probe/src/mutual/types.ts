@@ -1,4 +1,4 @@
-export type MutualActorId = "npc_a" | "npc_b";
+export type MutualActorId = string;
 
 export type InteractionCategory =
   | "conversationTurnState"
@@ -40,6 +40,8 @@ export type MutualStepRecord = {
   category?: InteractionCategory;
   actor?: string;
   observation?: MutualJsonValue;
+  threadState?: JsonObject;
+  sharedContext?: JsonObject;
   actorAction: {
     actor?: MutualActorId | string;
     tool: string;

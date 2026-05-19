@@ -3,7 +3,8 @@ import type {
   DialoguePersona,
   DialogueTranscriptEntry
 } from "./dialogueContext.js";
-import type { LastResult, MutualActorId, Proposal } from "./types.js";
+import type { ToolResult, MutualActorId, Proposal } from "./types.js";
+import { selectMutualPair } from "../runtime/actorRoster.js";
 
 export type ProviderInput = {
   actorId?: MutualActorId;
@@ -17,7 +18,7 @@ export type ProviderInput = {
       noInventedObservations: true;
       preferObserveWorldWhenUncertain: true;
   };
-  lastResult?: LastResult | null;
+  lastResult?: ToolResult | null;
 };
 
 export type MutualProvider = {
@@ -96,32 +97,34 @@ function markerEntitySeen(observation: ProviderInput["observation"]) {
 }
 
 export function createDeterministicMutualProviders(): Record<MutualActorId, MutualProvider> {
+  const [actorA, actorB] = selectMutualPair(["npc_a", "npc_b"]);
   return {
-    npc_a: createDeterministicMutualProvider("npc_a"),
-    npc_b: createDeterministicMutualProvider("npc_b")
+    [actorA]: createDeterministicMutualProvider(actorA),
+    [actorB]: createDeterministicMutualProvider(actorB)
   };
 }
 
-export function createMutualProviders(): Record<MutualActorId, MutualProvider> {
+export function createMutualProviders(actorIds: readonly string[] = ["npc_a", "npc_b"]): Record<MutualActorId, MutualProvider> {
+  const [actorA, actorB] = selectMutualPair(actorIds);
   return {
-    npc_a: createSequenceProvider([
+    [actorA]: createSequenceProvider([
       { tool: "observe_world", args: {} },
-      { tool: "move_to", args: { target: "npc_b" } },
-      { tool: "say", args: { target: "npc_b", text: "Jun, can you confirm the marker?" } },
-      { tool: "wait", args: { ticks: 20, reason: "npc_b was busy" } },
+      { tool: "move_to", args: { target: actorB } },
+      { tool: "say", args: { target: actorB, text: `Hi ${actorB}, can you confirm the marker?` } },
+      { tool: "wait", args: { ticks: 20, reason: `${actorB} was busy` } },
       { tool: "drop_item", args: { itemName: "paper", count: 1 } },
-      { tool: "remember", args: { note: "Jun answered after the marker drop" } }
+      { tool: "remember", args: { note: `${actorB} answered after the marker drop` } }
     ]),
-    npc_b: {
+    [actorB]: {
       next(input) {
         const lastResult = input.lastResult ?? null;
 
         if (lastResult === null) {
-          return { tool: "reply_to", args: { source: "npc_a", text: "Busy. Give me a second." } };
+          return { tool: "reply_to", args: { source: actorA, text: "Busy. Give me a second." } };
         }
 
         if (lastResult.tool === "reply_to" && lastResult.status === "busy_reply") {
-          return { tool: "look_at_actor", args: { target: "npc_a" } };
+          return { tool: "look_at_actor", args: { target: actorA } };
         }
 
         if (lastResult.tool === "look_at_actor") {
@@ -129,7 +132,7 @@ export function createMutualProviders(): Record<MutualActorId, MutualProvider> {
         }
 
         if (lastResult.tool === "observe_world" && markerEntitySeen(input.observation)) {
-          return { tool: "reply_to", args: { source: "npc_a", text: "I see the paper. Leave it with me." } };
+          return { tool: "reply_to", args: { source: actorA, text: "I see the paper. Leave it with me." } };
         }
 
         return { tool: "reply_to", args: { source: "npc_a", text: "I still do not see the marker." } };

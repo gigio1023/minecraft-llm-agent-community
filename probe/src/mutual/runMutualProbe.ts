@@ -2,8 +2,8 @@ import { loadMutualProbeConfig } from "../config.js";
 import { finalizeRunProbe, type ProbeRunResult } from "../runProbe.js";
 import { closeBots, createBots } from "../runtime/createBots.js";
 import { createMemory } from "../runtime/memory.js";
+import { buildScenarioPersonas } from "./personas.js";
 import { startDockerServer, type ServerHandle } from "../server/dockerServer.js";
-import { mutualPersonas } from "./personas.js";
 import { createMutualProviders } from "./provider.js";
 import { createMutualRuntimeState } from "./runtimeState.js";
 import { runMutualLoop } from "./mutualLoop.js";
@@ -24,27 +24,30 @@ export async function runMutualProbe(): Promise<ProbeRunResult> {
       host: server.host,
       port: server.port
     });
+    const actorIds = Object.keys(bots);
+    const personas = buildScenarioPersonas(actorIds);
 
-    const memories = {
-      npc_a: createMemory(config.memoryLimit),
-      npc_b: createMemory(config.memoryLimit)
-    };
+    const memories = Object.fromEntries(
+      actorIds.map((actorId) => [actorId, createMemory(config.memoryLimit)])
+    );
     const runtimeState = createMutualRuntimeState({
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable,
-      markerItemName: "paper"
+      markerItemName: "paper",
+      actorIds,
+      socialContextEnabled: true
     });
     const transcript = createMutualTranscript({
       evidenceDir: config.evidenceDir,
       probeId: config.probeId,
-      personas: {
-        npc_a: `${mutualPersonas.npc_a.name}, ${mutualPersonas.npc_a.summary}`,
-        npc_b: `${mutualPersonas.npc_b.name}, ${mutualPersonas.npc_b.summary}`
-      }
+      bots: actorIds,
+      personas: Object.fromEntries(
+        actorIds.map((actorId) => [actorId, `${personas[actorId].name}, ${personas[actorId].summary}`])
+      )
     });
 
     const final = await runMutualLoop({
       bots,
-      providers: createMutualProviders(),
+      providers: createMutualProviders(actorIds),
       tools: createMutualTools({ runtimeState, memories }),
       transcript
     });

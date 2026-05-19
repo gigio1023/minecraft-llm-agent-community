@@ -2,6 +2,7 @@ import type { Vec3 } from "vec3";
 
 import { createDialogueState } from "../runtime/dialogueState.js";
 import { createMemory } from "../runtime/memory.js";
+import type { ItemStack } from "../gameplay/storage/sharedStorageLedger.js";
 
 type DialogueState = ReturnType<typeof createDialogueState>;
 type MemoryStore = ReturnType<typeof createMemory>;
@@ -47,6 +48,10 @@ type ObserveArgs = {
   target: PositionedActor;
   dialogueState: DialogueState;
   memory: MemoryStore;
+  sharedChest?: {
+    chestId: string;
+    inspect(): Promise<ItemStack[] | null> | ItemStack[] | null;
+  };
 };
 
 function roundDistance(distance: number) {
@@ -87,22 +92,35 @@ export async function observe({
   actor,
   target,
   dialogueState,
-  memory
+  memory,
+  sharedChest
 }: ObserveArgs): Promise<ObserveResult> {
   const inventory = inspectInventory(actor);
   const nearbyBlocks = scanNearbyBlocks(actor);
+  const sharedChestItems = sharedChest ? await sharedChest.inspect() : null;
 
   return {
     status: "ok",
-    visibleActors: [
-      {
-        id: target.username,
-        distance: roundDistance(actor.entity.position.distanceTo(target.entity.position)),
-        busy: dialogueState.peek(target.username) === "busy"
-      }
-    ],
+    visibleActors:
+      target.username === actor.username
+        ? []
+        : [
+            {
+              id: target.username,
+              distance: roundDistance(actor.entity.position.distanceTo(target.entity.position)),
+              busy: dialogueState.peek(target.username) === "busy"
+            }
+          ],
     memory: memory.list(),
     ...(inventory ? { inventory } : {}),
-    ...(nearbyBlocks ? { nearbyBlocks } : {})
+    ...(nearbyBlocks ? { nearbyBlocks } : {}),
+    ...(sharedChest && sharedChestItems
+      ? {
+          sharedChest: {
+            chestId: sharedChest.chestId,
+            items: sharedChestItems
+          }
+        }
+      : {})
   };
 }

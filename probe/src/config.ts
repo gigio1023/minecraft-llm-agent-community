@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeActorIds } from "./runtime/actorRoster.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,7 +24,7 @@ export type ProbeConfig = {
     publishStrategy: "ephemeral-host-port";
     pingTimeoutMs: number;
   };
-  bots: [string, string];
+  bots: string[];
   dialogue: {
     busyRepliesBeforeAvailable: number;
     waitTicks: number;
@@ -32,6 +33,10 @@ export type ProbeConfig = {
 };
 
 export function loadProbeConfig(): ProbeConfig {
+  const envBots = process.env.PROBE_BOTS?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
   return {
     probeId: "agent_loop_probe_v0",
     evidenceDir: path.resolve(here, "../../data/evidence"),
@@ -52,7 +57,7 @@ export function loadProbeConfig(): ProbeConfig {
       publishStrategy: "ephemeral-host-port",
       pingTimeoutMs: 120000
     },
-    bots: ["npc_a", "npc_b"],
+    bots: normalizeActorIds(envBots),
     dialogue: {
       busyRepliesBeforeAvailable: 1,
       waitTicks: 20

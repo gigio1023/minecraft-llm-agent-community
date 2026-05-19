@@ -13,10 +13,15 @@ function isBusyResult(lastResult: ToolResult) {
 type NextInput = {
   observation?: Record<string, unknown> & {
     inventory?: Array<{ name: string; count: number }>;
+    visibleActors?: Array<{ id: string; distance: number }>;
   };
   lastResult: ToolResult | null;
   currentTask?: DeterministicTask | null;
 };
+
+function readVisibleTargetId(input: NextInput) {
+  return input.observation?.visibleActors?.[0]?.id;
+}
 
 function countItems(observation: NextInput["observation"], names: readonly string[]) {
   return observation?.inventory
@@ -148,13 +153,31 @@ export function createDeterministicProvider() {
       }
 
       if (lastResult.tool === "observe") {
-        return { tool: "move_to", args: { target: "npc_b" } };
+        const targetId = readVisibleTargetId(input);
+
+        if (!targetId) {
+          return {
+            tool: "remember",
+            args: { note: "no visible actor was available for the next social step" }
+          };
+        }
+
+        return { tool: "move_to", args: { target: targetId } };
       }
 
       if (lastResult.tool === "move_to") {
+        const targetId = readVisibleTargetId(input);
+
+        if (!targetId) {
+          return {
+            tool: "remember",
+            args: { note: "no visible actor remained after movement" }
+          };
+        }
+
         return {
           tool: "say",
-          args: { target: "npc_b", text: "hi npc_b, are you free?" }
+          args: { target: targetId, text: `hi ${targetId}, are you free?` }
         };
       }
 
@@ -169,7 +192,7 @@ export function createDeterministicProvider() {
         return {
           tool: "say",
           args: {
-            target: "npc_b",
+            target: readVisibleTargetId(input) ?? "npc_b",
             text: "checking again when you are ready"
           }
         };

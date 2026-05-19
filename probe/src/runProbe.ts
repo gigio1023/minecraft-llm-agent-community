@@ -17,6 +17,19 @@ import { collectLogs } from "./tools/collectLogs.js";
 import { craftItem } from "./tools/craftItem.js";
 import { createSharedStorageLedger } from "./gameplay/storage/sharedStorageLedger.js";
 import { createTeamBulletin } from "./npc/social/teamBulletin.js";
+import { createSharedSettlementState } from "./memory/shared/sharedSettlementState.js";
+import { getRoleContract, type RoleId } from "./npc/roles/contracts.js";
+import {
+  depositToSharedChest,
+  inspectChest,
+  withdrawFromSharedChest
+} from "./tools/sharedChest.js";
+import { createMineflayerSharedChestAccessor } from "./tools/liveSharedChest.js";
+import {
+  defaultActorRoles,
+  selectPrimaryActorId,
+  selectPrimaryTargetId
+} from "./runtime/actorRoster.js";
 
 export type ProbeRunResult = {
   transcriptPath: string;
@@ -111,6 +124,12 @@ export async function runProbe(): Promise<ProbeRunResult> {
       host: server.host,
       port: server.port
     });
+    const actorIds = Object.keys(bots);
+    const primaryActorId = selectPrimaryActorId(actorIds);
+    const primaryTargetId = selectPrimaryTargetId(actorIds, primaryActorId);
+    const activeBots = bots;
+    const actor = activeBots[primaryActorId];
+    const target = activeBots[primaryTargetId];
 
     const memory = createMemory(config.memoryLimit);
     const dialogueState = createDialogueState({
@@ -119,20 +138,30 @@ export async function runProbe(): Promise<ProbeRunResult> {
     const provider = createDeterministicProvider();
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
+    const sharedSettlementState = createSharedSettlementState();
     const transcript = createTranscript({
       evidenceDir: config.evidenceDir,
       probeId: config.probeId,
-      bots: [bots.npc_a.username, bots.npc_b.username]
+      bots: actorIds.map((actorId) => activeBots[actorId].username)
     });
+    const actorRole: RoleId = defaultActorRoles(actorIds)[primaryActorId] ?? "gatherer";
+    const sharedChest = createMineflayerSharedChestAccessor(actor);
+
+    function readActorInventory() {
+      return actor.inventory?.items().map((item) => ({
+        name: item.name,
+        count: item.count
+      })) ?? [];
+    }
 
     const final = await runAgentLoop({
-      bots,
+      bots: { actor, target },
       provider,
       transcript,
       tools: {
         validateProposal,
         observe: ({ actor, target }) =>
-          observe({ actor, target, dialogueState, memory }),
+          observe({ actor, target, dialogueState, memory, sharedChest }),
         move_to: ({ actor, target, args }) => {
           return withActionWrapper(
             () => {
@@ -155,37 +184,85 @@ export async function runProbe(): Promise<ProbeRunResult> {
             { tool: "craft_item" }
           );
         },
-        inspect_chest: () => {
+        inspect_chest: async () => {
           return withActionWrapper(
-            () => ({
-              status: "unavailable",
-              chestId: "shared-chest-1",
-              message: "shared chest runtime is not wired in live probe yet"
-            }),
+            async () => {
+              const result = await inspectChest({
+                actorId: actor.username,
+                roleId: actorRole,
+                chest: sharedChest,
+                ledger: sharedStorageLedger,
+                bulletin: teamBulletin,
+                currentTask: getRoleContract(actorRole).priorityList[0]
+              });
+
+              if (result.status === "inspected") {
+                sharedSettlementState.rememberSharedChest(
+                  result.chestId,
+                  result.items ?? []
+                );
+              }
+
+              return result;
+            },
             { tool: "inspect_chest" }
           );
         },
-        deposit_shared: () => {
+        deposit_shared: ({ args }) => {
           return withActionWrapper(
-            () => {
-              void sharedStorageLedger;
-              void teamBulletin;
-              return {
-                status: "unavailable",
-                chestId: "shared-chest-1",
-                message: "shared chest runtime is not wired in live probe yet"
-              };
+            async () => {
+              const result = await depositToSharedChest({
+                actorId: actor.username,
+                roleId: actorRole,
+                chest: sharedChest,
+                inventory: {
+                  items: readActorInventory
+                },
+                ledger: sharedStorageLedger,
+                bulletin: teamBulletin,
+                itemName: readStringArg(args, "itemName"),
+                count: typeof args.count === "number" ? args.count : 1,
+                currentTask: "deposit_shared_materials"
+              });
+
+              sharedSettlementState.rememberSharedChest(
+                result.chestId,
+                sharedStorageLedger.latestChest(result.chestId) ?? []
+              );
+
+              return result;
             },
             { tool: "deposit_shared" }
           );
         },
-        withdraw_shared: () => {
+        withdraw_shared: ({ args }) => {
           return withActionWrapper(
-            () => ({
-              status: "unavailable",
-              chestId: "shared-chest-1",
-              message: "shared chest runtime is not wired in live probe yet"
-            }),
+            async () => {
+              const result = await withdrawFromSharedChest({
+                actorId: actor.username,
+                roleId: actorRole,
+                chest: sharedChest,
+                inventory: {
+                  items: readActorInventory
+                },
+                ledger: sharedStorageLedger,
+                bulletin: teamBulletin,
+                itemName: readStringArg(args, "itemName"),
+                count: typeof args.count === "number" ? args.count : 1,
+                reason:
+                  typeof args.reason === "string" && args.reason.length > 0
+                    ? args.reason
+                    : "runtime withdrawal",
+                currentTask: getRoleContract(actorRole).priorityList[0]
+              });
+
+              sharedSettlementState.rememberSharedChest(
+                result.chestId,
+                sharedStorageLedger.latestChest(result.chestId) ?? []
+              );
+
+              return result;
+            },
             { tool: "withdraw_shared" }
           );
         },

@@ -3,13 +3,14 @@ import type {
   CategoryVerdict,
   InteractionCategory,
   JsonObject,
-  LastResult,
+  ToolResult,
   MutualActorId,
   MutualJsonValue,
   MutualStepRecord,
   Proposal
 } from "./types.js";
 import { validateProposal } from "./tools/index.js";
+import { selectMutualPair } from "../runtime/actorRoster.js";
 
 type LiveRuntimeActor = {
   username: string;
@@ -22,13 +23,13 @@ type LiveMutualLoopTools = {
     proposal: Proposal,
     observation: DialogueObservation
   ): Promise<MutualJsonValue> | MutualJsonValue;
-  lastResult(actorId: MutualActorId): LastResult | null;
+  lastResult(actorId: MutualActorId): ToolResult | null;
 };
 
 type LiveLoopProvider = {
   next(input: {
     observation: DialogueObservation;
-    lastResult: LastResult | null;
+    lastResult: ToolResult | null;
   }): Promise<Proposal> | Proposal;
 };
 
@@ -58,12 +59,12 @@ type DeterministicMutualRuntimeActor = {
 type DeterministicMutualProvider = {
   next(input: {
     observation?: Record<string, unknown>;
-    lastResult: LastResult | null;
+    lastResult: ToolResult | null;
   }): Promise<Proposal> | Proposal;
 };
 
 type RunDeterministicMutualLoopTools<TActor extends DeterministicMutualRuntimeActor> = {
-  lastResult(actorId: MutualActorId): LastResult | null;
+  lastResult(actorId: MutualActorId): ToolResult | null;
   validateProposal(proposal: Proposal): Proposal;
   observe_world(input: {
     actorId: MutualActorId;
@@ -241,23 +242,24 @@ async function runDeterministicMutualLoop<TActor extends DeterministicMutualRunt
   tools,
   transcript
 }: RunDeterministicMutualLoopArgs<TActor>): Promise<DeterministicMutualLoopResult> {
+  const [actorA, actorB] = selectMutualPair(Object.keys(bots));
   const turnPlan: MutualActorId[] = [
-    "npc_a",
-    "npc_a",
-    "npc_a",
-    "npc_b",
-    "npc_a",
-    "npc_b",
-    "npc_a",
-    "npc_b",
-    "npc_b",
-    "npc_a"
+    actorA,
+    actorA,
+    actorA,
+    actorB,
+    actorA,
+    actorB,
+    actorA,
+    actorB,
+    actorB,
+    actorA
   ];
   const recordedSteps: MutualStepRecord[] = [];
 
   for (const actorId of turnPlan) {
     const actor = bots[actorId];
-    const targetId = actorId === "npc_a" ? "npc_b" : "npc_a";
+    const targetId = actorId === actorA ? actorB : actorA;
     const target = bots[targetId];
     const observation = await tools.observe_world({ actorId, actor, targetId, target });
     const proposal = tools.validateProposal(

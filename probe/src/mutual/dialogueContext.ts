@@ -8,7 +8,7 @@ export type DialogueJsonValue =
 
 export type DialogueJsonObject = { [key: string]: DialogueJsonValue };
 
-export type MutualActorId = "npc_a" | "npc_b";
+export type MutualActorId = string;
 
 export const mutualPersonas = {
   npc_a: {
@@ -23,8 +23,8 @@ export const mutualPersonas = {
     style: "quick and slightly distracted",
     objective: "confirm the marker location"
   }
-} satisfies Record<
-  MutualActorId,
+} as const satisfies Record<
+  string,
   {
     name: string;
     role: string;
@@ -33,9 +33,38 @@ export const mutualPersonas = {
   }
 >;
 
-export type DialoguePersona = (typeof mutualPersonas)[MutualActorId];
+export type DialoguePersona = {
+  name: string;
+  role: string;
+  style: string;
+  objective: string;
+};
 export type DialogueObservation = DialogueJsonObject;
 export type DialogueTranscriptEntry = DialogueJsonObject;
+
+const fallbackRoles = ["quartermaster", "gatherer", "crafter", "runner"] as const;
+const fallbackNames = ["Mara", "Jun", "Iris", "Noah"] as const;
+
+export function getDialoguePersona(actorId: string, index = 0): DialoguePersona {
+  const knownPersona = mutualPersonas[actorId as keyof typeof mutualPersonas];
+
+  if (knownPersona) {
+    return knownPersona;
+  }
+
+  return {
+    name: fallbackNames[index] ?? `NPC ${index + 1}`,
+    role: fallbackRoles[index] ?? "gatherer",
+    style: index % 2 === 0 ? "brief and practical" : "responsive and concise",
+    objective: `coordinate the next validated tool step for ${actorId}`
+  };
+}
+
+export function buildDialoguePersonas(actorIds: readonly string[]) {
+  return Object.fromEntries(
+    actorIds.map((actorId, index) => [actorId, getDialoguePersona(actorId, index)])
+  ) as Record<string, DialoguePersona>;
+}
 
 export type DialogueContextInput = {
   actorId: MutualActorId;

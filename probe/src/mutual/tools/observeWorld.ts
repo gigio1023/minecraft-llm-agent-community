@@ -20,11 +20,14 @@ type ObserveWorldArgs = {
     };
   };
   runtimeState: {
+    beginTurn?(actorId: MutualActorId): void;
     consumeHeardMessages(target: MutualActorId): Array<{
       from: string;
       text: string;
     }>;
     markerItemName(): string;
+    recordObservation?(actorId: MutualActorId, observation: Record<string, unknown>): void;
+    socialContext?(actorId: MutualActorId): Record<string, unknown> | undefined;
   };
   memory: {
     list(): string[];
@@ -33,6 +36,29 @@ type ObserveWorldArgs = {
 
 function roundDistance(distance: number) {
   return Number(distance.toFixed(2));
+}
+
+function toJsonValue(value: unknown): import("../types.js").MutualJsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => toJsonValue(entry));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toJsonValue(entry)])
+    );
+  }
+
+  return String(value);
 }
 
 function findNearbyMarkerEntity({
@@ -67,9 +93,10 @@ export function observeWorld({
   runtimeState,
   memory
 }: ObserveWorldArgs) {
+  runtimeState.beginTurn?.(actor.username as MutualActorId);
   const itemId = actor.registry?.itemsByName?.[runtimeState.markerItemName()]?.id;
 
-  return {
+  const observation = {
     status: "ok" as const,
     visibleActors: [
       {
@@ -86,5 +113,14 @@ export function observeWorld({
       })
     ),
     memory: memory.list()
+  };
+
+  runtimeState.recordObservation?.(actor.username as MutualActorId, observation);
+
+  return {
+    ...observation,
+    ...((runtimeState.socialContext?.(actor.username as MutualActorId)
+      ? toJsonValue(runtimeState.socialContext?.(actor.username as MutualActorId))
+      : {}) as Record<string, import("../types.js").MutualJsonValue>)
   };
 }

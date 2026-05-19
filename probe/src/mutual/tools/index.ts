@@ -171,9 +171,22 @@ export async function executeMutualTool({
           });
     const memoryNote = readMemoryNote(validated.tool, actionResult as MutualJsonValue);
 
+    runtimeState.recordToolResult?.(
+      actor.username as MutualActorId,
+      toToolResult(actionResult as Record<string, unknown>, validated.tool)
+    );
+    if (memoryNote) {
+      runtimeState.rememberPrivateEvent?.(actor.username as MutualActorId, memoryNote.note);
+    }
+
+    const threadState = runtimeState.threadSnapshot?.(actor.username as MutualActorId);
+    const sharedContext = runtimeState.socialContext?.(actor.username as MutualActorId);
+
     transcript?.recordStep({
       actor: actor.username,
       observation: toJsonValue(observation),
+      ...(threadState ? { threadState: toJsonValue(threadState) as JsonObject } : {}),
+      ...(sharedContext ? { sharedContext: toJsonValue(sharedContext) as JsonObject } : {}),
       actorAction: { tool: validated.tool },
       ...(actorArgs ? { actorArgs } : {}),
       ...(memoryNote ? { memoryNote } : {}),
@@ -395,7 +408,15 @@ export function createMutualTools({ runtimeState, memories }: CreateMutualToolsA
           input.proposal.tool
         )
       );
-      return step;
+
+      const threadState = runtimeState.threadSnapshot?.(input.actorId);
+      const sharedContext = runtimeState.socialContext?.(input.actorId);
+
+      return {
+        ...step,
+        ...(threadState ? { threadState: toJsonValue(threadState) as JsonObject } : {}),
+        ...(sharedContext ? { sharedContext: toJsonValue(sharedContext) as JsonObject } : {})
+      };
     }
   };
 }

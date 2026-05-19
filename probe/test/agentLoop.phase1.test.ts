@@ -33,7 +33,7 @@ test("agent loop repeats move_to until the current approach task is verified", a
   let moveToCalls = 0;
 
   const final = await runAgentLoop({
-    bots: { npc_a: actor, npc_b: target },
+    bots: { actor, target },
     provider,
     transcript: {
       recordStep(step) {
@@ -114,7 +114,7 @@ test("agent loop blocks the fourth repeated failed move_to for the active approa
   let moveToCalls = 0;
 
   const final = await runAgentLoop({
-    bots: { npc_a: actor, npc_b: target },
+    bots: { actor, target },
     provider,
     transcript: {
       recordStep(step) {
@@ -190,7 +190,7 @@ test("agent loop advances through collect logs, craft materials, and craft craft
   const readInventory = () => [...inventory.entries()].map(([name, count]) => ({ name, count }));
 
   const final = await runAgentLoop({
-    bots: { npc_a: actor, npc_b: target },
+    bots: { actor, target },
     provider,
     transcript: {
       recordStep(step) {
