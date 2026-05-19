@@ -1,44 +1,56 @@
-# ⛏️ minecraft-llm-agent-community: Minecraft LLM Agent Social Simulation
+# minecraft-llm-agent-community
 
-![Cover Image](assets/cover-image.png)
+A headless, multi-agent Minecraft probe for studying LLM-driven NPC interactions.
 
-**minecraft-llm-agent-community** is a next-generation multi-bot Minecraft social simulation probe. We use a strictly bounded, headless agent runtime powered by TypeScript and Mineflayer to simulate an emergent **multi-NPC society**.
+[Documentation](https://gigio1023.github.io/minecraft-llm-agent-community/)
 
-- [📚 Documentation Blog](https://gigio1023.github.io/minecraft-llm-agent-community/)
+## Overview
 
-## 🎯 Vision
+minecraft-llm-agent-community runs multiple Mineflayer bots against a local vanilla Minecraft server. Each bot is driven by a language model through a bounded tool loop -- no raw eval, no manual client, no Fabric mods. Agents operate under resource pressures (gathering, crafting, inventory management) and produce structured transcripts for evaluation.
 
-Our goal is to prove that language models can maintain long-running, multi-agent interactions when bounded by strict runtime validation, biological pressures (like gathering wood or food), and memory compaction. We focus on **pressure-driven behavior**, **material scarcity**, and **social obligations**.
-
-## 🏗️ Architecture: The Headless Probe
-
-We have transitioned away from legacy bridge servers and raw eval loops. Our architecture is **Zero-Based**, **Headless**, and **Deterministic**:
-
-1. **Headless Environment**: Runs entirely on a local Vanilla Minecraft server via Docker. No manual client required.
-2. **Mineflayer Runtime**: Multiple NPCs connect simultaneously via TypeScript bots.
-3. **Pressure-Intent Lifecycle**: Agents operate under needs ("Pressures") compiled into structured "Intents".
-4. **Bounded Tools**: Agents use a strict, runtime-validated seed skill registry (e.g., `collect_logs`).
-5. **RCON & Config Management**: Environment enforced externally via Docker RCON and `probe-config.yaml`.
-
-## ⚙️ Usage
-
-The project is built with **TypeScript**, executed via **Bun**, and uses **Docker Compose**.
+## Quick Start
 
 ```bash
-# 1. Start the headless Minecraft server
-docker compose up -d
+# Start the headless server
+docker compose -f probe/compose.yaml up -d
 
-# 2. Install dependencies
-cd probe
-bun install
+# Install dependencies
+cd probe && bun install
 
-# 3. Run the Agent Loop Probe
+# Run the probe
 PROBE_BOTS="npc1,npc2,npc3" bun run src/cli.ts
 ```
 
-*Every run outputs a deterministic Transcript JSON in `data/evidence/` for evaluation.*
+Transcripts are written to `data/evidence/` after each run.
 
-## 📂 Structure
+## Architecture
 
-- `probe/`: The core bounded agent loop, skills, NPC logic, and memory system.
-- `docs/`: Technical reports, specifications (see `docs/docs/Architecture/SPEC.md`), and the project blog.
+The probe replaces the legacy Voyager eval-loop with a strictly bounded runtime:
+
+- **Headless server** -- Vanilla Minecraft via Docker Compose, no manual client required
+- **Mineflayer bots** -- Multiple NPCs connect simultaneously as TypeScript clients
+- **Bounded tool loop** -- The LLM selects from a registry of validated skill functions, each with a short runtime timeout and static API screening
+- **Pressure-driven behavior** -- Agents act on resource needs (wood, food, tools) rather than persona text alone
+- **Structured transcripts** -- Every run produces deterministic JSON evidence for analysis
+
+## Project Structure
+
+| Path | Purpose |
+|------|---------|
+| `probe/` | Agent loop, skills, NPC logic, memory, Docker server config |
+| `docs/` | Technical reports, specifications, and project blog |
+| `data/evidence/` | Transcript outputs from probe runs |
+
+## Requirements
+
+- Docker and Docker Compose
+- Bun 1.3+
+- Node.js 20+ (for Docusaurus docs)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit conventions, validation steps, and design rules.
+
+## License
+
+This project is a reference and migration staging area. Do not revive the legacy Voyager architecture as the active implementation path.
