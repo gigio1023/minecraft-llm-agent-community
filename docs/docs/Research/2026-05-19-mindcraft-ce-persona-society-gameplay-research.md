@@ -10,7 +10,7 @@ This report re-reads local `mindcraft-ce` code for patterns that make Minecraft
 
 Local repo inspected:
 
-- `/Users/naem1023/git/mindcraft-ce`
+- `../mindcraft-ce`
 
 ## Files Inspected
 

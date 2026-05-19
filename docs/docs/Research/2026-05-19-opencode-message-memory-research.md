@@ -10,7 +10,7 @@ This report studies local `opencode` as a coding-agent system, but with one
 
 Local repo inspected:
 
-- `/Users/naem1023/git/opencode`
+- `../opencode`
 
 ## Files Inspected
 

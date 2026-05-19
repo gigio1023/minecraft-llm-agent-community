@@ -13,7 +13,7 @@ This report re-reads local `Voyager` code for a narrower question than the prior
 
 Local repo inspected:
 
-- `/Users/naem1023/git/Voyager`
+- `../Voyager`
 
 ## Files Inspected
 

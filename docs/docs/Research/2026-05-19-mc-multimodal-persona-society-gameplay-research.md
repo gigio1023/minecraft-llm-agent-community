@@ -10,7 +10,7 @@ This report revisits local `mc-multimodal-agent` code for one specific question:
 
 Local repo inspected:
 
-- `/Users/naem1023/git/mc-multimodal-agent`
+- `../mc-multimodal-agent`
 
 ## Files Inspected
 

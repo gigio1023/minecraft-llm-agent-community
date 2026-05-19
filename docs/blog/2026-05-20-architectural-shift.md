@@ -38,6 +38,6 @@ Every run now outputs a comprehensive **Transcript JSON**. This transcript acts 
 
 ## Looking Forward
 
-The removal of the `bridge-server` marks the completion of our transition to this new, more rigorous foundation. We are now fully focused on expanding the `probe` to support complex social behaviors, shared storage, and long-term memory compaction, as outlined in our [Specification](https://github.com/naem1023/minecraft-llm-agent-community/blob/main/SPEC.md).
+The removal of the `bridge-server` marks the completion of our transition to this new, more rigorous foundation. We are now fully focused on expanding the `probe` to support complex social behaviors, shared storage, and long-term memory compaction, as outlined in our [Architecture Specification](/docs/Architecture/SPEC).
 
 Stay tuned for more updates as we continue to build out the Dream of One society!

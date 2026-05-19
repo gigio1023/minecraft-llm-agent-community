@@ -3,7 +3,7 @@
 Use the prompt below to hand this repo to another AI.
 
 ```text
-You are taking over unfinished work in /Users/naem1023/git/minecraft-llm-agent-community.
+You are taking over unfinished work in ..
 
 Current situation:
 - There are two lines of work in this repo right now.
@@ -13,7 +13,7 @@ Current situation:
 
 Worktree/branch to continue first:
 - Branch: `live-npc-dialogue`
-- Worktree path: `/Users/naem1023/git/minecraft-llm-agent-community/.worktrees/live-npc-dialogue`
+- Worktree path: `./.worktrees/live-npc-dialogue`
 
 Read these first:
 1. `docs/specs/2026-05-19-live-npc-dialogue-design.md`

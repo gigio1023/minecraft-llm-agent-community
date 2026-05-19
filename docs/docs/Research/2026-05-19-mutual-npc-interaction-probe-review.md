@@ -1,7 +1,7 @@
 # Mutual NPC Interaction Probe Review
 
 Date: 2026-05-19  
-Repo: `/Users/naem1023/git/minecraft-llm-agent-community`
+Repo: `../minecraft-llm-agent-community`
 
 ## Bottom line
 

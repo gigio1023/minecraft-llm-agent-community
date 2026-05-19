@@ -945,7 +945,7 @@ Expected: PASS for all three test files and `tsc --noEmit`.
 Run:
 
 ```bash
-cd /Users/naem1023/git/minecraft-llm-agent-community
+cd .
 ./scripts/run-live-mutual-dialogue-probe.sh
 ```
 

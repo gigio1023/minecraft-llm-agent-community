@@ -41,4 +41,4 @@ PROBE_BOTS="npc1,npc2,npc3" bun run src/cli.ts
 ## 📂 Structure
 
 - `probe/`: The core bounded agent loop, skills, NPC logic, and memory system.
-- `docs/`: Technical reports, specifications (see `SPEC.md`), and the project blog.
+- `docs/`: Technical reports, specifications (see `docs/docs/Architecture/SPEC.md`), and the project blog.
