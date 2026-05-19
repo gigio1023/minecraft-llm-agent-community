@@ -4,46 +4,31 @@ sidebar_position: 1
 
 # Introduction: Dream of One
 
-Welcome to the documentation for **Dream of One**, a next-generation multi-bot Minecraft social simulation probe built within the `minecraft-llm-agent-community` repository.
+**Dream of One** is a multi-bot Minecraft social simulation probe. We use Minecraft as a deterministic physics engine to prove that LLMs can sustain stable, long-running societies when constrained by strict rules.
 
-## Project Purpose
+## Core Philosophy
 
-The primary goal of this project is to simulate an emergent **multi-NPC society** within Minecraft. Instead of building agents that blindly explore and hallucinate unstructured actions (like earlier Voyager-style approaches), this project focuses on:
+We abandon open-ended, hallucination-prone prompts in favor of:
 
-1. **Pressure-Driven Behavior**: Agents act based on survival, material, and social pressures.
-2. **Material Scarcity & Crafting**: True interaction requires sharing finite resources, crafting dependencies, and collaborative building.
-3. **Social Obligations**: NPCs form relationships, respect boundaries, and share tasks.
+1. **Pressure-Driven Behavior**: Actions stem from biological needs (hunger) and material scarcity.
+2. **Material Scarcity**: True society requires shared resources, dependencies, and collaboration.
+3. **Social Obligations**: NPCs form roles, respect boundaries, and share tasks.
 
-We use Minecraft as a robust, deterministic physics engine to prove that Large Language Models can maintain long-running, stable multi-agent interactions when bounded by strict runtime constraints.
+## Architecture: The Headless Probe
 
-## System Architecture
+- **Zero-Based & Headless**: Runs on a local Dockerized Vanilla server (`itzg/minecraft-server`). No UI, no manual client setup.
+- **Bounded Tool Loop**: Agents do not write arbitrary code. They select from a strictly validated registry of static TypeScript skills.
+- **Pressure-Intent Lifecycle**: The runtime analyzes the world to generate "Pressures". The LLM processes these into actionable "Intents".
+- **Deterministic Evidence**: Relies on structured JSON transcripts for evaluation, not human visual inspection.
 
-The active runtime is designed as a **Zero-Based, Headless Mineflayer Probe**:
-
-- **Headless Server**: The environment is hosted on a local Dockerized Vanilla server (`itzg/minecraft-server`). There is no need for manual client installations, Fabric, Forge, or graphical UI.
-- **Bounded Tool Loop**: Agents do not write arbitrary JavaScript code. The LLM selects from a tightly controlled registry of static, pre-validated TypeScript skills (`observe`, `move`, `say`, `collect_logs`, etc.).
-- **Pressure-Intent Lifecycle**: The LLM does not generate free-form goals. The runtime analyzes the environment and biological needs to assign "Pressures", which the LLM compiles into actionable "Intents".
-- **Deterministic Evidence**: Instead of relying on human visual inspection, every run generates a structured JSON transcript (`data/evidence/*.json`) detailing observations, intent selections, and success verification.
-
-## Implementation Details
-
-The project utilizes a modern web and backend stack tailored for local AI execution:
+## Tech Stack
 
 - **Language:** TypeScript
 - **Runtime:** Bun
-- **Minecraft Client:** Mineflayer (handling bot physics, connection, and inventory state)
-- **Infrastructure:** Docker Compose (for the local headless server and optional databases)
-- **Configuration:** Strictly managed via `probe-config.yaml` to handle multi-bot spawning and world rules dynamically via RCON.
+- **Minecraft Interface:** Mineflayer
+- **Infrastructure:** Docker Compose (headless server, DBs)
+- **Configuration:** `probe-config.yaml` with RCON dynamic control.
 
-## Documentation Structure
+## Documentation Scope
 
-This documentation site contains our core blueprints, architectural changes, and research reports:
-
-- **Migration Guides**: Details on how we moved away from the old eval loop and manual clients to our current headless, deterministic probe.
-- **Agent Search Index**: A routing document for key technical decisions.
-- **Technical Reports**: Insights into specific failure modes, debugging (e.g., NPC teleportation fixes), and prompt engineering experiments.
-
-*Note: All legacy documentation regarding Voyager, Python setups, and manual client configurations has been archived or removed from the active site to prevent confusion.*
-
----
-![Dream of One Cover](img/cover-image.jpeg)
+This documentation focuses on active specs, architectural decisions, and research reports. All legacy Voyager-era setups have been archived.
