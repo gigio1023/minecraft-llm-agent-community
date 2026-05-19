@@ -1,6 +1,8 @@
 # minecraft-llm-agent-community
 
-![Cover Image](assets/cover-image.png)
+<img src="assets/cover-image.png" alt="Cover Image" width="60%">
+
+<!-- cover-image.png: 1448x1086, displayed at 60% width -->
 
 A headless, multi-agent Minecraft probe for studying LLM-driven NPC interactions.
 
