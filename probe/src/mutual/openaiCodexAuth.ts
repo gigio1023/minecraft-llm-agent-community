@@ -21,7 +21,7 @@ function parseAuthStore(raw: string): AuthStoreRecord {
 
   const { accessToken, expiresAt, profileEmail } = parsed as Record<string, unknown>;
 
-  if (typeof accessToken !== "string" || accessToken.length === 0) {
+  if (typeof accessToken !== "string" || accessToken.trim().length === 0) {
     throw new Error("OpenAI Codex auth store accessToken must be a non-empty string");
   }
 

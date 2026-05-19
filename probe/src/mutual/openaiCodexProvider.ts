@@ -72,7 +72,7 @@ export function createOpenAICodexProvider({
   fetchImpl = fetch,
   maxRetries = DEFAULT_MAX_RETRIES
 }: CreateOpenAICodexProviderArgs): MutualProvider {
-  if (typeof accessToken !== "string" || accessToken.length === 0) {
+  if (typeof accessToken !== "string" || accessToken.trim().length === 0) {
     throw new Error("OpenAI Codex provider accessToken must be a non-empty string");
   }
 

@@ -252,6 +252,29 @@ test("loadOpenAICodexAuth rejects an empty access token", async () => {
   await rm(authPath, { force: true });
 });
 
+test("loadOpenAICodexAuth rejects a whitespace-only access token", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "   ",
+      expiresAt: new Date(Date.now() + 60_000).toISOString()
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+
+  await assert.rejects(
+    loadOpenAICodexAuth(authPath),
+    /OpenAI Codex auth store accessToken must be a non-empty string/
+  );
+
+  await rm(authPath, { force: true });
+});
+
 test("loadOpenAICodexAuth rejects an expired auth store", async () => {
   const artifactDir = new URL("../test-artifacts/", import.meta.url);
   const authPath = new URL("openai-codex-auth.json", artifactDir);
@@ -380,6 +403,18 @@ test("createOpenAICodexProvider stops after exhausting malformed JSON retries", 
   );
 
   assert.equal(fetchCount, 3);
+});
+
+test("createOpenAICodexProvider rejects a whitespace-only access token", async () => {
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+
+  assert.throws(
+    () =>
+      createOpenAICodexProvider({
+        accessToken: "\t"
+      }),
+    /OpenAI Codex provider accessToken must be a non-empty string/
+  );
 });
 
 test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", async () => {
