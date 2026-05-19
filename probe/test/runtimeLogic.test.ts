@@ -17,6 +17,7 @@ import { finalizeRunProbe } from "../src/runProbe.js";
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 import { converse } from "../src/mutual/tools/converse.js";
 import { executeMutualTool } from "../src/mutual/tools/index.js";
+import { runMutualLoop } from "../src/mutual/mutualLoop.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -710,6 +711,179 @@ test("executeMutualTool records failures before rethrowing tool errors", async (
       }
     }
   ]);
+});
+
+test("runMutualLoop awaits async providers and records four live dialogue turns before movement", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actors: Record<"npc_a" | "npc_b", ReturnType<typeof createFakeBot>> = {
+    npc_a: createFakeBot("npc_a", 0),
+    npc_b: createFakeBot("npc_b", 2)
+  };
+  const transcriptSteps: Array<{
+    actor: string;
+    actorAction: { tool: string };
+    actorArgs?: Record<string, unknown>;
+    result: unknown;
+  }> = [];
+  const liveProposals = [
+    {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, are you near the shared chest?"
+      }
+    },
+    {
+      tool: "converse",
+      args: {
+        target: "npc_a",
+        utterance: "Yes, I am by the chest and I can check the marker."
+      }
+    },
+    {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Good. I will bring the marker paper over."
+      }
+    },
+    {
+      tool: "converse",
+      args: {
+        target: "npc_a",
+        utterance: "Understood. I will watch for it."
+      }
+    },
+    {
+      tool: "move_to",
+      args: {
+        target: "npc_b"
+      }
+    }
+  ];
+  const provider = {
+    async next() {
+      const proposal = liveProposals.shift();
+
+      if (!proposal) {
+        throw new Error("No live proposal available");
+      }
+
+      return proposal;
+    }
+  };
+  const lastResults = new Map<"npc_a" | "npc_b", { tool: string; status: string } | null>([
+    ["npc_a", null],
+    ["npc_b", null]
+  ]);
+
+  const result = await runMutualLoop({
+    actors,
+    providers: {
+      npc_a: provider,
+      npc_b: provider
+    },
+    tools: {
+      async observe(actorId) {
+        const actor = actors[actorId];
+        const targetId = actorId === "npc_a" ? "npc_b" : "npc_a";
+        const target = actors[targetId];
+
+        return {
+          visibleActors: [
+            {
+              id: targetId,
+              distance: Number(actor.entity.position.distanceTo(target.entity.position).toFixed(2)),
+              busy: false
+            }
+          ],
+          recentUtterances: runtimeState.recentUtterances(),
+          heardMessages: runtimeState.consumeHeardMessages(actorId),
+          marker: {
+            seen: true,
+            holder: "npc_a"
+          }
+        };
+      },
+      lastResult(actorId) {
+        return lastResults.get(actorId) ?? null;
+      },
+      async execute(actorId, proposal, observation) {
+        const actor = actors[actorId];
+        const result = await executeMutualTool({
+          proposal,
+          actor,
+          runtimeState,
+          observation,
+          transcript: {
+            recordStep(step) {
+              transcriptSteps.push(step);
+            }
+          },
+          handlers: {
+            async move_to({ args }) {
+              return {
+                status: "arrived",
+                targetId: String(args.target)
+              };
+            },
+            async observe_world() {
+              return {
+                status: "observed"
+              };
+            },
+            async wait() {
+              return {
+                status: "waited"
+              };
+            },
+            async remember() {
+              return {
+                status: "remembered"
+              };
+            },
+            async drop_item() {
+              return {
+                status: "dropped"
+              };
+            }
+          }
+        });
+
+        lastResults.set(actorId, {
+          tool: proposal.tool,
+          status: String((result as { status: string }).status)
+        });
+
+        return result;
+      }
+    }
+  });
+
+  assert.equal(result.status, "success");
+  assert.equal(result.categories.conversationTurnState, "passed");
+  assert.deepEqual(
+    transcriptSteps.map((step) => `${step.actor}:${step.actorAction.tool}`),
+    [
+      "npc_a:converse",
+      "npc_b:converse",
+      "npc_a:converse",
+      "npc_b:converse",
+      "npc_a:move_to"
+    ]
+  );
+  assert.deepEqual(
+    transcriptSteps.slice(0, 4).map((step) => step.actorArgs?.utterance),
+    [
+      "Jun, are you near the shared chest?",
+      "Yes, I am by the chest and I can check the marker.",
+      "Good. I will bring the marker paper over.",
+      "Understood. I will watch for it."
+    ]
+  );
 });
 
 test("agent loop records six steps and succeeds when remember changes the next action", async () => {
