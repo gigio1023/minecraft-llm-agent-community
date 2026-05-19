@@ -1,5 +1,7 @@
 # minecraft-llm-agent-community
 
+![Cover Image](assets/cover-image.png)
+
 A headless, multi-agent Minecraft probe for studying LLM-driven NPC interactions.
 
 [Documentation](https://gigio1023.github.io/minecraft-llm-agent-community/)
