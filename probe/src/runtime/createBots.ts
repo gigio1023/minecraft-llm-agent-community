@@ -1,5 +1,6 @@
 import * as mineflayer from "mineflayer";
 import type { Bot } from "mineflayer";
+import { pathfinder } from "mineflayer-pathfinder";
 
 import type { ProbeConfig } from "../config.js";
 
@@ -18,7 +19,7 @@ function createOfflineBot(
   server: ServerEndpoint,
   username: string
 ) {
-  return mineflayer.createBot({
+  const bot = mineflayer.createBot({
     host: server.host,
     port: server.port,
     username,
@@ -26,6 +27,10 @@ function createOfflineBot(
     version: config.server.version,
     viewDistance: "tiny"
   });
+
+  bot.loadPlugin(pathfinder);
+
+  return bot;
 }
 
 function waitForSpawn(bot: Bot) {

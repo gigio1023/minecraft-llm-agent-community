@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildServerEnv, loadProbeConfig } from "../src/config.js";
+import { buildServerEnv, loadMutualProbeConfig, loadProbeConfig } from "../src/config.js";
 import { getComposeCommandTimeouts } from "../src/server/dockerServer.js";
 
 test("loads probe config and builds vanilla server env", () => {
@@ -35,4 +35,12 @@ test("uses a longer timeout for docker compose up while keeping compose port and
   assert.equal(timeouts.startupMs, config.server.pingTimeoutMs);
   assert.equal(timeouts.managementMs, 10_000);
   assert.ok(timeouts.startupMs > timeouts.managementMs);
+});
+
+test("loads the mutual probe config on the same server baseline with a new probe id", () => {
+  const config = loadMutualProbeConfig();
+
+  assert.equal(config.probeId, "mutual_npc_interaction_probe_v1");
+  assert.equal(config.server.version, "1.21.11");
+  assert.deepEqual(config.bots, ["npc_a", "npc_b"]);
 });

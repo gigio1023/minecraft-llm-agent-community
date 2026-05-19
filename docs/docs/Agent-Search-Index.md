@@ -16,6 +16,7 @@ server, client, provider, and architecture decisions from chat history.
 | --- | --- | --- |
 | `MINECRAFT_AGENT_LOOP_MIGRATION`, `migration`, `zero based build` | `Migration/agent-loop-migration.md` | `Migration/minimal-probe-goal.md` |
 | `HEADLESS_MINEFLAYER_PROBE`, `headless`, `server setup`, `no manual client` | `Migration/headless-mineflayer-setup.md` | `Migration/minimal-probe-goal.md` |
+| `MUTUAL_NPC_INTERACTION_PROBE_V1`, `mutual interaction`, `two sided npc`, `material handoff` | `../superpowers/plans/2026-05-19-mutual-npc-interaction-probe.md` | `../superpowers/reports/2026-05-19-mutual-npc-interaction-probe-review.md` |
 | `NO_VOYAGER_EVAL_LOOP`, `Voyager`, `old repo`, `eval` | `Migration/agent-loop-migration.md` | `Analysis-of-Prior-Projects/voyager.md` |
 | `legacy install`, `old architecture`, `old progress` | `Archived/Documents/Installation.md` | `Archived/Documents/Architecture-of-Project.md` |
 | `OPENAI_CODEX_PROVIDER`, `openai-codex`, `Codex provider` | `Migration/openai-codex-provider.md` | `Migration/minimal-probe-goal.md` |
@@ -38,6 +39,12 @@ local headless server
 ```
 
 Archived legacy setup and progress notes now live under `Archived/Documents/`.
+
+The current live proofs are now split:
+
+- `agent_loop_probe_v0`: one acting bot, runtime-owned busy/available turn gate
+- `mutual_npc_interaction_probe_v1`: both bots act, reply, approach, and verify
+  a small paper handoff in the transcript
 
 ## Anti-Drift Rules
 

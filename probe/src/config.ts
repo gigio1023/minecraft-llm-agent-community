@@ -45,6 +45,13 @@ export function loadProbeConfig(): ProbeConfig {
   };
 }
 
+export function loadMutualProbeConfig(): ProbeConfig {
+  return {
+    ...loadProbeConfig(),
+    probeId: "mutual_npc_interaction_probe_v1"
+  };
+}
+
 export function buildServerEnv(config: ProbeConfig) {
   return {
     MC_IMAGE: config.server.image,
