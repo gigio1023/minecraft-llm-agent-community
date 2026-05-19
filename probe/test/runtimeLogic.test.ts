@@ -14,6 +14,7 @@ import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 import { converse } from "../src/mutual/tools/converse.js";
+import { executeMutualTool } from "../src/mutual/tools/index.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -310,6 +311,134 @@ test("converse sends directed speech, supports self-talk, and records heard mess
     runtimeState.consumeHeardMessages("npc_b")[0]?.text,
     "Jun, check the marker by the chest."
   );
+});
+
+test("executeMutualTool records converse dispatcher steps with args and provider metadata", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const transcriptSteps: Array<{
+    actor: string;
+    observation: unknown;
+    actorAction: { tool: string };
+    actorArgs?: Record<string, unknown>;
+    providerMeta?: { why: string };
+    result: unknown;
+  }> = [];
+
+  const result = await executeMutualTool({
+    proposal: {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, check the marker by the chest."
+      },
+      why: "I need Jun to confirm the marker location."
+    },
+    actor,
+    runtimeState,
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+    },
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step);
+      }
+    }
+  });
+
+  assert.deepEqual(result, {
+    status: "said_to_target",
+    utterance: "Jun, check the marker by the chest.",
+    targetId: "npc_b"
+  });
+  assert.deepEqual(transcriptSteps, [
+    {
+      actor: "npc_a",
+      observation: {
+        visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+      },
+      actorAction: { tool: "converse" },
+      actorArgs: {
+        target: "npc_b",
+        utterance: "Jun, check the marker by the chest."
+      },
+      providerMeta: {
+        why: "I need Jun to confirm the marker location."
+      },
+      result: {
+        status: "said_to_target",
+        utterance: "Jun, check the marker by the chest.",
+        targetId: "npc_b"
+      }
+    }
+  ]);
+});
+
+test("executeMutualTool records failures before rethrowing tool errors", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const transcriptSteps: Array<{
+    actorAction: { tool: string };
+    actorArgs?: Record<string, unknown>;
+    failure?: { message: string };
+    result: unknown;
+  }> = [];
+
+  await assert.rejects(
+    executeMutualTool({
+      proposal: {
+        tool: "move_to",
+        args: {
+          target: "npc_b"
+        },
+        why: "I should get closer first."
+      },
+      actor,
+      runtimeState,
+      observation: {
+        visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
+      },
+      transcript: {
+        recordStep(step) {
+          transcriptSteps.push(step);
+        }
+      },
+      handlers: {
+        async move_to() {
+          throw new Error("movement blocked");
+        }
+      }
+    }),
+    /movement blocked/
+  );
+
+  assert.deepEqual(transcriptSteps, [
+    {
+      actor: "npc_a",
+      observation: {
+        visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
+      },
+      actorAction: { tool: "move_to" },
+      actorArgs: {
+        target: "npc_b"
+      },
+      providerMeta: {
+        why: "I should get closer first."
+      },
+      failure: {
+        message: "movement blocked"
+      },
+      result: {
+        status: "failed"
+      }
+    }
+  ]);
 });
 
 test("agent loop records six steps and succeeds when remember changes the next action", async () => {

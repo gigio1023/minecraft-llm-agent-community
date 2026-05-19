@@ -1,6 +1,4 @@
-import { createMutualRuntimeState } from "../runtimeState.js";
-
-type MutualRuntimeState = ReturnType<typeof createMutualRuntimeState>;
+import type { MutualRuntimeState } from "../runtimeState.js";
 
 type ChatActor = {
   username: string;

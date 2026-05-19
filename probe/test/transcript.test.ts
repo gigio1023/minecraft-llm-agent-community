@@ -3,6 +3,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
+import { executeMutualTool } from "../src/mutual/tools/index.js";
 import { createMutualTranscript } from "../src/mutual/transcript.js";
 import { createTranscript } from "../src/runtime/transcript.js";
 
@@ -120,7 +122,7 @@ test("snapshots bots and steps so later mutations do not change the transcript",
   await fs.rm(evidenceDir, { recursive: true, force: true });
 });
 
-test("writes mutual transcript steps with converse args, memory notes, and provider metadata", async () => {
+test("writes mutual transcript steps from dispatcher execution including memory notes", async () => {
   const evidenceDir = path.resolve(
     "probe/test-artifacts",
     `mutual-transcript-${process.pid}-${Date.now()}`
@@ -133,25 +135,51 @@ test("writes mutual transcript steps with converse args, memory notes, and provi
     probeId: "live_npc_dialogue",
     bots: ["npc_a", "npc_b"]
   });
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = {
+    username: "npc_a",
+    chat() {}
+  };
 
-  transcript.recordStep({
-    actor: "npc_a",
-    observation: { visibleActors: ["npc_b"] },
-    actorAction: { tool: "converse" },
-    actorArgs: {
-      target: "npc_b",
-      utterance: "Jun, check the marker by the chest."
-    },
-    result: {
-      status: "said_to_target",
-      utterance: "Jun, check the marker by the chest.",
-      targetId: "npc_b"
-    },
-    memoryNote: {
-      note: "Jun agreed to check the chest."
-    },
-    providerMeta: {
+  await executeMutualTool({
+    proposal: {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, check the marker by the chest."
+      },
       why: "I need Jun to confirm the marker location."
+    },
+    actor,
+    runtimeState,
+    observation: { visibleActors: ["npc_b"] },
+    transcript
+  });
+
+  await executeMutualTool({
+    proposal: {
+      tool: "remember",
+      args: {
+        note: "Jun agreed to check the chest."
+      }
+    },
+    actor,
+    runtimeState,
+    observation: {
+      visibleActors: ["npc_b"],
+      recentUtterances: runtimeState.recentUtterances()
+    },
+    transcript,
+    handlers: {
+      remember() {
+        return {
+          status: "remembered",
+          note: "Jun agreed to check the chest."
+        };
+      }
     }
   });
 
@@ -164,8 +192,9 @@ test("writes mutual transcript steps with converse args, memory notes, and provi
 
   assert.equal(output.steps[0].actorAction.tool, "converse");
   assert.equal(output.steps[0].actorArgs.utterance, "Jun, check the marker by the chest.");
-  assert.equal(output.steps[0].memoryNote.note, "Jun agreed to check the chest.");
   assert.equal(output.steps[0].providerMeta.why, "I need Jun to confirm the marker location.");
+  assert.equal(output.steps[1].actorAction.tool, "remember");
+  assert.equal(output.steps[1].memoryNote.note, "Jun agreed to check the chest.");
 
   await fs.rm(evidenceDir, { recursive: true, force: true });
 });

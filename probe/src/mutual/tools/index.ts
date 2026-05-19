@@ -1,4 +1,4 @@
-import { createMutualRuntimeState } from "../runtimeState.js";
+import type { MutualRuntimeState } from "../runtimeState.js";
 import type { MutualJsonValue, MutualStepRecord, Proposal } from "../types.js";
 import { converse } from "./converse.js";
 
@@ -23,8 +23,6 @@ type MutualActor = {
   username: string;
   chat(message: string): void;
 };
-
-type MutualRuntimeState = ReturnType<typeof createMutualRuntimeState>;
 
 type TranscriptRecorder = {
   recordStep(step: MutualStepRecord): void;
@@ -78,7 +76,9 @@ function readOptionalStringArg(args: Record<string, unknown>, name: string) {
 
 function toJsonRecord(args: Record<string, unknown>) {
   return Object.fromEntries(
-    Object.entries(args).map(([key, value]) => [key, toJsonValue(value)])
+    Object.entries(args)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, toJsonValue(value)])
   );
 }
 
@@ -125,33 +125,52 @@ export async function executeMutualTool({
   transcript,
   handlers = {}
 }: ExecuteMutualToolArgs) {
-  const validated = validateProposal(proposal);
+  try {
+    const validated = validateProposal(proposal);
+    const actorArgs = toOptionalJsonRecord(validated.args);
+    const result =
+      validated.tool === "converse"
+        ? await converse({
+            actor,
+            runtimeState,
+            utterance: readStringArg(validated.args, "utterance"),
+            targetId: readOptionalStringArg(validated.args, "target")
+          })
+        : await executeHandler(validated.tool, handlers, {
+            actor,
+            runtimeState,
+            args: validated.args
+          });
+    const memoryNote = readMemoryNote(validated.tool, result);
 
-  const result =
-    validated.tool === "converse"
-      ? await converse({
-          actor,
-          runtimeState,
-          utterance: readStringArg(validated.args, "utterance"),
-          targetId: readOptionalStringArg(validated.args, "target")
-        })
-      : await executeHandler(validated.tool, handlers, {
-          actor,
-          runtimeState,
-          args: validated.args
-        });
+    transcript?.recordStep({
+      actor: actor.username,
+      observation: toJsonValue(observation),
+      actorAction: { tool: validated.tool },
+      ...(actorArgs ? { actorArgs } : {}),
+      ...(memoryNote ? { memoryNote } : {}),
+      ...(validated.why ? { providerMeta: { why: validated.why } } : {}),
+      result: toJsonValue(result)
+    });
 
-  transcript?.recordStep({
-    actor: actor.username,
-    observation: toJsonValue(observation),
-    actorAction: { tool: validated.tool },
-    actorArgs:
-      Object.keys(validated.args).length > 0 ? toJsonRecord({ ...validated.args }) : undefined,
-    providerMeta: validated.why ? { why: validated.why } : undefined,
-    result: toJsonValue(result)
-  });
+    return result;
+  } catch (error) {
+    const actorArgs = toOptionalJsonRecord(proposal.args);
 
-  return result;
+    transcript?.recordStep({
+      actor: actor.username,
+      observation: toJsonValue(observation),
+      actorAction: { tool: proposal.tool },
+      ...(actorArgs ? { actorArgs } : {}),
+      ...(proposal.why ? { providerMeta: { why: proposal.why } } : {}),
+      failure: { message: error instanceof Error ? error.message : String(error) },
+      result: {
+        status: "failed"
+      }
+    });
+
+    throw error;
+  }
 }
 
 async function executeHandler(
@@ -166,4 +185,25 @@ async function executeHandler(
   }
 
   return handler(context);
+}
+
+function toOptionalJsonRecord(args: Record<string, unknown> | undefined) {
+  if (!args) {
+    return undefined;
+  }
+
+  const jsonArgs = toJsonRecord(args);
+  return Object.keys(jsonArgs).length > 0 ? jsonArgs : undefined;
+}
+
+function readMemoryNote(tool: AllowedMutualTool, result: MutualJsonValue) {
+  if (tool !== "remember" || !isJsonRecord(result) || typeof result.note !== "string") {
+    return undefined;
+  }
+
+  return { note: result.note };
+}
+
+function isJsonRecord(value: MutualJsonValue): value is Record<string, MutualJsonValue> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -79,3 +79,5 @@ export function createMutualRuntimeState({
     }
   };
 }
+
+export type MutualRuntimeState = ReturnType<typeof createMutualRuntimeState>;
