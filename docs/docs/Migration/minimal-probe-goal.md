@@ -46,6 +46,21 @@ Optional only after the loop works:
 - `open_container(target)`
 - `trade_with_villager(target, tradeIndex)`
 
+## Generated Skill Slice
+
+After the constrained loop works, the repo may use a small Voyager-inspired
+skill path:
+
+- the LLM proposes one utterance and one TypeScript skill;
+- the skill is written under `build/generated-skills/`;
+- the skill exports only `async function run(ctx)`;
+- the runtime blocks imports, filesystem/process access, raw eval, and obvious
+  unbounded loops;
+- the runtime imports the skill and runs it with a short timeout.
+
+This keeps mineflayer as the broad action API without making raw code eval the
+default control surface.
+
 ## Acceptance Criteria
 
 The first slice is done when:
@@ -62,7 +77,7 @@ The first slice is done when:
 
 - no broad multi-agent village;
 - no Voyager skill DB;
-- no LLM-generated JS execution;
+- no raw LLM-generated JS eval;
 - no Fabric/Forge mod dependency;
 - no manual Minecraft client proof;
 - no live provider dependency before deterministic loop proof.

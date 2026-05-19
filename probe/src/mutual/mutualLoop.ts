@@ -1,22 +1,68 @@
+import type { DialogueObservation } from "./dialogueContext.js";
 import type {
   CategoryVerdict,
   InteractionCategory,
   JsonObject,
   LastResult,
   MutualActorId,
+  MutualJsonValue,
   MutualStepRecord,
   Proposal
 } from "./types.js";
+import { validateProposal } from "./tools/index.js";
 
-type MutualRuntimeActor = {
+type LiveRuntimeActor = {
   username: string;
 };
 
-type MutualProvider = {
-  next(input: { observation?: Record<string, unknown>; lastResult: LastResult | null }): Proposal;
+type LiveMutualLoopTools = {
+  observe(actorId: MutualActorId): Promise<DialogueObservation> | DialogueObservation;
+  execute(
+    actorId: MutualActorId,
+    proposal: Proposal,
+    observation: DialogueObservation
+  ): Promise<MutualJsonValue> | MutualJsonValue;
+  lastResult(actorId: MutualActorId): LastResult | null;
 };
 
-type RunMutualLoopTools<TActor extends MutualRuntimeActor> = {
+type LiveLoopProvider = {
+  next(input: {
+    observation: DialogueObservation;
+    lastResult: LastResult | null;
+  }): Promise<Proposal> | Proposal;
+};
+
+type LiveMutualLoopCategories = {
+  conversationTurnState: "passed" | "failed";
+  movementAfterConversation: "passed" | "failed";
+};
+
+type LiveMutualLoopResult = {
+  status: "success" | "failed";
+  why: string;
+  categories: LiveMutualLoopCategories;
+};
+
+type RunLiveMutualLoopArgs = {
+  actors: Record<MutualActorId, LiveRuntimeActor>;
+  providers: Record<MutualActorId, LiveLoopProvider>;
+  tools: LiveMutualLoopTools;
+  turnPlan?: MutualActorId[];
+  minimumConversationTurns?: number;
+};
+
+type DeterministicMutualRuntimeActor = {
+  username: string;
+};
+
+type DeterministicMutualProvider = {
+  next(input: {
+    observation?: Record<string, unknown>;
+    lastResult: LastResult | null;
+  }): Promise<Proposal> | Proposal;
+};
+
+type RunDeterministicMutualLoopTools<TActor extends DeterministicMutualRuntimeActor> = {
   lastResult(actorId: MutualActorId): LastResult | null;
   validateProposal(proposal: Proposal): Proposal;
   observe_world(input: {
@@ -35,20 +81,54 @@ type RunMutualLoopTools<TActor extends MutualRuntimeActor> = {
   }): Promise<MutualStepRecord> | MutualStepRecord;
 };
 
-type RunMutualLoopArgs<TActor extends MutualRuntimeActor> = {
+type RunDeterministicMutualLoopArgs<TActor extends DeterministicMutualRuntimeActor> = {
   bots: Record<MutualActorId, TActor>;
-  providers: Record<MutualActorId, MutualProvider>;
-  tools: RunMutualLoopTools<TActor>;
+  providers: Record<MutualActorId, DeterministicMutualProvider>;
+  tools: RunDeterministicMutualLoopTools<TActor>;
   transcript: {
     recordStep(step: MutualStepRecord): void;
   };
 };
 
-type MutualLoopResult = {
+type DeterministicMutualLoopResult = {
   status: "success" | "failed";
   why: string;
   categories: Record<InteractionCategory, CategoryVerdict>;
 };
+
+const DEFAULT_TURN_PLAN: MutualActorId[] = ["npc_a", "npc_b", "npc_a", "npc_b", "npc_a", "npc_b"];
+const DEFAULT_MINIMUM_CONVERSATION_TURNS = 4;
+
+function createCategories(
+  conversationTurnState: LiveMutualLoopCategories["conversationTurnState"],
+  movementAfterConversation: LiveMutualLoopCategories["movementAfterConversation"]
+): LiveMutualLoopCategories {
+  return {
+    conversationTurnState,
+    movementAfterConversation
+  };
+}
+
+function failLive(why: string, categories: LiveMutualLoopCategories): LiveMutualLoopResult {
+  return {
+    status: "failed",
+    why,
+    categories
+  };
+}
+
+function readResultStatus(result: MutualJsonValue) {
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    Array.isArray(result) ||
+    typeof result.status !== "string"
+  ) {
+    throw new Error("Mutual loop tool results must include a string status");
+  }
+
+  return result.status;
+}
 
 function deriveCategoryVerdicts(
   steps: readonly MutualStepRecord[]
@@ -95,12 +175,72 @@ function deriveCategoryVerdicts(
   };
 }
 
-export async function runMutualLoop<TActor extends MutualRuntimeActor>({
+async function runLiveMutualLoop({
+  actors,
+  providers,
+  tools,
+  turnPlan = DEFAULT_TURN_PLAN,
+  minimumConversationTurns = DEFAULT_MINIMUM_CONVERSATION_TURNS
+}: RunLiveMutualLoopArgs): Promise<LiveMutualLoopResult> {
+  let conversationTurns = 0;
+
+  for (const actorId of turnPlan) {
+    if (!actors[actorId]) {
+      throw new Error(`Missing actor for turn: ${actorId}`);
+    }
+
+    const observation = await tools.observe(actorId);
+    const proposal = await providers[actorId].next({
+      observation,
+      lastResult: tools.lastResult(actorId)
+    });
+    const validated = validateProposal(proposal);
+    const result = await tools.execute(actorId, validated, observation);
+    const status = readResultStatus(result);
+
+    if (validated.tool === "converse") {
+      conversationTurns += 1;
+      continue;
+    }
+
+    if (validated.tool === "move_to") {
+      if (conversationTurns >= minimumConversationTurns) {
+        return {
+          status: "success",
+          why: `recorded ${conversationTurns} live dialogue turns before movement (${status})`,
+          categories: createCategories("passed", "passed")
+        };
+      }
+
+      return failLive(
+        "movement started before the live dialogue sequence completed",
+        createCategories("failed", "failed")
+      );
+    }
+
+    if (conversationTurns < minimumConversationTurns) {
+      return failLive(
+        `${validated.tool} interrupted the live dialogue sequence after ${conversationTurns} turns`,
+        createCategories("failed", "failed")
+      );
+    }
+  }
+
+  return failLive(
+    `mutual loop exhausted the turn budget after ${conversationTurns} conversation turns`,
+    createCategories(
+      conversationTurns >= minimumConversationTurns ? "passed" : "failed",
+      "failed"
+    )
+  );
+}
+
+async function runDeterministicMutualLoop<TActor extends DeterministicMutualRuntimeActor>({
   bots,
   providers,
   tools,
   transcript
-}: RunMutualLoopArgs<TActor>): Promise<MutualLoopResult> {
+}: RunDeterministicMutualLoopArgs<TActor>): Promise<DeterministicMutualLoopResult> {
   const turnPlan: MutualActorId[] = [
     "npc_a",
     "npc_a",
@@ -121,7 +261,7 @@ export async function runMutualLoop<TActor extends MutualRuntimeActor>({
     const target = bots[targetId];
     const observation = await tools.observe_world({ actorId, actor, targetId, target });
     const proposal = tools.validateProposal(
-      providers[actorId].next({
+      await providers[actorId].next({
         observation,
         lastResult: tools.lastResult(actorId)
       })
@@ -151,4 +291,18 @@ export async function runMutualLoop<TActor extends MutualRuntimeActor>({
         : "one or more interaction categories did not reach acceptance",
     categories
   };
+}
+
+export function runMutualLoop(args: RunLiveMutualLoopArgs): Promise<LiveMutualLoopResult>;
+export function runMutualLoop<TActor extends DeterministicMutualRuntimeActor>(
+  args: RunDeterministicMutualLoopArgs<TActor>
+): Promise<DeterministicMutualLoopResult>;
+export async function runMutualLoop(
+  args: RunLiveMutualLoopArgs | RunDeterministicMutualLoopArgs<DeterministicMutualRuntimeActor>
+) {
+  if ("actors" in args) {
+    return runLiveMutualLoop(args);
+  }
+
+  return runDeterministicMutualLoop(args);
 }

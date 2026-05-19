@@ -21,7 +21,7 @@ type ObserveWorldArgs = {
   };
   runtimeState: {
     consumeHeardMessages(target: MutualActorId): Array<{
-      from: MutualActorId;
+      from: string;
       text: string;
     }>;
     markerItemName(): string;

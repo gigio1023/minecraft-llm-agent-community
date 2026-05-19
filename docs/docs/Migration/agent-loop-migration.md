@@ -5,8 +5,8 @@ sidebar_position: 1
 # Agent Loop Migration
 
 Status: active migration plan
-Search tokens: `MINECRAFT_AGENT_LOOP_MIGRATION`, `NO_VOYAGER_EVAL_LOOP`,
-`HEADLESS_MINEFLAYER_PROBE`.
+Search tokens: `MINECRAFT_AGENT_LOOP_MIGRATION`,
+`TYPESCRIPT_SKILL_BUNDLE_LOOP`, `HEADLESS_MINEFLAYER_PROBE`.
 
 ## Decision
 
@@ -25,7 +25,7 @@ LLM proposes task
 -> skill library stores generated code
 ```
 
-The new target is different:
+The first target was different:
 
 ```text
 NPC observes current world state
@@ -36,8 +36,20 @@ NPC observes current world state
 -> repeat for a small budget
 ```
 
-The LLM chooses intent. The runtime owns execution, safety, state mutation, and
-termination.
+The next target can reintroduce Voyager's useful idea, but as TypeScript skill
+bundles rather than raw JavaScript eval:
+
+```text
+NPC observes current world state
+-> LLM proposes one utterance and one small TypeScript skill
+-> runtime writes the skill to disk
+-> runtime screens blocked APIs and unbounded loops
+-> runtime imports and runs skill.run(ctx) with a timeout
+-> transcript records the skill file and result
+```
+
+The LLM may write embodied mineflayer actions. The runtime still owns the
+context object, blocked APIs, timeout, server, logs, and termination.
 
 ## Why Migrate
 
@@ -47,7 +59,7 @@ The previous setup made development too expensive:
 - Fabric/mod setup;
 - manual Minecraft client connection;
 - human character in-world as the main inspection path;
-- LLM-generated JS execution as the behavior layer;
+- raw LLM-generated JS eval as the behavior layer;
 - too much environment work before a small social result could be observed.
 
 The new setup must remove those costs first.
@@ -60,15 +72,15 @@ Preserve these ideas from the old repo:
 - Mineflayer gives a rich action API for movement, chat, inventory, crafting,
   block interaction, and entity observation.
 - Multi-agent behavior is interesting only after one small loop works.
-- Logs, observations, and skill traces were useful, but should be replaced by a
-  smaller transcript/event-ledger format.
+- Logs, observations, and skill traces are useful. Preserve them as small
+  transcript/event-ledger records linked to generated TypeScript skill files.
 
 ## What To Drop
 
 Drop these for the first proof:
 
 - Voyager as the active runtime;
-- generated JS skill execution;
+- raw generated JS eval;
 - Chroma skill library;
 - broad curriculum/critic agent stack;
 - Fabric server setup;

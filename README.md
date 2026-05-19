@@ -99,6 +99,31 @@ That run finished with:
 The detailed review handoff and preserved transcript copy live under
 `docs/superpowers/reports/`.
 
+## Live NPC Dialogue Probe
+
+The live dialogue path keeps the same bounded runtime, but lets the
+`openai-codex` provider choose one validated mutual tool per turn. It is meant
+for short evidence runs where the NPCs talk first, then perform a later world
+action such as movement.
+
+Provider auth is read from the ignored local store:
+
+```text
+build/provider-auth/openai-codex-auth.json
+```
+
+Run it with:
+
+```sh
+bun install --cwd probe
+bun run --cwd probe typecheck
+./scripts/run-live-mutual-dialogue-probe.sh
+```
+
+The command writes a transcript under `probe/data/evidence/`. Do not use this
+path as a Voyager-style eval loop; the runtime still owns tool validation,
+budgets, execution, and failure reporting.
+
 # Contribution
 ## Check lint
 ```sh

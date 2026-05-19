@@ -1,13 +1,27 @@
 import assert from "node:assert/strict";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
 
 import minecraftData from "minecraft-data";
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
-import { mutualPersonas } from "../src/mutual/personas.js";
+import {
+  buildDialogueContext,
+  type DialogueContextInput,
+  type DialogueContextOutput,
+  type DialogueObservation,
+  type DialogueTranscriptEntry,
+  mutualPersonas as dialogueMutualPersonas
+} from "../src/mutual/dialogueContext.js";
+import { mutualPersonas as scenarioMutualPersonas } from "../src/mutual/personas.js";
 import { createMutualProviders } from "../src/mutual/provider.js";
+import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
+import { converse } from "../src/mutual/tools/converse.js";
 import { dropItem } from "../src/mutual/tools/dropItem.js";
-import { validateMutualProposal } from "../src/mutual/tools/index.js";
+import {
+  executeMutualTool,
+  validateMutualProposal
+} from "../src/mutual/tools/index.js";
 import { observeWorld } from "../src/mutual/tools/observeWorld.js";
 import { replyTo } from "../src/mutual/tools/replyTo.js";
 import type { MutualStepRecord, Proposal } from "../src/mutual/types.js";
@@ -38,8 +52,7 @@ function createFakeBot(username: string, x: number) {
   const chatLog: string[] = [];
   const lookTargets: Array<{ x: number; y: number; z: number }> = [];
   const controls: Array<{ control: string; state: boolean }> = [];
-  const entities: Record<string, { name?: string; displayName?: string; metadata?: unknown[] }> =
-    {};
+  const entities: Record<string, { name?: string; displayName?: string; metadata?: unknown[] }> = {};
   const position = createPosition(x);
   const registry = {
     itemsByName: {
@@ -154,8 +167,7 @@ function createPathfindingBot(username: string, x: number) {
 function createInventoryFakeBot(username: string, options?: { delayedEntityMs?: number }) {
   const inventoryCalls: Array<{ slot: number; item: unknown }> = [];
   const tossCalls: Array<{ itemId: number; count: number }> = [];
-  const entities: Record<string, { name?: string; displayName?: string; metadata?: unknown[] }> =
-    {};
+  const entities: Record<string, { name?: string; displayName?: string; metadata?: unknown[] }> = {};
 
   return {
     username,
@@ -212,6 +224,385 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
   assert.throws(() => validateProposal({ tool: "drop_database", args: {} }), /Unsupported tool/);
 });
 
+test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
+  const allowedTools = ["converse", "wait"];
+  const persona: { name: string; role: string; style: string; objective: string } = {
+    ...dialogueMutualPersonas.npc_a
+  };
+  const visibleActors = [{ id: "npc_b", distance: 2, busy: false }];
+  const marker = {
+    seen: true,
+    holder: "npc_b"
+  };
+  const observation: DialogueObservation = {
+    visibleActors,
+    lastActionResult: { status: "available" },
+    marker
+  };
+  const memory = ["marker paper should stay near the chest"];
+  const transcriptArgs = { utterance: "I am ready." };
+  const recentTranscript: DialogueTranscriptEntry[] = [
+    {
+      actorId: "npc_b",
+      actorName: "Jun",
+      tool: "converse",
+      args: transcriptArgs,
+      result: { status: "available" }
+    }
+  ];
+
+  const context = buildDialogueContext({
+    actorId: "npc_a",
+    allowedTools,
+    persona,
+    observation,
+    memory,
+    recentTranscript
+  } satisfies DialogueContextInput);
+
+  persona.role = "changed";
+  visibleActors[0]!.busy = true;
+  marker.holder = "npc_a";
+  memory.push("mutated");
+  transcriptArgs.utterance = "mutated";
+  allowedTools.push("remember");
+
+  const expected: DialogueContextOutput = {
+    actorId: "npc_a",
+    persona: {
+      name: "Mara",
+      role: "quartermaster",
+      style: "brief but careful",
+      objective: "coordinate the marker handoff"
+    },
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+      lastActionResult: { status: "available" },
+      marker: {
+        seen: true,
+        holder: "npc_b"
+      }
+    },
+    memory: ["marker paper should stay near the chest"],
+    recentTranscript: [
+      {
+        actorId: "npc_b",
+        actorName: "Jun",
+        tool: "converse",
+        args: { utterance: "I am ready." },
+        result: { status: "available" }
+      }
+    ],
+    rules: {
+      oneToolPerTurn: true,
+      allowedTools: ["converse", "wait"],
+      noInventedObservations: true,
+      preferObserveWorldWhenUncertain: true
+    }
+  };
+
+  assert.deepEqual(context, expected);
+});
+
+test("parseProviderAction accepts converse, defaults args, and rejects invalid actions", () => {
+  assert.deepEqual(
+    parseProviderAction({
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, can you check the shared chest?"
+      },
+      why: "I need Jun to confirm the marker location."
+    }),
+    {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, can you check the shared chest?"
+      },
+      why: "I need Jun to confirm the marker location."
+    }
+  );
+
+  assert.deepEqual(parseProviderAction({ tool: "wait" }), {
+    tool: "wait",
+    args: {}
+  });
+
+  assert.deepEqual(parseProviderAction({ tool: "wait", args: "soon" }), {
+    tool: "wait",
+    args: {}
+  });
+
+  assert.throws(() => parseProviderAction("nope"), /Provider action must be an object/);
+  assert.throws(
+    () => parseProviderAction({ tool: "sing", args: {} }),
+    /Unsupported mutual tool: sing/
+  );
+});
+
+test("loadOpenAICodexAuth reads auth metadata without exposing raw secrets in JSON", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "top-secret-access-token",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      profileEmail: "npc@example.com"
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+  const auth = await loadOpenAICodexAuth(authPath);
+
+  assert.equal(auth.profileEmail, "npc@example.com");
+  assert.equal(typeof auth.accessToken, "string");
+  assert.throws(() => JSON.stringify(auth), /Cannot serialize auth/);
+
+  await rm(authPath, { force: true });
+});
+
+test("loadOpenAICodexAuth rejects an empty access token", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "",
+      expiresAt: new Date(Date.now() + 60_000).toISOString()
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+
+  await assert.rejects(
+    loadOpenAICodexAuth(authPath),
+    /OpenAI Codex auth store accessToken must be a non-empty string/
+  );
+
+  await rm(authPath, { force: true });
+});
+
+test("loadOpenAICodexAuth rejects a whitespace-only access token", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "   ",
+      expiresAt: new Date(Date.now() + 60_000).toISOString()
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+
+  await assert.rejects(
+    loadOpenAICodexAuth(authPath),
+    /OpenAI Codex auth store accessToken must be a non-empty string/
+  );
+
+  await rm(authPath, { force: true });
+});
+
+test("loadOpenAICodexAuth rejects an expired auth store", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "top-secret-access-token",
+      expiresAt: new Date(Date.now() - 60_000).toISOString()
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+
+  await assert.rejects(loadOpenAICodexAuth(authPath), /OpenAI Codex auth store is expired/);
+
+  await rm(authPath, { force: true });
+});
+
+test("createOpenAICodexProvider retries malformed JSON once before returning a parsed action", async () => {
+  const responses = [
+    { output_text: "not json" },
+    {
+      output_text: JSON.stringify({
+        tool: "converse",
+        args: {
+          target: "npc_b",
+          utterance: "Jun, check the marker."
+        }
+      })
+    }
+  ];
+  const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+  const provider = createOpenAICodexProvider({
+    accessToken: "test-token",
+    maxRetries: 1,
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url: String(url), init });
+      const payload = responses.shift();
+
+      assert.ok(payload, "expected a fake response payload");
+
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      });
+    }
+  });
+
+  const proposal = await provider.next({
+    actorId: "npc_a",
+    persona: dialogueMutualPersonas.npc_a,
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+      lastActionResult: { status: "available" }
+    },
+    memory: ["marker paper should stay near the chest"],
+    recentTranscript: [],
+    rules: {
+      oneToolPerTurn: true,
+      allowedTools: ["converse", "wait"],
+      noInventedObservations: true,
+      preferObserveWorldWhenUncertain: true
+    }
+  });
+
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(fetchCalls[0]?.url, "https://api.openai.com/v1/responses");
+  const firstRequest = fetchCalls[0]?.init;
+  assert.ok(firstRequest, "expected the first provider request");
+  assert.equal(new Headers(firstRequest.headers).get("authorization"), "Bearer test-token");
+  const firstRequestBody = JSON.parse(String(firstRequest.body));
+  assert.equal(firstRequestBody.model, "gpt-5.4-mini");
+  assert.deepEqual(firstRequestBody.reasoning, {
+    effort: "low"
+  });
+  assert.deepEqual(firstRequestBody.text, {
+    format: {
+      type: "json_object"
+    }
+  });
+  assert.equal(proposal.tool, "converse");
+});
+
+test("createOpenAICodexProvider stops after exhausting malformed JSON retries", async () => {
+  let fetchCount = 0;
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+  const provider = createOpenAICodexProvider({
+    accessToken: "test-token",
+    maxRetries: 2,
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return new Response(JSON.stringify({ output_text: "not json" }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      });
+    }
+  });
+
+  await assert.rejects(
+    Promise.resolve(
+      provider.next({
+        actorId: "npc_a",
+        persona: dialogueMutualPersonas.npc_a,
+        observation: {
+          visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+          lastActionResult: { status: "available" }
+        },
+        memory: [],
+        recentTranscript: [],
+        rules: {
+          oneToolPerTurn: true,
+          allowedTools: ["converse", "wait"],
+          noInventedObservations: true,
+          preferObserveWorldWhenUncertain: true
+        }
+      })
+    ),
+    SyntaxError
+  );
+
+  assert.equal(fetchCount, 3);
+});
+
+test("createOpenAICodexProvider rejects a whitespace-only access token", async () => {
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+
+  assert.throws(
+    () =>
+      createOpenAICodexProvider({
+        accessToken: "\t"
+      }),
+    /OpenAI Codex provider accessToken must be a non-empty string/
+  );
+});
+
+test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", async () => {
+  let fetchCount = 0;
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+  const provider = createOpenAICodexProvider({
+    accessToken: "test-token",
+    maxRetries: 3,
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            tool: "sing",
+            args: {}
+          })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+  });
+
+  await assert.rejects(
+    Promise.resolve(
+      provider.next({
+        actorId: "npc_a",
+        persona: dialogueMutualPersonas.npc_a,
+        observation: {
+          visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+          lastActionResult: { status: "available" }
+        },
+        memory: [],
+        recentTranscript: [],
+        rules: {
+          oneToolPerTurn: true,
+          allowedTools: ["converse", "wait"],
+          noInventedObservations: true,
+          preferObserveWorldWhenUncertain: true
+        }
+      })
+    ),
+    /Unsupported mutual tool: sing/
+  );
+
+  assert.equal(fetchCount, 1);
+});
+
 test("deterministic provider follows the planned runtime contract sequence", () => {
   const provider = createDeterministicProvider();
   const observation = { nearby: ["npc_b"] };
@@ -250,8 +641,8 @@ test("deterministic provider follows the planned runtime contract sequence", () 
 test("mutual providers keep actor-specific deterministic order", () => {
   const providers = createMutualProviders();
 
-  assert.equal(mutualPersonas.npc_a.name, "Mara");
-  assert.equal(mutualPersonas.npc_b.name, "Jun");
+  assert.equal(scenarioMutualPersonas.npc_a.name, "Mara");
+  assert.equal(scenarioMutualPersonas.npc_b.name, "Jun");
 
   assert.deepEqual(providers.npc_a.next({ lastResult: null }), {
     tool: "observe_world",
@@ -379,11 +770,7 @@ test("observeWorld detects a dropped paper item from entity metadata", () => {
 });
 
 test("mutual loop makes npc_b act after npc_a changes chat or world state", async () => {
-  const transcriptSteps: Array<{
-    category: string;
-    actorAction: { actor: string; tool: string; result: string };
-    targetResponse?: { actor: string; tool: string; result: string };
-  }> = [];
+  const transcriptSteps: MutualStepRecord[] = [];
 
   const result = await runMutualLoop({
     bots: createFakeMutualBots(),
@@ -449,6 +836,327 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
     note: "npc_b answered"
   });
   assert.deepEqual(memory.list(), ["saw npc_b near spawn", "npc_b answered"]);
+});
+
+test("converse sends directed speech, supports self-talk, and records heard messages", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const target = createFakeBot("npc_b", 2);
+
+  const directed = await converse({
+    actor,
+    runtimeState,
+    targetId: target.username,
+    utterance: "Jun, check the marker by the chest."
+  });
+  const aloud = await converse({
+    actor,
+    runtimeState,
+    utterance: "I should wait by the chest."
+  });
+
+  assert.equal(directed.status, "said_to_target");
+  assert.equal(aloud.status, "said_aloud");
+  assert.deepEqual(actor.chatLog, [
+    "Jun, check the marker by the chest.",
+    "I should wait by the chest."
+  ]);
+  assert.deepEqual(target.chatLog, []);
+  assert.deepEqual(
+    runtimeState.recentUtterances().map((entry) => entry.text),
+    ["Jun, check the marker by the chest.", "I should wait by the chest."]
+  );
+  assert.equal(
+    runtimeState.consumeHeardMessages("npc_b")[0]?.text,
+    "Jun, check the marker by the chest."
+  );
+});
+
+test("executeMutualTool records converse dispatcher steps with args and provider metadata", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const transcriptSteps: MutualStepRecord[] = [];
+
+  const result = await executeMutualTool({
+    proposal: {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, check the marker by the chest."
+      },
+      why: "I need Jun to confirm the marker location."
+    },
+    actor,
+    runtimeState,
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+    },
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step);
+      }
+    }
+  });
+
+  assert.deepEqual(result, {
+    status: "said_to_target",
+    utterance: "Jun, check the marker by the chest.",
+    targetId: "npc_b"
+  });
+  assert.deepEqual(transcriptSteps, [
+    {
+      actor: "npc_a",
+      observation: {
+        visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+      },
+      actorAction: { tool: "converse" },
+      actorArgs: {
+        target: "npc_b",
+        utterance: "Jun, check the marker by the chest."
+      },
+      providerMeta: {
+        why: "I need Jun to confirm the marker location."
+      },
+      result: {
+        status: "said_to_target",
+        utterance: "Jun, check the marker by the chest.",
+        targetId: "npc_b"
+      }
+    }
+  ]);
+});
+
+test("executeMutualTool records failures before rethrowing tool errors", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const transcriptSteps: MutualStepRecord[] = [];
+
+  await assert.rejects(
+    executeMutualTool({
+      proposal: {
+        tool: "move_to",
+        args: {
+          target: "npc_b"
+        },
+        why: "I should get closer first."
+      },
+      actor,
+      runtimeState,
+      observation: {
+        visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
+      },
+      transcript: {
+        recordStep(step) {
+          transcriptSteps.push(step);
+        }
+      },
+      handlers: {
+        async move_to() {
+          throw new Error("movement blocked");
+        }
+      }
+    }),
+    /movement blocked/
+  );
+
+  assert.deepEqual(transcriptSteps, [
+    {
+      actor: "npc_a",
+      observation: {
+        visibleActors: [{ id: "npc_b", distance: 4, busy: false }]
+      },
+      actorAction: { tool: "move_to" },
+      actorArgs: {
+        target: "npc_b"
+      },
+      providerMeta: {
+        why: "I should get closer first."
+      },
+      failure: {
+        message: "movement blocked"
+      },
+      result: {
+        status: "failed"
+      }
+    }
+  ]);
+});
+
+test("runMutualLoop awaits async providers and records four live dialogue turns before movement", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actors: Record<"npc_a" | "npc_b", ReturnType<typeof createFakeBot>> = {
+    npc_a: createFakeBot("npc_a", 0),
+    npc_b: createFakeBot("npc_b", 2)
+  };
+  const transcriptSteps: MutualStepRecord[] = [];
+  const liveProposals = [
+    {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, are you near the shared chest?"
+      }
+    },
+    {
+      tool: "converse",
+      args: {
+        target: "npc_a",
+        utterance: "Yes, I am by the chest and I can check the marker."
+      }
+    },
+    {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Good. I will bring the marker paper over."
+      }
+    },
+    {
+      tool: "converse",
+      args: {
+        target: "npc_a",
+        utterance: "Understood. I will watch for it."
+      }
+    },
+    {
+      tool: "move_to",
+      args: {
+        target: "npc_b"
+      }
+    }
+  ];
+  const provider = {
+    async next() {
+      const proposal = liveProposals.shift();
+
+      if (!proposal) {
+        throw new Error("No live proposal available");
+      }
+
+      return proposal;
+    }
+  };
+  const lastResults = new Map<"npc_a" | "npc_b", { tool: string; status: string } | null>([
+    ["npc_a", null],
+    ["npc_b", null]
+  ]);
+
+  const result = await runMutualLoop({
+    actors,
+    providers: {
+      npc_a: provider,
+      npc_b: provider
+    },
+    tools: {
+      async observe(actorId) {
+        const actor = actors[actorId];
+        const targetId = actorId === "npc_a" ? "npc_b" : "npc_a";
+        const target = actors[targetId];
+
+        return {
+          visibleActors: [
+            {
+              id: targetId,
+              distance: Number(actor.entity.position.distanceTo(target.entity.position).toFixed(2)),
+              busy: false
+            }
+          ],
+          recentUtterances: runtimeState.recentUtterances(),
+          heardMessages: runtimeState.consumeHeardMessages(actorId),
+          marker: {
+            seen: true,
+            holder: "npc_a"
+          }
+        };
+      },
+      lastResult(actorId) {
+        return lastResults.get(actorId) ?? null;
+      },
+      async execute(actorId, proposal, observation) {
+        const actor = actors[actorId];
+        const result = await executeMutualTool({
+          proposal,
+          actor,
+          runtimeState,
+          observation,
+          transcript: {
+            recordStep(step) {
+              transcriptSteps.push(step);
+            }
+          },
+          handlers: {
+            async move_to({ args }) {
+              return {
+                status: "arrived",
+                targetId: String(args.target)
+              };
+            },
+            async observe_world() {
+              return {
+                status: "observed"
+              };
+            },
+            async wait() {
+              return {
+                status: "waited"
+              };
+            },
+            async remember() {
+              return {
+                status: "remembered"
+              };
+            },
+            async drop_item() {
+              return {
+                status: "dropped"
+              };
+            }
+          }
+        });
+
+        lastResults.set(actorId, {
+          tool: proposal.tool,
+          status: String((result as { status: string }).status)
+        });
+
+        return result;
+      }
+    }
+  });
+
+  assert.equal(result.status, "success");
+  assert.equal(result.categories.conversationTurnState, "passed");
+  assert.deepEqual(
+    transcriptSteps.map((step) => `${step.actor}:${step.actorAction.tool}`),
+    [
+      "npc_a:converse",
+      "npc_b:converse",
+      "npc_a:converse",
+      "npc_b:converse",
+      "npc_a:move_to"
+    ]
+  );
+  assert.deepEqual(
+    transcriptSteps.slice(0, 4).map((step) => step.actorArgs?.utterance),
+    [
+      "Jun, are you near the shared chest?",
+      "Yes, I am by the chest and I can check the marker.",
+      "Good. I will bring the marker paper over.",
+      "Understood. I will watch for it."
+    ]
+  );
 });
 
 test("moveTo prefers pathfinder and returns before and after distance details", async () => {

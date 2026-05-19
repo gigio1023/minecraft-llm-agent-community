@@ -37,10 +37,16 @@ test("uses a longer timeout for docker compose up while keeping compose port and
   assert.ok(timeouts.startupMs > timeouts.managementMs);
 });
 
-test("loads the mutual probe config on the same server baseline with a new probe id", () => {
+test("loads locked live dialogue provider settings for the mutual probe", () => {
   const config = loadMutualProbeConfig();
 
   assert.equal(config.probeId, "mutual_npc_interaction_probe_v1");
   assert.equal(config.server.version, "1.21.11");
   assert.deepEqual(config.bots, ["npc_a", "npc_b"]);
+  assert.equal(config.liveDialogue.providerId, "openai-codex");
+  assert.equal(config.liveDialogue.model, "gpt-5.4-mini");
+  assert.equal(config.liveDialogue.reasoning, "low");
+  assert.equal(config.liveDialogue.maxRetries, 1);
+  assert.equal(config.liveDialogue.delayStartMs, 30_000);
+  assert.match(config.liveDialogue.authStorePath, /build\/provider-auth\/openai-codex-auth\.json$/);
 });

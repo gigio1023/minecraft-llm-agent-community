@@ -15,33 +15,33 @@ function snapshot<T>(value: T): T {
 export function createMutualTranscript({
   evidenceDir,
   probeId,
+  bots,
   personas
 }: CreateMutualTranscriptOptions) {
-  const transcriptPersonas = snapshot(personas);
+  const transcriptBots = bots ? snapshot(bots) : undefined;
+  const transcriptPersonas = personas ? snapshot(personas) : undefined;
   const steps: MutualStepRecord[] = [];
 
   return {
     recordStep(step: MutualStepRecord) {
       steps.push(snapshot(step));
     },
-    async write(categories: MutualCategories, final: TranscriptFinal) {
+    async write(categoriesOrFinal: MutualCategories | TranscriptFinal, maybeFinal?: TranscriptFinal) {
       await fs.mkdir(evidenceDir, { recursive: true });
 
       const outputPath = path.join(evidenceDir, `${probeId}-${Date.now()}.json`);
-      await fs.writeFile(
-        outputPath,
-        JSON.stringify(
-          {
-            probe: probeId,
-            personas: transcriptPersonas,
-            categories: snapshot(categories),
-            steps,
-            final: snapshot(final)
-          },
-          null,
-          2
-        )
-      );
+      const categories = maybeFinal ? snapshot(categoriesOrFinal as MutualCategories) : undefined;
+      const final = maybeFinal ? maybeFinal : (categoriesOrFinal as TranscriptFinal);
+      const payload = {
+        probe: probeId,
+        ...(transcriptBots ? { bots: transcriptBots } : {}),
+        ...(transcriptPersonas ? { personas: transcriptPersonas } : {}),
+        ...(categories ? { categories } : {}),
+        steps,
+        final: snapshot(final)
+      };
+
+      await fs.writeFile(outputPath, JSON.stringify(payload, null, 2));
 
       return outputPath;
     }
