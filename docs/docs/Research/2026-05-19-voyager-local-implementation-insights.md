@@ -1,6 +1,6 @@
 # Voyager Local Implementation Insights
 
-Target: The local implementation in `../Voyager`.
+Target: [Voyager](https://github.com/MineDojo/Voyager).
 Goal: Extract usable concepts for our small headless Minecraft NPC tool-loop (`/probe`) and discard approaches that misalign with our goals.
 
 ## The Core Loop

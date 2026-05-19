@@ -8,9 +8,7 @@ This report re-reads local `mineflayer-chatgpt` code for the problem most
  relevant to this repo's next stage: how to get multiple bots to feel like a
  small society while still acting like competent Minecraft players.
 
-Local repo inspected:
-
-- `/Users/naem1023/git/mineflayer-chatgpt`
+Local repo inspected: [`mineflayer-chatgpt`](https://github.com/KNiemitz/mineflayer-chatgpt)
 
 ## Files Inspected
 

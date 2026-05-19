@@ -11,9 +11,7 @@ This report re-reads local `Voyager` code for a narrower question than the prior
 - how to make cooperation and one bounded hostile NPC plausible;
 - how to make them play like experienced Minecraft players instead of drifting.
 
-Local repo inspected:
-
-- `../Voyager`
+Local repo inspected: [Voyager](https://github.com/MineDojo/Voyager)
 
 ## Files Inspected
 

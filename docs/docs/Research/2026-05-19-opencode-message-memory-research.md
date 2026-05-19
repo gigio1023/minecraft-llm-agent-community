@@ -8,9 +8,7 @@ This report studies local `opencode` as a coding-agent system, but with one
  transferable question in mind: how should a long-running multi-agent Minecraft
  runtime manage messages, tool transcripts, compaction, and durable memory.
 
-Local repo inspected:
-
-- `../opencode`
+Local repo inspected: `opencode`
 
 ## Files Inspected
 

@@ -8,9 +8,7 @@ This report studies local `codex` as a second reference for long-running LLM
  session architecture, especially around turn state, compaction, thread storage,
  event persistence, and durable reconstruction.
 
-Local repo inspected:
-
-- `/Users/naem1023/git/codex`
+Local repo inspected: `codex`
 
 ## Files Inspected
 

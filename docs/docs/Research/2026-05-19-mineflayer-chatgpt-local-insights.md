@@ -1,6 +1,6 @@
 # mineflayer-chatgpt Local Implementation Insights
 
-Target: `../mineflayer-chatgpt`
+Target: [`mineflayer-chatgpt`](https://github.com/KNiemitz/mineflayer-chatgpt)
 
 While this repo focuses on a long-living, streaming-oriented survival bot, several architectural choices map perfectly to our small headless `/probe`. We want its event-driven brain, prompt separation, and team bulletin, but we must strictly avoid its dynamic JavaScript execution model.
 

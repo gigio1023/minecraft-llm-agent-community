@@ -1,8 +1,8 @@
-# ⛏️ Dream of One: Minecraft LLM Agent Social Simulation
+# ⛏️ minecraft-llm-agent-community: Minecraft LLM Agent Social Simulation
 
 ![Cover Image](assets/cover-image.jpeg)
 
-**Dream of One** is a next-generation multi-bot Minecraft social simulation probe. We use a strictly bounded, headless agent runtime powered by TypeScript and Mineflayer to simulate an emergent **multi-NPC society**.
+**minecraft-llm-agent-community** is a next-generation multi-bot Minecraft social simulation probe. We use a strictly bounded, headless agent runtime powered by TypeScript and Mineflayer to simulate an emergent **multi-NPC society**.
 
 - [📚 Documentation Blog](https://gigio1023.github.io/minecraft-llm-agent-community/)
 

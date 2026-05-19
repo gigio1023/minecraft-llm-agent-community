@@ -1,6 +1,6 @@
 # yearn_for_mines Local Implementation Insights
 
-Target: `/Users/naem1023/git/yearn_for_mines`
+Target: `yearn_for_mines`
 Goal: Extract implementation patterns to improve our small `/probe` Minecraft LLM agent.
 
 ## Core Takeaways

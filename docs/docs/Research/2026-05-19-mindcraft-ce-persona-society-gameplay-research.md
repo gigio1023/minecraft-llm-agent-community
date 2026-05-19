@@ -8,9 +8,7 @@ This report re-reads local `mindcraft-ce` code for patterns that make Minecraft
  agents feel embodied, interruptible, and practically competent, especially in
  the areas of action management, conversation timing, and inventory-aware play.
 
-Local repo inspected:
-
-- `../mindcraft-ce`
+Local repo inspected: `mindcraft-ce`
 
 ## Files Inspected
 

@@ -8,9 +8,7 @@ This report revisits local `mc-multimodal-agent` code for one specific question:
  what should be borrowed to make this repo's NPCs feel embodied, persistent, and
  competent inside Minecraft.
 
-Local repo inspected:
-
-- `../mc-multimodal-agent`
+Local repo inspected: `mc-multimodal-agent`
 
 ## Files Inspected
 

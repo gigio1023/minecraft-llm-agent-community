@@ -1,7 +1,7 @@
 # NPC Spawn and Teleportation Troubleshooting Report
 
 **Date:** 2026-05-20
-**Context:** Dream of One - Headless Mineflayer NPC Probe
+**Context:** minecraft-llm-agent-community - Headless Mineflayer NPC Probe
 
 ## Issue Description
 During the execution of the multi-bot agent loop probe, we observed that 3 NPCs (`npc1`, `npc2`, `npc3`) were failing to spawn at the designated village location (`49.224, -60.062, -119.021`). Instead, they consistently spawned and remained at the default world spawn location (around `5.2, -60, -0.8`).

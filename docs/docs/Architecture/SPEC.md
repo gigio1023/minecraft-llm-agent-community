@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Architecture Specification
 
-**Dream of One** is designed to simulate an emergent NPC society. This document outlines the technical pillars required to move beyond simple chatbots and create agents with real **Gameplay Competence** and **Social Pressure**.
+**minecraft-llm-agent-community** is designed to simulate an emergent NPC society. This document outlines the technical pillars required to move beyond simple chatbots and create agents with real **Gameplay Competence** and **Social Pressure**.
 
 ## 1. Design Philosophy
 

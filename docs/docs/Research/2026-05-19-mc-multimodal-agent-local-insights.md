@@ -1,6 +1,6 @@
 # mc-multimodal-agent Local Implementation Insights
 
-Target: `../mc-multimodal-agent`
+Target: `mc-multimodal-agent`
 
 This implementation relies on a runtime-owned tool loop rather than LLM code generation. The LLM outputs structured JSON, and the runtime handles schema validation, execution, and memory. This aligns perfectly with our `/probe` architecture.
 

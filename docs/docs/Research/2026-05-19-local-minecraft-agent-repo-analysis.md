@@ -4,7 +4,7 @@ Date: 2026-05-19
 
 ## Scope
 
-This report is based on local clones under `/Users/naem1023/git`, not only web
+This report is based on local clones of the following repositories, not only web
 research:
 
 - `Voyager`

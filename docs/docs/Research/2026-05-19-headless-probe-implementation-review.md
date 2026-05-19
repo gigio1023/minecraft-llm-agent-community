@@ -1,7 +1,7 @@
 # Headless Probe Implementation and Execution Review
 
 Date: 2026-05-19  
-Repo: `../minecraft-llm-agent-community`  
+Repo: [minecraft-llm-agent-community](https://github.com/naem1023/minecraft-llm-agent-community)  
 Committed state: `6deb6a9ea1d98492e37a717e9796b1e2025dfe61`  
 Primary proof command: `./scripts/run-agent-loop-probe.sh`
 
@@ -81,7 +81,7 @@ Observed results:
 The latest verified live artifact from the real run is:
 
 ```text
-../minecraft-llm-agent-community/data/evidence/agent_loop_probe_v0-1779155056588.json
+data/evidence/agent_loop_probe_v0-1779155056588.json
 ```
 
 ## What happened in the live run

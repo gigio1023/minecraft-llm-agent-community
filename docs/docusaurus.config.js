@@ -113,7 +113,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Dream of One Project. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} minecraft-llm-agent-community Project. Built with Docusaurus.`,
       },
       prism: {
         theme: prismThemes.github,

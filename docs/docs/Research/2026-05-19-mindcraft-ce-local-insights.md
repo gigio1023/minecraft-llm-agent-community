@@ -1,6 +1,6 @@
 # mindcraft-ce Local Implementation Insights
 
-Target: `/Users/naem1023/git/mindcraft-ce`
+Target: `mindcraft-ce`
 
 `mindcraft-ce` is a massive benchmark and evaluation framework. Our `/probe` is a tiny, headless NPC dialogue loop. Therefore, we must aggressively filter out the benchmarking infrastructure, command surface, and code generation, keeping only the strict operational rules for tool execution and multi-agent conversation.
 

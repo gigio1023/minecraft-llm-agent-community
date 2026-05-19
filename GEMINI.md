@@ -51,7 +51,7 @@ Important search tokens:
 ## Design Rules
 
 - Use Minecraft as an experiment accelerator, not as a premature replacement
-  for Dream of One.
+  for minecraft-llm-agent-community.
 - The first proof is not a village simulator. It is a tiny NPC tool-loop probe.
 - Keep implementation aggressively simple. Prefer small, named modules over
   large files. If a TypeScript file approaches a few hundred lines, split it by
@@ -85,6 +85,9 @@ Important search tokens:
   and optional prismarine-viewer/screenshot evidence.
 - Keep tests small and Detroit-style. Do not add broad mocks to create false
   confidence.
+- Never use absolute local paths (e.g. `/Users/...`) in committed code or
+  documentation. Always use repo-relative paths instead. This applies to `.md`,
+  code, config, and any other committed file.
 
 ## Testing Rules
 

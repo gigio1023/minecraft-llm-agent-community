@@ -38,7 +38,7 @@ export default function Home() {
   return (
     <Layout
       title={`Welcome to ${siteConfig.title}`}
-      description="Documentation and updates for the Dream of One headless probe migration.">
+      description="Documentation and updates for the minecraft-llm-agent-community headless probe migration.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

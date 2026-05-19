@@ -2,9 +2,9 @@
 sidebar_position: 1
 ---
 
-# Welcome to Dream of One
+# Welcome to minecraft-llm-agent-community
 
-**Dream of One** is an experimental project focused on creating **Social NPCs** in Minecraft using Large Language Models (LLMs). We aim to build a stable, multi-agent society where NPCs cooperate, manage resources, and follow social rules within a deterministic game environment.
+**minecraft-llm-agent-community** is an experimental project focused on creating **Social NPCs** in Minecraft using Large Language Models (LLMs). We aim to build a stable, multi-agent society where NPCs cooperate, manage resources, and follow social rules within a deterministic game environment.
 
 ## Why Minecraft?
 
