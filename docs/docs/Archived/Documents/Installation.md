@@ -4,6 +4,9 @@ sidebar_position: 3
 
 # Installation
 
+Archived note: this page documents the older Voyager/Fabric/manual-server setup.
+It is not the active headless probe path.
+
 ### Dependenceis
 - Pyhton: v3.9
 - Node: v18

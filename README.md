@@ -1,8 +1,8 @@
 # ⛏️ minecraft-llm-agent-community
 
 - [🤖 Documentation Blog](https://naem1023.github.io/minecraft-llm-agent-community/)
-  - [Architecture](https://naem1023.github.io/minecraft-llm-agent-community/docs/Documents/Architecture-of-Project)
-  - [Installation Guide](https://naem1023.github.io/minecraft-llm-agent-community/docs/Documents/Installation)
+  - [Legacy Architecture](https://naem1023.github.io/minecraft-llm-agent-community/docs/Archived/Documents/Architecture-of-Project)
+  - [Legacy Installation Guide](https://naem1023.github.io/minecraft-llm-agent-community/docs/Archived/Documents/Installation)
 - [📚 Analysis of Prior Projects](https://naem1023.github.io/minecraft-llm-agent-community/docs/Analysis-of-Prior-Projects)
   - [Simple Analysis of Voyager](https://naem1023.github.io/minecraft-llm-agent-community/docs/Analysis-of-Prior-Projects/voyager)
 
@@ -19,49 +19,55 @@ agent-loop probe. Read these first:
 - [Handoff For GPT 5.4 Copilot](docs/docs/Migration/handoff-gpt54-copilot.md)
 
 The old Voyager baseline remains useful background, but it is not the active
-architecture. The next useful proof is a tiny local server plus two mineflayer
-bots that observe, move, talk, wait, and write a transcript without requiring a
-manual Minecraft client.
+architecture. The active path is a tiny headless probe: a local vanilla server,
+two mineflayer bots, a bounded observe/move/say/wait/remember loop, and a
+small transcript artifact for evidence.
 
-This project aims to observe how agents in the Minecraft world autonomously form groups and create villages. It is still in its early stages, and if valuable insights can be derived, it will be used as a research topic.
-
-This project seeks to expand the research to include how multi-agents form groups, in addition to autonomously learning skills and exploring items, based on [Voyager](https://github.com/MineDojo/Voyager).
+Longer-term social simulation ideas remain background motivation, but the first
+slice is intentionally smaller: prove the constrained NPC tool loop works
+without a manual Minecraft client or the old Voyager-style eval runtime.
 
 
 <p align="center">
   <img src="assets/cover-image.jpeg" width="512">
 </p>
 
-The purpose of this project can be changed, and welcome diverse opinions and feedback. Currently, I'm focusing on observing how issues of cooperation, coexistence, and survival are resolved. Additionally, most of my resources are currently invested in setting up the Minecraft environment, which has slowed the progress of core functionality development.
+## Legacy background
 
-## TODO 
-- [x] Basic Environment Setup using Voyager baseline
-- [x] Make single agent using Voyager baseline
-- [x] Analysis Voyager baseline and make a detail architecture image and pseudo code
-- [x] Fix bugs, deprecated methods and modules for Voyager replication
-- [ ] Setup an architecture for multi-agent based on Voyager
-  - [x] Mineflayer bridge server can accept multiple bots
-  - [x] Modify not to run and manage the Express server
-  - [x] Establish complete js development environment, not only for the module as python
-  - [ ] Make a simple multi agent
-- [ ] Integrate ollama for running local llm
-- [ ] Improve voyager baseline to make it more stable and robust
-- [ ] Setup monitoring system for multi-agent
+Voyager-era notes and backlog remain useful background, but they are not the
+current execution path. The main README now tracks only the headless probe
+workflow; older Fabric/Python/manual-client setup material should be read as
+historical context, not as the default way to run this repository.
 
 ## Architecture
 It's a sample architecture of executing a bot. It's not a final architecture.
 ![](docs/docs/Documents/img/sample-architecture.png)
-## Installation Guides
-Check the [Installation Document](https://naem1023.github.io/minecraft-llm-agent-community/docs/Documents/Installation)
 
-# Run
+## Legacy installation guides
+
+The published [Installation Document](https://naem1023.github.io/minecraft-llm-agent-community/docs/Archived/Documents/Installation)
+still describes the older Voyager/Fabric/manual-server path. It is useful as
+background only and does not describe the active headless probe setup below.
+
+## Headless Mineflayer Probe
+
+The active direction is a tiny headless probe, not the old Voyager eval loop.
+
+Prerequisites: Bun and Docker with Compose available locally.
+
 ```sh
-python start_agent.py
+bun install --cwd probe
+bun run --cwd probe typecheck
+./scripts/run-agent-loop-probe.sh
 ```
 
-## Check the bots are running
-If you want to check the bots, install minecraft and conenct to the local minecraft server.
-The default address is `localhost:25565`.
+The proof command starts a local vanilla Docker server, waits for Minecraft
+ping readiness, connects `npc_a` and `npc_b` with offline auth, runs the
+deterministic `observe` / `move` / `say` / `wait` / `remember` loop, and writes
+a transcript JSON artifact under `data/evidence/`.
+
+No manual Minecraft client, Fabric, Forge, or live OpenAI provider is required
+for this first proof.
 
 # Contribution
 ## Check lint

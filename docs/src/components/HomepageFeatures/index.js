@@ -4,29 +4,29 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Docuemnt',
+    title: 'Migration docs',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Fully documents for the project.
+        Start with the migration docs for the active headless probe direction.
       </>
     ),
   },
   {
-    title: '...',
+    title: 'Probe runtime',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        ...
+        The current slice is a local Docker server, two bots, and a bounded tool loop.
       </>
     ),
   },
   {
-    title: 'Analysis of Prior Projects',
+    title: 'Archived references',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        Documentation of the analyses of prior research and projects used for building this project.
+        Older Voyager-era setup notes remain available as archived background material.
       </>
     ),
   },

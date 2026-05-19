@@ -3,11 +3,20 @@ sidebar_position: 1
 ---
 
 # Introduction
-About ⛏️ minecraft-llm-agent-community.
+This documentation site tracks the active migration of
+`minecraft-llm-agent-community`.
 
-This project aims to observe how agents in the Minecraft world autonomously form groups and create villages. It is still in its early stages, and if valuable insights can be derived, it will be used as a research topic.
+The current direction is no longer the old Voyager-style runtime. The active
+work is a small headless mineflayer probe:
 
-This project seeks to expand the research to include how multi-agents form groups, in addition to autonomously learning skills and exploring items, similar to [Voyager](https://github.com/MineDojo/Voyager).
+- a local vanilla Docker server;
+- two offline mineflayer bots;
+- a bounded `observe` / `move` / `say` / `wait` / `remember` loop;
+- a transcript artifact under `data/evidence/`.
+
+The goal of this slice is simple: prove the runtime-owned NPC tool loop works
+without a manual Minecraft client, Fabric/Forge setup, or an eval-driven agent
+runtime.
 
 <!-- <div style="text-align: center;">
   <img src="img/cover-image.jpeg" alt="Description" style="max-width: 400px; height: auto;">
@@ -15,4 +24,6 @@ This project seeks to expand the research to include how multi-agents form group
 
 ![](img/cover-image.jpeg)
 
-The purpose of this project can be changed, and welcome diverse opinions and feedback. Currently, I'm focusing on observing how issues of cooperation, coexistence, and survival are resolved. Additionally, most of my resources are currently invested in setting up the Minecraft environment, which has slowed the progress of core functionality development.
+Older Voyager, Fabric, Python, and manual-server notes are still kept in this
+repository as reference material, but they are now archived background rather
+than the default way to run the project.

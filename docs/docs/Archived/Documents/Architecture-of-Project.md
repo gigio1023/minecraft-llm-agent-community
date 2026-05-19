@@ -3,6 +3,10 @@ sidebar_position: 1
 ---
 
 # Architecture of Project
+
+Archived note: this page describes an older Voyager-era architecture sketch.
+It is kept as background only and is not the active probe design.
+
 This project should handling real-time parallel multi-agent. 
 
 

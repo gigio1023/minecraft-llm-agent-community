@@ -3,6 +3,10 @@ sidebar_position: 2
 ---
 
 # Progress of Project
+
+Archived note: this backlog tracks the older Voyager-era direction and is kept
+for historical reference only.
+
 ## TODO 
 - [x] Basic Environment Setup using Voyager baseline
 - [x] Make single agent using Voyager baseline

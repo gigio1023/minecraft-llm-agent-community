@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { buildServerEnv, loadProbeConfig } from "../src/config.js";
+import { getComposeCommandTimeouts } from "../src/server/dockerServer.js";
+
+test("loads probe config and builds vanilla server env", () => {
+  const config = loadProbeConfig();
+  const env = buildServerEnv(config);
+
+  assert.equal(config.server.version, "1.21.11");
+  assert.equal(config.server.image, "itzg/minecraft-server:java21");
+  assert.equal(config.server.host, "127.0.0.1");
+  assert.equal(config.server.containerPort, 25565);
+  assert.equal(config.server.publishStrategy, "ephemeral-host-port");
+  assert.deepEqual(config.bots, ["npc_a", "npc_b"]);
+
+  assert.equal(env.EULA, "TRUE");
+  assert.equal(env.VERSION, "1.21.11");
+  assert.equal(env.TYPE, "VANILLA");
+  assert.equal(env.ONLINE_MODE, "FALSE");
+  assert.equal(env.MODE, "creative");
+  assert.equal(env.DIFFICULTY, "peaceful");
+  assert.equal(env.LEVEL_TYPE, "FLAT");
+  assert.equal(env.GENERATE_STRUCTURES, "false");
+  assert.equal(env.SPAWN_NPCS, "true");
+  assert.equal(env.SPAWN_ANIMALS, "false");
+  assert.equal(env.SPAWN_MONSTERS, "false");
+});
+
+test("uses a longer timeout for docker compose up while keeping compose port and down bounded", () => {
+  const config = loadProbeConfig();
+  const timeouts = getComposeCommandTimeouts(config);
+
+  assert.equal(timeouts.startupMs, config.server.pingTimeoutMs);
+  assert.equal(timeouts.managementMs, 10_000);
+  assert.ok(timeouts.startupMs > timeouts.managementMs);
+});
