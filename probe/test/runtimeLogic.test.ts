@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
@@ -194,6 +195,84 @@ test("parseProviderAction accepts converse, defaults args, and rejects invalid a
     () => parseProviderAction({ tool: "sing", args: {} }),
     /Unsupported mutual tool: sing/
   );
+});
+
+test("loadOpenAICodexAuth reads auth metadata without exposing raw secrets in JSON", async () => {
+  const artifactDir = new URL("../test-artifacts/", import.meta.url);
+  const authPath = new URL("openai-codex-auth.json", artifactDir);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    authPath,
+    JSON.stringify({
+      accessToken: "top-secret-access-token",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      profileEmail: "npc@example.com"
+    })
+  );
+
+  const { loadOpenAICodexAuth } = await import("../src/mutual/openaiCodexAuth.js");
+  const auth = await loadOpenAICodexAuth(authPath);
+
+  assert.equal(auth.profileEmail, "npc@example.com");
+  assert.equal(typeof auth.accessToken, "string");
+  assert.throws(() => JSON.stringify(auth), /Cannot serialize auth/);
+
+  await rm(authPath, { force: true });
+});
+
+test("createOpenAICodexProvider retries malformed JSON once before returning a parsed action", async () => {
+  const responses = [
+    { output_text: "not json" },
+    {
+      output_text: JSON.stringify({
+        tool: "converse",
+        args: {
+          target: "npc_b",
+          utterance: "Jun, check the marker."
+        }
+      })
+    }
+  ];
+  const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
+  const provider = createOpenAICodexProvider({
+    accessToken: "top-secret-access-token",
+    maxRetries: 1,
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url: String(url), init });
+      const payload = responses.shift();
+
+      assert.ok(payload, "expected a fake response payload");
+
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      });
+    }
+  });
+
+  const proposal = await provider.next({
+    actorId: "npc_a",
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
+      lastActionResult: { status: "available" }
+    },
+    memory: ["marker paper should stay near the chest"],
+    recentTranscript: [],
+    rules: {
+      oneToolPerTurn: true,
+      allowedTools: ["converse", "wait"],
+      noInventedObservations: true,
+      preferObserveWorldWhenUncertain: true
+    }
+  });
+
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(fetchCalls[0]?.url, "https://api.openai.com/v1/responses");
+  assert.equal(proposal.tool, "converse");
 });
 
 test("deterministic provider follows the planned runtime contract sequence", () => {
