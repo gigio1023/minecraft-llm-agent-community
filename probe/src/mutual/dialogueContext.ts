@@ -1,5 +1,3 @@
-import type { ObserveResult } from "../tools/observe.js";
-
 export type DialogueJsonValue =
   | string
   | number
@@ -8,30 +6,39 @@ export type DialogueJsonValue =
   | DialogueJsonValue[]
   | { [key: string]: DialogueJsonValue };
 
-export type DialogueActorId = "npc_a" | "npc_b";
+export type DialogueJsonObject = { [key: string]: DialogueJsonValue };
 
-export type DialoguePersona = {
-  name: DialogueActorId;
-  role: string;
-  style: string;
-  objective: string;
-};
+export type MutualActorId = "npc_a" | "npc_b";
 
-export type DialogueObservation = Pick<ObserveResult, "visibleActors"> & {
-  lastActionResult?: {
-    status: string;
-    [key: string]: DialogueJsonValue;
-  };
-};
+export const mutualPersonas = {
+  npc_a: {
+    name: "Mara",
+    role: "quartermaster",
+    style: "brief but careful",
+    objective: "coordinate the marker handoff"
+  },
+  npc_b: {
+    name: "Jun",
+    role: "runner",
+    style: "quick and slightly distracted",
+    objective: "confirm the marker location"
+  }
+} satisfies Record<
+  MutualActorId,
+  {
+    name: string;
+    role: string;
+    style: string;
+    objective: string;
+  }
+>;
 
-export type DialogueTranscriptEntry = {
-  actor: DialogueActorId;
-  tool: string;
-  args: Record<string, DialogueJsonValue>;
-};
+export type DialoguePersona = (typeof mutualPersonas)[MutualActorId];
+export type DialogueObservation = DialogueJsonObject;
+export type DialogueTranscriptEntry = DialogueJsonObject;
 
 export type DialogueContextInput = {
-  actorId: DialogueActorId;
+  actorId: MutualActorId;
   allowedTools: string[];
   persona: DialoguePersona;
   observation: DialogueObservation;

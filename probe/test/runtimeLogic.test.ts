@@ -7,8 +7,8 @@ import {
   type DialogueContextInput,
   type DialogueContextOutput,
   type DialogueObservation,
-  type DialoguePersona,
-  type DialogueTranscriptEntry
+  type DialogueTranscriptEntry,
+  mutualPersonas
 } from "../src/mutual/dialogueContext.js";
 import { parseProviderAction } from "../src/mutual/providerSchema.js";
 import { finalizeRunProbe } from "../src/runProbe.js";
@@ -78,22 +78,28 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
 
 test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
   const allowedTools = ["converse", "wait"];
-  const persona: DialoguePersona = {
-    name: "npc_a",
-    role: "runner",
-    style: "brief",
-    objective: "coordinate the marker handoff"
+  const persona: { name: string; role: string; style: string; objective: string } = {
+    ...mutualPersonas.npc_a
+  };
+  const visibleActors = [{ id: "npc_b", distance: 2, busy: false }];
+  const marker = {
+    seen: true,
+    holder: "npc_b"
   };
   const observation: DialogueObservation = {
-    visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
-    lastActionResult: { status: "available" }
+    visibleActors,
+    lastActionResult: { status: "available" },
+    marker
   };
   const memory = ["marker paper should stay near the chest"];
+  const transcriptArgs = { utterance: "I am ready." };
   const recentTranscript: DialogueTranscriptEntry[] = [
     {
-      actor: "npc_b",
+      actorId: "npc_b",
+      actorName: "Jun",
       tool: "converse",
-      args: { utterance: "I am ready." }
+      args: transcriptArgs,
+      result: { status: "available" }
     }
   ];
 
@@ -107,29 +113,36 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
   } satisfies DialogueContextInput);
 
   persona.role = "changed";
-  observation.visibleActors[0]!.busy = true;
+  visibleActors[0]!.busy = true;
+  marker.holder = "npc_a";
   memory.push("mutated");
-  recentTranscript[0]!.args.utterance = "mutated";
+  transcriptArgs.utterance = "mutated";
   allowedTools.push("remember");
 
   const expected: DialogueContextOutput = {
     actorId: "npc_a",
     persona: {
-      name: "npc_a",
-      role: "runner",
-      style: "brief",
+      name: "Mara",
+      role: "quartermaster",
+      style: "brief but careful",
       objective: "coordinate the marker handoff"
     },
     observation: {
       visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
-      lastActionResult: { status: "available" }
+      lastActionResult: { status: "available" },
+      marker: {
+        seen: true,
+        holder: "npc_b"
+      }
     },
     memory: ["marker paper should stay near the chest"],
     recentTranscript: [
       {
-        actor: "npc_b",
+        actorId: "npc_b",
+        actorName: "Jun",
         tool: "converse",
-        args: { utterance: "I am ready." }
+        args: { utterance: "I am ready." },
+        result: { status: "available" }
       }
     ],
     rules: {
