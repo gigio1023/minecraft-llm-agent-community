@@ -45,7 +45,7 @@ The probe replaces the legacy Voyager eval-loop with a strictly bounded runtime:
 
 - Docker and Docker Compose
 - Bun 1.3+
-- Node.js 20+ (for Docusaurus docs)
+- Node.js 22+ (for Docusaurus docs)
 
 ## Contributing
 
