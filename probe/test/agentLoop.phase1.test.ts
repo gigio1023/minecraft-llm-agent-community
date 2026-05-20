@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";

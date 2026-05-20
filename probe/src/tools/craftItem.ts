@@ -17,6 +17,7 @@ type CraftingBot = {
   };
   recipesFor(itemId: number, metadata: null, minResultCount: number, craftingTable: unknown): Recipe[];
   craft(recipe: Recipe, count: number, craftingTable: unknown): Promise<void>;
+  findBlock?(options: { matching: (block: any) => boolean; maxDistance?: number }): any;
 };
 
 type CraftResult = {
@@ -45,13 +46,37 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
     throw new Error(`Unknown craft item: ${resolvedItemName}`);
   }
 
-  const [recipe] = bot.recipesFor(item.id, null, 1, null);
-
-  if (!recipe) {
-    throw new Error(`No craftable recipe found for ${resolvedItemName}`);
+  // Auto-detect nearby crafting table blocks
+  let craftingTableBlock: any = null;
+  if (typeof bot.findBlock === "function") {
+    try {
+      craftingTableBlock = bot.findBlock({
+        matching: (block: any) => block.name === "crafting_table",
+        maxDistance: 8
+      }) || null;
+    } catch (e) {
+      console.warn("Failed scanning for nearby crafting tables:", e);
+    }
   }
 
-  await bot.craft(recipe, 1, null);
+  // Query recipe with or without crafting table block
+  let recipes = bot.recipesFor(item.id, null, 1, null);
+  if (recipes.length === 0 && craftingTableBlock) {
+    recipes = bot.recipesFor(item.id, null, 1, craftingTableBlock);
+  }
+
+  const recipe = recipes[0];
+
+  if (!recipe) {
+    throw new Error(`No craftable recipe found for ${resolvedItemName} (crafting_table adjacent? ${!!craftingTableBlock})`);
+  }
+
+  const requiresTable = (recipe as any).requiresTable;
+  if (requiresTable && !craftingTableBlock) {
+    throw new Error(`Item ${resolvedItemName} requires a crafting_table, but none was found within 8 blocks.`);
+  }
+
+  await bot.craft(recipe, 1, requiresTable ? craftingTableBlock : null);
 
   return {
     status: "crafted",

@@ -46,6 +46,16 @@ export function createDialogueState({
       return {
         status: "available"
       };
+    },
+    canEscalateDialogue(actorId: string, pressures: Array<{ kind: string; urgency: number }>): boolean {
+      const allowedCoopPressures = [
+        "shared_shortage",
+        "blocked_teammate",
+        "public_obligation_due",
+        "station_missing",
+        "hostile_risk"
+      ];
+      return pressures.some((p) => allowedCoopPressures.includes(p.kind) && p.urgency >= 0.6);
     }
   };
 }

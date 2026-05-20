@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 
 import { createCanonicalTranscript } from "../src/transcript/canonical/transcriptParts.js";
 import { projectDebugTimeline } from "../src/transcript/projectors/debugTimeline.js";

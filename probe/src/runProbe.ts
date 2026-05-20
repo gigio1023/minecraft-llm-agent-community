@@ -1,5 +1,6 @@
 import { loadProbeConfig } from "./config.js";
 import { createDeterministicProvider } from "./provider/deterministicProvider.js";
+import { createLocalLlmProvider } from "./provider/localLlmProvider.js";
 import { closeBots, createBots } from "./runtime/createBots.js";
 import { createDialogueState } from "./runtime/dialogueState.js";
 import { createMemory } from "./runtime/memory.js";
@@ -189,7 +190,10 @@ export async function runProbe(): Promise<ProbeRunResult> {
     const dialogueState = createDialogueState({
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable
     });
-    const provider = createDeterministicProvider();
+    const providerType = process.env.LLM_PROVIDER_TYPE || "deterministic";
+    const provider = providerType === "local_llm"
+      ? createLocalLlmProvider()
+      : createDeterministicProvider();
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
     const sharedSettlementState = createSharedSettlementState();
@@ -216,10 +220,12 @@ export async function runProbe(): Promise<ProbeRunResult> {
       bots: { actor, target },
       provider,
       transcript,
+      config,
+      server: server ? { host: server.host, port: server.port } : undefined,
       tools: {
         validateProposal,
         observe: ({ actor, target }) =>
-          observe({ actor, target, dialogueState, memory, sharedChest }),
+          observe({ actor: actor as any, target: target as any, dialogueState, memory, sharedChest }),
         move_to: ({ actor, target, args }) => {
           return withActionWrapper(
             () => {
@@ -330,6 +336,27 @@ export async function runProbe(): Promise<ProbeRunResult> {
               const targetId = readStringArg(args, "target");
               const text = readStringArg(args, "text");
               assertTarget(targetId, target.username);
+
+              const myBulletin = teamBulletin.snapshot().find((e) => e.actorId === actor.username);
+              const targetBulletin = teamBulletin.snapshot().find((e) => e.actorId === targetId);
+
+              const hasCooperativeNeed =
+                (myBulletin && myBulletin.currentBlocker) ||
+                (targetBulletin &&
+                  (targetBulletin.currentBlocker ||
+                    (targetBulletin.resourceNeeds && targetBulletin.resourceNeeds.length > 0))) ||
+                sharedSettlementState.snapshot().lastHostileSighting !== null;
+
+              if (!hasCooperativeNeed && providerType === "local_llm") {
+                console.log(`[${actor.username}] Dialogue gated (no active cooperative blocker/need). Bypassing talk.`);
+                return {
+                  tool: "say",
+                  ok: false,
+                  status: "blocked",
+                  message: "Dialogue gated by coordination policy."
+                };
+              }
+
               return say({ actor, target, dialogueState, text });
             },
             { tool: "say" }

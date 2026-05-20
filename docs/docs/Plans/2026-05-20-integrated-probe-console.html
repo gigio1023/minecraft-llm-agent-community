@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>마인크래프트 에이전트 통합 계획 피드백 콘솔</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #151d30;
+      --surface-hover: #1e2942;
+      --soft: #1b2640;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #334155;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-soft: rgba(59, 130, 246, 0.15);
+      --risk: #f59e0b;
+      --risk-soft: rgba(245, 158, 11, 0.1);
+      --success: #10b981;
+      --success-soft: rgba(16, 185, 129, 0.1);
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
+      line-height: 1.6;
+      padding: 0;
+    }
+
+    main {
+      width: min(1200px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 40px 0 60px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 30px;
+      padding-bottom: 30px;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+    }
+
+    h1 {
+      font-size: clamp(28px, 3.5vw, 42px);
+      line-height: 1.2;
+      font-weight: 800;
+      color: #f8fafc;
+      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 780px;
+    }
+
+    .meta-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      font-size: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .meta-card strong {
+      color: var(--accent-hover);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .meta-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      margin-top: 30px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      border-color: #475569;
+    }
+
+    .card h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #f8fafc;
+    }
+
+    .card h2::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .card.as-is h2::before {
+      background: var(--risk);
+    }
+
+    .card.to-be h2::before {
+      background: var(--success);
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    li strong {
+      color: var(--text);
+    }
+
+    .option-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .option-item {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111827;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .option-item:hover {
+      background: var(--surface-hover);
+      border-color: #4b5563;
+    }
+
+    .option-item input[type="radio"] {
+      margin-top: 4px;
+      margin-right: 12px;
+      accent-color: var(--accent);
+    }
+
+    .option-text strong {
+      display: block;
+      color: #f8fafc;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .option-text span {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .option-item input[type="radio"]:checked + .option-text::before {
+      content: "✓ ";
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    .option-item input[type="radio"]:checked {
+      outline: 2px solid var(--accent);
+    }
+
+    .question {
+      margin-bottom: 18px;
+    }
+
+    .question label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #cbd5e1;
+    }
+
+    select, textarea, input[type="number"] {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      transition: var(--transition);
+    }
+
+    select:focus, textarea:focus, input[type="number"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .payload-section {
+      margin-top: 30px;
+    }
+
+    .payload {
+      width: 100%;
+      min-height: 180px;
+      background: #020617;
+      color: #38bdf8;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      font-family: "Fira Code", Monaco, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .btn-copy {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .btn-copy:hover {
+      background: #2563eb;
+    }
+
+    .btn-copy:active {
+      transform: scale(0.98);
+    }
+
+    .status-toast {
+      display: none;
+      padding: 8px 16px;
+      background: var(--success-soft);
+      border: 1px solid var(--success);
+      color: #34d399;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .warning-box {
+      background: var(--risk-soft);
+      border: 1px solid var(--risk);
+      color: #fbbf24;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-top: 18px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 820px) {
+      header {
+        grid-template-columns: 1fr;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>통합 계획 의사결정 피드백 콘솔</h1>
+        <p class="subtitle">6대 벤치마킹 레포지토리 코드 분석에 기반하여, 안정적이고 토큰 효율적인 1000+ 사이클 생존을 목표로 하는 차기 통합 계획에 대한 의사결정 수렴 페이지입니다.</p>
+      </div>
+      <div class="meta-card">
+        <strong>현재 의사결정 영역</strong>
+        <p>Option A 기반 통합 구현 계획 승인 및 복원력 파라미터 튜닝</p>
+      </div>
+    </header>
+
+    <!-- As-Is vs To-Be -->
+    <section class="grid-2">
+      <article class="card as-is">
+        <h2>AS-IS (기존의 물리적 한계)</h2>
+        <ul>
+          <li><strong>동기식 I/O 병목</strong>: <code>writeFileSync</code>로 인한 200~500ms 지연으로 Mineflayer 봇 소켓이 킵얼라이브를 놓쳐 튕김 현상 발생.</li>
+          <li><strong>무한 루프 정체</strong>: 특정 행동이 반복 실패할 때 프롬프트 갱신 없이 무한정 동일 명령을 에러 실행하여 토큰 요금 파산.</li>
+          <li><strong>생존 무방비</strong>: LLM 프롬프트 대기 시간 및 기동 중 적대적 몹에게 피격당하면 반응 없이 그대로 사망.</li>
+        </ul>
+      </article>
+      <article class="card to-be">
+        <h2>TO-BE (통합 계획 복원력 전략)</h2>
+        <ul>
+          <li><strong>완전 비동기 논블로킹 I/O</strong>: <code>fs.promises</code> 상태 기록 분산화 및 100턴 에포크 단위 롤링 디스크 저장.</li>
+          <li><strong>Stall Detection Guard</strong>: 3회 이상 동일 패턴 실패 시 인라인 시스템 프롬프트 가이드를 강제 주입해 루프 탈출 유도.</li>
+          <li><strong>Combat Pulse 백그라운드 스레드</strong>: 에이전트 바깥에서 0.75초 간격으로 스캔하여 자동전투 및 자가 생존 모드 인터럽트.</li>
+          <li><strong>엇박자(Staggered) 자동 재연결</strong>: 서버 킥 발생 시 30s/60s 간격을 두고 자동 접속 회복 및 메모리 재수화.</li>
+        </ul>
+      </article>
+    </section>
+
+    <!-- Options and Interview Grid -->
+    <section class="grid-2">
+      <!-- Option Card -->
+      <article class="card">
+        <h2>통합 계획 세부 옵션 선택</h2>
+        <div class="option-group">
+          <label class="option-item" id="label-opt-full">
+            <input type="radio" name="decision" id="opt-full" value="full_integration" checked>
+            <div class="option-text">
+              <strong>1. 전체 계획 구현 및 1000턴 스트레스 테스트 (추천)</strong>
+              <span>비동기 I/O, Stall 감지, Combat Pulse, 재연결 루프를 모두 탑재하고 1000턴 가혹 환경에서 검증합니다.</span>
+            </div>
+          </label>
+
+          <label class="option-item" id="label-opt-partial">
+            <input type="radio" name="decision" id="opt-partial" value="partial_integration">
+            <div class="option-text">
+              <strong>2. 선별적 구현 (Stall 감지 & 재연결 우선)</strong>
+              <span>실시간 Combat Pulse 및 Dynamic Prompter를 제외하고, 복원력의 핵심인 스톨 방지와 재연결 루프만 선반영합니다.</span>
+            </div>
+          </label>
+
+          <label class="option-item" id="label-opt-bypass">
+            <input type="radio" name="decision" id="opt-bypass" value="original_option_a">
+            <div class="option-text">
+              <strong>3. 기존 Option A 원안만 실행</strong>
+              <span>비동기 I/O 및 3중 안전 가드(Bypass 5턴 제한)만 구현하고, 벤치마킹 추가 개선안은 반영하지 않습니다.</span>
+            </div>
+          </label>
+        </div>
+      </article>
+
+      <!-- Interview Card -->
+      <article class="card">
+        <h2>복원력 제어 파라미터 설정 (Interview)</h2>
+        <form id="param-form">
+          <div class="question">
+            <label for="combat-pulse-ms">Combat Pulse 스캔 주기 (ms)</label>
+            <input type="number" id="combat-pulse-ms" value="750" min="200" max="5000" step="50">
+          </div>
+
+          <div class="question">
+            <label for="reconnect-attempts">최대 재연결 시도 횟수</label>
+            <input type="number" id="reconnect-attempts" value="50" min="1" max="200">
+          </div>
+
+          <div class="question">
+            <label for="stall-threshold">Stall Detection 정체 판단 역치 (턴 수)</label>
+            <input type="number" id="stall-threshold" value="3" min="2" max="10">
+          </div>
+
+          <div class="question">
+            <label for="feedback-notes">추가 검토 및 개선 의견</label>
+            <textarea id="feedback-notes" placeholder="구현 시 특별히 신경 써야 하거나 예외 처리할 사항이 있다면 적어주세요."></textarea>
+          </div>
+        </form>
+      </article>
+    </section>
+
+    <!-- Payload Section -->
+    <section class="card payload-section">
+      <h2>전송용 JSON Payload</h2>
+      <p class="muted">아래 텍스트 상자의 Payload를 복사하여 에이전트 채팅창에 붙여넣어 주시면, 해당 피드백을 수렴하여 실행에 즉각 반영합니다.</p>
+      <textarea class="payload" id="payload-box" readonly></textarea>
+      
+      <button class="btn-copy" id="btn-copy">📋 클립보드에 복사</button>
+      <div class="status-toast" id="toast-msg">클립보드에 Payload가 복사되었습니다!</div>
+
+      <div class="warning-box">
+        <strong>⚠️ 안내 사항:</strong> 본 피드백 콘솔은 HTML 폼 컨트롤을 기반으로 완벽한 자바스크립트 샌드박싱 상태로 동작합니다. 외부 네트워크로 피드백 데이터가 절대 전송되지 않으며, 오직 안전하게 복사-붙여넣기를 통해서만 연동됩니다.
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const optFull = document.getElementById('opt-full');
+    const optPartial = document.getElementById('opt-partial');
+    const optBypass = document.getElementById('opt-bypass');
+
+    const combatPulseMs = document.getElementById('combat-pulse-ms');
+    const reconnectAttempts = document.getElementById('reconnect-attempts');
+    const stallThreshold = document.getElementById('stall-threshold');
+    const feedbackNotes = document.getElementById('feedback-notes');
+    
+    const payloadBox = document.getElementById('payload-box');
+    const btnCopy = document.getElementById('btn-copy');
+    const toastMsg = document.getElementById('toast-msg');
+
+    function getSelectedDecision() {
+      if (optFull.checked) return { value: "full_integration", label: "Full Integration & 1000-turn Verification" };
+      if (optPartial.checked) return { value: "partial_integration", label: "Partial Integration (Stall & Reconnect)" };
+      if (optBypass.checked) return { value: "original_option_a", label: "Original Option A Only" };
+      return { value: "unknown", label: "Unknown" };
+    }
+
+    function generatePayload() {
+      const decisionObj = getSelectedDecision();
+      const payload = {
+        schema_version: "html-feedback-console-v1",
+        page: "integrated-probe-console",
+        updated_at: new Date().toISOString(),
+        decision: decisionObj,
+        scope: {
+          value: "minecraft-probe-integrated",
+          label: "Minecraft Agent Loop Probe Integration"
+        },
+        selected_risks: [
+          "OOM due to log bloat protected by rolling logger",
+          "Mineflayer sockets kept alive during LLM delays"
+        ],
+        interview: {
+          combat_pulse_ms: parseInt(combatPulseMs.value) || 750,
+          reconnect_attempts: parseInt(reconnectAttempts.value) || 50,
+          stall_threshold: parseInt(stallThreshold.value) || 3,
+          additional_notes: feedbackNotes.value.trim()
+        },
+        next_agent_instruction: `통합 계획서의 의사결정을 '${decisionObj.label}'로 적용하고, Combat Pulse 주기를 ${combatPulseMs.value}ms, 재연결 시도를 ${reconnectAttempts.value}회, 정체 역치를 ${stallThreshold.value}턴으로 적용하여 1000턴 검증 테스트 코드를 작성하고 실행 준비를 마칠 것.`
+      };
+
+      payloadBox.value = JSON.stringify(payload, null, 2);
+    }
+
+    // Add event listeners for dynamic update
+    [optFull, optPartial, optBypass].forEach(el => el.addEventListener('change', generatePayload));
+    [combatPulseMs, reconnectAttempts, stallThreshold].forEach(el => el.addEventListener('input', generatePayload));
+    feedbackNotes.addEventListener('input', generatePayload);
+
+    // Initial load
+    generatePayload();
+
+    // Copy to clipboard
+    btnCopy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(payloadBox.value);
+        toastMsg.style.display = 'block';
+        setTimeout(() => {
+          toastMsg.style.display = 'none';
+        }, 3000);
+      } catch (err) {
+        // Fallback selection if clipboard blocked
+        payloadBox.select();
+        alert('클립보드 복사에 실패했습니다. 텍스트 상자의 Payload를 전체 선택하여 복사해 주세요.');
+      }
+    });
+  </script>
+</body>
+</html>

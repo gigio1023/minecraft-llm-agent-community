@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 
 import { createSharedStorageLedger } from "../src/gameplay/storage/sharedStorageLedger.js";
 import { createTeamBulletin } from "../src/npc/social/teamBulletin.js";

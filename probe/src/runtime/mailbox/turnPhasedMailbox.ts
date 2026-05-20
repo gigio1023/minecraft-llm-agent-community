@@ -23,6 +23,9 @@ export function createTurnPhasedMailbox() {
     enqueue(item: MailItem) {
       const queue = nextTurn.get(item.to) ?? [];
       queue.push(snapshot(item));
+      if (queue.length > 10) {
+        queue.splice(0, queue.length - 10);
+      }
       nextTurn.set(item.to, queue);
     },
     visible(actorId: string) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import test from "node:test";
+import { test } from "bun:test";
 
 import minecraftData from "minecraft-data";
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
@@ -473,7 +473,7 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
   const provider = createOpenAICodexProvider({
     accessToken: "test-token",
     maxRetries: 1,
-    fetchImpl: async (url, init) => {
+    fetchImpl: (async (url: any, init: any) => {
       fetchCalls.push({ url: String(url), init });
       const payload = responses.shift();
 
@@ -485,7 +485,7 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
           "content-type": "application/json"
         }
       });
-    }
+    }) as any
   });
 
   const proposal = await provider.next({
@@ -529,7 +529,7 @@ test("createOpenAICodexProvider stops after exhausting malformed JSON retries", 
   const provider = createOpenAICodexProvider({
     accessToken: "test-token",
     maxRetries: 2,
-    fetchImpl: async () => {
+    fetchImpl: (async () => {
       fetchCount += 1;
       return new Response(JSON.stringify({ output_text: "not json" }), {
         status: 200,
@@ -537,7 +537,7 @@ test("createOpenAICodexProvider stops after exhausting malformed JSON retries", 
           "content-type": "application/json"
         }
       });
-    }
+    }) as any
   });
 
   await assert.rejects(
@@ -583,7 +583,7 @@ test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", 
   const provider = createOpenAICodexProvider({
     accessToken: "test-token",
     maxRetries: 3,
-    fetchImpl: async () => {
+    fetchImpl: (async () => {
       fetchCount += 1;
       return new Response(
         JSON.stringify({
@@ -599,7 +599,7 @@ test("createOpenAICodexProvider does not retry non-SyntaxError parse failures", 
           }
         }
       );
-    }
+    }) as any
   });
 
   await assert.rejects(
