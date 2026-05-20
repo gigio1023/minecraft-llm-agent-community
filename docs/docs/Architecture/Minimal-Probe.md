@@ -24,8 +24,12 @@ The first strong proof should include:
 - `collect_logs` working end-to-end in live Minecraft;
 - follow-up progression beyond the first log attempt;
 - transcript-visible evidence for progress, failure, timeout, or stall;
-- single-bot live reconnect;
+- truthful reconnect/session evidence when reconnect is exercised;
 - checkpoint-ready runtime artifacts.
+
+Deep reconnect refactoring is not the current implementation driver. The probe
+should avoid claiming reconnect success unless runtime tools and verification
+state are actually fresh.
 
 ## What Makes This Valuable
 

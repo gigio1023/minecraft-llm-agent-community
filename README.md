@@ -17,7 +17,7 @@ Short-term product:
 - a tiny headless Minecraft runtime;
 - one bot that can make real end-to-end progress on boring gameplay tasks;
 - strong observability through transcript and runtime artifacts;
-- single-bot live reconnect;
+- truthful reconnect/session lifecycle evidence when reconnect is in scope;
 - architecture space for per-agent action skill ownership and later action skill
   evolution.
 
@@ -49,6 +49,7 @@ It is this:
 - no raw JavaScript `eval` gameplay loop;
 - deterministic-first runtime development;
 - runtime-owned validation, timeout, verification, and artifacts;
+- actor workspace is the source of truth for actor-owned action skill state;
 - tests stay small and Detroit-style;
 - live transcript is the primary behavior evidence;
 - social simulation should emerge from Minecraft task pressure, not persona text alone.

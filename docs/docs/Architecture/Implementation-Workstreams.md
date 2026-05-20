@@ -1,0 +1,255 @@
+---
+sidebar_position: 6
+---
+
+# Implementation Workstreams
+
+This document is the parallel implementation plan for the next architecture
+slice.
+
+The goal is not to finish every historical `SPEC.md` item. The goal is to make
+actor workspace, action skill lifecycle, hot-path evidence, provider snapshots,
+and per-NPC async reviewers coherent without blocking gameplay turns.
+
+## Immediate Slice
+
+The next slice should deliver:
+
+1. actor workspace source-of-truth layout;
+2. action skill recipe schema and validator;
+3. active seed action skill materialization;
+4. shutdown or migration path for legacy `build/generated-skills` output;
+5. actor-scoped evidence files;
+6. provider input snapshots for LLM-backed paths;
+7. per-NPC reviewer output schema and guardrails;
+8. subagent-friendly implementation boundaries.
+
+## Current Slice Status
+
+As of the first implementation pass:
+
+- Worker A has landed the actor workspace path/store API, baseline
+  `reviews/` and `provider-inputs/` dirs, active seed materialization, and
+  active action skill reads.
+- Worker B has landed recipe types, validation, proposal records, lifecycle
+  transition guards, and default shutdown of legacy generated TypeScript
+  execution unless explicitly opted in with
+  `ALLOW_LEGACY_GENERATED_ACTION_SKILLS`.
+- Worker C has landed provider input snapshot persistence and credential-key
+  rejection, with live dialogue provider calls writing snapshots.
+- Worker D has landed actor-scoped evidence writing for failed verification and
+  fake-progress rejection in the deterministic runtime loop.
+- Worker E has landed the per-actor reviewer output schema and writer, but not
+  the asynchronous queue/runner.
+- The coordinator has landed the phase-one active action-skill gate: current
+  `runProbe` reads active actor workspace records, passes them into
+  `runAgentLoop`, includes active skill context in provider input, and blocks
+  provider proposals whose primitives are not backed by actor-owned active
+  records.
+
+Remaining work in this slice is to broaden evidence coverage across all
+primitive categories, add the per-NPC async reviewer runner, and wire the same
+active action-skill gate into any legacy or mutual gameplay runner that still
+executes outside the phase-one `runAgentLoop` path.
+
+## Coordinator
+
+The coordinator owns shared integration points:
+
+- `probe/src/runProbe.ts`;
+- `probe/src/runtime/agentLoop.ts`;
+- `probe/src/runtime/transcript.ts`;
+- final docs/index cleanup.
+
+Coordinator duties:
+
+- lock narrow interfaces before workers touch shared code;
+- keep hot path synchronous only for gameplay work;
+- prevent reviewer or provider snapshot work from blocking actor turns;
+- integrate workers in the merge order below;
+- run final validation.
+
+## Worker A: Actor Workspace Source Of Truth
+
+Exclusive ownership:
+
+- `probe/src/runtime/actorWorkspace.ts`;
+- new `probe/src/runtime/actorWorkspacePaths.ts`;
+- new `probe/src/runtime/actorWorkspaceStore.ts`;
+- `probe/test/actorWorkspace.test.ts`.
+
+Deliverables:
+
+- add `reviews/` and `provider-inputs/` baseline dirs;
+- preserve non-destructive initialization;
+- materialize active seed action skills;
+- make active action skills readable from actor workspace;
+- expose a narrow path/store API for candidates, retired records, rejected
+  records, evidence, reviews, and provider inputs;
+- no recipe validation;
+- no reviewer logic;
+- no provider logic.
+
+## Worker B: Action Skill Recipe Lifecycle
+
+Exclusive ownership:
+
+- `probe/src/skills/ownership.ts`;
+- new `probe/src/skills/recipes/*`;
+- new `probe/src/skills/proposals/*`;
+- new `probe/src/skills/lifecycle/*`;
+- recipe and ownership tests.
+
+Shared touch through coordinator:
+
+- legacy generated action skill entry points that currently write to
+  `build/generated-skills`.
+
+Deliverables:
+
+- `ActionSkillRecipe` schema;
+- validator rejecting unknown primitives, planned primitives, missing verifiers,
+  missing timeouts, role-incompatible primitives, and success-by-text;
+- adapter from current seed ownership records into actor workspace action skill
+  records;
+- proposal records;
+- lifecycle statuses: `draft`, `candidate`, `active`, `superseded`, `retired`,
+  `rejected`;
+- candidate action skill proposals written to actor workspace, not
+  `build/generated-skills`;
+- no reviewer-driven direct active mutation.
+
+## Worker C: Provider Input Snapshots
+
+Exclusive ownership:
+
+- new `probe/src/provider/inputSnapshot.ts`;
+- new `probe/src/provider/providerInputStore.ts`;
+- provider snapshot tests.
+
+Shared touch only through coordinator:
+
+- provider call sites in `agentLoop.ts` or live dialogue runners.
+
+Deliverables:
+
+- persist exact provider input packet per actor turn for provider-backed runs;
+- store under `data/actors/<actor_id>/provider-inputs/`;
+- never store raw auth tokens;
+- deterministic mode remains zero-network and does not claim live provider
+  traces.
+
+## Worker D: Hot-Path Evidence
+
+Exclusive ownership:
+
+- new `probe/src/runtime/evidence/*`;
+- `probe/src/gameplay/verification/verifyTask.ts`;
+- `probe/src/tools/collectLogs.ts`;
+- `probe/src/tools/moveTo.ts`;
+- evidence and verification tests.
+
+Deliverables:
+
+- actor-scoped evidence files for attempts, pre/post observation, verifier
+  decision, timeout, stall, and failure reason;
+- strong evidence for the known failure class: "pretends to chop, walks away,
+  repeats";
+- fake-progress rejection for started-swinging, pathing-started, optimistic
+  provider text, or generated return objects without runtime evidence;
+- no reviewer calls from hot path;
+- immutable evidence refs that Worker E can consume later.
+
+## Worker E: Per-NPC Async Reviewers
+
+Exclusive ownership:
+
+- new `probe/src/reviewer/*`;
+- new `probe/src/skills/review/*`;
+- reviewer tests.
+
+Read-only dependencies:
+
+- actor workspace path API from Worker A;
+- lifecycle types from Worker B;
+- provider snapshot refs from Worker C;
+- evidence refs from Worker D;
+- transcript/canonical transcript refs.
+
+Deliverables:
+
+- actor-scoped review job input schema;
+- evidence queue over immutable artifact references;
+- reviewer output schema;
+- guardrails preventing active action skill mutation;
+- optional deterministic reviewer stub;
+- no network calls in deterministic tests.
+
+## Optional Worker F: Cross-Actor Summarizer
+
+Do this only after Worker E exists.
+
+Exclusive ownership:
+
+- new `probe/src/reviewer/crossActorSummarizer.ts`;
+- summarizer tests.
+
+Deliverables:
+
+- read per-actor review outputs;
+- identify shared failure patterns;
+- recommend shared seed fixes without mutating actor workspaces;
+- no direct active action skill changes.
+
+## Merge Order
+
+1. Worker A first: path and source-of-truth API.
+2. Worker B next: recipe/lifecycle types use workspace paths.
+3. Worker C and Worker D can merge in parallel after A stabilizes.
+4. Worker E last: it consumes A/B/C/D artifacts and must stay sidecar-only.
+5. Optional Worker F after E.
+6. Coordinator final pass: minimal `runProbe.ts` and `agentLoop.ts` wiring.
+
+## Dependency Graph
+
+```text
+Worker A -> Worker B
+Worker A -> Worker C
+Worker A -> Worker D
+Worker A -> Worker E
+Worker B -> Worker E
+Worker C -> Worker E
+Worker D -> Worker E
+Worker E -> Worker F
+Coordinator -> final integration
+```
+
+## Deferred Work
+
+Do not implement these in this slice unless the user re-approves:
+
+- full arbitrary checkpoint resume;
+- generated TypeScript action skill hot-loop execution;
+- long-term memory compaction workers;
+- global critic ownership;
+- broad multi-bot society mechanics;
+- deep reconnect refactor unless required by hot-path evidence work.
+
+Legacy `build/generated-skills` execution is also deferred. If code still emits
+files there during transition, those files are debug artifacts only and must not
+be read as actor-owned candidate or active skills.
+
+## Validation Gate
+
+Run at minimum:
+
+- `bun run typecheck`;
+- targeted actor workspace tests;
+- recipe validation tests;
+- provider snapshot tests;
+- reviewer guardrail tests;
+- hot-path evidence tests;
+- deterministic no-network test path.
+
+The broad test suite may still contain legacy failures. If so, report them
+separately and do not confuse them with the new slice's targeted validation.

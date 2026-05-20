@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { validateProposal } from "../src/tools/index.js";
+import {
+  runtimeControlActionSkill,
+  testActionSkillRecord
+} from "./helpers/actionSkillRecords.js";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 function createPosition(x: number, y = 0, z = 0) {
   return {
@@ -35,6 +44,11 @@ test("agent loop repeats move_to until the current approach task is verified", a
   const final = await runAgentLoop({
     bots: { actor, target },
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("approachAndRequestItem", ["observe", "move_to", "say", "wait"])
+    ],
+    stepDelayMs: 0,
     transcript: {
       recordStep(step) {
         transcriptSteps.push(step as Record<string, unknown>);
@@ -116,6 +130,11 @@ test("agent loop blocks the fourth repeated failed move_to for the active approa
   const final = await runAgentLoop({
     bots: { actor, target },
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("approachAndRequestItem", ["observe", "move_to", "say", "wait"])
+    ],
+    stepDelayMs: 0,
     transcript: {
       recordStep(step) {
         transcriptSteps.push(step as Record<string, unknown>);
@@ -190,6 +209,11 @@ test("agent loop does not assign collect_logs to a role that cannot gather", asy
     bots: { actor, target },
     roleId: "quartermaster",
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("inspectSharedChest", ["observe", "inspect_chest", "wait"])
+    ],
+    stepDelayMs: 0,
     transcript: {
       recordStep(step) {
         transcriptSteps.push(step as Record<string, unknown>);
@@ -257,6 +281,13 @@ test("agent loop advances through collect logs, craft materials, and craft craft
   const final = await runAgentLoop({
     bots: { actor, target },
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("collectLogs", ["observe", "collect_logs", "wait"]),
+      testActionSkillRecord("craftPlanksAndSticks", ["observe", "craft_item", "wait"]),
+      testActionSkillRecord("craftCraftingTable", ["observe", "craft_item", "wait"])
+    ],
+    stepDelayMs: 0,
     transcript: {
       recordStep(step) {
         transcriptSteps.push(step as Record<string, unknown>);
@@ -345,4 +376,171 @@ test("agent loop advances through collect logs, craft materials, and craft craft
     true
   );
   assert.equal(transcriptSteps[transcriptSteps.length - 1]?.tool, "remember");
+});
+
+test("agent loop writes actor evidence when collect_logs only pretends to progress", async () => {
+  const provider = createDeterministicProvider();
+  const actor = createBot("npc_b", 0);
+  const target = createBot("npc_a", 2);
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `agent-loop-evidence-${process.pid}-${Date.now()}`
+  );
+
+  try {
+    const final = await runAgentLoop({
+      bots: { actor, target },
+      roleId: "gatherer",
+      provider,
+      activeActionSkills: [
+        runtimeControlActionSkill("npc_b"),
+        testActionSkillRecord("collectLogs", ["observe", "collect_logs", "wait"], "npc_b")
+      ],
+      transcript: {
+        recordStep() {}
+      },
+      stepDelayMs: 0,
+      artifacts: {
+        actorWorkspaceRootDir: rootDir
+      },
+      tools: {
+        validateProposal,
+        async observe() {
+          return {
+            status: "ok" as const,
+            visibleActors: [],
+            inventory: [{ name: "oak_log", count: 0 }],
+            nearbyBlocks: [{ name: "oak_log", distance: 3 }],
+            memory: []
+          };
+        },
+        async move_to() {
+          return { tool: "move_to", ok: false, status: "blocked" };
+        },
+        async collect_logs() {
+          return { tool: "collect_logs", ok: true, status: "pathing_started" };
+        },
+        async craft_item() {
+          return { tool: "craft_item", ok: false, status: "blocked" };
+        },
+        async inspect_chest() {
+          return { tool: "inspect_chest", ok: true, status: "inspected" };
+        },
+        async deposit_shared() {
+          return { tool: "deposit_shared", ok: true, status: "deposited" };
+        },
+        async withdraw_shared() {
+          return { tool: "withdraw_shared", ok: true, status: "withdrew" };
+        },
+        async say() {
+          return { tool: "say", ok: true, status: "delivered" };
+        },
+        async wait() {
+          return { tool: "wait", ok: true, status: "waited" };
+        },
+        async remember({ args }) {
+          return { tool: "remember", ok: true, status: "remembered", note: String(args.note) };
+        }
+      }
+    });
+
+    assert.deepEqual(final, {
+      status: "failed",
+      why: "collect_4_logs was blocked repeatedly"
+    });
+
+    const evidenceDir = path.join(rootDir, "npc_b", "evidence");
+    const evidenceFiles = await fs.readdir(evidenceDir);
+    assert.ok(evidenceFiles.some((file) => file.includes("fake-progress")));
+
+    const stored = JSON.parse(
+      await fs.readFile(path.join(evidenceDir, evidenceFiles[0]), "utf8")
+    );
+    assert.equal(stored.actor_id, "npc_b");
+    assert.equal(stored.category, "fake_progress_rejection");
+    assert.equal(stored.data.task.id, "collect_4_logs");
+    assert.equal(stored.data.tool, "collect_logs");
+    assert.equal(stored.data.verification.status, "failed");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("agent loop blocks provider proposals not backed by actor workspace active action skills", async () => {
+  const provider = createDeterministicProvider();
+  const actor = createBot("npc_a", 0);
+  const target = createBot("npc_b", 2);
+  const transcriptSteps: Array<Record<string, unknown>> = [];
+  let collectLogCalls = 0;
+
+  const final = await runAgentLoop({
+    bots: { actor, target },
+    roleId: "gatherer",
+    provider,
+    activeActionSkills: [
+      runtimeControlActionSkill()
+    ],
+    stepDelayMs: 0,
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step as Record<string, unknown>);
+      }
+    },
+    tools: {
+      validateProposal,
+      async observe() {
+        return {
+          status: "ok" as const,
+          visibleActors: [],
+          inventory: [{ name: "oak_log", count: 0 }],
+          memory: []
+        };
+      },
+      async move_to() {
+        return { tool: "move_to", ok: false, status: "blocked" };
+      },
+      async collect_logs() {
+        collectLogCalls += 1;
+        throw new Error("collect_logs must not execute without an active action skill");
+      },
+      async craft_item() {
+        return { tool: "craft_item", ok: false, status: "blocked" };
+      },
+      async inspect_chest() {
+        return { tool: "inspect_chest", ok: true, status: "inspected" };
+      },
+      async deposit_shared() {
+        return { tool: "deposit_shared", ok: true, status: "deposited" };
+      },
+      async withdraw_shared() {
+        return { tool: "withdraw_shared", ok: true, status: "withdrew" };
+      },
+      async say() {
+        return { tool: "say", ok: true, status: "delivered" };
+      },
+      async wait() {
+        return { tool: "wait", ok: true, status: "waited" };
+      },
+      async remember({ args }) {
+        return { tool: "remember", ok: true, status: "remembered", note: String(args.note) };
+      }
+    }
+  });
+
+  assert.deepEqual(final, {
+    status: "failed",
+    why: "collect_4_logs was blocked repeatedly"
+  });
+  assert.equal(collectLogCalls, 0);
+  assert.deepEqual(
+    transcriptSteps.map((step) => step.tool),
+    ["observe", "collect_logs", "remember"]
+  );
+  assert.equal((transcriptSteps[1]?.result as { status: string }).status, "blocked");
+  assert.match(
+    (transcriptSteps[1]?.result as { message: string }).message,
+    /not backed by active action skills/
+  );
+  assert.equal((transcriptSteps[1]?.verification as { status: string }).status, "failed");
 });

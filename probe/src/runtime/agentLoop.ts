@@ -4,6 +4,14 @@ import type { ObserveResult } from "../tools/observe.js";
 import { toToolResult } from "../mutual/tools/wrapper.js";
 import { selectDeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
 import { verifyTask, type TaskVerification } from "../gameplay/verification/verifyTask.js";
+import { writeProviderInputSnapshot } from "../provider/providerInputStore.js";
+import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
+import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
+import {
+  buildActiveActionSkillGate,
+  checkActiveActionSkillPermission,
+  type ActiveActionSkillGate
+} from "./activeActionSkillGate.js";
 import { createAntiRepeatPolicy } from "./antiRepeat.js";
 import { buildPressureIntentContext, type IntentRecord, type PressureIntentContext } from "./pressureIntent.js";
 
@@ -43,6 +51,10 @@ type Provider = {
     observation: ObserveResult;
     lastResult: ToolResult | null;
     currentTask?: ReturnType<typeof selectDeterministicTask>;
+    activeActionSkillContext?: {
+      activeSkillIds: string[];
+      allowedPrimitives: AllowedTool[];
+    };
   }): ToolProposal;
 };
 
@@ -70,6 +82,15 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
   tools: AgentLoopTools<TActor>;
   transcript: TranscriptRecorder;
   initialCompletedTaskIds?: string[];
+  activeActionSkills: readonly ActorActionSkillRecord[];
+  stepDelayMs?: number;
+  artifacts?: {
+    actorWorkspaceRootDir: string;
+    providerInputSnapshots?: {
+      provider_id: string;
+      model: string;
+    };
+  };
 };
 
 const MAX_STEPS = 10;
@@ -110,6 +131,19 @@ function toJsonValue(value: unknown): JsonValue {
   }
 
   throw new Error(`Tool args must be JSON-safe, received ${typeof value}`);
+}
+
+function shouldVerifyTaskProgress(
+  currentTask: ReturnType<typeof selectDeterministicTask>,
+  tool: AllowedTool
+) {
+  return (
+    currentTask !== null &&
+    currentTask !== undefined &&
+    tool !== "observe" &&
+    tool !== "wait" &&
+    tool !== "remember"
+  );
 }
 
 async function executeTool<TActor extends RuntimeActor>(
@@ -154,7 +188,10 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   provider,
   tools,
   transcript,
-  initialCompletedTaskIds = []
+  initialCompletedTaskIds = [],
+  activeActionSkills,
+  stepDelayMs = 1000,
+  artifacts
 }: AgentLoopArgs<TActor>) {
   const actor = bots.actor;
   const target = bots.target;
@@ -162,6 +199,14 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   let previousIntent: IntentRecord | undefined;
   const antiRepeat = createAntiRepeatPolicy();
   const completedTaskIds = new Set<string>(initialCompletedTaskIds);
+  const activeActionSkillGate = buildActiveActionSkillGate({
+    actorId: actor.username,
+    activeActionSkills
+  });
+  const activeActionSkillContext = {
+    activeSkillIds: activeActionSkillGate.activeSkillIds,
+    allowedPrimitives: activeActionSkillGate.allowedPrimitives
+  };
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
     // Every turn starts from Mineflayer-observed state. The provider can choose
@@ -194,9 +239,23 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     });
     previousIntent = pressureContext.currentIntent;
 
-    const proposal = provider.next({ observation, lastResult, currentTask });
+    const turnId = `turn-${String(step + 1).padStart(4, "0")}`;
+    const providerInput = {
+      observation,
+      lastResult,
+      currentTask,
+      activeActionSkillContext
+    };
+    await recordProviderInputSnapshotIfRequested({
+      artifacts,
+      actorId: actor.username,
+      turnId,
+      providerInput: toJsonValue(providerInput)
+    });
+
+    const proposal = provider.next(providerInput);
     const validated = tools.validateProposal(proposal);
-    const result = await executePhaseOneTool({
+    const execution = await executePhaseOneTool({
       tools,
       validated,
       actor,
@@ -204,9 +263,25 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       observation,
       currentTask,
       actorId: actor.username,
+      activeActionSkillGate,
       antiRepeat
     });
-    const verification = readVerification(result);
+    const result = execution.result;
+    const verification = execution.verification ?? readVerification(result);
+
+    await recordVerificationEvidenceIfNeeded({
+      artifacts,
+      actor,
+      turnId,
+      currentTask,
+      pressureContext,
+      tool: validated.tool,
+      args: validated.args,
+      before: observation,
+      after: execution.postObservation,
+      result,
+      verification
+    });
 
     transcript.recordStep({
       actor: actor.username,
@@ -227,7 +302,9 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
 
     // Keep probe turns visually separable in live logs without using delay as a
     // success signal; verification above is the only task-completion gate.
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (stepDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, stepDelayMs));
+    }
 
     if (validated.tool === "remember") {
       const note =
@@ -261,8 +338,13 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
   observation: ObserveResult;
   currentTask: ReturnType<typeof selectDeterministicTask>;
   actorId: string;
+  activeActionSkillGate: ActiveActionSkillGate;
   antiRepeat: ReturnType<typeof createAntiRepeatPolicy>;
-}) {
+}): Promise<{
+  result: ToolResult;
+  verification?: TaskVerification;
+  postObservation?: ObserveResult;
+}> {
   const {
     tools,
     validated,
@@ -271,8 +353,45 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
     observation,
     currentTask,
     actorId,
+    activeActionSkillGate,
     antiRepeat
   } = input;
+
+  const shouldVerifyCurrentTask = shouldVerifyTaskProgress(currentTask, validated.tool);
+
+  const permission = checkActiveActionSkillPermission(activeActionSkillGate, validated.tool);
+
+  if (!permission.allowed) {
+    const blockedResult = {
+      tool: validated.tool,
+      ok: false,
+      status: "blocked",
+      message: permission.reason,
+      active_action_skill_gate: {
+        active_skill_ids: permission.activeSkillIds,
+        allowed_primitives: permission.allowedPrimitives
+      }
+    } satisfies ToolResult;
+    const verification =
+      shouldVerifyCurrentTask && currentTask
+        ? verifyTask(currentTask, {
+            before: observation,
+            after: observation,
+            result: blockedResult
+          })
+        : undefined;
+
+    return {
+      result: verification
+        ? ({
+            ...blockedResult,
+            verification
+          } satisfies ToolResult)
+        : blockedResult,
+      verification,
+      postObservation: observation
+    };
+  }
 
   if (currentTask && !currentTask.primitiveIds.includes(validated.tool)) {
     // The runtime owns curriculum boundaries; provider proposals cannot expand
@@ -280,26 +399,22 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
     if (validated.tool === "remember") {
       // remember is always permitted as an explicit terminal/status artifact,
       // even when the current task would not allow it as gameplay progress.
-      return executeTool(tools, validated, actor, target, observation);
+      return { result: await executeTool(tools, validated, actor, target, observation) };
     }
 
     return {
-      tool: validated.tool,
-      ok: false,
-      status: "invalid",
-      message: `Task ${currentTask.id} does not allow ${validated.tool}`
-    } satisfies ToolResult;
+      result: {
+        tool: validated.tool,
+        ok: false,
+        status: "invalid",
+        message: `Task ${currentTask.id} does not allow ${validated.tool}`
+      } satisfies ToolResult
+    };
   }
-
-  const shouldVerifyCurrentTask =
-    currentTask !== null &&
-    currentTask !== undefined &&
-    validated.tool !== "observe" &&
-    validated.tool !== "wait" &&
-    validated.tool !== "remember";
 
   if (
     shouldVerifyCurrentTask &&
+    currentTask &&
     antiRepeat.shouldBlock({
       actorId,
       tool: validated.tool,
@@ -319,18 +434,22 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
     });
 
     return {
-      tool: validated.tool,
-      ok: false,
-      status: "blocked",
-      message: `Repeated failed ${validated.tool} attempt blocked by runtime policy`,
-      verification
-    } satisfies ToolResult;
+      result: {
+        tool: validated.tool,
+        ok: false,
+        status: "blocked",
+        message: `Repeated failed ${validated.tool} attempt blocked by runtime policy`,
+        verification
+      } satisfies ToolResult,
+      verification,
+      postObservation: observation
+    };
   }
 
   const result = await executeTool(tools, validated, actor, target, observation);
 
   if (!shouldVerifyCurrentTask || !currentTask) {
-    return result;
+    return { result };
   }
 
   // Verify against a fresh post-action observation; movement or animation alone
@@ -351,7 +470,114 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
   });
 
   return {
-    ...result,
-    verification
-  } satisfies ToolResult;
+    result: {
+      ...result,
+      verification
+    } satisfies ToolResult,
+    verification,
+    postObservation: after
+  };
+}
+
+async function recordProviderInputSnapshotIfRequested(input: {
+  artifacts: AgentLoopArgs<RuntimeActor>["artifacts"] | undefined;
+  actorId: string;
+  turnId: string;
+  providerInput: JsonValue;
+}) {
+  const snapshotConfig = input.artifacts?.providerInputSnapshots;
+
+  if (!input.artifacts || !snapshotConfig) {
+    return;
+  }
+
+  await writeProviderInputSnapshot(input.artifacts.actorWorkspaceRootDir, {
+    schema: "provider-input-snapshot/v1",
+    snapshot_id: input.turnId,
+    actor_id: input.actorId,
+    turn_id: input.turnId,
+    provider_id: snapshotConfig.provider_id,
+    model: snapshotConfig.model,
+    created_at: new Date().toISOString(),
+    input: input.providerInput
+  });
+}
+
+function readActorPosition(actor: RuntimeActor) {
+  const maybePosition = (actor as {
+    entity?: { position?: { x?: unknown; y?: unknown; z?: unknown } };
+  }).entity?.position;
+
+  if (
+    typeof maybePosition?.x !== "number" ||
+    typeof maybePosition.y !== "number" ||
+    typeof maybePosition.z !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    x: maybePosition.x,
+    y: maybePosition.y,
+    z: maybePosition.z
+  };
+}
+
+function isFakeProgressFailure(result: ToolResult, verification: TaskVerification) {
+  return verification.status === "failed" && result.ok !== false;
+}
+
+async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(input: {
+  artifacts: AgentLoopArgs<TActor>["artifacts"] | undefined;
+  actor: TActor;
+  turnId: string;
+  currentTask: ReturnType<typeof selectDeterministicTask>;
+  pressureContext: PressureIntentContext;
+  tool: AllowedTool;
+  args: Record<string, unknown>;
+  before: ObserveResult;
+  after?: ObserveResult;
+  result: ToolResult;
+  verification?: TaskVerification;
+}) {
+  if (!input.artifacts || !input.verification || input.verification.status !== "failed") {
+    return;
+  }
+
+  const category = isFakeProgressFailure(input.result, input.verification)
+    ? "fake_progress_rejection"
+    : "verification_failure";
+  const idPrefix = category === "fake_progress_rejection" ? "fake-progress" : "verification-failure";
+
+  await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
+    schema: "actor-evidence/v1",
+    evidence_id: `${idPrefix}-${input.turnId}-${input.tool}`,
+    actor_id: input.actor.username,
+    category,
+    created_at: new Date().toISOString(),
+    turn_id: input.turnId,
+    target:
+      input.currentTask && "targetId" in input.currentTask
+        ? input.currentTask.targetId
+        : input.currentTask?.id,
+    pre_position: toJsonValue(readActorPosition(input.actor) ?? null),
+    post_position: toJsonValue(readActorPosition(input.actor) ?? null),
+    tool_attempt: toJsonValue({
+      tool: input.tool,
+      args: toJsonRecord(input.args),
+      result: input.result
+    }),
+    verifier_reason: input.verification.reason,
+    missing_delta: toJsonValue(input.verification.progress),
+    data: toJsonValue({
+      task: input.currentTask,
+      pressureContext: input.pressureContext,
+      tool: input.tool,
+      args: toJsonRecord(input.args),
+      before: input.before,
+      after: input.after ?? null,
+      result: input.result,
+      verification: input.verification
+    })
+  });
 }

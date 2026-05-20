@@ -13,6 +13,15 @@ test("assigns visible active seed action skill ownership per actor role", () => 
   assert.ok(
     ownership.some((record) =>
       record.owner_actor_id === "npc_a" &&
+      record.skill_id === "runtimeObserveAndRemember" &&
+      record.source_kind === "seed" &&
+      record.status === "active" &&
+      record.supersession === null
+    )
+  );
+  assert.ok(
+    ownership.some((record) =>
+      record.owner_actor_id === "npc_a" &&
       record.skill_id === "inspectSharedChest" &&
       record.source_kind === "seed" &&
       record.status === "active" &&

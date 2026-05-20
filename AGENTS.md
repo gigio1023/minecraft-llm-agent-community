@@ -15,7 +15,7 @@ Immediate target:
 
 - one bot that can perform boring gameplay tasks end-to-end;
 - transcript and runtime artifacts that explain success, failure, stall, and reconnect;
-- single-bot live reconnect;
+- reconnect/session lifecycle that stays truthful when explicitly in scope;
 - architecture support for per-agent action skill ownership and later bounded
   action skill evolution.
 
@@ -37,9 +37,14 @@ Read these first:
 1. `SPEC.md`
 2. `docs/docs/Agent-Search-Index.md`
 3. `docs/docs/Terminology.md`
-4. `docs/docs/Architecture/Minimal-Probe.md`
-5. `docs/docs/Setup/Headless-Server.md`
-6. `docs/docs/Setup/Provider-Setup.md`
+4. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+5. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+6. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+7. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+8. `docs/docs/Architecture/Implementation-Workstreams.md`
+9. `docs/docs/Architecture/Minimal-Probe.md`
+10. `docs/docs/Setup/Headless-Server.md`
+11. `docs/docs/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -68,9 +73,13 @@ Important search tokens:
 - `GAME_RUNTIME_CODEX_AUTH`
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
 - `SOCIAL_SIMULATION_SEED`
+- `SPEED_BOUNDED_SOCIAL_SIMULATION`
 - `LIVE_TRANSCRIPT_FIRST`
 - `CHECKPOINT_READY_RUNTIME`
 - `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
+- `GENERATED_ACTION_SKILL_LEGACY_STORE`
+- `PER_NPC_ASYNC_REVIEWER`
+- `IMPLEMENTATION_WORKSTREAMS`
 - `ACTION_SKILL`
 - `AGENT_SKILL`
 
@@ -104,6 +113,9 @@ Important search tokens:
 - Failures should be explainable from artifacts without immediate reproduction.
 - Progress must be real. Do not confuse partial motion, initial animation, or
   optimistic status text with success.
+- Actor workspace is the source of truth for actor-owned action skill state.
+- Treat `build/generated-skills` as legacy exploratory output, not as active or
+  candidate actor-owned action skill memory.
 - Keep tests small and Detroit-style. Use them to protect real owned behavior,
   not to simulate a fake feeling of coverage.
 - Live transcript is the primary evidence of runtime value.

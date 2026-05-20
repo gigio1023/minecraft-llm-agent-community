@@ -14,7 +14,7 @@ import {
 
 test("seed action skill registry provides roadmap action skills covering core, survival utility, social, and hostile categories", () => {
   const all = listSeedActionSkills();
-  assert.equal(all.length, 28);
+  assert.equal(all.length, 29);
 
   const coreIds = listCoreActionSkillIds();
   assert.equal(coreIds.length, 12);
@@ -51,6 +51,7 @@ test("seed action skill registry separates implemented action skills from planne
   const implementedIds = listImplementedSeedActionSkills().map((actionSkill) => actionSkill.id);
   const plannedIds = listPlannedSeedActionSkills().map((actionSkill) => actionSkill.id);
 
+  assert.ok(implementedIds.includes("runtimeObserveAndRemember"));
   assert.ok(implementedIds.includes("collectLogs"));
   assert.ok(implementedIds.includes("craftCraftingTable"));
   assert.ok(plannedIds.includes("mineCobblestone"));

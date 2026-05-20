@@ -4,7 +4,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { initializeActorWorkspaces } from "../src/runtime/actorWorkspace.js";
+import {
+  initializeActorWorkspaces,
+  listActiveActorActionSkillRecords
+} from "../src/runtime/actorWorkspace.js";
+import { getActorWorkspacePaths } from "../src/runtime/actorWorkspacePaths.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const testArtifactRoot = path.resolve(
@@ -57,27 +61,44 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     assert.equal(actorFile.actor_id, "npc_a");
     assert.equal(actorFile.action_skill_library, "action-skills/index.json");
 
+    const paths = getActorWorkspacePaths(testArtifactRoot, "npc_a");
     const actionSkillIndex = JSON.parse(
       await fs.readFile(
-        path.join(testArtifactRoot, "npc_a", "action-skills", "index.json"),
+        paths.actionSkills.indexFile,
         "utf8"
       )
     );
     assert.equal(actionSkillIndex.schema, "action-skill-library/v1");
-    assert.deepEqual(actionSkillIndex.active_seed_action_skills, [
+    assert.deepEqual(actionSkillIndex.active, ["collectLogs"]);
+
+    const activeRecords = await listActiveActorActionSkillRecords(testArtifactRoot, "npc_a");
+    assert.deepEqual(activeRecords, [
       {
+        schema: "actor-action-skill/v1",
         skill_id: "collectLogs",
         owner_actor_id: "npc_a",
         source_kind: "seed",
         status: "active",
-        supersession: null
+        created_at: "2026-05-20T00:00:00.000Z",
+        updated_at: "2026-05-20T00:00:00.000Z",
+        required_primitives: ["observe", "collect_logs", "wait"],
+        preconditions: [],
+        success_verifier: "runtime verifier for collectLogs",
+        known_failure_modes: [],
+        evidence_refs: [],
+        review_refs: [],
+        notes: "Mine nearby trees to gather logs"
       }
     ]);
 
-    await fs.access(path.join(testArtifactRoot, "npc_a", "action-skills", "active"));
-    await fs.access(path.join(testArtifactRoot, "npc_a", "action-skills", "retired"));
-    await fs.access(path.join(testArtifactRoot, "npc_a", "memory"));
-    await fs.access(path.join(testArtifactRoot, "npc_a", "evidence"));
+    await fs.access(paths.actionSkills.activeDir);
+    await fs.access(paths.actionSkills.candidatesDir);
+    await fs.access(paths.actionSkills.retiredDir);
+    await fs.access(paths.actionSkills.rejectedDir);
+    await fs.access(paths.memoryDir);
+    await fs.access(paths.evidenceDir);
+    await fs.access(paths.reviewsDir);
+    await fs.access(paths.providerInputsDir);
     await fs.access(path.join(testArtifactRoot, "index.json"));
   } finally {
     await fs.rm(testArtifactRoot, { recursive: true, force: true });

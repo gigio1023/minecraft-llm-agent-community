@@ -47,8 +47,9 @@ The active architecture is built around these rules:
 - **No Raw Eval Loop**: do not return to open-ended JavaScript gameplay execution
 - **Live Transcript First**: transcript and runtime artifacts are the primary evidence
 - **Checkpoint-Ready Runtime**: phase 1 should leave useful artifacts and progress snapshots
-- **Minimal Action Skill Memory Hook**: actor-owned action skill metadata should have a place even before full action skill evolution exists
+- **Actor Workspace Source Of Truth**: actor-owned memory, evidence, provider inputs, reviews, and action skill lifecycle records should live under the actor workspace
 - **Bounded Action Skill Creation**: future action skill evolution should start from runtime evidence and validated recipes, not generated code in the hot loop
+- **Per-NPC Async Reviewers**: each NPC gets its own reviewer sidecar; global review only summarizes cross-actor patterns
 
 ## Read These Next
 
@@ -56,6 +57,11 @@ The active architecture is built around these rules:
 - [Agent Search Index](Agent-Search-Index.md)
 - [Terminology](Terminology.md)
 - [Minimal Probe](Architecture/Minimal-Probe.md)
+- [Runtime Loop And Verification](Architecture/Runtime-Loop-And-Verification.md)
+- [Transcript And Runtime Artifacts](Architecture/Transcript-And-Runtime-Artifacts.md)
+- [Actor Workspace And Action Skill Memory](Architecture/Actor-Workspace-And-Action-Skill-Memory.md)
+- [Async Reviewer Sidecars](Architecture/Async-Reviewer-Sidecars.md)
+- [Implementation Workstreams](Architecture/Implementation-Workstreams.md)
 - [Bounded Action Skill Creation](Architecture/Bounded-Action-Skill-Creation.md)
 - [Headless Server Setup](Setup/Headless-Server.md)
 - [Provider Setup](Setup/Provider-Setup.md)

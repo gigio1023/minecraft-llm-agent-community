@@ -37,6 +37,10 @@ import { observe } from "../src/tools/observe.js";
 import { remember } from "../src/tools/remember.js";
 import { say } from "../src/tools/say.js";
 import { wait } from "../src/tools/wait.js";
+import {
+  runtimeControlActionSkill,
+  testActionSkillRecord
+} from "./helpers/actionSkillRecords.js";
 
 function createPosition(x: number, y = 0, z = 0) {
   return {
@@ -834,6 +838,8 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
       distance: 0.75,
       beforeDistance: 2,
       afterDistance: 0.75,
+      distanceDelta: 1.25,
+      reason: "move_to arrived within 1.5 blocks of npc_b.",
       arrived: true
     }
   );
@@ -1244,6 +1250,11 @@ test("agent loop records six steps and succeeds when remember changes the next a
       target: { username: "npc_b" }
     },
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("approachAndRequestItem", ["observe", "move_to", "say", "wait"])
+    ],
+    stepDelayMs: 0,
     transcript: {
       recordStep(step) {
         transcriptSteps.push(step);

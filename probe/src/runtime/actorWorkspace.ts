@@ -3,6 +3,14 @@ import path from "node:path";
 
 import type { SeedActionSkillOwnershipRecord } from "../skills/ownership.js";
 import type { ActorSession } from "./session/probeSession.js";
+import { getActorWorkspacePaths } from "./actorWorkspacePaths.js";
+import {
+  getRequiredActorWorkspaceDirs,
+  listActorActionSkillRecords,
+  materializeSeedActionSkillRecord,
+  writeActorActionSkillRecord,
+  writeJson
+} from "./actorWorkspaceStore.js";
 
 export type ActorWorkspaceInitOptions = {
   rootDir: string;
@@ -24,11 +32,6 @@ export type ActorWorkspaceInitResult = {
   initializedAt: string;
   actors: ActorWorkspaceRecord[];
 };
-
-async function writeJson(filePath: string, value: unknown) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
 
 function ownedSeedActionSkills(
   actorId: string,
@@ -53,17 +56,10 @@ export async function initializeActorWorkspaces(
   await fs.mkdir(options.rootDir, { recursive: true });
 
   for (const actor of options.actors) {
-    const workspacePath = path.join(options.rootDir, actor.actor_id);
-    const actionSkillLibraryPath = path.join(workspacePath, "action-skills");
-    const workspaceDirs = [
-      workspacePath,
-      actionSkillLibraryPath,
-      path.join(actionSkillLibraryPath, "active"),
-      path.join(actionSkillLibraryPath, "candidates"),
-      path.join(actionSkillLibraryPath, "retired"),
-      path.join(workspacePath, "memory"),
-      path.join(workspacePath, "evidence")
-    ];
+    const paths = getActorWorkspacePaths(options.rootDir, actor.actor_id);
+    const workspacePath = paths.actorDir;
+    const actionSkillLibraryPath = paths.actionSkills.rootDir;
+    const workspaceDirs = getRequiredActorWorkspaceDirs(options.rootDir, actor.actor_id);
 
     await Promise.all(
       workspaceDirs.map((workspaceDir) => fs.mkdir(workspaceDir, { recursive: true }))
@@ -71,7 +67,7 @@ export async function initializeActorWorkspaces(
 
     // actor.json is the per-run baseline contract. It can be rewritten because
     // durable candidate/evidence artifacts live under child directories.
-    await writeJson(path.join(workspacePath, "actor.json"), {
+    await writeJson(paths.actorFile, {
       schema: "actor-workspace/v1",
       actor_id: actor.actor_id,
       username: actor.username,
@@ -80,16 +76,23 @@ export async function initializeActorWorkspaces(
       action_skill_library: "action-skills/index.json"
     });
 
-    await writeJson(path.join(actionSkillLibraryPath, "index.json"), {
+    const activeRecords = ownedSeedActionSkills(
+      actor.actor_id,
+      options.seedActionSkillOwnership
+    ).map((record) => materializeSeedActionSkillRecord(record, initializedAt));
+
+    await Promise.all(
+      activeRecords.map((record) => writeActorActionSkillRecord(options.rootDir, record))
+    );
+
+    await writeJson(paths.actionSkills.indexFile, {
       schema: "action-skill-library/v1",
       owner_actor_id: actor.actor_id,
       initialized_at: initializedAt,
-      active_seed_action_skills: ownedSeedActionSkills(
-        actor.actor_id,
-        options.seedActionSkillOwnership
-      ),
+      active: activeRecords.map((record) => record.skill_id),
       candidates: [],
-      retired: []
+      retired: [],
+      rejected: []
     });
 
     actorRecords.push({
@@ -116,4 +119,8 @@ export async function initializeActorWorkspaces(
   });
 
   return result;
+}
+
+export async function listActiveActorActionSkillRecords(rootDir: string, actorId: string) {
+  return listActorActionSkillRecords(rootDir, actorId, "active");
 }

@@ -21,6 +21,7 @@ import { createMutualTranscript } from "./transcript.js";
 import { executeMutualTool, allowedMutualTools } from "./tools/index.js";
 import type { ToolResult } from "./types.js";
 import { toToolResult } from "./tools/wrapper.js";
+import { writeProviderInputSnapshot } from "../provider/providerInputStore.js";
 
 
 
@@ -127,6 +128,9 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     const personas = buildDialoguePersonas(actorIds);
     const pair = actorIds.slice(0, 2) as MutualActorId[];
     const [actorA, actorB] = pair;
+    const providerTurnCounters = new Map<MutualActorId, number>(
+      pair.map((actorId) => [actorId, 0])
+    );
 
     if (!actorA || !actorB) {
       throw new Error("live mutual dialogue probe requires at least two NPCs");
@@ -154,6 +158,27 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     // so early dialogue failures are not just login/spawn timing artifacts.
     await delay(config.liveDialogue.delayStartMs);
 
+    async function writeLiveProviderSnapshot(
+      actorId: MutualActorId,
+      input: import("./dialogueContext.js").DialogueJsonObject
+    ) {
+      const nextTurn = (providerTurnCounters.get(actorId) ?? 0) + 1;
+      providerTurnCounters.set(actorId, nextTurn);
+      const turnId = `turn-${String(nextTurn).padStart(4, "0")}`;
+
+      await writeProviderInputSnapshot(config.actorWorkspace.rootDir, {
+        schema: "provider-input-snapshot/v1",
+        snapshot_id: turnId,
+        actor_id: actorId,
+        turn_id: turnId,
+        provider_id: config.liveDialogue.providerId,
+        model: config.liveDialogue.model,
+        created_at: new Date().toISOString(),
+        input: input as import("../provider/inputSnapshot.js").JsonValue,
+        allowed_tools: [...liveAllowedTools]
+      });
+    }
+
     const final = await runMutualLoop({
       actors: {
         [actorA]: activeBots[actorA],
@@ -162,36 +187,36 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
       providers: {
         [actorA]: {
           async next({ observation, lastResult }) {
-            return provider.next(
-              buildDialogueContext({
-                actorId: actorA,
-                allowedTools: [...liveAllowedTools],
-                persona: personas[actorA] ?? getDialoguePersona(actorA, 0),
-                observation: {
-                  ...observation,
-                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
-                },
-                memory: memories[actorA].list(),
-                recentTranscript: createRecentTranscript(runtimeState)
-              })
-            );
+            const input = buildDialogueContext({
+              actorId: actorA,
+              allowedTools: [...liveAllowedTools],
+              persona: personas[actorA] ?? getDialoguePersona(actorA, 0),
+              observation: {
+                ...observation,
+                ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
+              },
+              memory: memories[actorA].list(),
+              recentTranscript: createRecentTranscript(runtimeState)
+            });
+            await writeLiveProviderSnapshot(actorA, input);
+            return provider.next(input);
           }
         },
         [actorB]: {
           async next({ observation, lastResult }) {
-            return provider.next(
-              buildDialogueContext({
-                actorId: actorB,
-                allowedTools: [...liveAllowedTools],
-                persona: personas[actorB] ?? getDialoguePersona(actorB, 1),
-                observation: {
-                  ...observation,
-                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
-                },
-                memory: memories[actorB].list(),
-                recentTranscript: createRecentTranscript(runtimeState)
-              })
-            );
+            const input = buildDialogueContext({
+              actorId: actorB,
+              allowedTools: [...liveAllowedTools],
+              persona: personas[actorB] ?? getDialoguePersona(actorB, 1),
+              observation: {
+                ...observation,
+                ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
+              },
+              memory: memories[actorB].list(),
+              recentTranscript: createRecentTranscript(runtimeState)
+            });
+            await writeLiveProviderSnapshot(actorB, input);
+            return provider.next(input);
           }
         }
       },

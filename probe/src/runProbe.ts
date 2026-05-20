@@ -31,7 +31,10 @@ import {
 } from "./runtime/actorRoster.js";
 import { createProbeSession } from "./runtime/session/probeSession.js";
 import { assignSeedActionSkillOwnership } from "./skills/ownership.js";
-import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
+import {
+  initializeActorWorkspaces,
+  listActiveActorActionSkillRecords
+} from "./runtime/actorWorkspace.js";
 
 export type ProbeRunResult = {
   transcriptPath: string;
@@ -211,6 +214,14 @@ export async function runProbe(): Promise<ProbeRunResult> {
           seedActionSkillOwnership: session.seed_skill_ownership
         })
       : null;
+    const activeActionSkillsByActor = new Map(
+      await Promise.all(
+        actorIds.map(async (actorId) => [
+          actorId,
+          await listActiveActorActionSkillRecords(config.actorWorkspace.rootDir, actorId)
+        ] as const)
+      )
+    );
 
     const memory = createMemory(config.memoryLimit);
     const dialogueState = createDialogueState({
@@ -251,149 +262,153 @@ export async function runProbe(): Promise<ProbeRunResult> {
       }
 
       return runAgentLoop({
-      bots: { actor, target },
-      roleId: actorRole,
-      provider,
-      transcript,
-      tools: {
-        validateProposal,
-        observe: ({ actor, target }) =>
-          observe({
-            actor: asObserveActor(actor),
-            target: asObserveActor(target),
-            dialogueState,
-            memory,
-            sharedChest
-          }),
-        move_to: ({ actor, target, args }) => {
-          return withActionWrapper(
-            () => {
-              const targetId = readStringArg(args, "target");
-              assertTarget(targetId, target.username);
-              return moveTo({ actor, target, targetId });
-            },
-            { tool: "move_to" }
-          );
+        bots: { actor, target },
+        roleId: actorRole,
+        provider,
+        activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
+        artifacts: {
+          actorWorkspaceRootDir: config.actorWorkspace.rootDir
         },
-        collect_logs: ({ actor }) => {
-          return withActionWrapper(
-            (signal) => collectLogs({ bot: actor, signal }),
-            { tool: "collect_logs" }
-          );
-        },
-        craft_item: ({ actor, args }) => {
-          return withActionWrapper(
-            () => craftItem({ bot: actor, itemName: readStringArg(args, "itemName") }),
-            { tool: "craft_item" }
-          );
-        },
-        inspect_chest: async () => {
-          return withActionWrapper(
-            async () => {
-              const result = await inspectChest({
-                actorId: actor.username,
-                roleId: actorRole,
-                chest: sharedChest,
-                ledger: sharedStorageLedger,
-                bulletin: teamBulletin,
-                currentTask: getRoleContract(actorRole).priorityList[0]
-              });
+        transcript,
+        tools: {
+          validateProposal,
+          observe: ({ actor, target }) =>
+            observe({
+              actor: asObserveActor(actor),
+              target: asObserveActor(target),
+              dialogueState,
+              memory,
+              sharedChest
+            }),
+          move_to: ({ actor, target, args }) => {
+            return withActionWrapper(
+              () => {
+                const targetId = readStringArg(args, "target");
+                assertTarget(targetId, target.username);
+                return moveTo({ actor, target, targetId });
+              },
+              { tool: "move_to" }
+            );
+          },
+          collect_logs: ({ actor }) => {
+            return withActionWrapper(
+              (signal) => collectLogs({ bot: actor, signal }),
+              { tool: "collect_logs" }
+            );
+          },
+          craft_item: ({ actor, args }) => {
+            return withActionWrapper(
+              () => craftItem({ bot: actor, itemName: readStringArg(args, "itemName") }),
+              { tool: "craft_item" }
+            );
+          },
+          inspect_chest: async () => {
+            return withActionWrapper(
+              async () => {
+                const result = await inspectChest({
+                  actorId: actor.username,
+                  roleId: actorRole,
+                  chest: sharedChest,
+                  ledger: sharedStorageLedger,
+                  bulletin: teamBulletin,
+                  currentTask: getRoleContract(actorRole).priorityList[0]
+                });
 
-              if (result.status === "inspected") {
+                if (result.status === "inspected") {
+                  sharedSettlementState.rememberSharedChest(
+                    result.chestId,
+                    result.items ?? []
+                  );
+                }
+
+                return result;
+              },
+              { tool: "inspect_chest" }
+            );
+          },
+          deposit_shared: ({ args }) => {
+            return withActionWrapper(
+              async () => {
+                const result = await depositToSharedChest({
+                  actorId: actor.username,
+                  roleId: actorRole,
+                  chest: sharedChest,
+                  inventory: {
+                    items: readActorInventory
+                  },
+                  ledger: sharedStorageLedger,
+                  bulletin: teamBulletin,
+                  itemName: readStringArg(args, "itemName"),
+                  count: typeof args.count === "number" ? args.count : 1,
+                  currentTask: "deposit_shared_materials"
+                });
+
                 sharedSettlementState.rememberSharedChest(
                   result.chestId,
-                  result.items ?? []
+                  sharedStorageLedger.latestChest(result.chestId) ?? []
                 );
-              }
 
-              return result;
-            },
-            { tool: "inspect_chest" }
-          );
-        },
-        deposit_shared: ({ args }) => {
-          return withActionWrapper(
-            async () => {
-              const result = await depositToSharedChest({
-                actorId: actor.username,
-                roleId: actorRole,
-                chest: sharedChest,
-                inventory: {
-                  items: readActorInventory
-                },
-                ledger: sharedStorageLedger,
-                bulletin: teamBulletin,
-                itemName: readStringArg(args, "itemName"),
-                count: typeof args.count === "number" ? args.count : 1,
-                currentTask: "deposit_shared_materials"
-              });
+                return result;
+              },
+              { tool: "deposit_shared" }
+            );
+          },
+          withdraw_shared: ({ args }) => {
+            return withActionWrapper(
+              async () => {
+                const result = await withdrawFromSharedChest({
+                  actorId: actor.username,
+                  roleId: actorRole,
+                  chest: sharedChest,
+                  inventory: {
+                    items: readActorInventory
+                  },
+                  ledger: sharedStorageLedger,
+                  bulletin: teamBulletin,
+                  itemName: readStringArg(args, "itemName"),
+                  count: typeof args.count === "number" ? args.count : 1,
+                  reason:
+                    typeof args.reason === "string" && args.reason.length > 0
+                      ? args.reason
+                      : "runtime withdrawal",
+                  currentTask: getRoleContract(actorRole).priorityList[0]
+                });
 
-              sharedSettlementState.rememberSharedChest(
-                result.chestId,
-                sharedStorageLedger.latestChest(result.chestId) ?? []
-              );
+                sharedSettlementState.rememberSharedChest(
+                  result.chestId,
+                  sharedStorageLedger.latestChest(result.chestId) ?? []
+                );
 
-              return result;
-            },
-            { tool: "deposit_shared" }
-          );
-        },
-        withdraw_shared: ({ args }) => {
-          return withActionWrapper(
-            async () => {
-              const result = await withdrawFromSharedChest({
-                actorId: actor.username,
-                roleId: actorRole,
-                chest: sharedChest,
-                inventory: {
-                  items: readActorInventory
-                },
-                ledger: sharedStorageLedger,
-                bulletin: teamBulletin,
-                itemName: readStringArg(args, "itemName"),
-                count: typeof args.count === "number" ? args.count : 1,
-                reason:
-                  typeof args.reason === "string" && args.reason.length > 0
-                    ? args.reason
-                    : "runtime withdrawal",
-                currentTask: getRoleContract(actorRole).priorityList[0]
-              });
-
-              sharedSettlementState.rememberSharedChest(
-                result.chestId,
-                sharedStorageLedger.latestChest(result.chestId) ?? []
-              );
-
-              return result;
-            },
-            { tool: "withdraw_shared" }
-          );
-        },
-        say: ({ actor, target, args }) => {
-          return withActionWrapper(
-            () => {
-              const targetId = readStringArg(args, "target");
-              const text = readStringArg(args, "text");
-              assertTarget(targetId, target.username);
-              return say({ actor, target, dialogueState, text });
-            },
-            { tool: "say" }
-          );
-        },
-        wait: ({ args }) => {
-          return withActionWrapper(
-            () => wait({ ticks: readTicksArg(args) }),
-            { tool: "wait" }
-          );
-        },
-        remember: ({ args }) => {
-          return withActionWrapper(
-            () => remember({ memory, note: readStringArg(args, "note") }),
-            { tool: "remember" }
-          );
+                return result;
+              },
+              { tool: "withdraw_shared" }
+            );
+          },
+          say: ({ actor, target, args }) => {
+            return withActionWrapper(
+              () => {
+                const targetId = readStringArg(args, "target");
+                const text = readStringArg(args, "text");
+                assertTarget(targetId, target.username);
+                return say({ actor, target, dialogueState, text });
+              },
+              { tool: "say" }
+            );
+          },
+          wait: ({ args }) => {
+            return withActionWrapper(
+              () => wait({ ticks: readTicksArg(args) }),
+              { tool: "wait" }
+            );
+          },
+          remember: ({ args }) => {
+            return withActionWrapper(
+              () => remember({ memory, note: readStringArg(args, "note") }),
+              { tool: "remember" }
+            );
+          }
         }
-      }
-    });
+      });
     });
 
     const finals = await Promise.all(loops);

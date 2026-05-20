@@ -17,6 +17,10 @@ type NextInput = {
   };
   lastResult: ToolResult | null;
   currentTask?: DeterministicTask | null;
+  activeActionSkillContext?: {
+    activeSkillIds: string[];
+    allowedPrimitives: string[];
+  };
 };
 
 function readVisibleTargetId(input: NextInput) {

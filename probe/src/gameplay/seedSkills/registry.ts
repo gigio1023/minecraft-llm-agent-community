@@ -7,6 +7,7 @@ import type { RuntimePrimitiveId } from "../primitives/registry.js";
 // of implying that prompt text alone can make the behavior trustworthy.
 
 export type SeedActionSkillId =
+  | "runtimeObserveAndRemember"
   // Core progression (12)
   | "collectLogs"
   | "craftPlanksAndSticks"
@@ -51,6 +52,20 @@ export type SeedActionSkill = {
   primitiveIds: RuntimePrimitiveId[];
   missingPrimitives?: string[];
 };
+
+const runtimeControlActionSkills: SeedActionSkill[] = [
+  {
+    id: "runtimeObserveAndRemember",
+    summary: "Observe current state, wait safely, and write runtime memory notes",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Baseline control bundle. It keeps sensing, explicit wait, and terminal/status memory notes inside actor workspace ownership.",
+    intentKinds: ["wait_or_defer", "inspect_settlement_state"],
+    validRoles: ["gatherer", "crafter", "quartermaster"],
+    preconditions: [],
+    primitiveIds: ["observe", "wait", "remember"]
+  }
+];
 
 // Core progression is the current proof path: gather wood, craft the first
 // station, and make shared storage evidence visible before expanding the loop.
@@ -384,6 +399,7 @@ const hostileActionSkills: SeedActionSkill[] = [
 // behavior in callers.
 
 const allActionSkills: SeedActionSkill[] = [
+  ...runtimeControlActionSkills,
   ...coreActionSkills,
   ...survivalUtilityActionSkills,
   ...socialActionSkills,

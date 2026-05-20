@@ -23,12 +23,16 @@ import { diffObservations, observeActor } from "./skillVillage/observation.js";
 import { summarizeResult } from "./skillVillage/result.js";
 import { flushTracing, startTracing, traceGeneration } from "./skillVillage/tracing.js";
 import type { ActorId, BotRecord, CodexInputMessage, HelperEvent, SeedActionSkill, ActionSkillContext, ActionSkillProposal } from "./skillVillage/types.js";
+import { shouldExecuteLegacyGeneratedActionSkills } from "../skills/generatedLegacyPolicy.js";
+import { writeActionSkillProposal } from "../skills/proposals/proposalStore.js";
 
 const config = loadMutualProbeConfig();
 const projectName = "skill-village-manual";
 const composeFile = config.composeFile;
 const composeDir = path.dirname(composeFile);
 const dataDir = path.resolve(composeDir, "tmp/skill-village-server");
+// Legacy debug output only. Default runtime behavior stores proposals in actor
+// workspace and does not auto-import generated TypeScript.
 const actionSkillDir = path.resolve(composeDir, "../build/generated-skills");
 const memoryDir = path.resolve(composeDir, "../build/agent-memory");
 
@@ -466,6 +470,24 @@ function assertActionSkillCodeSafe(code: string) {
 }
 
 async function executeActionSkill(actorId: ActorId, bots: BotRecord, proposal: ActionSkillProposal) {
+  const candidatePath = await persistGeneratedActionSkillProposal(actorId, proposal);
+  const preObservation = observeActor(actorId, bots);
+
+  if (!shouldExecuteLegacyGeneratedActionSkills()) {
+    return {
+      filePath: candidatePath,
+      result: {
+        status: "candidate_recorded",
+        message:
+          "Generated TypeScript action skills are stored as actor workspace candidates and are not auto-executed by default."
+      },
+      helperEvents: [],
+      preObservation,
+      postObservation: preObservation,
+      diff: diffObservations(preObservation, preObservation)
+    };
+  }
+
   assertActionSkillCodeSafe(proposal.skillCode);
   await mkdir(actionSkillDir, { recursive: true });
   const filePath = path.join(actionSkillDir, `${Date.now()}-${actorId}-${proposal.skillName.replace(/[^a-zA-Z0-9_-]/g, "_")}.ts`);
@@ -474,7 +496,6 @@ async function executeActionSkill(actorId: ActorId, bots: BotRecord, proposal: A
   const moduleUrl = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
   const actionSkill = (await import(moduleUrl)) as { run(ctx: unknown): Promise<unknown> };
   const bot = bots[actorId];
-  const preObservation = observeActor(actorId, bots);
   const helperEvents: HelperEvent[] = [];
   let ctx: ActionSkillContext;
   const runSeedActionSkill = async (name: string): Promise<unknown> => {
@@ -613,6 +634,35 @@ async function executeActionSkill(actorId: ActorId, bots: BotRecord, proposal: A
     postObservation,
     diff: diffObservations(preObservation, postObservation)
   };
+}
+
+async function persistGeneratedActionSkillProposal(
+  actorId: ActorId,
+  proposal: ActionSkillProposal
+) {
+  const now = new Date().toISOString();
+  const proposalId = `${Date.now()}-${actorId}-${proposal.skillName.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+
+  return writeActionSkillProposal(config.actorWorkspace.rootDir, {
+    schema: "action-skill-proposal/v1",
+    proposal_id: proposalId,
+    skill_id: proposal.skillName,
+    owner_actor_id: actorId,
+    source_kind: "learned",
+    status: "draft",
+    task_intent: proposal.skillDescription,
+    evidence_refs: [],
+    preconditions: [],
+    required_primitives: [],
+    proposed_recipe_id: `legacy-generated-code:${proposalId}`,
+    success_verifier: "not_validated_generated_code_requires_recipe_conversion",
+    known_failure_modes: ["legacy_generated_code_not_runtime_verified"],
+    created_at: now,
+    updated_at: now,
+    legacy_generated_code: proposal.skillCode,
+    legacy_generated_code_language: "typescript",
+    notes: proposal.utterance
+  });
 }
 
 function withHelperLogging(ctx: ActionSkillContext, helperEvents: HelperEvent[]): ActionSkillContext {
