@@ -1,7 +1,6 @@
 import * as mineflayer from "mineflayer";
 import type { Bot } from "mineflayer";
-import { pathfinder, Movements } from "mineflayer-pathfinder";
-import minecraftData from "minecraft-data";
+import { Movements, pathfinder } from "mineflayer-pathfinder";
 
 import type { ProbeConfig } from "../config.js";
 import { normalizeActorIds } from "./actorRoster.js";
@@ -12,6 +11,16 @@ type ServerEndpoint = {
 };
 
 export type ProbeBots = Record<string, Bot>;
+
+/**
+ * Rebinds Mineflayer pathfinder movements after spawn when world data exists.
+ *
+ * Creating Movements too early can capture incomplete bot state, which later
+ * looks like gameplay indecision rather than a client-initialization failure.
+ */
+export function initializePathfinderForSpawn(bot: Bot) {
+  bot.pathfinder.setMovements(new Movements(bot));
+}
 
 function createOfflineBot(
   config: ProbeConfig,
@@ -29,18 +38,15 @@ function createOfflineBot(
 
   bot.loadPlugin(pathfinder);
 
-  bot.once("spawn", () => {
-    const mcData = minecraftData(bot.version || config.server.version || "1.20.1");
-    const defaultMovements = new (Movements as any)(bot, mcData);
-    bot.pathfinder.setMovements(defaultMovements);
-  });
-
   return bot;
 }
 
 function waitForSpawn(bot: Bot) {
   return new Promise<void>((resolve, reject) => {
     const onSpawn = () => {
+      // Pathfinder movement depends on the spawned bot's world state, so bind
+      // movements only after Mineflayer has emitted spawn.
+      initializePathfinderForSpawn(bot);
       cleanup();
       resolve();
     };
@@ -53,6 +59,8 @@ function waitForSpawn(bot: Bot) {
       reject(new Error(`Bot ${bot.username} disconnected before spawn: ${reason}`));
     };
     const cleanup = () => {
+      // Remove all one-shot listeners on every exit path so reconnect attempts
+      // do not inherit stale spawn/error handlers from a previous session.
       bot.off("spawn", onSpawn);
       bot.off("error", onError);
       bot.off("end", onEnd);
@@ -72,6 +80,8 @@ async function closeBotList(bots: Array<Bot | null | undefined>) {
       }
 
       try {
+        // Prefer the polite disconnect path so the server sees a normal leave;
+        // fall back to end() for partially initialized Mineflayer clients.
         bot.quit();
       } catch {
         bot.end();
@@ -91,6 +101,8 @@ export async function createBots(
     for (const actorId of actorIds) {
       const bot = createOfflineBot(config, server, actorId);
       createdBots[actorId] = bot;
+      // Spawn is the runtime session boundary: returning earlier would expose a
+      // bot that exists as a socket but cannot yet execute movement primitives.
       await waitForSpawn(bot);
     }
 

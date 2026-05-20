@@ -4,9 +4,10 @@ Date: 2026-05-19
 
 ## Verdict
 
-The current skill-village probe is a functional integration test, not a valid
-Minecraft agent simulation. It connects LLMs to Mineflayer and records traces,
-but the behavior is not meaningfully grounded in Minecraft gameplay.
+The current skill-village probe is a historical probe name. It was a functional
+integration test, not a valid Minecraft agent simulation. It connects LLMs to
+Mineflayer and records traces, but the behavior is not meaningfully grounded in
+Minecraft gameplay.
 
 ## What Failed
 
@@ -27,13 +28,13 @@ but the behavior is not meaningfully grounded in Minecraft gameplay.
 ## Root Cause
 
 The runtime gave the model low-level affordances without a Minecraft gameplay
-model. Without seed skills and concrete progression goals, the LLM used the only
-obvious primitives available: scan, face, move, dig, and collect drops.
+model. Without seed action skills and concrete progression goals, the LLM used
+the only obvious primitives available: scan, face, move, dig, and collect drops.
 
 Voyager's design makes this failure predictable. Voyager does not ask an LLM to
 invent Minecraft from scratch. It provides reusable control primitives,
-game-specific skills, a curriculum that proposes concrete tasks, and iterative
-feedback from execution errors and environment state.
+game-specific action skills, a curriculum that proposes concrete tasks, and
+iterative feedback from execution errors and environment state.
 
 ## Required Correction
 
@@ -41,8 +42,8 @@ feedback from execution errors and environment state.
   crafting, tools, food, shelter/base, mining, exploration, farming, trading,
   equipment, and dimensions.
 - Add a compact Minecraft gameplay guide to the system prompt.
-- Add a seed skill library equivalent to Voyager's early-game primitives before
-  expecting social behavior.
+- Add a seed action skill library equivalent to Voyager's early-game primitives
+  before expecting social behavior.
 - Replace vague "survive and observe" goals with concrete Minecraft tasks, such
   as "obtain logs", "craft crafting table", "craft wooden pickaxe", "mine
   cobblestone", "craft furnace", "cook food", "inspect village chest", or

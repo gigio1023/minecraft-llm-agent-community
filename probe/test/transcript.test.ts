@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { test } from "bun:test";
+import test from "node:test";
 
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 import { executeMutualTool } from "../src/mutual/tools/index.js";

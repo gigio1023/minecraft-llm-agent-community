@@ -27,12 +27,12 @@ Different personalities and allowed actions create emergent social behavior with
 - **For `/probe`:** Keep it simple. Define `npc_a` (requester) and `npc_b` (responder) with different `allowedTools` and `initialBusyState`. This is the cheapest way to prove multi-bot interaction.
 
 ### Failure Blacklists
-The bot categorizes failures into precondition failures (e.g., missing items) and real failures (broken skills), preventing immediate retries.
+The bot categorizes failures into precondition failures (e.g., missing items) and real failures (broken action skills), preventing immediate retries.
 - **For `/probe`:** Implement short-lived failure blacklists. If `say:npc_b` is blocked by `target_busy`, ban that specific action for 1 turn, forcing a `wait` or `rephrase`.
 
 ## What to Discard
 
-- **Dynamic JavaScript Loader:** The repo ports Voyager's seed skills and runs them via `vm`. This violates our core safety principle. Do not execute LLM-generated code.
+- **Dynamic JavaScript Loader:** The repo ports Voyager's seed action skills and runs them via `vm`. This violates our core safety principle. Do not execute LLM-generated code.
 - **Heavy Systems:** Ignore the hostile scanner, overlay, TTS, complex job roles, and long-running static macros (like building farms).
 
 ## Action Items for `/probe`

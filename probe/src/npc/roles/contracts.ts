@@ -9,6 +9,8 @@ export type RoleContract = {
   priorityList: string[];
 };
 
+// Role contracts are runtime permissions, not persona flavor. They gate which
+// primitives and shared-storage actions an actor can execute.
 const roleContracts: Record<RoleId, RoleContract> = {
   gatherer: {
     roleId: "gatherer",
@@ -93,6 +95,7 @@ function allowsItem(allowedItemNames: readonly string[], itemName: string) {
   return allowedItemNames.includes("*") || allowedItemNames.includes(itemName);
 }
 
+/** Returns the immutable contract used for role-based primitive gating. */
 export function getRoleContract(roleId: RoleId): RoleContract {
   return roleContracts[roleId];
 }

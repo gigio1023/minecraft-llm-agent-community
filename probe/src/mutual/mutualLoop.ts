@@ -134,6 +134,8 @@ function readResultStatus(result: MutualJsonValue) {
 function deriveCategoryVerdicts(
   steps: readonly MutualStepRecord[]
 ): Record<InteractionCategory, CategoryVerdict> {
+  // Category verdicts are artifact-level checks, not model self-reports. Each
+  // pass condition requires a concrete recorded step or world-state change.
   const conversationTurnState = steps.some(
     (step) =>
       step.category === "conversationTurnState" &&
@@ -185,6 +187,8 @@ async function runLiveMutualLoop({
 }: RunLiveMutualLoopArgs): Promise<LiveMutualLoopResult> {
   let conversationTurns = 0;
 
+  // The live loop intentionally demands several conversation turns before
+  // movement so "social interaction" is not satisfied by immediate pathing.
   for (const actorId of turnPlan) {
     if (!actors[actorId]) {
       throw new Error(`Missing actor for turn: ${actorId}`);
@@ -257,6 +261,8 @@ async function runDeterministicMutualLoop<TActor extends DeterministicMutualRunt
   ];
   const recordedSteps: MutualStepRecord[] = [];
 
+  // Deterministic mutual runs probe causal artifact shape: actor action, target
+  // observation, and target response must line up in the transcript.
   for (const actorId of turnPlan) {
     const actor = bots[actorId];
     const targetId = actorId === actorA ? actorB : actorA;

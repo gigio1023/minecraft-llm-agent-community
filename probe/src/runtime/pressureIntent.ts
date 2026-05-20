@@ -1,9 +1,6 @@
 import type { DeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
 
-// ---------------------------------------------------------------------------
-// Lifecycle Mode
-// ---------------------------------------------------------------------------
-
+/** Runtime mode used to decide which pressures may interrupt the current task. */
 export type LifecycleMode =
   | "bootstrap"
   | "normal"
@@ -12,10 +9,7 @@ export type LifecycleMode =
   | "danger"
   | "social_obligation";
 
-// ---------------------------------------------------------------------------
-// Pressure
-// ---------------------------------------------------------------------------
-
+/** A scored reason for the actor to keep, switch, or defer its current intent. */
 export type PressureKind =
   | "bootstrap_missing_progress"
   | "recovery_after_death"
@@ -49,10 +43,7 @@ export type PressureRecord = {
   interruptsCurrentIntent: boolean;
 };
 
-// ---------------------------------------------------------------------------
-// Intent
-// ---------------------------------------------------------------------------
-
+/** The compact, provider-facing intent chosen from runtime pressure records. */
 export type IntentKind =
   | "bootstrap_progress"
   | "resupply_shared_storage"
@@ -81,10 +72,6 @@ export type IntentRecord = {
   lastUpdatedTurn: number;
 };
 
-// ---------------------------------------------------------------------------
-// Context Output
-// ---------------------------------------------------------------------------
-
 export type IntentTransition = "selected" | "continued" | "interrupted" | "replaced";
 
 export type PressureIntentContext = {
@@ -95,10 +82,6 @@ export type PressureIntentContext = {
   currentIntent: IntentRecord;
   intentTransition: IntentTransition;
 };
-
-// ---------------------------------------------------------------------------
-// Input
-// ---------------------------------------------------------------------------
 
 type VisibleActor = {
   id: string;
@@ -136,17 +119,14 @@ export type BuildPressureIntentContextArgs = {
   };
 };
 
-// ---------------------------------------------------------------------------
-// Bootstrap / Recovery progression IDs (deterministic curriculum order)
-// ---------------------------------------------------------------------------
-
+// Deterministic curriculum order is also the recovery spine: regressing to an
+// earlier task after it was completed is evidence of lost gear or station state.
 const BOOTSTRAP_TASK_IDS = [
   "collect_4_logs",
   "craft_planks_and_sticks",
   "craft_crafting_table"
 ] as const;
 
-// If a previously completed task reappears, the actor lost gear → recovery.
 function detectRecovery(
   currentTask: DeterministicTask | null,
   completedTaskIds: string[]
@@ -155,6 +135,8 @@ function detectRecovery(
     return false;
   }
 
+  // If a task earlier than completed progression becomes current again, assume
+  // inventory/station loss until observation-specific recovery signals improve.
   return completedTaskIds.some(
     (completedId) =>
       BOOTSTRAP_TASK_IDS.indexOf(completedId as typeof BOOTSTRAP_TASK_IDS[number]) >
@@ -162,17 +144,14 @@ function detectRecovery(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Lifecycle mode computation
-// ---------------------------------------------------------------------------
-
 function resolveLifecycleMode(
   currentTask: DeterministicTask | null,
   completedTaskIds: string[],
   previousIntent?: IntentRecord,
   reinjectionHints?: BuildPressureIntentContextArgs["reinjectionHints"]
 ): LifecycleMode {
-  // Reinjection: death or missing gear triggers recovery regardless
+  // External reinjection hints outrank intent continuity because death, lost
+  // tools, and shared scarcity need to interrupt stale plans.
   if (reinjectionHints) {
     if (reinjectionHints.recentDeathCount && reinjectionHints.recentDeathCount > 0) {
       return "recovery";
@@ -203,10 +182,6 @@ function resolveLifecycleMode(
 
   return "normal";
 }
-
-// ---------------------------------------------------------------------------
-// Pressure computation
-// ---------------------------------------------------------------------------
 
 let pressureIdCounter = 0;
 
@@ -350,10 +325,6 @@ function computePressures(
   return pressures;
 }
 
-// ---------------------------------------------------------------------------
-// Intent selection
-// ---------------------------------------------------------------------------
-
 let intentIdCounter = 0;
 
 function nextIntentId() {
@@ -369,11 +340,12 @@ function selectIntent(
   currentTask: DeterministicTask | null,
   previousIntent?: IntentRecord
 ): { intent: IntentRecord; transition: IntentTransition } {
-  // If previous intent exists and no stronger pressure interrupts, continue it
   if (previousIntent && previousIntent.status === "active") {
     const interruptingPressure = pressures.find((p) => p.interruptsCurrentIntent);
 
     if (!interruptingPressure) {
+      // Preserve the intent ID across turns so transcripts distinguish real
+      // continuity from repeatedly selecting the same-looking goal.
       return {
         intent: {
           ...previousIntent,
@@ -384,7 +356,8 @@ function selectIntent(
     }
   }
 
-  // Select a new intent from the highest-urgency pressure
+  // Runtime defaults pick the highest urgency pressure; provider reasoning can
+  // later enrich this, but the transcript should already expose the source.
   const topPressure = [...pressures].sort((a, b) => b.urgency - a.urgency)[0];
 
   if (lifecycleMode === "recovery") {
@@ -507,10 +480,13 @@ function mapPressureToIntentKind(pressureKind?: PressureKind): IntentKind {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
+/**
+ * Builds the pressure and intent context recorded by each agent-loop turn.
+ *
+ * This is runtime-owned scaffolding, not a social-simulation model by itself:
+ * it explains why the loop chose or continued an intent before any provider
+ * proposal is accepted.
+ */
 export function buildPressureIntentContext({
   actorId,
   turn,
@@ -542,4 +518,3 @@ export function buildPressureIntentContext({
     intentTransition: transition
   };
 }
-

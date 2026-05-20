@@ -31,6 +31,12 @@ function toJsonValue(value: unknown): JsonValue {
   throw new Error(`Checkpoint summary values must be JSON-safe, received ${typeof value}`);
 }
 
+/**
+ * Builds the compact actor state saved at checkpoint boundaries.
+ *
+ * The summary is JSON-safe by construction because it may be written to
+ * transcript artifacts and later injected into provider context.
+ */
 export type CheckpointAgentSummary = {
   agentId: string;
   roleId: string;
@@ -53,6 +59,8 @@ export function buildCheckpointSummary(input: {
   privateMemorySummary: string[];
   sharedSettlement: Record<string, unknown>;
 }) {
+  // Keep only the strongest pressures so checkpoint context stays small and
+  // does not crowd out recent raw transcript evidence.
   return {
     agentId: input.agentId,
     roleId: input.roleId,

@@ -1,25 +1,19 @@
 import type { IntentKind, LifecycleMode } from "./pressureIntent.js";
 import type { RoleId } from "../npc/roles/contracts.js";
 import { canRoleUseTool } from "../npc/roles/contracts.js";
-import { listSeedSkills, type SeedSkill, type SeedSkillId } from "../gameplay/seedSkills/registry.js";
+import { listSeedActionSkills, type SeedActionSkill, type SeedActionSkillId } from "../gameplay/seedSkills/registry.js";
 
-// ---------------------------------------------------------------------------
-// Skill Candidate (what the runtime offers to the LLM for a given intent)
-// ---------------------------------------------------------------------------
-
-export type SkillCandidate = {
-  id: SeedSkillId;
+export type ActionSkillCandidate = {
+  id: SeedActionSkillId;
   summary: string;
   intentKinds: IntentKind[];
   validRoles: RoleId[];
   preconditionSummary: string[];
 };
 
-// ---------------------------------------------------------------------------
-// Lifecycle-based skill gating
-// ---------------------------------------------------------------------------
-
-const BOOTSTRAP_SKILLS: ReadonlySet<SeedSkillId> = new Set([
+// Lifecycle gates keep recovery/danger modes from offering high-agency action
+// skills before the runtime has enough state to verify them safely.
+const BOOTSTRAP_ACTION_SKILLS: ReadonlySet<SeedActionSkillId> = new Set([
   "collectLogs",
   "craftPlanksAndSticks",
   "craftCraftingTable",
@@ -32,7 +26,7 @@ const BOOTSTRAP_SKILLS: ReadonlySet<SeedSkillId> = new Set([
   "collectDroppedItems"
 ]);
 
-const RECOVERY_SKILLS: ReadonlySet<SeedSkillId> = new Set([
+const RECOVERY_ACTION_SKILLS: ReadonlySet<SeedActionSkillId> = new Set([
   "collectLogs",
   "craftPlanksAndSticks",
   "craftCraftingTable",
@@ -41,80 +35,78 @@ const RECOVERY_SKILLS: ReadonlySet<SeedSkillId> = new Set([
   "inspectSharedChest"
 ]);
 
-function isSkillAllowedInLifecycle(skillId: SeedSkillId, mode: LifecycleMode): boolean {
+function isActionSkillAllowedInLifecycle(actionSkillId: SeedActionSkillId, mode: LifecycleMode): boolean {
   switch (mode) {
     case "bootstrap":
-      return BOOTSTRAP_SKILLS.has(skillId);
+      return BOOTSTRAP_ACTION_SKILLS.has(actionSkillId);
     case "recovery":
-      return RECOVERY_SKILLS.has(skillId);
+      return RECOVERY_ACTION_SKILLS.has(actionSkillId);
     case "danger":
-      return skillId === "collectDroppedItems" || skillId === "attackThenRetreat" || skillId === "patrolArea";
+      return (
+        actionSkillId === "collectDroppedItems" ||
+        actionSkillId === "attackThenRetreat" ||
+        actionSkillId === "patrolArea"
+      );
     default:
       return true;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Role-based primitive filtering
-// ---------------------------------------------------------------------------
-
-function canRoleUseSkill(roleId: RoleId, skill: SeedSkill): boolean {
-  // Hostile skills have empty validRoles - they are only for hostile role
-  if (skill.validRoles.length === 0) {
+function canRoleUseActionSkill(roleId: RoleId, actionSkill: SeedActionSkill): boolean {
+  // Empty validRoles is reserved for hostile/runtime-only action skills, so
+  // regular actors cannot acquire them through prompt-side intent compilation.
+  if (actionSkill.validRoles.length === 0) {
     return false;
   }
 
-  // Check role is in valid roles list
-  if (!skill.validRoles.includes(roleId)) {
+  if (!actionSkill.validRoles.includes(roleId)) {
     return false;
   }
 
-  // Check all primitives are allowed for this role
-  return skill.primitiveIds.every((primitiveId) => canRoleUseTool(roleId, primitiveId));
+  // The action-skill declaration and the role primitive contract must both
+  // agree; this prevents a bundled skill from bypassing role ownership rules.
+  return actionSkill.primitiveIds.every((primitiveId) => canRoleUseTool(roleId, primitiveId));
 }
 
-// ---------------------------------------------------------------------------
-// Intent-to-Skill Compilation
-// ---------------------------------------------------------------------------
-
-export type CompileSkillCandidatesInput = {
+export type CompileActionSkillCandidatesInput = {
   intentKind: IntentKind;
   roleId: RoleId;
   lifecycleMode: LifecycleMode;
 };
 
-export function compileSkillCandidates({
+export function compileActionSkillCandidates({
   intentKind,
   roleId,
   lifecycleMode
-}: CompileSkillCandidatesInput): SkillCandidate[] {
-  const allSkills = listSeedSkills();
+}: CompileActionSkillCandidatesInput): ActionSkillCandidate[] {
+  const allActionSkills = listSeedActionSkills();
 
-  return allSkills
-    .filter((skill) => {
-      // Must match the intent
-      if (!skill.intentKinds.includes(intentKind)) {
+  return allActionSkills
+    .filter((actionSkill) => {
+      if (actionSkill.runtimeStatus !== "implemented") {
         return false;
       }
 
-      // Must be allowed in this lifecycle mode
-      if (!isSkillAllowedInLifecycle(skill.id, lifecycleMode)) {
+      if (!actionSkill.intentKinds.includes(intentKind)) {
         return false;
       }
 
-      // Must be executable by this role
-      if (!canRoleUseSkill(roleId, skill)) {
+      if (!isActionSkillAllowedInLifecycle(actionSkill.id, lifecycleMode)) {
+        return false;
+      }
+
+      if (!canRoleUseActionSkill(roleId, actionSkill)) {
         return false;
       }
 
       return true;
     })
-    .map((skill) => ({
-      id: skill.id,
-      summary: skill.summary,
-      intentKinds: [...skill.intentKinds],
-      validRoles: [...skill.validRoles],
-      preconditionSummary: [...skill.preconditions]
+    .map((actionSkill) => ({
+      id: actionSkill.id,
+      summary: actionSkill.summary,
+      intentKinds: [...actionSkill.intentKinds],
+      validRoles: [...actionSkill.validRoles],
+      preconditionSummary: [...actionSkill.preconditions]
     }));
 }
 
@@ -122,21 +114,22 @@ export function compileAllowedPrimitiveIds({
   intentKind,
   roleId,
   lifecycleMode
-}: CompileSkillCandidatesInput): string[] {
-  const candidates = compileSkillCandidates({ intentKind, roleId, lifecycleMode });
+}: CompileActionSkillCandidatesInput): string[] {
+  const candidates = compileActionSkillCandidates({ intentKind, roleId, lifecycleMode });
   const primitiveIds = new Set<string>();
 
   for (const candidate of candidates) {
-    const skill = listSeedSkills().find((s) => s.id === candidate.id);
+    const actionSkill = listSeedActionSkills().find((s) => s.id === candidate.id);
 
-    if (skill) {
-      for (const primitiveId of skill.primitiveIds) {
+    if (actionSkill) {
+      for (const primitiveId of actionSkill.primitiveIds) {
         primitiveIds.add(primitiveId);
       }
     }
   }
 
-  // Always allow observe, wait, remember
+  // These primitives are runtime control valves: observe refreshes evidence,
+  // wait avoids forced fake action, and remember emits terminal/status notes.
   primitiveIds.add("observe");
   primitiveIds.add("wait");
   primitiveIds.add("remember");

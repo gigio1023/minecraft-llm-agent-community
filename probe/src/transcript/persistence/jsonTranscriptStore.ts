@@ -8,21 +8,20 @@ export type CanonicalTranscriptFinal = Record<string, CanonicalJsonValue> & {
   why: string;
 };
 
-// ---------------------------------------------------------------------------
-// Persistence Mode (SPEC §10.4)
-// ---------------------------------------------------------------------------
-// - limited: semantic action/result/checkpoint only
-// - extended: raw observations, traces, diagnostics, path logs included
-// ---------------------------------------------------------------------------
-
 export type PersistenceMode = "limited" | "extended";
 
+/**
+ * Applies the transcript persistence policy before writing evidence to disk.
+ *
+ * `extended` is the debugging mode: keep raw observations and diagnostics.
+ * `limited` is the shareable mode: keep semantic actions, results, checkpoints,
+ * and memory context while excluding raw observation blobs.
+ */
 function shouldIncludePart(part: CanonicalTranscriptPart, mode: PersistenceMode): boolean {
   if (mode === "extended") {
     return true;
   }
 
-  // In limited mode, skip raw observations and keep only actionable parts
   switch (part.kind) {
     case "tool_call":
     case "tool_result":
@@ -32,7 +31,6 @@ function shouldIncludePart(part: CanonicalTranscriptPart, mode: PersistenceMode)
     case "memory_update":
       return true;
     case "observation":
-      // In limited mode, only keep observations that have minimal content
       return false;
     case "chat_utterance":
       return true;
@@ -56,6 +54,8 @@ export async function writeCanonicalTranscript(input: {
   mode?: PersistenceMode;
 }) {
   const mode = input.mode ?? "extended";
+  // Filter before counting so partCount matches the artifact a reviewer opens,
+  // not the in-memory event stream that may include omitted observations.
   const filteredParts = filterPartsForPersistence(input.parts, mode);
 
   await fs.mkdir(input.evidenceDir, { recursive: true });

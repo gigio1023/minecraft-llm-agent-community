@@ -30,6 +30,8 @@ export const allowedMutualTools = [
 
 export type AllowedMutualTool = (typeof allowedMutualTools)[number];
 
+// Scenario-only tools are accepted by the deterministic dispatcher, but are not
+// exposed as live provider affordances.
 const mutualScenarioAllowedTools = [
   "observe_world",
   "move_to",
@@ -134,6 +136,8 @@ function toJsonValue(value: unknown): MutualJsonValue {
 }
 
 export function validateProposal(proposal: Proposal): ValidatedProposal {
+  // Live provider output must stay within the narrow mutual action set before
+  // any Mineflayer side effect is allowed.
   if (!allowedMutualTools.includes(proposal.tool as AllowedMutualTool)) {
     throw new Error(`Unsupported mutual tool: ${proposal.tool}`);
   }
@@ -171,6 +175,8 @@ export async function executeMutualTool({
           });
     const memoryNote = readMemoryNote(validated.tool, actionResult as MutualJsonValue);
 
+    // Runtime state updates happen before transcript write so the same step can
+    // include action result plus derived thread/social context.
     runtimeState.recordToolResult?.(
       actor.username as MutualActorId,
       toToolResult(actionResult as Record<string, unknown>, validated.tool)
@@ -206,6 +212,7 @@ async function executeHandler(
   const handler = handlers[tool];
 
   if (!handler) {
+    // Provider drift is a runtime failure, not a silent no-op.
     throw new Error(`Tool not implemented: ${tool}`);
   }
 
@@ -234,6 +241,8 @@ function isJsonRecord(value: MutualJsonValue): value is Record<string, MutualJso
 }
 
 export function validateMutualProposal(proposal: Proposal): Proposal {
+  // Deterministic scenario validation allows extra scripted tools used to prove
+  // causal categories that live dialogue does not expose yet.
   if (
     !mutualScenarioAllowedTools.includes(
       proposal.tool as (typeof mutualScenarioAllowedTools)[number]
@@ -275,6 +284,8 @@ async function executeScenarioTool({
   runtimeState,
   memories
 }: ExecuteScenarioToolArgs & CreateMutualToolsArgs): Promise<MutualStepRecord> {
+  // Each branch returns a transcript step with explicit category evidence, so
+  // acceptance does not depend on the provider claiming the scenario succeeded.
   switch (proposal.tool) {
     case "observe_world":
       return {
@@ -412,6 +423,8 @@ export function createMutualTools({ runtimeState, memories }: CreateMutualToolsA
       const threadState = runtimeState.threadSnapshot?.(input.actorId);
       const sharedContext = runtimeState.socialContext?.(input.actorId);
 
+      // Enrich the step after recording the result so thread/social snapshots
+      // reflect the just-executed action.
       return {
         ...step,
         ...(threadState ? { threadState: toJsonValue(threadState) as JsonObject } : {}),

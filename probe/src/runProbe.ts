@@ -1,6 +1,5 @@
 import { loadProbeConfig } from "./config.js";
 import { createDeterministicProvider } from "./provider/deterministicProvider.js";
-import { createLocalLlmProvider } from "./provider/localLlmProvider.js";
 import { closeBots, createBots } from "./runtime/createBots.js";
 import { createDialogueState } from "./runtime/dialogueState.js";
 import { createMemory } from "./runtime/memory.js";
@@ -28,9 +27,11 @@ import {
 import { createMineflayerSharedChestAccessor } from "./tools/liveSharedChest.js";
 import {
   defaultActorRoles,
-  selectPrimaryActorId,
   selectPrimaryTargetId
 } from "./runtime/actorRoster.js";
+import { createProbeSession } from "./runtime/session/probeSession.js";
+import { assignSeedActionSkillOwnership } from "./skills/ownership.js";
+import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 
 export type ProbeRunResult = {
   transcriptPath: string;
@@ -42,6 +43,12 @@ type FinalizeRunProbeOptions = {
   caughtError?: unknown;
   cleanupErrors?: unknown[];
 };
+
+type ObserveActor = Parameters<typeof observe>[0]["actor"];
+
+function asObserveActor(bot: import("mineflayer").Bot): ObserveActor {
+  return bot as unknown as ObserveActor;
+}
 
 function readStringArg(args: Record<string, unknown>, name: string) {
   const value = args[name];
@@ -128,7 +135,7 @@ async function teleportBotsToRequestedSpawn(
 
   try {
     console.log("Setting server world spawn via RCON...");
-    await execAsync(`docker exec skill-village-manual-mc-1 rcon-cli -- setworldspawn ${x} ${y} ${z}`);
+    await execAsync(`docker exec -w / skill-village-manual-mc-1 rcon-cli -- setworldspawn ${x} ${y} ${z}`);
   } catch (error) {
     console.warn("Failed to set world spawn via RCON (is the container named skill-village-manual-mc-1?). Error:", error);
   }
@@ -153,7 +160,7 @@ async function teleportBotsToRequestedSpawn(
       console.log(`[${actorId}] Sending teleport via RCON: ${tpCmd}`);
       
       try {
-        await execAsync(`docker exec skill-village-manual-mc-1 rcon-cli -- ${tpCmd}`);
+        await execAsync(`docker exec -w / skill-village-manual-mc-1 rcon-cli -- ${tpCmd}`);
       } catch (error) {
         console.warn(`[${actorId}] RCON teleport failed, trying bot.chat fallback...`);
         bot.chat(`/tp @s ${x + dx} ${y + dy} ${z + dz}`);
@@ -174,6 +181,8 @@ export async function runProbe(): Promise<ProbeRunResult> {
   const cleanupErrors: unknown[] = [];
 
   try {
+    // Local manual-server mode keeps behavior iteration fast; Docker startup is
+    // still available through startDockerServer when the probe owns the server.
     // server = await startDockerServer(config);
     server = { host: "127.0.0.1", port: Number(process.env.MC_PORT || 32769), stop: async () => {} };
     bots = await createBots(config, {
@@ -185,28 +194,53 @@ export async function runProbe(): Promise<ProbeRunResult> {
     
     const activeBots = bots;
     const actorIds = Object.keys(bots);
+    const actorRoles = defaultActorRoles(actorIds);
+    const seedActionSkillOwnership = assignSeedActionSkillOwnership(actorIds, actorRoles);
+    // Session and workspace metadata are created before provider calls so every
+    // transcript can explain which actor owned which action skills during a run.
+    const session = createProbeSession({
+      bots: activeBots,
+      actorIds,
+      actorRoles,
+      seedActionSkillOwnership
+    });
+    const actorWorkspaceInitialization = config.actorWorkspace.initializeOnStart
+      ? await initializeActorWorkspaces({
+          rootDir: config.actorWorkspace.rootDir,
+          actors: session.actors,
+          seedActionSkillOwnership: session.seed_skill_ownership
+        })
+      : null;
 
     const memory = createMemory(config.memoryLimit);
     const dialogueState = createDialogueState({
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable
     });
-    const providerType = process.env.LLM_PROVIDER_TYPE || "deterministic";
-    const provider = providerType === "local_llm"
-      ? createLocalLlmProvider()
-      : createDeterministicProvider();
+    const provider = createDeterministicProvider();
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
     const sharedSettlementState = createSharedSettlementState();
     const transcript = createTranscript({
       evidenceDir: config.evidenceDir,
       probeId: config.probeId,
-      bots: actorIds.map((actorId) => activeBots[actorId].username)
+      bots: actorIds.map((actorId) => activeBots[actorId].username),
+      metadata: {
+        // Metadata is duplicated into final output below because artifact review
+        // often starts from either the transcript header or final summary.
+        actor_sessions: session.actors,
+        seed_skill_ownership: session.seed_skill_ownership,
+        actor_workspace: {
+          root_dir: config.actorWorkspace.rootDir,
+          initialize_on_start: config.actorWorkspace.initializeOnStart,
+          initialization: actorWorkspaceInitialization
+        }
+      }
     });
     const loops = actorIds.map(async (actorId) => {
       const actor = activeBots[actorId];
       const targetId = selectPrimaryTargetId(actorIds, actorId);
       const target = activeBots[targetId];
-      const actorRole: RoleId = defaultActorRoles(actorIds)[actorId] ?? "gatherer";
+      const actorRole: RoleId = actorRoles[actorId] ?? "gatherer";
       const sharedChest = createMineflayerSharedChestAccessor(actor);
 
       function readActorInventory() {
@@ -218,15 +252,19 @@ export async function runProbe(): Promise<ProbeRunResult> {
 
       return runAgentLoop({
       bots: { actor, target },
+      roleId: actorRole,
       provider,
       transcript,
-      config,
-      server: server ? { host: server.host, port: server.port } : undefined,
-      maxSteps: Number(process.env.PROBE_MAX_STEPS || 10),
       tools: {
         validateProposal,
         observe: ({ actor, target }) =>
-          observe({ actor: actor as any, target: target as any, dialogueState, memory, sharedChest }),
+          observe({
+            actor: asObserveActor(actor),
+            target: asObserveActor(target),
+            dialogueState,
+            memory,
+            sharedChest
+          }),
         move_to: ({ actor, target, args }) => {
           return withActionWrapper(
             () => {
@@ -239,7 +277,7 @@ export async function runProbe(): Promise<ProbeRunResult> {
         },
         collect_logs: ({ actor }) => {
           return withActionWrapper(
-            () => collectLogs({ bot: actor }),
+            (signal) => collectLogs({ bot: actor, signal }),
             { tool: "collect_logs" }
           );
         },
@@ -337,27 +375,6 @@ export async function runProbe(): Promise<ProbeRunResult> {
               const targetId = readStringArg(args, "target");
               const text = readStringArg(args, "text");
               assertTarget(targetId, target.username);
-
-              const myBulletin = teamBulletin.snapshot().find((e) => e.actorId === actor.username);
-              const targetBulletin = teamBulletin.snapshot().find((e) => e.actorId === targetId);
-
-              const hasCooperativeNeed =
-                (myBulletin && myBulletin.currentBlocker) ||
-                (targetBulletin &&
-                  (targetBulletin.currentBlocker ||
-                    (targetBulletin.resourceNeeds && targetBulletin.resourceNeeds.length > 0))) ||
-                sharedSettlementState.snapshot().lastHostileSighting !== null;
-
-              if (!hasCooperativeNeed && providerType === "local_llm") {
-                console.log(`[${actor.username}] Dialogue gated (no active cooperative blocker/need). Bypassing talk.`);
-                return {
-                  tool: "say",
-                  ok: false,
-                  status: "blocked",
-                  message: "Dialogue gated by coordination policy."
-                };
-              }
-
               return say({ actor, target, dialogueState, text });
             },
             { tool: "say" }
@@ -380,7 +397,21 @@ export async function runProbe(): Promise<ProbeRunResult> {
     });
 
     const finals = await Promise.all(loops);
-    const transcriptPath = await transcript.write(finals[0]);
+    const finalByActor = Object.fromEntries(
+      actorIds.map((actorId, index) => [actorId, finals[index]])
+    );
+    const transcriptPath = await transcript.write({
+      status: finals.every((final) => final.status === "success") ? "success" : "partial",
+      why: finals.map((final, index) => `${actorIds[index]}: ${final.why}`).join("; "),
+      actor_sessions: session.actors,
+      seed_skill_ownership: session.seed_skill_ownership,
+      actor_workspace: {
+        root_dir: config.actorWorkspace.rootDir,
+        initialize_on_start: config.actorWorkspace.initializeOnStart,
+        initialization: actorWorkspaceInitialization
+      },
+      per_actor_final: finalByActor
+    });
     result = { transcriptPath };
   } catch (error) {
     caughtError = error;

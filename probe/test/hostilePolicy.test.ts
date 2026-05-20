@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "bun:test";
+import test from "node:test";
 
 import { decideHostileAction } from "../src/npc/hostile/hostilePolicy.js";
 

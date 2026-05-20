@@ -51,6 +51,12 @@ function readVisibleTargetId(input: ProviderInput) {
   return undefined;
 }
 
+/**
+ * Creates a deterministic provider for two-actor mutual smoke tests.
+ *
+ * It chooses only conversation when a visible target exists so runtime tests can
+ * isolate social-turn plumbing from live-model creativity.
+ */
 function createDeterministicMutualProvider(actorId: MutualActorId): MutualProvider {
   return {
     next(input) {
@@ -85,6 +91,8 @@ function createSequenceProvider(sequence: Proposal[]): MutualProvider {
 
   return {
     next() {
+      // Repeat the final proposal after the sequence ends so tests remain
+      // bounded by loop budgets rather than provider exhaustion.
       const proposal = sequence[Math.min(index, sequence.length - 1)];
       index += 1;
       return structuredClone(proposal);
@@ -107,6 +115,8 @@ export function createDeterministicMutualProviders(): Record<MutualActorId, Mutu
 export function createMutualProviders(actorIds: readonly string[] = ["npc_a", "npc_b"]): Record<MutualActorId, MutualProvider> {
   const [actorA, actorB] = selectMutualPair(actorIds);
   return {
+    // npc_a follows a scripted causal chain that should produce a visible
+    // marker handoff in transcript artifacts.
     [actorA]: createSequenceProvider([
       { tool: "observe_world", args: {} },
       { tool: "move_to", args: { target: actorB } },
@@ -119,6 +129,8 @@ export function createMutualProviders(actorIds: readonly string[] = ["npc_a", "n
       next(input) {
         const lastResult = input.lastResult ?? null;
 
+        // npc_b's sequence is result-driven so the probe proves that tool output
+        // and marker observation can alter later provider choices.
         if (lastResult === null) {
           return { tool: "reply_to", args: { source: actorA, text: "Busy. Give me a second." } };
         }

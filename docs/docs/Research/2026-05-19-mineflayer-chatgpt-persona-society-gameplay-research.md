@@ -48,7 +48,7 @@ That is much closer to the target state of this repo than any prompt-only social
 `bot/role.ts` gives each bot explicit:
 
 - allowed actions;
-- allowed skills;
+- allowed action skills;
 - keep-items policy;
 - leash radius;
 - priority rules.
@@ -86,10 +86,10 @@ The repo's role system plus combat specialization suggests the right adaptation:
 
 ### Failure blocking is essential
 
-`bot/memory.ts` and `bot/brain.ts` keep recently failed actions/skills from being
+`bot/memory.ts` and `bot/brain.ts` keep recently failed actions/action skills from being
  retried blindly. This is directly portable into this repo's runtime loop.
 
-### Material planning and seed skills make bots look capable
+### Material planning and seed action skills make bots look capable
 
 `skills/materials.ts`, `skills/craft-gear.ts`, `skills/smelt-ores.ts`, and
  `skills/strip-mine.ts` encode real gameplay progression. They are a strong
@@ -104,18 +104,18 @@ The repo's role system plus combat specialization suggests the right adaptation:
 2. Role contract model.
 3. Shared team bulletin.
 4. Per-bot failure memory.
-5. Typed skill interface and executor.
+5. Typed action skill interface and executor.
 6. Shared stash/storage logic.
 
 ### Strong secondary imports
 
 - compact perception builder;
 - specialized reactive combat for one hostile role;
-- gather-before-skill material planning.
+- gather-before-action-skill material planning.
 
 ## What Not To Port
 
-- raw generated JS skill execution via dynamic loader paths;
+- raw generated JS action skill execution via dynamic loader paths;
 - teleport-heavy recovery as normal gameplay;
 - random exploration as the default exploration model;
 - giant mixed-responsibility files as-is.

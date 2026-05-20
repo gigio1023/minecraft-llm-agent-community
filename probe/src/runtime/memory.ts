@@ -1,3 +1,9 @@
+/**
+ * Small in-loop memory store used by deterministic probes.
+ *
+ * It preserves only a recent tail so memory cannot become an unbounded hidden
+ * dependency or replace transcript evidence.
+ */
 export function createMemory(limit = 8) {
   const notes: string[] = [];
 

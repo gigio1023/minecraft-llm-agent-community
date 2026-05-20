@@ -131,6 +131,8 @@ export function selectDeterministicTask(
 ): DeterministicTask | null {
   const completedTaskIds = new Set(state.completedTaskIds ?? []);
 
+  // Inventory observations anchor boring competence; social approach is only a
+  // fallback when the runtime cannot currently prove an early-game material task.
   if (state.inventory) {
     const logCount = countItems(state.inventory, LOG_ITEM_NAMES);
     const plankCount = countItems(state.inventory, PLANK_ITEM_NAMES);
@@ -142,6 +144,8 @@ export function selectDeterministicTask(
       "crafting_table"
     ]);
 
+    // Shared storage visibility comes before local crafting so later actors can
+    // reason from a public artifact instead of another actor's private inventory.
     if (
       state.sharedChest &&
       (logCount > 0 || plankCount > 0 || craftingTableCount > 0) &&
@@ -163,6 +167,9 @@ export function selectDeterministicTask(
     }
 
     if (craftingTableCount >= 1 || completedTaskIds.has("craft_crafting_table")) {
+      // Stop the current deterministic chain at the first tool-station proof.
+      // Later stages need table placement/use and richer tool verification
+      // before they become honest runtime targets.
       return null;
     }
 
@@ -199,6 +206,9 @@ export function selectDeterministicTask(
     }
 
     if (completedTaskIds.has("craft_planks_and_sticks")) {
+      // Completed ids are a fallback for cases where inventory observation is
+      // temporarily narrow after reconnect or pickup lag. They should advance
+      // the chain, but verification still owns the pass/fail decision.
       return {
         id: "craft_crafting_table",
         reason: "Need a crafting table to unlock the next progression layer.",
@@ -271,6 +281,9 @@ export function selectDeterministicTask(
     return null;
   }
 
+  // Social movement remains a fallback task. It keeps the loop doing observable
+  // work when inventory evidence is missing, but it is not the primary proof of
+  // Minecraft competence.
   return {
     id: "approach_visible_target",
     reason: `Need to close distance to ${nearestActor.id} before the next interaction.`,

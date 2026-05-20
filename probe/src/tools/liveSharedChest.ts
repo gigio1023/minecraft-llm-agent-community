@@ -47,6 +47,8 @@ function snapshotItems(items: InventoryItem[]): ItemStack[] {
 }
 
 function findSharedChestBlock(bot: SharedChestBot, maxDistance: number) {
+  // The first live storage boundary is intentionally simple: one nearby normal
+  // or trapped chest acts as the shared stash until chest registration exists.
   return bot.findBlock?.({
     matching(block) {
       return block.name === "chest" || block.name === "trapped_chest";
@@ -61,6 +63,8 @@ function readItemType(bot: SharedChestBot, item: InventoryItem) {
     return item.type;
   }
 
+  // Some Mineflayer item stacks from windows omit `type`; registry lookup keeps
+  // storage transfer code version-tolerant without hard-coding numeric ids.
   return bot.registry?.itemsByName?.[item.name]?.id;
 }
 
@@ -74,12 +78,16 @@ export function createMineflayerSharedChestAccessor(
       const block = findSharedChestBlock(bot, maxDistance);
 
       if (!block || !bot.openChest) {
+        // Observation should stay non-fatal when a chest is absent; mutating
+        // actions below throw because they need an explicit runtime boundary.
         return null;
       }
 
       const chest = await bot.openChest(block);
 
       try {
+        // Return a value snapshot, not the live window contents, so transcript
+        // observations cannot change after the chest window is closed.
         return snapshotItems(chest.containerItems());
       } finally {
         chest.close();
@@ -103,6 +111,9 @@ export function createMineflayerSharedChestAccessor(
           const itemType = inventoryItem ? readItemType(bot, inventoryItem) : undefined;
 
           if (!inventoryItem || itemType === undefined) {
+            // Deposit is allowed to no-op when the actor lacks the item; policy
+            // checks happen before this adapter and ledger evidence records the
+            // actual moved count.
             return 0;
           }
 
@@ -115,6 +126,8 @@ export function createMineflayerSharedChestAccessor(
           const itemType = chestItem ? readItemType(bot, chestItem) : undefined;
 
           if (!chestItem || itemType === undefined) {
+            // Missing chest contents are not fatal at the adapter layer. The
+            // caller converts zero movement into a blocked storage action.
             return 0;
           }
 

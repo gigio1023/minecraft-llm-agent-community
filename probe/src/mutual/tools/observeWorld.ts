@@ -70,6 +70,8 @@ function findNearbyMarkerEntity({
   itemName: string;
   itemId?: number;
 }) {
+  // Item entity shape varies by protocol/version, so marker detection checks
+  // name, displayName, and metadata itemId before declaring it invisible.
   return Object.values(entities).find(
     (entity) =>
       entity.name === itemName ||
@@ -93,6 +95,8 @@ export function observeWorld({
   runtimeState,
   memory
 }: ObserveWorldArgs) {
+  // Observe starts the actor's turn and consumes heard messages. This makes chat
+  // delivery turn-phased instead of globally visible at arbitrary times.
   runtimeState.beginTurn?.(actor.username as MutualActorId);
   const itemId = actor.registry?.itemsByName?.[runtimeState.markerItemName()]?.id;
 
@@ -117,6 +121,8 @@ export function observeWorld({
 
   runtimeState.recordObservation?.(actor.username as MutualActorId, observation);
 
+  // Social context is appended after the raw world observation so transcript
+  // review can separate Minecraft facts from derived memory/role pressure.
   return {
     ...observation,
     ...((runtimeState.socialContext?.(actor.username as MutualActorId)

@@ -22,6 +22,8 @@ export function createTeamBulletin() {
       });
     },
     visibleTo(actorId: string) {
+      // Actors read other actors' public state only; their own state is already
+      // known locally and should not echo back as social pressure.
       return [...entries.values()]
         .filter((entry) => entry.actorId !== actorId)
         .sort((left, right) => left.updatedAt - right.updatedAt)

@@ -9,6 +9,12 @@ type TalkResult =
   | { status: "available" }
   | { status: "unavailable"; reason: string };
 
+/**
+ * Owns deterministic dialogue availability for the single-bot probe.
+ *
+ * Busy replies are runtime state, not provider text, so tests can prove waiting
+ * and retry behavior without needing a live model.
+ */
 export function createDialogueState({
   busyRepliesBeforeAvailable
 }: DialogueStateOptions) {
@@ -27,6 +33,8 @@ export function createDialogueState({
       return remainingBusyReplies > 0 ? "busy" : "available";
     },
     requestTalk(actorId: string, targetId: string): TalkResult {
+      // Unsupported pairs return unavailable rather than falling back to open
+      // chat, keeping early social proof limited to the configured scenario.
       if (!isSupported(actorId, targetId)) {
         return {
           status: "unavailable",
@@ -46,16 +54,6 @@ export function createDialogueState({
       return {
         status: "available"
       };
-    },
-    canEscalateDialogue(actorId: string, pressures: Array<{ kind: string; urgency: number }>): boolean {
-      const allowedCoopPressures = [
-        "shared_shortage",
-        "blocked_teammate",
-        "public_obligation_due",
-        "station_missing",
-        "hostile_risk"
-      ];
-      return pressures.some((p) => allowedCoopPressures.includes(p.kind) && p.urgency >= 0.6);
     }
   };
 }

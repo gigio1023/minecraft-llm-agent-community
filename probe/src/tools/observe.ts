@@ -74,6 +74,8 @@ function scanNearbyBlocks(actor: PositionedActor) {
     return undefined;
   }
 
+  // Nearby blocks are coarse evidence for verification and debugging, not a
+  // full world model. Keep the scan small so observe remains cheap in each loop.
   return actor
     .findBlocks({
       matching: (block) => block.name !== "air" && block.name !== "void_air",
@@ -99,6 +101,9 @@ export async function observe({
   const nearbyBlocks = scanNearbyBlocks(actor);
   const sharedChestItems = sharedChest ? await sharedChest.inspect() : null;
 
+  // Observe is the transcript-facing state boundary. Optional capabilities stay
+  // optional so the same primitive can run against Mineflayer bots and narrow
+  // test doubles without fabricating evidence.
   return {
     status: "ok",
     visibleActors:

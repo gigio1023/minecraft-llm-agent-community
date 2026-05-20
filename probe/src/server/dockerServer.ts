@@ -30,6 +30,13 @@ export function getComposeCommandTimeouts(config: ProbeConfig) {
   };
 }
 
+/**
+ * Runs a bounded Docker command and returns stdout only after the process exits.
+ *
+ * Startup and cleanup failures must be explainable from probe artifacts, so this
+ * helper preserves stderr/stdout context while still forcing hung compose
+ * commands through SIGTERM and then SIGKILL.
+ */
 function runCommand(
   command: string,
   args: readonly string[],
@@ -211,6 +218,7 @@ function parsePublishedEndpoint(output: string, fallbackHost: string) {
 }
 
 function normalizePublishedHost(host: string, fallbackHost: string) {
+  // Docker may publish on a wildcard address; Mineflayer needs a concrete host.
   if (!host || host === "0.0.0.0" || host === "::" || host === "*") {
     return fallbackHost;
   }
@@ -252,6 +260,8 @@ async function waitForServerReady(
       });
       return;
     } catch (error) {
+      // Compose can report the port before the Java server has accepted login
+      // traffic, so readiness is a protocol ping rather than container status.
       lastError = error;
       const retryDelayMs = Math.min(SERVER_READY_POLL_MS, deadline - Date.now());
 
@@ -291,6 +301,8 @@ async function cleanupServerResources(
   }
 
   try {
+    // The probe server world is disposable; actor workspaces and run evidence
+    // live elsewhere and are not removed by this server cleanup path.
     await rm(dataDir, { recursive: true, force: true });
   } catch (error) {
     cleanupErrors.push(error);
@@ -328,6 +340,8 @@ export async function startDockerServer(
   let cleanupPromise: Promise<void> | undefined;
 
   const cleanup = () => {
+    // Stop can be called from normal completion and error paths; share one
+    // cleanup promise so Docker teardown is idempotent within a run.
     if (cleanupPromise) {
       return cleanupPromise;
     }

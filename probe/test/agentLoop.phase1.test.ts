@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "bun:test";
+import test from "node:test";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
@@ -168,7 +168,7 @@ test("agent loop blocks the fourth repeated failed move_to for the active approa
   });
 
   assert.deepEqual(final, {
-    status: "success",
+    status: "failed",
     why: "approach to npc_b was blocked repeatedly"
   });
   assert.equal(moveToCalls, 3);
@@ -178,6 +178,71 @@ test("agent loop blocks the fourth repeated failed move_to for the active approa
   );
   assert.equal((transcriptSteps[4]?.result as { status: string }).status, "blocked");
   assert.equal((transcriptSteps[4]?.verification as { status: string }).status, "failed");
+});
+
+test("agent loop does not assign collect_logs to a role that cannot gather", async () => {
+  const provider = createDeterministicProvider();
+  const actor = createBot("npc_a", 0);
+  const target = createBot("npc_b", 2);
+  const transcriptSteps: Array<Record<string, unknown>> = [];
+
+  const final = await runAgentLoop({
+    bots: { actor, target },
+    roleId: "quartermaster",
+    provider,
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step as Record<string, unknown>);
+      }
+    },
+    tools: {
+      validateProposal,
+      async observe() {
+        return {
+          status: "ok" as const,
+          visibleActors: [],
+          inventory: [],
+          memory: []
+        };
+      },
+      async move_to() {
+        return { tool: "move_to", ok: false, status: "blocked" };
+      },
+      async collect_logs() {
+        throw new Error("quartermaster must not receive collect_logs");
+      },
+      async craft_item() {
+        return { tool: "craft_item", ok: false, status: "blocked" };
+      },
+      async inspect_chest() {
+        return { tool: "inspect_chest", ok: true, status: "inspected" };
+      },
+      async deposit_shared() {
+        return { tool: "deposit_shared", ok: true, status: "deposited" };
+      },
+      async withdraw_shared() {
+        return { tool: "withdraw_shared", ok: true, status: "withdrew" };
+      },
+      async say() {
+        return { tool: "say", ok: true, status: "delivered" };
+      },
+      async wait() {
+        return { tool: "wait", ok: true, status: "waited" };
+      },
+      async remember({ args }) {
+        return { tool: "remember", ok: true, status: "remembered", note: String(args.note) };
+      }
+    }
+  });
+
+  assert.deepEqual(final, {
+    status: "success",
+    why: "no visible actor was available for the next social step"
+  });
+  assert.deepEqual(
+    transcriptSteps.map((step) => step.tool),
+    ["observe", "remember"]
+  );
 });
 
 test("agent loop advances through collect logs, craft materials, and craft crafting table in order", async () => {

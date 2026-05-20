@@ -4,35 +4,58 @@ sidebar_position: 1
 
 # Welcome to minecraft-llm-agent-community
 
-**minecraft-llm-agent-community** is an experimental project focused on creating **Social NPCs** in Minecraft using Large Language Models (LLMs). We build a stable, multi-agent society where NPCs cooperate, manage resources, and follow social rules within a deterministic game environment.
+**minecraft-llm-agent-community** is currently rebuilding a headless Minecraft
+agent-loop runtime.
 
-## Why Minecraft?
+The project is not currently trying to prove a full NPC society.
+It is trying to build a small, bounded, observable runtime that can later grow
+into a social simulation seed.
 
-Minecraft provides a robust physics and state engine, making it an ideal "sandbox" for AI research. Placing agents in a world with material scarcity and survival needs allows us to observe emergent behaviors that go beyond simple chat interactions.
+## Current Goal
 
-## Key Concepts
+The current goal is to make one bot reliably perform boring gameplay tasks while
+leaving enough transcript and runtime evidence that failures are easy to inspect
+and improve.
 
-Our agents are **Embodied Agents** driven by:
+The first proof is not persona richness.
+The first proof is competence plus observability.
 
-- **Survival & Scarcity**: NPCs must gather resources (food, wood, iron) to survive. Scarcity naturally encourages cooperation or competition.
-- **Roles & Responsibilities**: Each NPC has a clear purpose (e.g., Gatherer, Crafter, Scout).
-- **Social Obligations**: Cooperation is built on promises and shared storage rather than just persona text.
+## Long-Term Direction
 
-## Technical Foundation
+The long-term north star remains a **social simulation seed**:
 
-To ensure stability and safety, we use a **Headless Runtime** architecture:
+- bots with role pressure;
+- eventually distinct action skill ownership;
+- memory and bounded action skill evolution;
+- cooperation with each other and later with a human player.
 
-- **Headless Environment**: The simulation runs on a local Minecraft server via Docker. No manual GUI client or Fabric/Forge mod setup is required.
-- **Mineflayer-Based Bots**: We use [Mineflayer](https://github.com/PrismarineJS/mineflayer) to create lightweight, programmable bots that interact with the world via TypeScript.
-- **Bounded Tool Loop**: Instead of letting the AI write raw, risky JavaScript `eval` code, the LLM selects from a strictly validated set of tools (e.g., `mineBlock`, `say`, `craftItem`).
-- **Deterministic Evaluation**: Every session is recorded as a structured JSON transcript, allowing us to analyze agent decisions and social interactions.
+That future depends on the runtime being small, inspectable, and trustworthy now.
 
-## Re-designed Structure & Navigation
+## What We Are Not Optimizing For Yet
 
-Our documentation has been reorganized to support researchers and developers:
+- long-run autonomy as a product goal;
+- rich social roleplay as a content goal;
+- large multi-bot society behavior before single-bot competence is trustworthy.
 
-- 📄 **[Search Index](Agent-Search-Index.md)**: Find specific search tokens and review the recommended reading order.
-- 📐 **[Architecture Specification](Architecture/SPEC.md)**: A deep dive into core subsystems, bounded runtime, and memory compaction.
-- ⚙️ **[Getting Started Setup](Setup/Headless-Server.md)**: Steps to spin up the local Docker server and connect Mineflayer bots.
-- 🎯 **[Simulation Plans](Plans/2026-05-19-mutual-npc-interaction-probe.md)**: Explore the active multi-agent interaction and dialogue probe plans.
-- 🔬 **[Research & Audits](Research/2026-05-19-local-minecraft-agent-repo-analysis.md)**: Review comparative audits of 20+ prominent repositories in the Minecraft AI domain.
+## Current Technical Foundation
+
+The active architecture is built around these rules:
+
+- **Headless Runtime**: local Minecraft server, no manual GUI requirement
+- **Mineflayer Bots**: embodied TypeScript bots using the game client API
+- **Bounded Tool Loop**: the runtime validates actions; the model only selects valid tools
+- **No Raw Eval Loop**: do not return to open-ended JavaScript gameplay execution
+- **Live Transcript First**: transcript and runtime artifacts are the primary evidence
+- **Checkpoint-Ready Runtime**: phase 1 should leave useful artifacts and progress snapshots
+- **Minimal Action Skill Memory Hook**: actor-owned action skill metadata should have a place even before full action skill evolution exists
+- **Bounded Action Skill Creation**: future action skill evolution should start from runtime evidence and validated recipes, not generated code in the hot loop
+
+## Read These Next
+
+- [Canonical Rebuild Spec](Architecture/SPEC.md)
+- [Agent Search Index](Agent-Search-Index.md)
+- [Terminology](Terminology.md)
+- [Minimal Probe](Architecture/Minimal-Probe.md)
+- [Bounded Action Skill Creation](Architecture/Bounded-Action-Skill-Creation.md)
+- [Headless Server Setup](Setup/Headless-Server.md)
+- [Provider Setup](Setup/Provider-Setup.md)

@@ -9,6 +9,12 @@ export const llmConversations: Record<ActorId, CodexInputMessage[]> = {
   npc_c: []
 };
 
+/**
+ * Builds the actor-specific prompt history for the exploratory live loop.
+ *
+ * Histories are kept per actor so generated action skills do not collapse all
+ * NPCs into one shared model conversation.
+ */
 export function buildActorInput(actorId: ActorId, nextMessage: string) {
   return [
     ...llmConversations[actorId],
@@ -30,6 +36,7 @@ export function rememberActorExchange(actorId: ActorId, userMessage: string, ass
       content: [{ type: "output_text", text: assistantOutput }]
     }
   );
+  // Keep only the recent tail; durable evidence is in memory/transcript files.
   llmConversations[actorId] = llmConversations[actorId].slice(-maxMessagesPerActor);
 }
 

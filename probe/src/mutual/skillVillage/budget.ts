@@ -14,6 +14,12 @@ function estimateTokens(text: string) {
   return Math.max(1, Math.ceil(text.length / 3));
 }
 
+/**
+ * Tracks rough live-model spend for the exploratory skill-village path.
+ *
+ * The estimate is intentionally coarse; it is a budget guardrail, not billing
+ * truth, and should not drive gameplay acceptance.
+ */
 export function addBudget(actorId: ActorId, inputText: string, outputText: string) {
   const inputTokens = estimateTokens(inputText);
   const outputTokens = estimateTokens(outputText);

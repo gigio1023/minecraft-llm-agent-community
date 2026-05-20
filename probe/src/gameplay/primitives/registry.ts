@@ -1,3 +1,6 @@
+// Runtime primitives are the small action boundaries the loop can validate,
+// execute, and record. Seed action skills compose these; they should not add
+// new behavior unless the primitive list can expose an observable boundary.
 export const runtimePrimitives = [
   { id: "observe", category: "sensing" },
   { id: "move_to", category: "movement" },

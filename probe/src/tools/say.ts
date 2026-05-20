@@ -18,6 +18,12 @@ type SayArgs = {
   text: string;
 };
 
+/**
+ * Sends directed chat only after runtime dialogue availability allows it.
+ *
+ * The busy/unavailable result is returned as evidence so the loop can wait or
+ * stop instead of pretending a social action happened.
+ */
 export async function say({
   actor,
   target,

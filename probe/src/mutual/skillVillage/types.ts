@@ -2,7 +2,7 @@ import type { Bot } from "mineflayer";
 
 export type ActorId = "npc_a" | "npc_b" | "npc_c";
 
-export type SkillProposal = {
+export type ActionSkillProposal = {
   actorId: ActorId;
   utterance: string;
   skillName: string;
@@ -17,6 +17,8 @@ export type CodexInputMessage = {
 
 export type BotRecord = Record<ActorId, Bot>;
 
+// Helper events are the review trail for generated action skills. They record
+// which safe helper was called without allowing arbitrary generated code access.
 export type HelperEvent = {
   name: string;
   args: unknown[];
@@ -41,7 +43,7 @@ export type WorldObservation = {
   episodicMemory: MemoryEntry[];
 };
 
-export type SkillExecution = {
+export type ActionSkillExecution = {
   filePath: string;
   result: unknown;
   helperEvents: HelperEvent[];
@@ -71,7 +73,13 @@ export type PublicEvent = {
   skillResult?: string;
 };
 
-export type SkillContext = {
+/**
+ * Safe helper surface exposed to generated action skills.
+ *
+ * Generated code should interact through this context instead of importing Node,
+ * Mineflayer internals, filesystem, or network APIs directly.
+ */
+export type ActionSkillContext = {
   bot: Bot;
   bots: BotRecord;
   say(text: string): void;
@@ -91,8 +99,8 @@ export type SkillContext = {
   runSkill(name: string): Promise<unknown>;
 };
 
-export type SeedSkill = {
+export type SeedActionSkill = {
   name: string;
   description: string;
-  run(ctx: SkillContext): Promise<unknown>;
+  run(ctx: ActionSkillContext): Promise<unknown>;
 };

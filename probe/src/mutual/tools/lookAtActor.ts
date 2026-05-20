@@ -1,3 +1,9 @@
+/**
+ * Records spatial attention without moving the actor.
+ *
+ * This gives the mutual probe a cheap world-state action between chat turns so
+ * transcripts can distinguish "heard" from "looked at target".
+ */
 export async function lookAtActor({
   actor,
   target

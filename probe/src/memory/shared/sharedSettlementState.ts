@@ -13,6 +13,8 @@ export function createSharedSettlementState() {
 
   return {
     rememberSharedChest(chestId: string, items: ItemStack[]) {
+      // Store copies so Mineflayer inventory objects cannot mutate shared memory
+      // after a transcript or provider context has already referenced it.
       knownSharedChests.set(
         chestId,
         items.map((item) => ({ name: item.name, count: item.count }))
@@ -21,6 +23,7 @@ export function createSharedSettlementState() {
     recordMajorEvent(event: string) {
       recentMajorEvents.push(event);
 
+      // Settlement context is a prompt/debug summary, not an unbounded event log.
       if (recentMajorEvents.length > 12) {
         recentMajorEvents.splice(0, recentMajorEvents.length - 12);
       }
@@ -29,6 +32,8 @@ export function createSharedSettlementState() {
       lastHostileSighting = { ...sighting };
     },
     snapshot() {
+      // Snapshots are provider-facing and artifact-facing, so callers receive
+      // detached data rather than handles to mutable settlement state.
       return {
         knownSharedChests: [...knownSharedChests.entries()].map(([chestId, items]) => ({
           chestId,

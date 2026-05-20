@@ -15,6 +15,8 @@ type CreateOpenAICodexProviderArgs = {
 };
 
 function createPrompt(input: ProviderInput) {
+  // The runtime validates the selected tool later; the provider prompt stays
+  // narrow so malformed prose cannot be mistaken for a gameplay action.
   return [
     "Return exactly one JSON object with keys tool, args, and optional why.",
     "Choose exactly one allowed tool and keep args short.",
@@ -27,6 +29,12 @@ function isMalformedJsonError(error: unknown) {
   return error instanceof SyntaxError;
 }
 
+/**
+ * Calls the live provider for a single mutual-dialogue proposal.
+ *
+ * This layer only obtains model output. It does not decide whether the action is
+ * safe, executable, or evidence-backed; those checks remain runtime-owned.
+ */
 async function requestResponse(
   fetchImpl: typeof fetch,
   accessToken: string,
@@ -53,6 +61,8 @@ async function requestResponse(
   });
 
   if (!response.ok) {
+    // Do not include response bodies here; auth or account errors may carry data
+    // that should not end up in transcript artifacts.
     throw new Error(`OpenAI Codex provider request failed with status ${response.status}`);
   }
 
@@ -88,6 +98,8 @@ export function createOpenAICodexProvider({
         try {
           return parseProviderAction(parseOutputText(payload));
         } catch (error) {
+          // Retry only parser noise. Schema or runtime validation failures should
+          // surface as implementation feedback instead of being hidden by retries.
           if (attempt < maxRetries && isMalformedJsonError(error)) {
             continue;
           }

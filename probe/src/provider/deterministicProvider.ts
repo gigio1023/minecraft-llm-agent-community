@@ -58,6 +58,8 @@ export function createDeterministicProvider() {
       }
 
       if (input.currentTask?.id === "collect_4_logs") {
+        // Deterministic mode is deliberately boring: repeat the owned primitive
+        // until runtime evidence either verifies progress or records a blocker.
         if (lastResult.tool === "collect_logs" && lastResult.status === "blocked") {
           return {
             tool: "remember",
@@ -76,6 +78,8 @@ export function createDeterministicProvider() {
           };
         }
 
+        // Inventory observation drives the next craft step; the provider does
+        // not assume that a previous craft result changed state.
         if (countItems(input.observation, PLANK_ITEM_NAMES) < 4) {
           return {
             tool: "craft_item",
@@ -155,6 +159,8 @@ export function createDeterministicProvider() {
       if (lastResult.tool === "observe") {
         const targetId = readVisibleTargetId(input);
 
+        // No visible actor is a real terminal observation for this social probe,
+        // not a reason to wander and invent social progress.
         if (!targetId) {
           return {
             tool: "remember",

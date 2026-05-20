@@ -12,6 +12,12 @@ type RememberArgs = {
   note: string;
 };
 
+/**
+ * Writes an explicit runtime note instead of treating memory as hidden success.
+ *
+ * In the probe loop, remember often acts as a terminal/status artifact that
+ * explains why the actor stopped, stalled, or completed a bounded task.
+ */
 export function remember({ memory, note }: RememberArgs): RememberResult {
   memory.add(note);
 

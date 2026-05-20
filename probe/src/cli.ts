@@ -1,5 +1,7 @@
 import { runProbe } from "./runProbe.js";
 
+// AggregateError is common because runtime failures and cleanup failures are
+// reported together; flatten it so CLI logs remain useful for artifact review.
 function formatError(error: unknown): string {
   if (error instanceof AggregateError) {
     const nested = error.errors.map((entry) => formatError(entry)).join("\n");

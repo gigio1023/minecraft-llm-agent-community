@@ -10,6 +10,8 @@ export type DialogueJsonObject = { [key: string]: DialogueJsonValue };
 
 export type MutualActorId = string;
 
+// Personas shape utterance style only; observations and validated tools remain
+// the source of truth for whether social/world progress happened.
 export const mutualPersonas = {
   npc_a: {
     name: "Mara",
@@ -45,6 +47,12 @@ export type DialogueTranscriptEntry = DialogueJsonObject;
 const fallbackRoles = ["quartermaster", "gatherer", "crafter", "runner"] as const;
 const fallbackNames = ["Mara", "Jun", "Iris", "Noah"] as const;
 
+/**
+ * Resolves known actor personas and deterministic fallbacks for extra bots.
+ *
+ * Fallbacks keep smoke runs stable when the actor roster changes without making
+ * persona richness a Phase 1 delivery target.
+ */
 export function getDialoguePersona(actorId: string, index = 0): DialoguePersona {
   const knownPersona = mutualPersonas[actorId as keyof typeof mutualPersonas];
 
@@ -84,6 +92,12 @@ export type DialogueContextOutput = Omit<DialogueContextInput, "allowedTools"> &
   };
 };
 
+/**
+ * Builds the provider-facing dialogue packet.
+ *
+ * The context is cloned so provider code cannot mutate runtime observations,
+ * memory, or transcript tails after they have been recorded.
+ */
 export function buildDialogueContext(input: DialogueContextInput): DialogueContextOutput {
   return structuredClone({
     actorId: input.actorId,

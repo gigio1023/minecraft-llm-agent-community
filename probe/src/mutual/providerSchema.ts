@@ -17,6 +17,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Parses live-provider output into the narrow mutual tool schema.
+ *
+ * This function is the first guardrail after model text: unsupported tools or
+ * malformed metadata fail before any Mineflayer side effect can run.
+ */
 export function parseProviderAction(input: unknown): ProviderAction {
   if (!isRecord(input)) {
     throw new Error("Provider action must be an object");

@@ -28,6 +28,10 @@ export type ProbeConfig = {
     maxRetries: 1;
     delayStartMs: 30000;
   };
+  actorWorkspace: {
+    rootDir: string;
+    initializeOnStart: boolean;
+  };
   server: {
     image: string;
     version: string;
@@ -44,10 +48,32 @@ export type ProbeConfig = {
   memoryLimit: number;
 };
 
-export function loadProbeConfig(): ProbeConfig {
-  const envBots = process.env.PROBE_BOTS?.split(",")
+export function parseProbeBotIds(value: string | undefined) {
+  return value?.split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+export function parseBooleanEnv(value: string | undefined, defaultValue: boolean) {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Expected boolean environment value, received: ${value}`);
+}
+
+export function loadProbeConfig(): ProbeConfig {
+  const envBots = parseProbeBotIds(process.env.PROBE_BOTS);
 
   let yamlConfig = {
     world: { seed: "", levelType: "default" },
@@ -75,11 +101,19 @@ export function loadProbeConfig(): ProbeConfig {
     },
     liveDialogue: {
       providerId: "openai-codex",
+      // Gameplay provider auth is repo-local and intentionally separate from
+      // Codex CLI login; the auth loader rejects expired stores before live runs.
       authStorePath: path.resolve(here, "../../build/provider-auth/openai-codex-auth.json"),
       model: "gpt-5.4-mini",
       reasoning: "low",
       maxRetries: 1,
       delayStartMs: 30_000
+    },
+    actorWorkspace: {
+      rootDir: path.resolve(here, "../../data/actors"),
+      // Default on so tests and smoke runs start from an inspectable baseline;
+      // initialization rewrites indexes but does not delete actor artifacts.
+      initializeOnStart: parseBooleanEnv(process.env.ACTOR_WORKSPACE_INIT, true)
     },
     server: {
       image: "itzg/minecraft-server:java21",

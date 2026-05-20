@@ -6,12 +6,6 @@ import { selectDeterministicTask } from "../gameplay/curriculum/deterministicCur
 import { verifyTask, type TaskVerification } from "../gameplay/verification/verifyTask.js";
 import { createAntiRepeatPolicy } from "./antiRepeat.js";
 import { buildPressureIntentContext, type IntentRecord, type PressureIntentContext } from "./pressureIntent.js";
-import { createMemoryCompactor, type StepRecord } from "../memory/summaries/memoryCompactor.js";
-import * as fs from "fs/promises";
-import * as path from "path";
-import * as mineflayer from "mineflayer";
-import { pathfinder, Movements } from "mineflayer-pathfinder";
-import minecraftData from "minecraft-data";
 
 type JsonValue =
   | string
@@ -49,7 +43,7 @@ type Provider = {
     observation: ObserveResult;
     lastResult: ToolResult | null;
     currentTask?: ReturnType<typeof selectDeterministicTask>;
-  }): Promise<ToolProposal> | ToolProposal;
+  }): ToolProposal;
 };
 
 export type AgentLoopTools<TActor extends RuntimeActor> = {
@@ -71,16 +65,23 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
     actor: TActor;
     target: TActor;
   };
+  roleId?: string;
   provider: Provider;
   tools: AgentLoopTools<TActor>;
   transcript: TranscriptRecorder;
   initialCompletedTaskIds?: string[];
-  maxSteps?: number;
-  config?: any;
-  server?: { host: string; port: number };
 };
 
-const DEFAULT_MAX_STEPS = 10;
+const MAX_STEPS = 10;
+
+// Terminal notes are the current probe's human-readable stop condition. Keep
+// the classifier conservative so a blocked/stalled transcript is never reported
+// as success only because the provider chose the remember tool.
+function classifyTerminalNote(note: string) {
+  return /blocked repeatedly|failed|stalled|timeout/i.test(note)
+    ? "failed"
+    : "success";
+}
 
 function toJsonRecord(args: Record<string, unknown>) {
   return Object.fromEntries(
@@ -147,181 +148,26 @@ async function executeTool<TActor extends RuntimeActor>(
   }
 }
 
-function isBotConnected(bot: any): boolean {
-  return bot && bot._client && bot._client.socket && bot._client.socket.writable;
-}
-
 export async function runAgentLoop<TActor extends RuntimeActor>({
   bots,
+  roleId,
   provider,
   tools,
   transcript,
-  initialCompletedTaskIds = [],
-  maxSteps = DEFAULT_MAX_STEPS,
-  config,
-  server
+  initialCompletedTaskIds = []
 }: AgentLoopArgs<TActor>) {
-  let actor = bots.actor;
+  const actor = bots.actor;
   const target = bots.target;
-
-  // Create checkpoints directory asynchronously (skip in test environment to avoid test pollution)
-  const isTestEnv = process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test";
-  const checkpointDir = path.join(process.cwd(), "build", "checkpoints");
-  if (!isTestEnv) {
-    await fs.mkdir(checkpointDir, { recursive: true });
-  }
-
-  const tasksPath = path.join(checkpointDir, `tasks-${actor.username}.json`);
-  const memoryPath = path.join(checkpointDir, `memory-${actor.username}.json`);
-  const physicalPath = path.join(checkpointDir, `physical-${actor.username}.json`);
-
-  // 1) Hydrate completed tasks checkpoint
-  const completedTaskIds = new Set<string>(initialCompletedTaskIds);
-  if (!isTestEnv) {
-    try {
-      const tasksContent = await fs.readFile(tasksPath, "utf-8");
-      const parsedTasks = JSON.parse(tasksContent) as string[];
-      for (const taskId of parsedTasks) {
-        completedTaskIds.add(taskId);
-      }
-      console.log(`[${actor.username}] Hydrated completed tasks checkpoint:`, [...completedTaskIds]);
-    } catch (e) {
-      console.log(`[${actor.username}] No tasks checkpoint or error reading, using default tasks.`);
-    }
-  }
-
-  // 2) Hydrate memory state checkpoint
-  const compactor = createMemoryCompactor();
-  let accumulatedSummary = "";
-  const recentSteps: StepRecord[] = [];
-  if (!isTestEnv) {
-    try {
-      const memoryContent = await fs.readFile(memoryPath, "utf-8");
-      const parsedMemory = JSON.parse(memoryContent) as { accumulatedSummary: string; recentSteps: StepRecord[] };
-      accumulatedSummary = parsedMemory.accumulatedSummary || "";
-      for (const stepRec of parsedMemory.recentSteps || []) {
-        recentSteps.push(stepRec);
-      }
-      console.log(`[${actor.username}] Hydrated memory summary length: ${accumulatedSummary.length}, recent steps: ${recentSteps.length}`);
-    } catch (e) {
-      console.log(`[${actor.username}] No memory checkpoint or error reading, starting fresh memory.`);
-    }
-  }
-
-  // 3) Hydrate physical state checkpoint and loop step indices
-  let startStep = 0;
-  let currentEpoch = 1;
-  if (!isTestEnv) {
-    try {
-      const physicalContent = await fs.readFile(physicalPath, "utf-8");
-      const parsedPhys = JSON.parse(physicalContent) as { x: number; y: number; z: number; health?: number; hunger?: number; epoch?: number; totalTurns?: number };
-      if (typeof parsedPhys.totalTurns === "number") {
-        startStep = parsedPhys.totalTurns;
-      }
-      if (typeof parsedPhys.epoch === "number") {
-        currentEpoch = parsedPhys.epoch;
-      }
-      console.log(`[${actor.username}] Hydrated physical state at turn ${startStep}, epoch ${currentEpoch}: x=${parsedPhys.x}, y=${parsedPhys.y}, z=${parsedPhys.z}`);
-    } catch (e) {
-      console.log(`[${actor.username}] No physical checkpoint or error reading, starting loop from step 0.`);
-    }
-  }
-
   let lastResult: ToolResult | null = null;
   let previousIntent: IntentRecord | undefined;
-  let previousProposal: ToolProposal | undefined;
   const antiRepeat = createAntiRepeatPolicy();
-  let consecutiveBypassTurns = 0;
-  const maxContinuousBypassTurns = 5;
+  const completedTaskIds = new Set<string>(initialCompletedTaskIds);
 
-  // Sliding window for Stall Detection
-  const lastThreeTurns: Array<{ tool: string; args: any; ok: boolean }> = [];
-
-  for (let step = startStep; step < maxSteps; step += 1) {
-    // Check if the bot connection is still alive, otherwise auto reconnect
-    if (!isTestEnv && !isBotConnected(actor)) {
-      console.log(`[${actor.username}] Connection lost! Initiating auto reconnect...`);
-      let success = false;
-      const staggerDelays = [1000, 2000, 5000, 10000, 30000, 60000];
-      let reconnectAttempts = 0;
-      const maxAttempts = config?.reconnect_attempts ?? 50;
-
-      while (reconnectAttempts < maxAttempts && !success) {
-        reconnectAttempts++;
-        const delay = staggerDelays[Math.min(reconnectAttempts - 1, staggerDelays.length - 1)];
-        console.log(`[${actor.username}] Reconnect attempt ${reconnectAttempts}/${maxAttempts} in ${delay}ms...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-
-        try {
-          const newBot = mineflayer.createBot({
-            host: server?.host ?? "127.0.0.1",
-            port: server?.port ?? 25565,
-            username: actor.username,
-            auth: "offline",
-            version: config?.server?.version ?? "1.20.1",
-            viewDistance: "tiny"
-          });
-          newBot.loadPlugin(pathfinder);
-
-          const mcData = minecraftData(newBot.version || config?.server?.version || "1.20.1");
-          const defaultMovements = new (Movements as any)(newBot, mcData);
-          (newBot as any).pathfinder.setMovements(defaultMovements);
-
-          await new Promise<void>((resolve, reject) => {
-            const onSpawn = () => {
-              newBot.off("spawn", onSpawn);
-              newBot.off("error", onError);
-              newBot.off("end", onEnd);
-              resolve();
-            };
-            const onError = (err: Error) => {
-              newBot.off("spawn", onSpawn);
-              newBot.off("error", onError);
-              newBot.off("end", onEnd);
-              reject(err);
-            };
-            const onEnd = (reason: string) => {
-              newBot.off("spawn", onSpawn);
-              newBot.off("error", onError);
-              newBot.off("end", onEnd);
-              reject(new Error(`Bot ended before spawn: ${reason}`));
-            };
-            newBot.on("spawn", onSpawn);
-            newBot.on("error", onError);
-            newBot.on("end", onEnd);
-          });
-
-          bots.actor = newBot as any;
-          actor = newBot as any;
-          success = true;
-          console.log(`[${actor.username}] Auto reconnect successful on attempt ${reconnectAttempts}!`);
-        } catch (err) {
-          console.error(`[${actor.username}] Reconnect attempt ${reconnectAttempts} failed:`, err);
-        }
-      }
-
-      if (!success) {
-        throw new Error(`[${actor.username}] Auto reconnect failed after ${maxAttempts} attempts.`);
-      }
-    }
-
+  for (let step = 0; step < MAX_STEPS; step += 1) {
+    // Every turn starts from Mineflayer-observed state. The provider can choose
+    // a primitive, but it cannot invent progress or carry stale inventory state.
     const observation = await tools.observe({ actor, target });
-    if (accumulatedSummary) {
-      observation.memory = [accumulatedSummary, ...observation.memory];
-    }
-
-    // Stall Detection Guard
-    const isStalled = lastThreeTurns.length === 3 && lastThreeTurns.every(t => {
-      return !t.ok && t.tool === lastThreeTurns[0].tool && JSON.stringify(t.args) === JSON.stringify(lastThreeTurns[0].args);
-    });
-
-    if (isStalled) {
-      const stallMsg = `[STALL GUARD] 에이전트 ${actor.username}이(가) 최근 3턴 동안 동일한 행동(${lastThreeTurns[0].tool})을 수행하여 실패했습니다. 인자: ${JSON.stringify(lastThreeTurns[0].args)}. 동일한 툴과 좌표 매개변수를 계속해서 반복 호출하지 말고, 다른 툴을 활용하거나 대상 좌표를 변경하여 새로운 방식을 모색하세요.`;
-      console.log(`[${actor.username}] [Turn ${step + 1}] Stall detected! Injecting warning to prompter.`);
-      observation.memory = [stallMsg, ...observation.memory];
-    }
-
-    const currentTask = selectDeterministicTask({
+    const selectedTask = selectDeterministicTask({
       visibleActors: observation.visibleActors.map((visibleActor) => ({
         id: visibleActor.id,
         distance: visibleActor.distance
@@ -330,7 +176,14 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       ...(observation.sharedChest ? { sharedChest: observation.sharedChest } : {}),
       completedTaskIds: [...completedTaskIds]
     });
+    const currentTask =
+      selectedTask && roleId && !selectedTask.preferredActorRoles.includes(roleId)
+        ? null
+        : selectedTask;
 
+    // Pressure/intent context is recorded even while the provider remains
+    // deterministic so future agent-loop changes can explain why a primitive
+    // was allowed, continued, or interrupted.
     const pressureContext = buildPressureIntentContext({
       actorId: actor.username,
       turn: step + 1,
@@ -341,58 +194,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     });
     previousIntent = pressureContext.currentIntent;
 
-    // 3-tier Safety Guard System for Event-driven LLM triggers
-    let proposal: ToolProposal;
-    const isSustainableTool =
-      previousProposal &&
-      ["collect_logs", "move_to", "wait"].includes(previousProposal.tool);
-
-    // Duck typing entities search to check for hostile threats within 16 blocks
-    let hostileDetected = false;
-    const entities = (actor as any).entities;
-    if (entities) {
-      const hostileNames = ["zombie", "skeleton", "spider", "creeper", "witch", "enderman", "slime", "phantom", "pillager"];
-      const botPos = (actor as any).entity?.position;
-      for (const key of Object.keys(entities)) {
-        const entity = entities[key];
-        if (entity && hostileNames.includes(entity.name)) {
-          if (botPos && entity.position) {
-            const dist = botPos.distanceTo(entity.position);
-            if (dist <= 16) {
-              hostileDetected = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    const hungerWarning = typeof (actor as any).food === "number" && (actor as any).food <= 6;
-    const healthWarning = typeof (actor as any).health === "number" && (actor as any).health < 20;
-    const safetyTriggered = hostileDetected || hungerWarning || healthWarning;
-
-    const shouldBypass =
-      lastResult &&
-      lastResult.ok &&
-      isSustainableTool &&
-      currentTask &&
-      !completedTaskIds.has(currentTask.id) &&
-      consecutiveBypassTurns < maxContinuousBypassTurns &&
-      !safetyTriggered;
-
-    if (shouldBypass) {
-      proposal = previousProposal!;
-      consecutiveBypassTurns += 1;
-      console.log(`[${actor.username}] [Turn ${step + 1}] Bypassing LLM (Consecutive: ${consecutiveBypassTurns}). Continuing: ${proposal.tool}`);
-    } else {
-      proposal = await provider.next({ observation, lastResult, currentTask });
-      consecutiveBypassTurns = 0;
-      if (safetyTriggered) {
-        console.log(`[${actor.username}] [Turn ${step + 1}] Safety Guard Triggered (Hostile: ${hostileDetected}, Hunger: ${hungerWarning}, Health: ${healthWarning}). Forcing LLM call.`);
-      }
-    }
-    previousProposal = proposal;
-
+    const proposal = provider.next({ observation, lastResult, currentTask });
     const validated = tools.validateProposal(proposal);
     const result = await executePhaseOneTool({
       tools,
@@ -406,103 +208,41 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     });
     const verification = readVerification(result);
 
-    // Record this turn in the stall history window
-    lastThreeTurns.push({
-      tool: validated.tool,
-      args: validated.args,
-      ok: result.ok
-    });
-    if (lastThreeTurns.length > 3) {
-      lastThreeTurns.shift();
-    }
-
-    const stepRecord: StepRecord = {
+    transcript.recordStep({
       actor: actor.username,
       observation: toJsonValue(observation),
       ...(currentTask ? { task: toJsonValue(currentTask) } : {}),
       pressureContext: toJsonValue(pressureContext),
-      tool: validated.tool as AllowedTool,
+      tool: validated.tool,
       args: Object.keys(validated.args).length > 0 ? toJsonRecord(validated.args) : undefined,
       result: toJsonValue(result),
       ...(verification ? { verification: toJsonValue(verification) } : {})
-    };
-
-    // Async Non-blocking Transcript Logging
-    transcript.recordStep(stepRecord as any);
-    recentSteps.push(stepRecord);
-
-    // Strict Array Capping to protect against Node.js Heap OOM leaks
-    if (recentSteps.length > 12) {
-      recentSteps.splice(0, recentSteps.length - 12);
-    }
-
-    // 100-turn Rolling Epoch Management for transcript.jsonl (skip if test env)
-    const currentEpochVal = Math.floor(step / 100) + 1;
-    if (!isTestEnv) {
-      const transcriptPath = path.join(checkpointDir, `transcript-${actor.username}-epoch-${currentEpochVal}.jsonl`);
-      const jsonlLine = JSON.stringify(stepRecord) + "\n";
-      await fs.appendFile(transcriptPath, jsonlLine, "utf-8").catch(err => {
-        console.error(`[${actor.username}] Failed async writing transcript JSONL line:`, err);
-      });
-    }
-
-    if (recentSteps.length >= 5) {
-      console.log(`[${actor.username}] Compacting last 5 steps to reduce context...`);
-      accumulatedSummary = await compactor.compact(recentSteps, accumulatedSummary);
-      recentSteps.length = 0;
-      
-      // Async Non-blocking write of memory checkpoint (skip if test env)
-      if (!isTestEnv) {
-        await fs.writeFile(memoryPath, JSON.stringify({ accumulatedSummary, recentSteps }), "utf-8").catch(err => {
-          console.error(`[${actor.username}] Failed async writing memory checkpoint:`, err);
-        });
-      }
-    }
+    });
 
     lastResult = toToolResult(result, validated.tool);
 
-    // Async Non-blocking write of tasks checkpoint (skip if test env)
     if (currentTask && verification?.status === "passed") {
       completedTaskIds.add(currentTask.id);
-      if (!isTestEnv) {
-        await fs.writeFile(tasksPath, JSON.stringify([...completedTaskIds]), "utf-8").catch(err => {
-          console.error(`[${actor.username}] Failed async writing tasks checkpoint:`, err);
-        });
-      }
     }
 
-    // Async Non-blocking write of physical state checkpoint (skip if test env)
-    const actorPos = (actor as any).entity?.position;
-    const physicalState = {
-      x: actorPos?.x ?? 0,
-      y: actorPos?.y ?? 0,
-      z: actorPos?.z ?? 0,
-      health: (actor as any).health,
-      hunger: (actor as any).food,
-      epoch: currentEpochVal,
-      totalTurns: step + 1
-    };
-    if (!isTestEnv) {
-      await fs.writeFile(physicalPath, JSON.stringify(physicalState), "utf-8").catch(err => {
-        console.error(`[${actor.username}] Failed async writing physical checkpoint:`, err);
-      });
-    }
-
-    const stepDelay = process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" ? 0 : 1000;
-    await new Promise((resolve) => setTimeout(resolve, stepDelay));
+    // Keep probe turns visually separable in live logs without using delay as a
+    // success signal; verification above is the only task-completion gate.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     if (validated.tool === "remember") {
+      const note =
+        typeof result.note === "string"
+          ? result.note
+          : "runtime-owned curriculum reached a terminal note";
+
       return {
-        status: "success" as const,
-        why:
-          typeof result.note === "string"
-            ? result.note
-            : "runtime-owned curriculum reached a terminal note"
+        status: classifyTerminalNote(note),
+        why: note
       };
     }
   }
 
-  throw new Error(`Agent loop exhausted ${maxSteps}-step budget without remember`);
+  throw new Error(`Agent loop exhausted ${MAX_STEPS}-step budget without remember`);
 }
 
 function readVerification(result: ToolResult) {
@@ -535,7 +275,11 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
   } = input;
 
   if (currentTask && !currentTask.primitiveIds.includes(validated.tool)) {
+    // The runtime owns curriculum boundaries; provider proposals cannot expand
+    // the current task's allowed action-skill primitives.
     if (validated.tool === "remember") {
+      // remember is always permitted as an explicit terminal/status artifact,
+      // even when the current task would not allow it as gameplay progress.
       return executeTool(tools, validated, actor, target, observation);
     }
 
@@ -562,6 +306,8 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
       args: validated.args
     })
   ) {
+    // Repeated identical failures are recorded as runtime blocks, not hidden
+    // retries, so transcripts explain stalls without another live reproduction.
     const verification = verifyTask(currentTask, {
       before: observation,
       after: observation,
@@ -587,6 +333,9 @@ async function executePhaseOneTool<TActor extends RuntimeActor>(input: {
     return result;
   }
 
+  // Verify against a fresh post-action observation; movement or animation alone
+  // is not accepted as task progress. This is the main fake-progress rejection
+  // boundary between provider text and Minecraft state.
   const after = await tools.observe({ actor, target });
   const verification = verifyTask(currentTask, {
     before: observation,

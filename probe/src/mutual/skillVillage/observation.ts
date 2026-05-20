@@ -16,6 +16,8 @@ function positionOf(bot: BotRecord[ActorId]) {
 }
 
 function scanBlocks(bot: BotRecord[ActorId]) {
+  // Keep scans bounded so observations are useful as prompt/evidence context
+  // without becoming a full world dump.
   return bot
     .findBlocks({
       matching: (block) => block.name !== "air" && block.name !== "void_air",
@@ -68,6 +70,12 @@ export function observeActor(actorId: ActorId, bots: BotRecord): WorldObservatio
   };
 }
 
+/**
+ * Produces a compact before/after diff for generated action skill review.
+ *
+ * The diff highlights evidence that can explain whether an action changed the
+ * world, instead of relying on the generated skill's return value.
+ */
 export function diffObservations(before: WorldObservation, after: WorldObservation) {
   return {
     positionDelta: {

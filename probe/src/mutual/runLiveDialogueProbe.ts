@@ -26,6 +26,8 @@ import { toToolResult } from "./tools/wrapper.js";
 
 const liveAllowedTools = allowedMutualTools.filter((tool) => tool !== "drop_item");
 
+// Live provider context must be JSON-safe because it is sent to the Responses
+// API and may also appear in trace metadata.
 function toDialogueJsonValue(value: unknown): import("./dialogueContext.js").DialogueJsonValue {
   if (
     value === null ||
@@ -84,6 +86,8 @@ function readTicksArg(args: Record<string, unknown>, fallbackTicks: number) {
 }
 
 function createRecentTranscript(runtimeState: ReturnType<typeof createMutualRuntimeState>) {
+  // Recent utterances give the provider short social continuity without handing
+  // it the whole transcript or mutable runtime state.
   return runtimeState.recentUtterances().map<DialogueTranscriptEntry>((entry) => ({
     actorId: entry.actorId,
     actorName: getDialoguePersona(entry.actorId).name,
@@ -146,6 +150,8 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
       bots: actorIds.map((actorId) => activeBots[actorId].username)
     });
 
+    // Delay before the first provider call lets both Mineflayer clients settle
+    // so early dialogue failures are not just login/spawn timing artifacts.
     await delay(config.liveDialogue.delayStartMs);
 
     const final = await runMutualLoop({
@@ -214,6 +220,8 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
 
           runtimeState.recordObservation(actorId, observation);
 
+          // Social context is derived after the raw observation so provider
+          // input can include mailbox/bulletin state without mutating it.
           const socialContext = runtimeState.socialContext?.(actorId);
 
           return {

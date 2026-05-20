@@ -1,3 +1,5 @@
+// Scenario personas provide concise social framing for transcript readability.
+// They should not be treated as proof of social simulation by themselves.
 export const mutualPersonas = {
   npc_a: {
     name: "Mara",
@@ -11,6 +13,7 @@ export const mutualPersonas = {
   }
 } as const;
 
+/** Resolves known scenario personas and deterministic fallbacks for extra bots. */
 export function getScenarioPersona(actorId: string, index = 0) {
   const knownPersona = mutualPersonas[actorId as keyof typeof mutualPersonas];
 

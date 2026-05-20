@@ -22,14 +22,14 @@ import {
 import { diffObservations, observeActor } from "./skillVillage/observation.js";
 import { summarizeResult } from "./skillVillage/result.js";
 import { flushTracing, startTracing, traceGeneration } from "./skillVillage/tracing.js";
-import type { ActorId, BotRecord, CodexInputMessage, HelperEvent, SeedSkill, SkillContext, SkillProposal } from "./skillVillage/types.js";
+import type { ActorId, BotRecord, CodexInputMessage, HelperEvent, SeedActionSkill, ActionSkillContext, ActionSkillProposal } from "./skillVillage/types.js";
 
 const config = loadMutualProbeConfig();
 const projectName = "skill-village-manual";
 const composeFile = config.composeFile;
 const composeDir = path.dirname(composeFile);
 const dataDir = path.resolve(composeDir, "tmp/skill-village-server");
-const skillDir = path.resolve(composeDir, "../build/generated-skills");
+const actionSkillDir = path.resolve(composeDir, "../build/generated-skills");
 const memoryDir = path.resolve(composeDir, "../build/agent-memory");
 
 function loadActiveActors() {
@@ -40,7 +40,7 @@ function loadActiveActors() {
   return requested?.length ? requested : actors;
 }
 
-const seedSkills: SeedSkill[] = [
+const seedActionSkills: SeedActionSkill[] = [
   {
     name: "look_at_nearest_entity",
     description: "Look at the nearest visible entity to acknowledge nearby people or animals.",
@@ -309,21 +309,21 @@ async function teleportBotsToRequestedSpawn(bots: BotRecord) {
 }
 
 async function loadSkillMemory() {
-  await mkdir(skillDir, { recursive: true });
-  const files = await readdir(skillDir).catch(() => []);
+  await mkdir(actionSkillDir, { recursive: true });
+  const files = await readdir(actionSkillDir).catch(() => []);
   const generated = await Promise.all(
     files
       .filter((file) => file.endsWith(".ts"))
       .slice(-8)
       .map(async (file) => {
-        const code = await readFile(path.join(skillDir, file), "utf8");
+        const code = await readFile(path.join(actionSkillDir, file), "utf8");
         const firstLines = code.split(/\r?\n/).slice(0, 10).join("\n");
         return { file, firstLines };
       })
   );
 
   return {
-    seedSkills: seedSkills.map(({ name, description }) => ({ name, description })),
+    seedActionSkills: seedActionSkills.map(({ name, description }) => ({ name, description })),
     recentGeneratedSkills: generated
   };
 }
@@ -366,7 +366,7 @@ function toLangfuseChat(instructions: string, input: CodexInputMessage[]) {
   ];
 }
 
-async function requestProposal(actorId: ActorId, bots: BotRecord): Promise<SkillProposal> {
+async function requestProposal(actorId: ActorId, bots: BotRecord): Promise<ActionSkillProposal> {
   const auth = await loadOpenAICodexAuth(config.liveDialogue.authStorePath);
   const schema = {
     type: "object",
@@ -408,14 +408,14 @@ async function requestProposal(actorId: ActorId, bots: BotRecord): Promise<Skill
       });
 
       if (!response.ok) {
-        throw new Error(`Codex skill proposal failed ${response.status}: ${(await response.text()).slice(0, 500)}`);
+        throw new Error(`Codex action skill proposal failed ${response.status}: ${(await response.text()).slice(0, 500)}`);
       }
 
       return readStreamText(await response.text());
     }
   );
   addBudget(actorId, JSON.stringify({ instructions, input }), outputText);
-  const proposal = JSON.parse(outputText) as SkillProposal;
+  const proposal = JSON.parse(outputText) as ActionSkillProposal;
   rememberActorExchange(actorId, promptText, JSON.stringify({
     actorId: proposal.actorId,
     utterance: proposal.utterance,
@@ -455,32 +455,32 @@ function readStreamText(payload: string) {
   return text.trim();
 }
 
-function assertSkillCodeSafe(code: string) {
+function assertActionSkillCodeSafe(code: string) {
   const blocked = /\b(import|require|process|Bun|Deno|eval|Function|while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)|child_process|fs|net|http)\b/;
   if (blocked.test(code)) {
-    throw new Error("Generated skill contains a blocked API or unbounded loop");
+    throw new Error("Generated action skill contains a blocked API or unbounded loop");
   }
   if (!code.includes("export async function run")) {
-    throw new Error("Generated skill must export async function run(ctx)");
+    throw new Error("Generated action skill must export async function run(ctx)");
   }
 }
 
-async function executeSkill(actorId: ActorId, bots: BotRecord, proposal: SkillProposal) {
-  assertSkillCodeSafe(proposal.skillCode);
-  await mkdir(skillDir, { recursive: true });
-  const filePath = path.join(skillDir, `${Date.now()}-${actorId}-${proposal.skillName.replace(/[^a-zA-Z0-9_-]/g, "_")}.ts`);
+async function executeActionSkill(actorId: ActorId, bots: BotRecord, proposal: ActionSkillProposal) {
+  assertActionSkillCodeSafe(proposal.skillCode);
+  await mkdir(actionSkillDir, { recursive: true });
+  const filePath = path.join(actionSkillDir, `${Date.now()}-${actorId}-${proposal.skillName.replace(/[^a-zA-Z0-9_-]/g, "_")}.ts`);
   await writeFile(filePath, proposal.skillCode);
 
   const moduleUrl = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
-  const skill = (await import(moduleUrl)) as { run(ctx: unknown): Promise<unknown> };
+  const actionSkill = (await import(moduleUrl)) as { run(ctx: unknown): Promise<unknown> };
   const bot = bots[actorId];
   const preObservation = observeActor(actorId, bots);
   const helperEvents: HelperEvent[] = [];
-  let ctx: SkillContext;
-  const runSeedSkill = async (name: string): Promise<unknown> => {
-    const seed = seedSkills.find((skill) => skill.name === name);
+  let ctx: ActionSkillContext;
+  const runSeedActionSkill = async (name: string): Promise<unknown> => {
+    const seed = seedActionSkills.find((actionSkill) => actionSkill.name === name);
     if (!seed) {
-      throw new Error(`Unknown seed skill: ${name}`);
+      throw new Error(`Unknown seed action skill: ${name}`);
     }
 
     return seed.run(ctx);
@@ -598,11 +598,11 @@ async function executeSkill(actorId: ActorId, bots: BotRecord, proposal: SkillPr
       return { status: "approached_dropped_item" };
     },
     async runSkill(name: string) {
-      return runSeedSkill(name);
+      return runSeedActionSkill(name);
     }
   }, helperEvents);
 
-  const result = await runGeneratedSkillSafely(skill, ctx);
+  const result = await runGeneratedActionSkillSafely(actionSkill, ctx);
   bot.clearControlStates();
   const postObservation = observeActor(actorId, bots);
   return {
@@ -615,7 +615,7 @@ async function executeSkill(actorId: ActorId, bots: BotRecord, proposal: SkillPr
   };
 }
 
-function withHelperLogging(ctx: SkillContext, helperEvents: HelperEvent[]): SkillContext {
+function withHelperLogging(ctx: ActionSkillContext, helperEvents: HelperEvent[]): ActionSkillContext {
   return new Proxy(ctx, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
@@ -652,10 +652,10 @@ function withHelperLogging(ctx: SkillContext, helperEvents: HelperEvent[]): Skil
   });
 }
 
-async function runGeneratedSkillSafely(skill: { run(ctx: unknown): Promise<unknown> }, ctx: SkillContext) {
+async function runGeneratedActionSkillSafely(actionSkill: { run(ctx: unknown): Promise<unknown> }, ctx: ActionSkillContext) {
   try {
     return await Promise.race([
-      skill.run(ctx),
+      actionSkill.run(ctx),
       wait(14_000).then(() => ({ status: "timeout" }))
     ]);
   } catch (error) {
@@ -709,7 +709,7 @@ async function runActorLoop(actorId: ActorId, bots: BotRecord, recent: string[])
     bots[actorId].chat(proposal.utterance);
     recent.push(`${names[actorId]}: ${proposal.utterance}`);
     await rememberPublicUtterance(memoryDir, actorId, proposal.utterance);
-    const execution = await executeSkill(actorId, bots, proposal);
+    const execution = await executeActionSkill(actorId, bots, proposal);
     rememberActorFeedback(actorId, JSON.stringify({
       kind: "post_action_feedback",
       skillName: proposal.skillName,
@@ -723,11 +723,11 @@ async function runActorLoop(actorId: ActorId, bots: BotRecord, recent: string[])
     await remember(
       memoryDir,
       actorId,
-      `I ran skill ${proposal.skillName}: ${proposal.skillDescription}. Result: ${summarizeResult(execution.result)}`
+      `I ran action skill ${proposal.skillName}: ${proposal.skillDescription}. Result: ${summarizeResult(execution.result)}`
     );
     console.log(`${names[actorId]} loop=${turn + 1}: ${proposal.utterance}`);
     console.log(`  selected=${proposal.skillName}: ${proposal.skillDescription}`);
-    console.log(`  skill=${proposal.skillName} file=${execution.filePath}`);
+    console.log(`  action_skill=${proposal.skillName} file=${execution.filePath}`);
     console.log(`  result=${summarizeResult(execution.result)}`);
     console.log(
       `  budget calls=${budgets[actorId].calls} inputTok~${budgets[actorId].estimatedInputTokens} outputTok~${budgets[actorId].estimatedOutputTokens} cost~$${budgets[actorId].estimatedCostUsd.toFixed(5)}`

@@ -17,7 +17,6 @@ type CraftingBot = {
   };
   recipesFor(itemId: number, metadata: null, minResultCount: number, craftingTable: unknown): Recipe[];
   craft(recipe: Recipe, count: number, craftingTable: unknown): Promise<void>;
-  findBlock?(options: { matching: (block: any) => boolean; maxDistance?: number }): any;
 };
 
 type CraftResult = {
@@ -27,6 +26,9 @@ type CraftResult = {
 
 function resolveCraftTarget(bot: CraftingBot, itemName: string) {
   if (itemName === "planks") {
+    // "planks" is a curriculum-level target, not a Minecraft item id. Resolve
+    // it to the first wood-specific plank recipe currently craftable by this
+    // bot so the primitive stays biome-agnostic.
     return [...PLANK_ITEM_NAMES].find((candidate) => bot.recipesFor(bot.registry.itemsByName[candidate]?.id ?? -1, null, 1, null).length > 0) ?? null;
   }
 
@@ -46,37 +48,16 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
     throw new Error(`Unknown craft item: ${resolvedItemName}`);
   }
 
-  // Auto-detect nearby crafting table blocks
-  let craftingTableBlock: any = null;
-  if (typeof bot.findBlock === "function") {
-    try {
-      craftingTableBlock = bot.findBlock({
-        matching: (block: any) => block.name === "crafting_table",
-        maxDistance: 8
-      }) || null;
-    } catch (e) {
-      console.warn("Failed scanning for nearby crafting tables:", e);
-    }
-  }
-
-  // Query recipe with or without crafting table block
-  let recipes = bot.recipesFor(item.id, null, 1, null);
-  if (recipes.length === 0 && craftingTableBlock) {
-    recipes = bot.recipesFor(item.id, null, 1, craftingTableBlock);
-  }
-
-  const recipe = recipes[0];
+  const [recipe] = bot.recipesFor(item.id, null, 1, null);
 
   if (!recipe) {
-    throw new Error(`No craftable recipe found for ${resolvedItemName} (crafting_table adjacent? ${!!craftingTableBlock})`);
+    // Passing null for the crafting table deliberately limits this primitive to
+    // inventory recipes. Table-bound recipes need a separate runtime boundary
+    // that can find, place, and verify use of a crafting table.
+    throw new Error(`No craftable recipe found for ${resolvedItemName}`);
   }
 
-  const requiresTable = (recipe as any).requiresTable;
-  if (requiresTable && !craftingTableBlock) {
-    throw new Error(`Item ${resolvedItemName} requires a crafting_table, but none was found within 8 blocks.`);
-  }
-
-  await bot.craft(recipe, 1, requiresTable ? craftingTableBlock : null);
+  await bot.craft(recipe, 1, null);
 
   return {
     status: "crafted",

@@ -14,6 +14,12 @@ export type ValidatedProposal = {
   args: Record<string, unknown>;
 };
 
+/**
+ * Validates provider proposals against runtime primitive ids.
+ *
+ * This is the first single-bot guardrail: unsupported tools fail before any
+ * Mineflayer operation can run.
+ */
 export function validateProposal(proposal: ToolProposal): ValidatedProposal {
   if (!allowedTools.includes(proposal.tool as AllowedTool)) {
     throw new Error(`Unsupported tool: ${proposal.tool}`);

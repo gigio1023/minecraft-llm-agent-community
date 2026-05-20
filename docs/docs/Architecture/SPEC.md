@@ -4,48 +4,47 @@ sidebar_position: 1
 
 # Architecture Specification
 
-**minecraft-llm-agent-community** is designed to simulate an emergent NPC society. This document outlines the technical pillars required to move beyond simple chatbots and create agents with real **Gameplay Competence** and **Social Pressure**.
+This page is now a thin architecture overview.
 
-## 1. Design Philosophy
+The canonical rebuild spec lives in the repo root at:
 
-A believable society cannot be built with "Persona Prompts" alone. It requires:
-- **Expert Play**: Agents must handle Minecraft's mechanics like skilled players.
-- **Material Scarcity**: Cooperation and conflict should emerge from the need for finite resources (wood, coal, iron).
-- **Social Framework**: Roles, shared storage, and social obligations provide the "glue" for long-term interactions.
+- `SPEC.md`
 
-## 2. Core Subsystems
+Use that file as the source of truth for:
 
-### A. The Bounded Runtime
-To ensure stability, the runtime (built on **Mineflayer**) owns the "Reality" of the world. It validates every action, handles timeouts, and records every state change.
-- **Single Active Action**: Only one physical action (like mining or moving) can be active at a time per agent to prevent race conditions.
-- **Post-Action Refresh**: After every action, the runtime provides a fresh observation of the agent's inventory and surroundings.
+- current product direction;
+- current rebuild scope;
+- module boundaries;
+- workstreams;
+- dependency graph;
+- validation criteria.
 
-### B. Pressure & Intent Loop
-Instead of open-ended planning, our agents operate on a **Pressure-Intent** model:
-1. **Pressures**: The environment generates internal "pressures" (e.g., *Hunger*, *Shared Stash Shortage*, *Hostile Nearby*).
-2. **Intents**: The LLM compiles these pressures into a high-level **Intent** (e.g., "Collect wood for the shared chest").
-3. **Execution**: The intent is carried out using a strictly validated registry of **Tools** (e.g., `collectLogs`, `craftItem`).
+## Current Architecture Summary
 
-### C. Social Simulation
-- **Role Contracts**: NPCs have specific roles (Gatherer, Crafter, Scout, Guard) with corresponding permissions and priorities.
-- **Shared Storage**: The settlement uses shared chests, creating a mutual dependency between NPCs.
-- **Hostile Entities**: A single, bounded hostile NPC act as a source of "dramatic pressure," forcing the cooperative NPCs to react to danger.
+The active architecture direction is:
 
-## 3. Memory & Transcripts
+- a small, headless, bounded Minecraft runtime;
+- one-bot boring gameplay competence before larger social claims;
+- runtime-owned validation, timeout, verification, reconnect, transcript, and artifacts;
+- live transcript and runtime artifacts as the primary evidence;
+- checkpoint-ready runtime design;
+- room for later per-agent action skill ownership and social simulation growth.
 
-Long-running simulations require a sophisticated memory architecture:
-- **Part-Based Transcripts**: Every turn is recorded as a structured record (Observation + Intent + Tool Call + Result).
-- **Compaction**: As the session grows, the runtime "compacts" old history into a summary while keeping a "raw tail" of recent events to stay within the LLM's context window.
-- **Memory Layers**:
-    - **Episodic**: Recent experiences and successes/failures.
-    - **Procedural**: Knowledge of how to perform specific workflows (e.g., smelting iron).
-    - **Semantic**: Shared knowledge (e.g., "Where is the main storage?").
+## Important Constraints
 
-## 4. Key References
+- do not reintroduce raw gameplay `eval` loops;
+- do not optimize for persona richness before competence exists;
+- do not optimize for long-run autonomy before short-run boring tasks are reliable;
+- do not let quick probes become permanent monoliths.
 
-Our design draws lessons from several pioneering Minecraft AI projects:
-- **Voyager**: Adopted structured curriculum and primitive validation.
-- **mc-multimodal-agent**: Adopted post-action refreshes and layered memory.
-- **mineflayer-chatgpt**: Adopted event-driven multi-bot brains and role restrictions.
-- **mindcraft-ce**: Adopted single-action gating and busy-aware conversation.
-- **Opencode/Codex**: Adopted advanced transcript compaction and replay architectures.
+## Read Next
+
+1. `../../../../SPEC.md`
+2. `../Architecture/Minimal-Probe.md`
+3. `../Setup/Headless-Server.md`
+4. `../Setup/Provider-Setup.md`
+
+## Historical Note
+
+Older architecture and plan docs in this repository may still be useful as
+research context, but they should not override the current root `SPEC.md`.

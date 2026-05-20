@@ -1,14 +1,6 @@
 import type { CanonicalTranscriptPart, CanonicalJsonValue } from "../../transcript/canonical/transcriptParts.js";
 import type { LifecycleMode } from "../../runtime/pressureIntent.js";
 
-// ---------------------------------------------------------------------------
-// Compaction Checkpoint
-// ---------------------------------------------------------------------------
-// SPEC §10.3: compaction is not summary-only. It produces replacement-history
-// checkpoints that keep the recent raw tail plus a compact summary of
-// everything before the checkpoint boundary.
-// ---------------------------------------------------------------------------
-
 export type CompactionCheckpointSummary = {
   overallMission: string;
   agents: Array<{
@@ -43,10 +35,6 @@ export type CompactionCheckpoint = {
   recentTail: CanonicalTranscriptPart[];
 };
 
-// ---------------------------------------------------------------------------
-// Builder
-// ---------------------------------------------------------------------------
-
 const RECENT_TAIL_SIZE = 12;
 
 let checkpointIdCounter = 0;
@@ -62,6 +50,13 @@ export type BuildCompactionCheckpointInput = {
   summary: CompactionCheckpointSummary;
 };
 
+/**
+ * Builds a replacement-history checkpoint for transcript compaction.
+ *
+ * The summary covers everything before the boundary, while recentTail keeps raw
+ * canonical parts close to the decision point. That split lets a resumed actor
+ * preserve concrete recent evidence without carrying the whole transcript.
+ */
 export function buildCompactionCheckpoint({
   currentTurn,
   allParts,
@@ -69,6 +64,8 @@ export function buildCompactionCheckpoint({
 }: BuildCompactionCheckpointInput): CompactionCheckpoint {
   const tailStart = Math.max(0, allParts.length - RECENT_TAIL_SIZE);
   const recentTail = allParts.slice(tailStart).map((part) => structuredClone(part));
+  // Use the first retained part's turn so reconstruction can state exactly how
+  // much raw history remains after the compact summary.
   const recentTailStartTurn = recentTail.length > 0
     ? recentTail[0].turn
     : currentTurn;
@@ -82,10 +79,7 @@ export function buildCompactionCheckpoint({
   };
 }
 
-// ---------------------------------------------------------------------------
-// Checkpoint can produce a compact canonical transcript part
-// ---------------------------------------------------------------------------
-
+/** Converts a checkpoint into the canonical event stream as system evidence. */
 export function checkpointToTranscriptPart(
   checkpoint: CompactionCheckpoint
 ): CanonicalTranscriptPart {
@@ -98,15 +92,17 @@ export function checkpointToTranscriptPart(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Reconstruct working context from checkpoint + recent tail
-// ---------------------------------------------------------------------------
-
 export type ReconstructedContext = {
   checkpointSummary: CompactionCheckpointSummary;
   recentParts: CanonicalTranscriptPart[];
 };
 
+/**
+ * Rehydrates only the compact summary and retained raw tail.
+ *
+ * Callers should treat this as sufficient context for the next turn, not as a
+ * lossless transcript replay.
+ */
 export function reconstructFromCheckpoint(
   checkpoint: CompactionCheckpoint
 ): ReconstructedContext {

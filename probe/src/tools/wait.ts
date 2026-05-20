@@ -13,6 +13,12 @@ function delay(ms: number) {
   });
 }
 
+/**
+ * Converts Minecraft ticks into a bounded wall-clock pause.
+ *
+ * Waiting is transcript-visible pacing, not progress evidence; verification must
+ * still come from a later observation.
+ */
 export async function wait({ ticks }: WaitArgs): Promise<WaitResult> {
   await delay(ticks * 50);
 

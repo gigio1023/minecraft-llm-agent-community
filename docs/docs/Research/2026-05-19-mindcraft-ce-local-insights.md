@@ -10,9 +10,9 @@ Target: `mindcraft-ce`
 All long-running tasks are wrapped with timeouts and explicit interrupt checks (`requestInterrupt()`, `bot.interrupt_code`). Concurrent actions are blocked by an `executing` gate.
 - **For `/probe`:** Implement an `ActionRunner` that strictly enforces one active tool at a time. Long tools must check an `AbortController` or shared flag. Tool results must always return a structured `{ ok, status, message, durationMs }` to the transcript.
 
-### Separation of World vs. Skills
+### Separation of World vs. Action Skills
 The repo cleanly divides read-only world observation helpers (`world.js`) from mutation/action helpers (`skills.js`).
-- **For `/probe`:** Adopt this boundary. `observeWorld(bot)` returns pure state (position, nearby actors, inventory). `tools/moveToActor`, `tools/say`, etc., handle state changes. Avoid porting the massive 2k+ line skill files.
+- **For `/probe`:** Adopt this boundary. `observeWorld(bot)` returns pure state (position, nearby actors, inventory). `tools/moveToActor`, `tools/say`, etc., handle state changes. Avoid porting the massive 2k+ line action skill files.
 
 ### History Compaction
 Old chat context is chunked, summarized, and moved to a ledger while keeping the active prompt small.
@@ -36,7 +36,7 @@ Tasks define initial conditions, blocked actions, and completion criteria.
 - **Generated Code (`coder.js`):** Absolutely no dynamic JS execution or SES compartments. LLM output must be strictly typed JSON matching our tool schema.
 - **Large Action Surface:** Ignore cooking, crafting, combat, and building.
 - **Cheat Orchestration:** Do not intertwine `/give`, `/tp`, `/fill` commands with the main agent loop (use only for test fixtures).
-- **Heavy Infrastructure:** Ignore the tmux wrappers, embedding-based skill retrieval, and benchmarking workflows.
+- **Heavy Infrastructure:** Ignore the tmux wrappers, embedding-based action skill retrieval, and benchmarking workflows.
 
 ## Action Items for `/probe`
 

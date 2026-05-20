@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compileSkillCandidates, compileAllowedPrimitiveIds } from "../src/runtime/intentToSkill.js";
+import { compileActionSkillCandidates, compileAllowedPrimitiveIds } from "../src/runtime/intentToSkill.js";
 
-test("intent-to-skill compiler returns bootstrap skills for a gatherer in bootstrap mode", () => {
-  const candidates = compileSkillCandidates({
+test("intent-to-action-skill compiler returns bootstrap action skills for a gatherer in bootstrap mode", () => {
+  const candidates = compileActionSkillCandidates({
     intentKind: "bootstrap_progress",
     roleId: "gatherer",
     lifecycleMode: "bootstrap"
@@ -14,11 +14,13 @@ test("intent-to-skill compiler returns bootstrap skills for a gatherer in bootst
 
   const ids = candidates.map((c) => c.id);
   assert.ok(ids.includes("collectLogs"), "gatherer can collect logs during bootstrap");
+  assert.ok(!ids.includes("mineCobblestone"), "planned stone mining is not an active runtime candidate");
+  assert.ok(!ids.includes("mineCoal"), "planned coal mining is not an active runtime candidate");
   assert.ok(!ids.includes("craftPlanksAndSticks"), "gatherer cannot craft during bootstrap");
 });
 
-test("intent-to-skill compiler returns craft skills for a crafter in bootstrap mode", () => {
-  const candidates = compileSkillCandidates({
+test("intent-to-action-skill compiler returns craft action skills for a crafter in bootstrap mode", () => {
+  const candidates = compileActionSkillCandidates({
     intentKind: "bootstrap_progress",
     roleId: "crafter",
     lifecycleMode: "bootstrap"
@@ -32,26 +34,26 @@ test("intent-to-skill compiler returns craft skills for a crafter in bootstrap m
   assert.ok(!ids.includes("collectLogs"), "crafter should not have collectLogs in bootstrap");
 });
 
-test("intent-to-skill compiler filters hostile skills from cooperative roles", () => {
-  const candidates = compileSkillCandidates({
+test("intent-to-action-skill compiler filters hostile action skills from cooperative roles", () => {
+  const candidates = compileActionSkillCandidates({
     intentKind: "avoid_or_retreat",
     roleId: "gatherer",
     lifecycleMode: "normal"
   });
 
   const ids = candidates.map((c) => c.id);
-  assert.ok(!ids.includes("attackThenRetreat"), "cooperative role must not get hostile skills");
-  assert.ok(!ids.includes("threatenApproach"), "cooperative role must not get hostile skills");
+  assert.ok(!ids.includes("attackThenRetreat"), "cooperative role must not get hostile action skills");
+  assert.ok(!ids.includes("threatenApproach"), "cooperative role must not get hostile action skills");
 });
 
-test("intent-to-skill compiler narrows skills during recovery lifecycle", () => {
-  const normalCandidates = compileSkillCandidates({
+test("intent-to-action-skill compiler narrows action skills during recovery lifecycle", () => {
+  const normalCandidates = compileActionSkillCandidates({
     intentKind: "recover_basic_tools",
     roleId: "gatherer",
     lifecycleMode: "normal"
   });
 
-  const recoveryCandidates = compileSkillCandidates({
+  const recoveryCandidates = compileActionSkillCandidates({
     intentKind: "recover_basic_tools",
     roleId: "gatherer",
     lifecycleMode: "recovery"

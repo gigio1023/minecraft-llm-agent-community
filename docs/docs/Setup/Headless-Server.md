@@ -4,27 +4,34 @@ sidebar_position: 1
 
 # Headless Server Setup
 
-This guide explains how to set up a local Minecraft environment for AI research. We focus on a "headless" setup—meaning the server and bots run without a graphical user interface, making it ideal for automation and large-scale testing.
+This guide explains the local headless Minecraft setup used by the current
+runtime rebuild.
 
-## The Headless Workflow
+## Why Headless
 
-Our goal is to make Minecraft testing simple and repeatable:
-1. Start a local server with a single command.
-2. Spawn multiple bots automatically.
-3. Record all bot interactions in a structured JSON transcript.
-4. (Optional) Inspect the world via a web-based viewer if needed.
+The first proof should not require a manual Minecraft client.
 
-## Recommended: Docker Setup
+The active workflow is:
 
-Using Docker is the most reliable way to ensure a consistent environment. We use the [itzg/minecraft-server](https://github.com/itzg/docker-minecraft-server) image.
+1. start a local headless server;
+2. connect Mineflayer bots;
+3. run the bounded runtime;
+4. inspect transcript and runtime artifacts;
+5. optionally use viewer evidence if needed.
 
-### Example Docker Compose
+The primary evidence is not a GUI.
+It is transcript plus runtime artifacts.
+
+## Recommended Setup
+
+Use Docker for a repeatable local vanilla server.
+
+Example shape:
 
 ```yaml
 services:
   mc:
     image: itzg/minecraft-server:java21
-    container_name: dream-of-one-server
     ports:
       - "25565:25565"
     environment:
@@ -32,39 +39,25 @@ services:
       VERSION: "1.21.1"
       TYPE: "VANILLA"
       ONLINE_MODE: "FALSE"
-      MODE: "creative"
-      LEVEL_TYPE: "FLAT"
       ENABLE_RCON: "true"
-      RCON_PASSWORD: "local-dev-only"
-    tty: true
-    stdin_open: true
 ```
 
-**Note:** We set `ONLINE_MODE=FALSE` for local development. This allows our bots to connect using "offline" authentication, which is faster and doesn't require Microsoft account management for every bot.
+The exact compose file should live under `probe/` and be treated as the runtime
+source of truth.
 
-## Connecting Bots
+## Important Rules
 
-We use **Mineflayer**, a powerful JavaScript library, to program our bots. Below is a basic example of connecting a bot to your local server:
+- local headless setup only for the first proof;
+- no manual client gate;
+- no Fabric/Forge requirement for the first proof;
+- Mineflayer is the client API layer;
+- RCON and viewer are optional support tools, not the primary evidence path.
 
-```javascript
-const mineflayer = require("mineflayer");
+## Evidence Order
 
-const bot = mineflayer.createBot({
-  host: "127.0.0.1",
-  port: 25565,
-  username: "NPC_Explorer",
-  auth: "offline",
-});
+Use these in order:
 
-bot.on('spawn', () => {
-  console.log('Bot has spawned in the world!');
-});
-```
-
-## Visual Inspection
-
-While our focus is on automated transcripts, visual debugging is sometimes necessary. We recommend using **prismarine-viewer**, which provides a real-time view of the bot's perspective in your web browser.
-
-1. **Structured Transcripts**: Our primary source of truth.
-2. **Terminal Logs**: Quick feedback on bot actions.
-3. **Web Viewer**: For visual confirmation of movement or building.
+1. transcript
+2. checkpoint-like runtime artifacts
+3. traces
+4. optional visual confirmation

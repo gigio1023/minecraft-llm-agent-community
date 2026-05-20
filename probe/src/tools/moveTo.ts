@@ -1,11 +1,13 @@
 import { goals } from "mineflayer-pathfinder";
 
 export type MoveToResult = {
-  status: "arrived" | "moved";
+  status: "arrived" | "moved" | "blocked";
   distance: number;
   beforeDistance: number;
   afterDistance: number;
+  distanceDelta: number;
   arrived: boolean;
+  reason: string;
 };
 
 type MovingActor = {
@@ -54,6 +56,9 @@ export async function moveTo({
   const beforeDistance = roundDistance(actor.entity.position.distanceTo(target.entity.position));
 
   if (actor.pathfinder) {
+    // Pathfinder arrival is the stronger movement primitive because it accounts
+    // for terrain and collision. The manual branch is a bounded fallback for
+    // minimal runtimes where pathfinder is unavailable.
     await actor.pathfinder.goto(
       new goals.GoalNear(
         target.entity.position.x,
@@ -74,12 +79,24 @@ export async function moveTo({
   }
 
   const afterDistance = roundDistance(actor.entity.position.distanceTo(target.entity.position));
+  const distanceDelta = roundDistance(beforeDistance - afterDistance);
+  const arrived = afterDistance <= 1.5;
+  const movedCloser = distanceDelta > 0;
 
+  // Status is based on measured distance, not the fact that a movement command
+  // was issued. This keeps transcripts from treating attempted motion as proof
+  // of interaction range.
   return {
-    status: afterDistance <= 1.5 ? "arrived" : "moved",
+    status: arrived ? "arrived" : movedCloser ? "moved" : "blocked",
     distance: afterDistance,
     beforeDistance,
     afterDistance,
-    arrived: afterDistance <= 1.5
+    distanceDelta,
+    arrived,
+    reason: arrived
+      ? `move_to arrived within 1.5 blocks of ${targetId}.`
+      : movedCloser
+        ? `move_to reduced distance to ${targetId} by ${distanceDelta} blocks.`
+        : `move_to did not reduce distance to ${targetId}.`
   };
 }

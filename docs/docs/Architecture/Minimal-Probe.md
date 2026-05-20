@@ -2,42 +2,64 @@
 sidebar_position: 2
 ---
 
-# Project Roadmap & Goals
+# Minimal Probe
 
-Our immediate goal is to demonstrate a stable "NPC Tool-Loop"—a system where a Minecraft NPC can perceive its environment, make decisions using an LLM, and execute those decisions reliably.
+This page describes the active current-phase goal in plain language.
 
-## The Minimal Viable Proof
+## What The Minimal Probe Is
 
-We are building a scenario where two NPCs, `NPC_A` and `NPC_B`, must interact to solve a simple problem:
+The minimal probe is not a social-simulation demo.
 
-1. **Perception**: `NPC_A` observes the world and sees `NPC_B`.
-2. **Decision**: `NPC_A` decides to approach `NPC_B` and ask a question.
-3. **Social Awareness**: If `NPC_B` is busy (e.g., crafting), `NPC_A` must decide whether to wait or try again later.
-4. **Conclusion**: `NPC_A` records the result in its memory and the session transcript is saved.
+It is a small runtime proof where:
 
-## Core Tool Set
+- a single headless bot observes the world;
+- chooses one bounded action at a time;
+- makes real progress on a boring gameplay task;
+- records enough evidence that a human or coding agent can explain failure.
 
-To keep the initial research focused, we use a minimal set of validated tools:
+## Current Proof Target
 
-- `observe()`: Gather data about surroundings.
-- `move_to(target)`: Navigate to a specific actor or coordinate.
-- `say(target, text)`: Communicate with another NPC.
-- `wait(duration)`: Pause for a short period.
-- `remember(note)`: Store a key fact in local memory.
+The first strong proof should include:
 
-## Future Milestones
+- `collect_logs` working end-to-end in live Minecraft;
+- follow-up progression beyond the first log attempt;
+- transcript-visible evidence for progress, failure, timeout, or stall;
+- single-bot live reconnect;
+- checkpoint-ready runtime artifacts.
 
-Once the basic tool-loop is proven stable, we plan to expand into:
+## What Makes This Valuable
 
-- **Shared Economy**: NPCs managing shared chests and crafting dependencies.
-- **Role-Based Societies**: Clear divisions of labor (e.g., Gatherers vs. Crafters).
-- **Survival Challenges**: Introducing scarcity and hostile entities to observe emergent cooperation.
-- **Dynamic Skill Generation**: Allowing NPCs to "learn" new complex behaviors over time.
+The value of this probe is not that it looks alive.
+The value is that it behaves in a way we can improve.
 
-## Success Criteria
+The minimum bar is:
 
-A simulation run is considered successful when:
-- Multiple bots join and stay connected to a headless server.
-- The transcript shows logical turn-taking and tool usage.
-- The agents successfully navigate social state (e.g., waiting for a busy partner).
-- A structured data artifact is produced for every run.
+- real gameplay progress;
+- no fake success;
+- failures diagnosable from transcript, artifacts, and traces.
+
+## Why This Still Points Toward Social Simulation
+
+The minimal probe is the substrate for later work on:
+
+- role pressure;
+- shared/private memory;
+- per-agent action skill ownership;
+- bounded action skill evolution;
+- multi-bot coordination;
+- human-in-the-loop social play.
+
+Those later layers should not be forced into the runtime before the runtime can
+reliably handle boring competence.
+
+## Not Current Goals
+
+- persona richness as a content target;
+- long-run autonomy as a product target;
+- large society behavior before single-bot competence is trustworthy.
+
+## Canonical Spec
+
+For the authoritative rebuild plan, read:
+
+- `../../../../SPEC.md`

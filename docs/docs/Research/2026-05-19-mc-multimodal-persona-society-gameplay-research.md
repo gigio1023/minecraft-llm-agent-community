@@ -109,7 +109,7 @@ For this repo, each important tool should attach compact post-state such as:
 
 ### Strong secondary imports
 
-- skill representation as ordered steps with preconditions and success criteria;
+- action skill representation as ordered steps with preconditions and success criteria;
 - compact transcript plus checkpoint compaction;
 - lightweight imitation/event capture later, after the basics work.
 

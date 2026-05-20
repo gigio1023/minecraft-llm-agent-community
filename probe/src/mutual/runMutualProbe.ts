@@ -10,6 +10,12 @@ import { runMutualLoop } from "./mutualLoop.js";
 import { createMutualTranscript } from "./transcript.js";
 import { createMutualTools } from "./tools/index.js";
 
+/**
+ * Runs the deterministic mutual probe against a real Docker-backed server.
+ *
+ * This path validates causal transcript shape for multi-actor interaction, but
+ * still uses scripted providers so failures are attributable to runtime wiring.
+ */
 export async function runMutualProbe(): Promise<ProbeRunResult> {
   const config = loadMutualProbeConfig();
   let server: ServerHandle | null = null;
@@ -27,6 +33,8 @@ export async function runMutualProbe(): Promise<ProbeRunResult> {
     const actorIds = Object.keys(bots);
     const personas = buildScenarioPersonas(actorIds);
 
+    // Keep actor memory separate from public transcript evidence. The provider
+    // may read memory, but final acceptance comes from recorded tool/world steps.
     const memories = Object.fromEntries(
       actorIds.map((actorId) => [actorId, createMemory(config.memoryLimit)])
     );

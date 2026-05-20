@@ -12,6 +12,13 @@ export type OpenAICodexAuth = {
   toJSON(): never;
 };
 
+/**
+ * Validates the repo-local game-runtime auth store without exposing token data.
+ *
+ * This auth path is intentionally separate from Codex CLI login: gameplay uses
+ * the `openai-codex` provider through a runtime-owned token file, and stale or
+ * malformed auth must fail before a live Minecraft run starts.
+ */
 function parseAuthStore(raw: string): AuthStoreRecord {
   const parsed = JSON.parse(raw);
 
@@ -57,6 +64,7 @@ export async function loadOpenAICodexAuth(authStorePath: string | URL): Promise<
     accessToken: authStore.accessToken,
     ...(authStore.profileEmail ? { profileEmail: authStore.profileEmail } : {}),
     toJSON() {
+      // Prevent accidental transcript/log serialization of bearer credentials.
       throw new Error("Cannot serialize auth");
     }
   };
