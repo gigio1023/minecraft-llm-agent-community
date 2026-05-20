@@ -71,6 +71,18 @@ before any Mineflayer primitive is executed. A missing active action skill is a
 runtime blocker and review signal, not a reason to silently fall back to a
 success note.
 
+The mutual dispatcher now follows the same ownership rule when active action
+skill records are provided. Live mutual runs initialize/read actor workspaces
+before provider turns and pass those records into the dispatcher, so social tools
+such as `converse` are gated through the underlying `say` primitive.
+
+Phase-one gameplay can also use an opt-in `openai-codex` provider through
+`PROBE_GAMEPLAY_PROVIDER=openai-codex`. The provider receives the same bounded
+runtime packet as deterministic mode plus actor workspace context: active action
+skills, candidates, recent evidence, recent reviews, and memory. The provider
+still only proposes one primitive; runtime gates and verification remain
+authoritative.
+
 ## Reconnect Scope
 
 Reconnect remains a runtime-owned lifecycle problem, but it is not the main

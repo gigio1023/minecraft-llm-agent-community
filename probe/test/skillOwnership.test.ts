@@ -30,12 +30,32 @@ test("assigns visible active seed action skill ownership per actor role", () => 
   );
   assert.ok(
     ownership.some((record) =>
+      record.owner_actor_id === "npc_a" &&
+      record.skill_id === "approachAndRequestItem" &&
+      record.source_kind === "seed" &&
+      record.status === "active" &&
+      record.supersession === null
+    ),
+    "quartermaster should own bounded social approach/request behavior"
+  );
+  assert.ok(
+    ownership.some((record) =>
       record.owner_actor_id === "npc_b" &&
       record.skill_id === "collectLogs" &&
       record.source_kind === "seed" &&
       record.status === "active" &&
       record.supersession === null
     )
+  );
+  assert.ok(
+    ownership.some((record) =>
+      record.owner_actor_id === "npc_b" &&
+      record.skill_id === "announceResourceDiscovery" &&
+      record.source_kind === "seed" &&
+      record.status === "active" &&
+      record.supersession === null
+    ),
+    "gatherer should own bounded social announcement behavior"
   );
   assert.equal(
     ownership.some((record) =>

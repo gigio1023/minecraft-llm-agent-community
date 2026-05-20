@@ -40,84 +40,111 @@ test("agent loop repeats move_to until the current approach task is verified", a
   const target = createBot("npc_b", 4);
   const transcriptSteps: Array<Record<string, unknown>> = [];
   let moveToCalls = 0;
-
-  const final = await runAgentLoop({
-    bots: { actor, target },
-    provider,
-    activeActionSkills: [
-      runtimeControlActionSkill(),
-      testActionSkillRecord("approachAndRequestItem", ["observe", "move_to", "say", "wait"])
-    ],
-    stepDelayMs: 0,
-    transcript: {
-      recordStep(step) {
-        transcriptSteps.push(step as Record<string, unknown>);
-      }
-    },
-    tools: {
-      validateProposal,
-      async observe() {
-        return {
-          status: "ok" as const,
-          visibleActors: [
-            {
-              id: "npc_b",
-              distance: Number(actor.entity.position.distanceTo(target.entity.position).toFixed(2)),
-              busy: false
-            }
-          ],
-          memory: []
-        };
-      },
-      async move_to() {
-        moveToCalls += 1;
-
-        if (moveToCalls === 1) {
-          actor.entity.position.x = 2;
-          return { tool: "move_to", ok: true, status: "moved" };
-        }
-
-        actor.entity.position.x = 3;
-        return { tool: "move_to", ok: true, status: "arrived" };
-      },
-      async collect_logs() {
-        return { tool: "collect_logs", ok: true, status: "collected" };
-      },
-      async craft_item() {
-        return { tool: "craft_item", ok: true, status: "crafted" };
-      },
-      async inspect_chest() {
-        return { tool: "inspect_chest", ok: true, status: "inspected" };
-      },
-      async deposit_shared() {
-        return { tool: "deposit_shared", ok: true, status: "deposited" };
-      },
-      async withdraw_shared() {
-        return { tool: "withdraw_shared", ok: true, status: "withdrew" };
-      },
-      async say() {
-        return { tool: "say", ok: true, status: "delivered" };
-      },
-      async wait() {
-        return { tool: "wait", ok: true, status: "waited" };
-      },
-      async remember() {
-        return { tool: "remember", ok: true, status: "remembered", note: "npc_b responded after one busy turn" };
-      }
-    }
-  });
-
-  assert.deepEqual(final, {
-    status: "success",
-    why: "npc_b responded after one busy turn"
-  });
-  assert.equal(moveToCalls, 2);
-  assert.deepEqual(
-    transcriptSteps.map((step) => step.tool),
-    ["observe", "move_to", "move_to", "say", "remember"]
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `agent-loop-attempt-evidence-${process.pid}-${Date.now()}`
   );
-  assert.equal((transcriptSteps[1]?.verification as { status: string }).status, "progressing");
-  assert.equal((transcriptSteps[2]?.verification as { status: string }).status, "passed");
+
+  try {
+    const final = await runAgentLoop({
+      bots: { actor, target },
+      provider,
+      activeActionSkills: [
+        runtimeControlActionSkill(),
+        testActionSkillRecord("approachAndRequestItem", ["observe", "move_to", "say", "wait"])
+      ],
+      artifacts: {
+        actorWorkspaceRootDir: rootDir
+      },
+      stepDelayMs: 0,
+      transcript: {
+        recordStep(step) {
+          transcriptSteps.push(step as Record<string, unknown>);
+        }
+      },
+      tools: {
+        validateProposal,
+        async observe() {
+          return {
+            status: "ok" as const,
+            visibleActors: [
+              {
+                id: "npc_b",
+                distance: Number(actor.entity.position.distanceTo(target.entity.position).toFixed(2)),
+                busy: false
+              }
+            ],
+            memory: []
+          };
+        },
+        async move_to() {
+          moveToCalls += 1;
+
+          if (moveToCalls === 1) {
+            actor.entity.position.x = 2;
+            return { tool: "move_to", ok: true, status: "moved" };
+          }
+
+          actor.entity.position.x = 3;
+          return { tool: "move_to", ok: true, status: "arrived" };
+        },
+        async collect_logs() {
+          return { tool: "collect_logs", ok: true, status: "collected" };
+        },
+        async craft_item() {
+          return { tool: "craft_item", ok: true, status: "crafted" };
+        },
+        async inspect_chest() {
+          return { tool: "inspect_chest", ok: true, status: "inspected" };
+        },
+        async deposit_shared() {
+          return { tool: "deposit_shared", ok: true, status: "deposited" };
+        },
+        async withdraw_shared() {
+          return { tool: "withdraw_shared", ok: true, status: "withdrew" };
+        },
+        async say() {
+          return { tool: "say", ok: true, status: "delivered" };
+        },
+        async wait() {
+          return { tool: "wait", ok: true, status: "waited" };
+        },
+        async remember() {
+          return { tool: "remember", ok: true, status: "remembered", note: "npc_b responded after one busy turn" };
+        }
+      }
+    });
+
+    assert.deepEqual(final, {
+      status: "success",
+      why: "npc_b responded after one busy turn"
+    });
+    assert.equal(moveToCalls, 2);
+    assert.deepEqual(
+      transcriptSteps.map((step) => step.tool),
+      ["observe", "move_to", "move_to", "say", "remember"]
+    );
+    assert.equal((transcriptSteps[1]?.verification as { status: string }).status, "progressing");
+    assert.equal((transcriptSteps[2]?.verification as { status: string }).status, "passed");
+
+    const evidenceDir = path.join(rootDir, "npc_a", "evidence");
+    const evidenceFiles = await fs.readdir(evidenceDir);
+    assert.ok(evidenceFiles.includes("turn-turn-0003.json"));
+    assert.ok(evidenceFiles.includes("tool-attempt-turn-0003-move_to.json"));
+
+    const attempt = JSON.parse(
+      await fs.readFile(path.join(evidenceDir, "tool-attempt-turn-0003-move_to.json"), "utf8")
+    );
+    assert.equal(attempt.schema, "actor-evidence/v1");
+    assert.equal(attempt.category, "tool_attempt");
+    assert.equal(attempt.tool_attempt.tool, "move_to");
+    assert.equal(attempt.data.verification.status, "passed");
+    assert.deepEqual(attempt.pre_position, { x: 2, y: 0, z: 0 });
+    assert.deepEqual(attempt.post_position, { x: 3, y: 0, z: 0 });
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
 });
 
 test("agent loop blocks the fourth repeated failed move_to for the active approach task", async () => {
@@ -454,14 +481,29 @@ test("agent loop writes actor evidence when collect_logs only pretends to progre
     const evidenceFiles = await fs.readdir(evidenceDir);
     assert.ok(evidenceFiles.some((file) => file.includes("fake-progress")));
 
-    const stored = JSON.parse(
-      await fs.readFile(path.join(evidenceDir, evidenceFiles[0]), "utf8")
-    );
+    const fakeProgressFile = evidenceFiles.find((file) => file.includes("fake-progress"));
+    assert.ok(fakeProgressFile);
+    const stored = JSON.parse(await fs.readFile(path.join(evidenceDir, fakeProgressFile), "utf8"));
     assert.equal(stored.actor_id, "npc_b");
     assert.equal(stored.category, "fake_progress_rejection");
     assert.equal(stored.data.task.id, "collect_4_logs");
     assert.equal(stored.data.tool, "collect_logs");
     assert.equal(stored.data.verification.status, "failed");
+
+    const reviewQueueDir = path.join(rootDir, "npc_b", "reviews", "queue");
+    const reviewJobs = await fs.readdir(reviewQueueDir);
+    const fakeProgressReviewJob = reviewJobs.find((file) => file.includes("fake-progress"));
+    assert.ok(fakeProgressReviewJob);
+    const reviewJob = JSON.parse(
+      await fs.readFile(path.join(reviewQueueDir, fakeProgressReviewJob), "utf8")
+    );
+    assert.equal(reviewJob.schema, "actor-review-job/v1");
+    assert.equal(reviewJob.actor_id, "npc_b");
+    assert.equal(reviewJob.reason, "fake_progress_rejection");
+    assert.deepEqual(
+      reviewJob.active_action_skill_snapshot.map((skill: { skill_id: string }) => skill.skill_id),
+      ["collectLogs", "runtimeObserveAndRemember"]
+    );
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

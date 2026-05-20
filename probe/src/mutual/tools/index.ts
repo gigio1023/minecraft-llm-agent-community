@@ -1,6 +1,12 @@
 import { toToolResult, withActionWrapper } from "./wrapper.js";
 import type { ProbeBots } from "../../runtime/createBots.js";
+import {
+  buildActiveActionSkillGate,
+  checkActiveActionSkillPermission
+} from "../../runtime/activeActionSkillGate.js";
 import { createMemory } from "../../runtime/memory.js";
+import type { ActorActionSkillRecord } from "../../runtime/actorWorkspaceStore.js";
+import type { AllowedTool as RuntimeAllowedTool } from "../../tools/index.js";
 import { moveTo } from "../../tools/moveTo.js";
 import { remember } from "../../tools/remember.js";
 import { wait } from "../../tools/wait.js";
@@ -78,6 +84,7 @@ type ExecuteMutualToolArgs = {
   observation: MutualJsonValue;
   transcript?: TranscriptRecorder;
   handlers?: ToolHandlers;
+  activeActionSkills?: readonly ActorActionSkillRecord[];
 };
 
 function readStringArg(args: Record<string, unknown>, name: string) {
@@ -155,10 +162,32 @@ export async function executeMutualTool({
   runtimeState,
   observation,
   transcript,
-  handlers = {}
+  handlers = {},
+  activeActionSkills
 }: ExecuteMutualToolArgs): Promise<ToolResult> {
   return withActionWrapper(async () => {
     const validated = validateProposal(proposal);
+    const permission = checkMutualActionSkillPermission(actor.username, validated.tool, activeActionSkills);
+    if (!permission.allowed) {
+      const blockedResult = {
+        tool: validated.tool,
+        ok: false,
+        status: "blocked",
+        message: permission.reason,
+        active_action_skill_gate: {
+          active_skill_ids: permission.activeSkillIds,
+          allowed_primitives: permission.allowedPrimitives
+        }
+      };
+      transcript?.recordStep({
+        actor: actor.username,
+        observation: toJsonValue(observation),
+        actorAction: { tool: validated.tool },
+        result: toJsonValue(blockedResult)
+      });
+      return blockedResult;
+    }
+
     const actorArgs = toOptionalJsonRecord(validated.args);
     const actionResult =
       validated.tool === "converse"
@@ -202,6 +231,51 @@ export async function executeMutualTool({
 
     return actionResult;
   }, { tool: proposal.tool });
+}
+
+function mapMutualToolToRuntimePrimitive(tool: string): RuntimeAllowedTool | undefined {
+  switch (tool) {
+    case "converse":
+    case "say":
+    case "reply_to":
+      return "say";
+    case "observe_world":
+      return "observe";
+    case "move_to":
+    case "look_at_actor":
+      return "move_to";
+    case "wait":
+      return "wait";
+    case "remember":
+      return "remember";
+    case "drop_item":
+      // Legacy mutual marker handoff is a material-transfer action. Until
+      // drop/pickup primitives exist, gate it through shared-deposit ownership.
+      return "deposit_shared";
+  }
+}
+
+function checkMutualActionSkillPermission(
+  actorId: string,
+  tool: string,
+  activeActionSkills: readonly ActorActionSkillRecord[] | undefined
+) {
+  if (!activeActionSkills) {
+    return { allowed: true as const };
+  }
+
+  const gate = buildActiveActionSkillGate({ actorId, activeActionSkills });
+  const runtimePrimitive = mapMutualToolToRuntimePrimitive(tool);
+  if (!runtimePrimitive) {
+    return {
+      allowed: false as const,
+      reason: `Mutual tool ${tool} has no runtime primitive mapping for ${actorId}`,
+      activeSkillIds: [...gate.activeSkillIds],
+      allowedPrimitives: [...gate.allowedPrimitives]
+    };
+  }
+
+  return checkActiveActionSkillPermission(gate, runtimePrimitive);
 }
 
 async function executeHandler(
@@ -260,6 +334,7 @@ export function validateMutualProposal(proposal: Proposal): Proposal {
 type CreateMutualToolsArgs = {
   runtimeState: MutualRuntimeState;
   memories: Record<MutualActorId, ReturnType<typeof createMemory>>;
+  activeActionSkillsByActor?: Partial<Record<MutualActorId, readonly ActorActionSkillRecord[]>>;
 };
 
 type ObserveWorldToolArgs = {
@@ -282,8 +357,32 @@ async function executeScenarioTool({
   proposal,
   observation,
   runtimeState,
-  memories
+  memories,
+  activeActionSkillsByActor
 }: ExecuteScenarioToolArgs & CreateMutualToolsArgs): Promise<MutualStepRecord> {
+  const permission = checkMutualActionSkillPermission(
+    actorId,
+    proposal.tool,
+    activeActionSkillsByActor?.[actorId]
+  );
+  if (!permission.allowed) {
+    return {
+      category: "conversationTurnState",
+      actorAction: { actor: actorId, tool: proposal.tool, result: "blocked" },
+      targetObservation: observation,
+      worldStateChange: {
+        tool: proposal.tool,
+        ok: false,
+        status: "blocked",
+        message: permission.reason,
+        active_action_skill_gate: {
+          active_skill_ids: permission.activeSkillIds,
+          allowed_primitives: permission.allowedPrimitives
+        }
+      }
+    };
+  }
+
   // Each branch returns a transcript step with explicit category evidence, so
   // acceptance does not depend on the provider claiming the scenario succeeded.
   switch (proposal.tool) {
@@ -389,7 +488,11 @@ async function executeScenarioTool({
   }
 }
 
-export function createMutualTools({ runtimeState, memories }: CreateMutualToolsArgs) {
+export function createMutualTools({
+  runtimeState,
+  memories,
+  activeActionSkillsByActor
+}: CreateMutualToolsArgs) {
   return {
     lastResult(actorId: MutualActorId) {
       return runtimeState.lastResult(actorId);
@@ -407,7 +510,8 @@ export function createMutualTools({ runtimeState, memories }: CreateMutualToolsA
       const step = await executeScenarioTool({
         ...input,
         runtimeState,
-        memories
+        memories,
+        activeActionSkillsByActor
       });
       runtimeState.recordToolResult(
         input.actorId,

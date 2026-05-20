@@ -1,5 +1,6 @@
 import type { ToolResult } from "../mutual/types.js";
 import type { DeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
+import type { JsonValue } from "./inputSnapshot.js";
 
 type Proposal = {
   tool: string;
@@ -21,6 +22,7 @@ type NextInput = {
     activeSkillIds: string[];
     allowedPrimitives: string[];
   };
+  actorProviderContext?: JsonValue;
 };
 
 function readVisibleTargetId(input: NextInput) {

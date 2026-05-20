@@ -87,6 +87,29 @@ read immutable evidence -> write review note/proposal -> wait for validation
 The next actor turn may optionally read already-validated active action skill
 records, but it must not wait for a reviewer job to finish.
 
+## Current Implementation
+
+The current code has the deterministic sidecar boundary in place:
+
+- failed phase-one runtime verification writes actor evidence;
+- the hot path enqueues `actor-review-job/v1` files under
+  `data/actors/<actor_id>/reviews/queue/`;
+- queued jobs contain only actor-scoped artifact refs plus an active action
+  skill snapshot;
+- `bun run review:actors [actor_id...]` runs the deterministic reviewer over
+  queued jobs and writes `actor-review/v1` outputs under
+  `data/actors/<actor_id>/reviews/`;
+- deterministic fake-progress and verification-failure reviews also write draft
+  candidate action skill proposals under
+  `data/actors/<actor_id>/action-skills/candidates/`;
+- `REVIEW_ACTORS_PROVIDER=openai-codex bun run review:actors [actor_id...]`
+  can use the bounded LLM reviewer adapter for findings/proposal hints;
+- reviewer output always declares `active_mutation: "forbidden"`.
+
+This proves the sidecar contract without adding network calls or blocking actor
+turns. LLM-backed reviewer reasoning is opt-in and still cannot mutate active
+records.
+
 ## Cross-Actor Summarizer
 
 A global summarizer may read per-actor reviews and identify patterns:

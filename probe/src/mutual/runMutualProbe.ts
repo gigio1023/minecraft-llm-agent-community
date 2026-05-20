@@ -1,7 +1,14 @@
 import { loadMutualProbeConfig } from "../config.js";
 import { finalizeRunProbe, type ProbeRunResult } from "../runProbe.js";
 import { closeBots, createBots } from "../runtime/createBots.js";
+import { defaultActorRoles } from "../runtime/actorRoster.js";
+import {
+  initializeActorWorkspaces,
+  listActiveActorActionSkillRecords
+} from "../runtime/actorWorkspace.js";
 import { createMemory } from "../runtime/memory.js";
+import { createProbeSession } from "../runtime/session/probeSession.js";
+import { assignSeedActionSkillOwnership } from "../skills/ownership.js";
 import { buildScenarioPersonas } from "./personas.js";
 import { startDockerServer, type ServerHandle } from "../server/dockerServer.js";
 import { createMutualProviders } from "./provider.js";
@@ -31,6 +38,29 @@ export async function runMutualProbe(): Promise<ProbeRunResult> {
       port: server.port
     });
     const actorIds = Object.keys(bots);
+    const actorRoles = defaultActorRoles(actorIds);
+    const seedActionSkillOwnership = assignSeedActionSkillOwnership(actorIds, actorRoles);
+    const session = createProbeSession({
+      bots,
+      actorIds,
+      actorRoles,
+      seedActionSkillOwnership
+    });
+    if (config.actorWorkspace.initializeOnStart) {
+      await initializeActorWorkspaces({
+        rootDir: config.actorWorkspace.rootDir,
+        actors: session.actors,
+        seedActionSkillOwnership: session.seed_skill_ownership
+      });
+    }
+    const activeActionSkillsByActor = Object.fromEntries(
+      await Promise.all(
+        actorIds.map(async (actorId) => [
+          actorId,
+          await listActiveActorActionSkillRecords(config.actorWorkspace.rootDir, actorId)
+        ] as const)
+      )
+    );
     const personas = buildScenarioPersonas(actorIds);
 
     // Keep actor memory separate from public transcript evidence. The provider
@@ -56,7 +86,7 @@ export async function runMutualProbe(): Promise<ProbeRunResult> {
     const final = await runMutualLoop({
       bots,
       providers: createMutualProviders(actorIds),
-      tools: createMutualTools({ runtimeState, memories }),
+      tools: createMutualTools({ runtimeState, memories, activeActionSkillsByActor }),
       transcript
     });
 

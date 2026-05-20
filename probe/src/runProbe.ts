@@ -1,11 +1,13 @@
 import { loadProbeConfig } from "./config.js";
 import { createDeterministicProvider } from "./provider/deterministicProvider.js";
+import { createOpenAICodexGameplayProvider } from "./provider/openaiCodexGameplayProvider.js";
 import { closeBots, createBots } from "./runtime/createBots.js";
 import { createDialogueState } from "./runtime/dialogueState.js";
 import { createMemory } from "./runtime/memory.js";
 import { runAgentLoop } from "./runtime/agentLoop.js";
 import { createTranscript } from "./runtime/transcript.js";
 import { startDockerServer, type ServerHandle } from "./server/dockerServer.js";
+import { loadOpenAICodexAuth } from "./mutual/openaiCodexAuth.js";
 import { validateProposal } from "./tools/index.js";
 import { withActionWrapper } from "./mutual/tools/wrapper.js";
 import { moveTo } from "./tools/moveTo.js";
@@ -227,7 +229,15 @@ export async function runProbe(): Promise<ProbeRunResult> {
     const dialogueState = createDialogueState({
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable
     });
-    const provider = createDeterministicProvider();
+    const provider =
+      config.gameplayProvider.providerId === "openai-codex"
+        ? createOpenAICodexGameplayProvider({
+            accessToken: (await loadOpenAICodexAuth(config.liveDialogue.authStorePath)).accessToken,
+            model: config.gameplayProvider.model,
+            reasoning: config.gameplayProvider.reasoning,
+            maxRetries: config.gameplayProvider.maxRetries
+          })
+        : createDeterministicProvider();
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
     const sharedSettlementState = createSharedSettlementState();
@@ -267,7 +277,11 @@ export async function runProbe(): Promise<ProbeRunResult> {
         provider,
         activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
         artifacts: {
-          actorWorkspaceRootDir: config.actorWorkspace.rootDir
+          actorWorkspaceRootDir: config.actorWorkspace.rootDir,
+          providerInputSnapshots: {
+            provider_id: config.gameplayProvider.providerId,
+            model: config.gameplayProvider.model
+          }
         },
         transcript,
         tools: {

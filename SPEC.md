@@ -47,12 +47,14 @@ docs as the source of truth for detailed implementation contracts.
 
 ## 2. Current Implementation Status
 
-The current implementation is not complete against this spec.
+The current bounded runtime implementation satisfies this spec's immediate
+delivery scope.
 
-Implemented or partially implemented:
+Implemented:
 
 - bounded Mineflayer runtime primitives;
-- deterministic provider path for the stable probe;
+- deterministic provider path for the stable probe and opt-in
+  `openai-codex` gameplay provider path for phase-one runs;
 - transcript and canonical transcript artifacts;
 - runtime verification for key task progress;
 - actor sessions and seed action skill ownership metadata;
@@ -62,35 +64,51 @@ Implemented or partially implemented:
   materialization;
 - bounded action skill recipe schema, validator, proposal records, and lifecycle
   transition guard;
+- bounded trial evidence recording and promotion/supersession module for
+  candidate action skill recipes;
+- bounded candidate recipe trial runner that executes primitive steps with
+  per-step timeouts and records recipe-trial evidence;
+- explicit active action skill retirement helper that moves records out of the
+  active set with evidence refs;
 - default shutdown of legacy generated TypeScript hot-loop execution, with
   generated proposals stored as actor workspace candidates unless explicitly
   opted into as legacy debug behavior;
-- actor-scoped runtime evidence writer for verification failures and fake
-  progress rejection in the deterministic loop;
-- provider input snapshot store with credential-key rejection and live dialogue
-  snapshot wiring;
-- per-actor reviewer output schema and actor-scoped review writer;
+- archive tooling for older `build/generated-skills` files that migrates legacy
+  TypeScript into actor workspace candidate proposals and moves source files to
+  `build/generated-skills-archive`;
+- actor-scoped runtime evidence writer for every phase-one turn/tool attempt,
+  verification failures, and fake-progress rejection in the deterministic loop;
+- provider input snapshot store with credential-key rejection, phase-one
+  gameplay snapshot wiring, and live dialogue snapshot wiring;
+- provider-facing actor context builder that injects active action skills,
+  candidate proposals, recent evidence, recent reviews, and memory into
+  LLM-backed gameplay/dialogue calls;
+- per-actor reviewer output schema, actor-scoped review writer, per-NPC review
+  job queue, deterministic sidecar runner, opt-in `openai-codex` reviewer
+  reasoning, draft candidate proposal writing, and `review:actors` CLI;
 - phase-one runtime action-skill gate: `runProbe` reads actor workspace active
   action skill records, passes them into `runAgentLoop`, records the active
   skill context in provider input, and blocks provider proposals whose
   primitives are not backed by the actor's active records;
+- mutual live and deterministic dispatchers can be gated by actor-owned active
+  action skill records, and live mutual runs now initialize/read actor
+  workspaces before provider turns;
+- role contracts now expose bounded movement/social primitives required for
+  implemented social seed action skills to become real actor-owned skills;
 - initial terminology and seed action skill registry;
 - a visual architecture review page for LLM context, memory, actor workspace,
   and action skill lifecycle.
 
-Not yet complete:
+Future extensions outside the current bounded delivery scope:
 
-- wiring the same active action-skill gate through every legacy or mutual
-  gameplay runner outside the current phase-one `runAgentLoop` path;
-- full migration/archive tooling for older `build/generated-skills` files;
-- live recipe trial, promotion, supersession, and retirement execution modules;
-- per-NPC asynchronous reviewer sidecar queue and runner;
-- provider input snapshots for every future LLM-backed gameplay path, beyond the
-  currently wired live dialogue path;
-- complete actor-scoped evidence coverage for every primitive category, beyond
-  current verification-failure and fake-progress coverage;
-- live gameplay LLM path using the same bounded evidence contract as the
-  deterministic path.
+- production hardening of LLM-backed reviewer prompts and scoring beyond the
+  current opt-in bounded reviewer adapter;
+- provider input snapshots for future LLM-backed gameplay paths outside
+  phase-one gameplay and live dialogue;
+- actor-scoped evidence coverage for future gameplay paths outside phase-one
+  `runAgentLoop` and mutual dispatchers;
+- migration of the legacy skill-village path from generated TypeScript proposals
+  into executable bounded recipes, if that path remains needed.
 
 Deferred unless the user re-approves:
 
@@ -186,8 +204,8 @@ The next slice is done when:
 5. candidate action skill recipes can be validated before trial;
 6. generated or candidate action skill proposals are stored under the actor
    workspace lifecycle, not `build/generated-skills`;
-7. reviewer output can be written per actor without touching active runtime
-   state;
+7. reviewer jobs and outputs can be written per actor without touching active
+   runtime state;
 8. provider-backed runs persist the exact provider input packet per actor turn;
 9. failed gameplay attempts leave actor-scoped evidence suitable for review,
    including target, pre/post position, tool attempt, verifier reason, and

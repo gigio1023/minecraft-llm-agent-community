@@ -34,6 +34,43 @@ Provider-backed paths are useful for:
 - next action proposal;
 - later trace inspection.
 
+## Gameplay Provider Switch
+
+Phase-one gameplay uses the deterministic provider by default.
+
+To opt into the live OpenAI Codex gameplay provider:
+
+```bash
+PROBE_GAMEPLAY_PROVIDER=openai-codex bun run probe:v0
+```
+
+The live gameplay provider receives:
+
+- current observation;
+- current deterministic task;
+- last tool result;
+- active action skill ids and allowed primitives;
+- actor workspace context containing active action skills, candidates, recent
+  evidence, recent reviews, and memory.
+
+The provider still returns only one bounded runtime primitive. Runtime action
+skill gates and verification decide whether the proposed action can execute or
+counts as progress.
+
+## Reviewer Provider Switch
+
+Per-actor review jobs use the deterministic reviewer by default.
+
+To opt into the OpenAI Codex reviewer:
+
+```bash
+REVIEW_ACTORS_PROVIDER=openai-codex bun run review:actors npc_b
+```
+
+The reviewer receives immutable review jobs plus actor workspace context. It can
+write findings and draft candidate proposal hints only; active action skill
+mutation remains forbidden.
+
 Provider-backed paths are not allowed to silently replace:
 
 - runtime verification;

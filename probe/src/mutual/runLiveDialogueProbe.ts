@@ -1,11 +1,19 @@
 import { loadMutualProbeConfig } from "../config.js";
+import { defaultActorRoles } from "../runtime/actorRoster.js";
+import {
+  initializeActorWorkspaces,
+  listActiveActorActionSkillRecords
+} from "../runtime/actorWorkspace.js";
 import { createBots, closeBots } from "../runtime/createBots.js";
 import { createMemory } from "../runtime/memory.js";
+import { createProbeSession } from "../runtime/session/probeSession.js";
 import { finalizeRunProbe, type ProbeRunResult } from "../runProbe.js";
 import { startDockerServer, type ServerHandle } from "../server/dockerServer.js";
+import { assignSeedActionSkillOwnership } from "../skills/ownership.js";
 import { moveTo } from "../tools/moveTo.js";
 import { remember } from "../tools/remember.js";
 import { wait } from "../tools/wait.js";
+import { buildActorProviderContext } from "../provider/actorProviderContext.js";
 import {
   buildDialogueContext,
   buildDialoguePersonas,
@@ -125,6 +133,29 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     });
     const activeBots = bots;
     const actorIds = Object.keys(bots);
+    const actorRoles = defaultActorRoles(actorIds);
+    const seedActionSkillOwnership = assignSeedActionSkillOwnership(actorIds, actorRoles);
+    const session = createProbeSession({
+      bots: activeBots,
+      actorIds,
+      actorRoles,
+      seedActionSkillOwnership
+    });
+    if (config.actorWorkspace.initializeOnStart) {
+      await initializeActorWorkspaces({
+        rootDir: config.actorWorkspace.rootDir,
+        actors: session.actors,
+        seedActionSkillOwnership: session.seed_skill_ownership
+      });
+    }
+    const activeActionSkillsByActor = new Map(
+      await Promise.all(
+        actorIds.map(async (actorId) => [
+          actorId,
+          await listActiveActorActionSkillRecords(config.actorWorkspace.rootDir, actorId)
+        ] as const)
+      )
+    );
     const personas = buildDialoguePersonas(actorIds);
     const pair = actorIds.slice(0, 2) as MutualActorId[];
     const [actorA, actorB] = pair;
@@ -175,8 +206,20 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
         model: config.liveDialogue.model,
         created_at: new Date().toISOString(),
         input: input as import("../provider/inputSnapshot.js").JsonValue,
-        allowed_tools: [...liveAllowedTools]
+        allowed_tools: [...liveAllowedTools],
+        active_action_skills: activeActionSkillsByActor
+          .get(actorId)
+          ?.map((record) => record.skill_id)
       });
+    }
+
+    async function buildLiveActorProviderContext(actorId: MutualActorId) {
+      return await buildActorProviderContext({
+        actorWorkspaceRootDir: config.actorWorkspace.rootDir,
+        actorId,
+        activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
+        memory: memories[actorId].list()
+      }) as import("./dialogueContext.js").DialogueJsonObject;
     }
 
     const final = await runMutualLoop({
@@ -196,7 +239,8 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
                 ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
               },
               memory: memories[actorA].list(),
-              recentTranscript: createRecentTranscript(runtimeState)
+              recentTranscript: createRecentTranscript(runtimeState),
+              actorProviderContext: await buildLiveActorProviderContext(actorA)
             });
             await writeLiveProviderSnapshot(actorA, input);
             return provider.next(input);
@@ -213,7 +257,8 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
                 ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
               },
               memory: memories[actorB].list(),
-              recentTranscript: createRecentTranscript(runtimeState)
+              recentTranscript: createRecentTranscript(runtimeState),
+              actorProviderContext: await buildLiveActorProviderContext(actorB)
             });
             await writeLiveProviderSnapshot(actorB, input);
             return provider.next(input);
@@ -269,6 +314,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
             runtimeState,
             observation,
             transcript,
+            activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
             handlers: {
               async observe_world() {
                 return {

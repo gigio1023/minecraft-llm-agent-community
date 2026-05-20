@@ -9,7 +9,11 @@ import {
   writeActorEvidenceRecord
 } from "../src/runtime/evidence/actorEvidence.js";
 import { writeProviderInputSnapshot } from "../src/provider/providerInputStore.js";
+import { buildActorProviderContext } from "../src/provider/actorProviderContext.js";
 import { writeReviewerOutput } from "../src/reviewer/reviewerStore.js";
+import { writeActionSkillProposal } from "../src/skills/proposals/proposalStore.js";
+import { writeActorActionSkillRecord, writeJson } from "../src/runtime/actorWorkspaceStore.js";
+import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -123,6 +127,81 @@ test("writes provider snapshots and reviewer outputs into actor workspace paths"
       path.relative(rootDir, reviewPath),
       path.join("npc_b", "reviews", "review-0001.json")
     );
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("builds provider-facing actor context from workspace artifacts", async () => {
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `actor-provider-context-${process.pid}-${Date.now()}`
+  );
+
+  try {
+    await writeJson(path.join(rootDir, "npc_b", "actor.json"), {
+      schema: "actor-workspace/v1",
+      actor_id: "npc_b",
+      username: "npc_b",
+      role_id: "gatherer"
+    });
+    const activeSkill = testActionSkillRecord(
+      "collectLogs",
+      ["observe", "collect_logs", "wait"],
+      "npc_b"
+    );
+    await writeActorActionSkillRecord(rootDir, activeSkill);
+    const evidencePath = await writeActorEvidenceRecord(rootDir, {
+      schema: "actor-evidence/v1",
+      evidence_id: "fake-progress-turn-0001-collect_logs",
+      actor_id: "npc_b",
+      category: "fake_progress_rejection",
+      created_at: "2026-05-20T00:00:00.000Z",
+      turn_id: "turn-0001",
+      target: "oak_log",
+      verifier_reason: "no block or inventory delta"
+    });
+    await writeActionSkillProposal(rootDir, {
+      schema: "action-skill-proposal/v1",
+      proposal_id: "proposal-repair-collect-logs",
+      skill_id: "collectLogsRepair",
+      owner_actor_id: "npc_b",
+      source_kind: "derived",
+      status: "draft",
+      task_intent: "repair collect logs",
+      evidence_refs: [evidencePath],
+      preconditions: ["nearby log block is visible"],
+      required_primitives: ["observe", "collect_logs"],
+      proposed_recipe_id: "recipe-repair-collect-logs",
+      success_verifier: "block_delta:oak_log",
+      known_failure_modes: ["fake_progress"],
+      created_at: "2026-05-20T00:00:01.000Z",
+      updated_at: "2026-05-20T00:00:01.000Z"
+    });
+
+    const context = await buildActorProviderContext({
+      actorWorkspaceRootDir: rootDir,
+      actorId: "npc_b",
+      activeActionSkills: [activeSkill],
+      memory: ["saw oak logs west of spawn"]
+    });
+
+    assert.equal(context.schema, "actor-provider-context/v1");
+    assert.deepEqual(context.actor, { actor_id: "npc_b", role_id: "gatherer" });
+    assert.equal(
+      (context.active_action_skills as Array<{ skill_id: string }>)[0]?.skill_id,
+      "collectLogs"
+    );
+    assert.equal(
+      (context.candidate_action_skills as Array<{ proposal_id: string }>)[0]?.proposal_id,
+      "proposal-repair-collect-logs"
+    );
+    assert.equal(
+      (context.recent_evidence as Array<{ category: string }>)[0]?.category,
+      "fake_progress_rejection"
+    );
+    assert.deepEqual(context.memory, ["saw oak logs west of spawn"]);
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

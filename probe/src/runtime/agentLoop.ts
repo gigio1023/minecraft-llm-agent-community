@@ -4,9 +4,14 @@ import type { ObserveResult } from "../tools/observe.js";
 import { toToolResult } from "../mutual/tools/wrapper.js";
 import { selectDeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
 import { verifyTask, type TaskVerification } from "../gameplay/verification/verifyTask.js";
+import { buildActorProviderContext } from "../provider/actorProviderContext.js";
 import { writeProviderInputSnapshot } from "../provider/providerInputStore.js";
 import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
+import {
+  enqueueActorReviewJob,
+  snapshotActiveActionSkills
+} from "../reviewer/reviewerQueue.js";
 import {
   buildActiveActionSkillGate,
   checkActiveActionSkillPermission,
@@ -55,7 +60,8 @@ type Provider = {
       activeSkillIds: string[];
       allowedPrimitives: AllowedTool[];
     };
-  }): ToolProposal;
+    actorProviderContext?: JsonValue;
+  }): Promise<ToolProposal> | ToolProposal;
 };
 
 export type AgentLoopTools<TActor extends RuntimeActor> = {
@@ -244,17 +250,28 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       observation,
       lastResult,
       currentTask,
-      activeActionSkillContext
+      activeActionSkillContext,
+      ...(artifacts
+        ? {
+            actorProviderContext: await buildActorProviderContext({
+              actorWorkspaceRootDir: artifacts.actorWorkspaceRootDir,
+              actorId: actor.username,
+              activeActionSkills,
+              memory: observation.memory
+            })
+          }
+        : {})
     };
-    await recordProviderInputSnapshotIfRequested({
+    const providerSnapshotPath = await recordProviderInputSnapshotIfRequested({
       artifacts,
       actorId: actor.username,
       turnId,
       providerInput: toJsonValue(providerInput)
     });
 
-    const proposal = provider.next(providerInput);
+    const proposal = await provider.next(providerInput);
     const validated = tools.validateProposal(proposal);
+    const preActionPosition = readActorPosition(actor);
     const execution = await executePhaseOneTool({
       tools,
       validated,
@@ -266,8 +283,25 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       activeActionSkillGate,
       antiRepeat
     });
+    const postActionPosition = readActorPosition(actor);
     const result = execution.result;
     const verification = execution.verification ?? readVerification(result);
+
+    await recordTurnAndAttemptEvidenceIfRequested({
+      artifacts,
+      actor,
+      turnId,
+      currentTask,
+      pressureContext,
+      tool: validated.tool,
+      args: validated.args,
+      before: observation,
+      after: execution.postObservation,
+      result,
+      verification,
+      preActionPosition,
+      postActionPosition
+    });
 
     await recordVerificationEvidenceIfNeeded({
       artifacts,
@@ -280,7 +314,11 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       before: observation,
       after: execution.postObservation,
       result,
-      verification
+      verification,
+      preActionPosition,
+      postActionPosition,
+      providerSnapshotPath,
+      activeActionSkills
     });
 
     transcript.recordStep({
@@ -484,14 +522,14 @@ async function recordProviderInputSnapshotIfRequested(input: {
   actorId: string;
   turnId: string;
   providerInput: JsonValue;
-}) {
+}): Promise<string | undefined> {
   const snapshotConfig = input.artifacts?.providerInputSnapshots;
 
   if (!input.artifacts || !snapshotConfig) {
-    return;
+    return undefined;
   }
 
-  await writeProviderInputSnapshot(input.artifacts.actorWorkspaceRootDir, {
+  return writeProviderInputSnapshot(input.artifacts.actorWorkspaceRootDir, {
     schema: "provider-input-snapshot/v1",
     snapshot_id: input.turnId,
     actor_id: input.actorId,
@@ -500,6 +538,74 @@ async function recordProviderInputSnapshotIfRequested(input: {
     model: snapshotConfig.model,
     created_at: new Date().toISOString(),
     input: input.providerInput
+  });
+}
+
+async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeActor>(input: {
+  artifacts: AgentLoopArgs<TActor>["artifacts"] | undefined;
+  actor: TActor;
+  turnId: string;
+  currentTask: ReturnType<typeof selectDeterministicTask>;
+  pressureContext: PressureIntentContext;
+  tool: AllowedTool;
+  args: Record<string, unknown>;
+  before: ObserveResult;
+  after?: ObserveResult;
+  result: ToolResult;
+  verification?: TaskVerification;
+  preActionPosition?: ReturnType<typeof readActorPosition>;
+  postActionPosition?: ReturnType<typeof readActorPosition>;
+}) {
+  if (!input.artifacts) {
+    return;
+  }
+
+  const target =
+    input.currentTask && "targetId" in input.currentTask
+      ? input.currentTask.targetId
+      : input.currentTask?.id;
+  const data = toJsonValue({
+    task: input.currentTask,
+    pressureContext: input.pressureContext,
+    tool: input.tool,
+    args: toJsonRecord(input.args),
+    before: input.before,
+    after: input.after ?? null,
+    result: input.result,
+    verification: input.verification ?? null
+  });
+
+  await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
+    schema: "actor-evidence/v1",
+    evidence_id: `turn-${input.turnId}`,
+    actor_id: input.actor.username,
+    category: "turn",
+    created_at: new Date().toISOString(),
+    turn_id: input.turnId,
+    ...(target ? { target } : {}),
+    pre_position: toJsonValue(input.preActionPosition ?? null),
+    post_position: toJsonValue(input.postActionPosition ?? null),
+    data
+  });
+
+  await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
+    schema: "actor-evidence/v1",
+    evidence_id: `tool-attempt-${input.turnId}-${input.tool}`,
+    actor_id: input.actor.username,
+    category: "tool_attempt",
+    created_at: new Date().toISOString(),
+    turn_id: input.turnId,
+    ...(target ? { target } : {}),
+    pre_position: toJsonValue(input.preActionPosition ?? null),
+    post_position: toJsonValue(input.postActionPosition ?? null),
+    tool_attempt: toJsonValue({
+      tool: input.tool,
+      args: toJsonRecord(input.args),
+      result: input.result
+    }),
+    verifier_reason: input.verification?.reason,
+    missing_delta: toJsonValue(input.verification?.progress ?? null),
+    data
   });
 }
 
@@ -539,6 +645,10 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
   after?: ObserveResult;
   result: ToolResult;
   verification?: TaskVerification;
+  preActionPosition?: ReturnType<typeof readActorPosition>;
+  postActionPosition?: ReturnType<typeof readActorPosition>;
+  providerSnapshotPath?: string;
+  activeActionSkills: readonly ActorActionSkillRecord[];
 }) {
   if (!input.artifacts || !input.verification || input.verification.status !== "failed") {
     return;
@@ -549,9 +659,10 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
     : "verification_failure";
   const idPrefix = category === "fake_progress_rejection" ? "fake-progress" : "verification-failure";
 
-  await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
+  const evidenceId = `${idPrefix}-${input.turnId}-${input.tool}`;
+  const evidencePath = await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
     schema: "actor-evidence/v1",
-    evidence_id: `${idPrefix}-${input.turnId}-${input.tool}`,
+    evidence_id: evidenceId,
     actor_id: input.actor.username,
     category,
     created_at: new Date().toISOString(),
@@ -560,8 +671,8 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
       input.currentTask && "targetId" in input.currentTask
         ? input.currentTask.targetId
         : input.currentTask?.id,
-    pre_position: toJsonValue(readActorPosition(input.actor) ?? null),
-    post_position: toJsonValue(readActorPosition(input.actor) ?? null),
+    pre_position: toJsonValue(input.preActionPosition ?? null),
+    post_position: toJsonValue(input.postActionPosition ?? null),
     tool_attempt: toJsonValue({
       tool: input.tool,
       args: toJsonRecord(input.args),
@@ -579,5 +690,20 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
       result: input.result,
       verification: input.verification
     })
+  });
+
+  await enqueueActorReviewJob(input.artifacts.actorWorkspaceRootDir, {
+    schema: "actor-review-job/v1",
+    job_id: evidenceId,
+    actor_id: input.actor.username,
+    reason: category,
+    created_at: new Date().toISOString(),
+    input_refs: [
+      { kind: "evidence", ref: evidencePath },
+      ...(input.providerSnapshotPath
+        ? [{ kind: "provider_input" as const, ref: input.providerSnapshotPath }]
+        : [])
+    ],
+    active_action_skill_snapshot: snapshotActiveActionSkills(input.activeActionSkills)
   });
 }

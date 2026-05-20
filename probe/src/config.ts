@@ -28,6 +28,12 @@ export type ProbeConfig = {
     maxRetries: 1;
     delayStartMs: 30000;
   };
+  gameplayProvider: {
+    providerId: "deterministic" | "openai-codex";
+    model: "gpt-5.4-mini";
+    reasoning: "low";
+    maxRetries: 1;
+  };
   actorWorkspace: {
     rootDir: string;
     initializeOnStart: boolean;
@@ -72,6 +78,18 @@ export function parseBooleanEnv(value: string | undefined, defaultValue: boolean
   throw new Error(`Expected boolean environment value, received: ${value}`);
 }
 
+function parseGameplayProviderId(value: string | undefined): ProbeConfig["gameplayProvider"]["providerId"] {
+  if (!value || value.trim().length === 0) {
+    return "deterministic";
+  }
+
+  if (value === "deterministic" || value === "openai-codex") {
+    return value;
+  }
+
+  throw new Error(`Unsupported PROBE_GAMEPLAY_PROVIDER: ${value}`);
+}
+
 export function loadProbeConfig(): ProbeConfig {
   const envBots = parseProbeBotIds(process.env.PROBE_BOTS);
 
@@ -108,6 +126,12 @@ export function loadProbeConfig(): ProbeConfig {
       reasoning: "low",
       maxRetries: 1,
       delayStartMs: 30_000
+    },
+    gameplayProvider: {
+      providerId: parseGameplayProviderId(process.env.PROBE_GAMEPLAY_PROVIDER),
+      model: "gpt-5.4-mini",
+      reasoning: "low",
+      maxRetries: 1
     },
     actorWorkspace: {
       rootDir: path.resolve(here, "../../data/actors"),

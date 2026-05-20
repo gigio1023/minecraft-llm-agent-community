@@ -19,6 +19,7 @@ import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 import { converse } from "../src/mutual/tools/converse.js";
 import { dropItem } from "../src/mutual/tools/dropItem.js";
 import {
+  createMutualTools,
   executeMutualTool,
   validateMutualProposal
 } from "../src/mutual/tools/index.js";
@@ -527,6 +528,111 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
   assert.equal(proposal.tool, "converse");
 });
 
+test("createOpenAICodexGameplayProvider sends actor workspace context and parses runtime tools", async () => {
+  const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const { createOpenAICodexGameplayProvider } = await import(
+    "../src/provider/openaiCodexGameplayProvider.js"
+  );
+  const provider = createOpenAICodexGameplayProvider({
+    accessToken: "test-token",
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url: String(url), init });
+
+      return new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            tool: "collect_logs",
+            args: { targetCount: 4 }
+          })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+  });
+
+  const proposal = await provider.next({
+    observation: { inventory: [{ name: "oak_log", count: 0 }] },
+    lastResult: null,
+    currentTask: { id: "collect_4_logs" },
+    activeActionSkillContext: {
+      activeSkillIds: ["collectLogs"],
+      allowedPrimitives: ["observe", "collect_logs", "wait"]
+    },
+    actorProviderContext: {
+      schema: "actor-provider-context/v1",
+      recent_evidence: [{ category: "fake_progress_rejection" }]
+    }
+  });
+
+  assert.deepEqual(proposal, {
+    tool: "collect_logs",
+    args: { targetCount: 4 }
+  });
+  const requestBody = JSON.parse(String(fetchCalls[0]?.init?.body));
+  assert.match(requestBody.input, /actor-provider-context\/v1/);
+  assert.match(requestBody.input, /fake_progress_rejection/);
+});
+
+test("createOpenAICodexReviewer parses bounded findings and proposal hints", async () => {
+  const { createOpenAICodexReviewer } = await import("../src/reviewer/openaiCodexReviewer.js");
+  const reviewer = createOpenAICodexReviewer({
+    accessToken: "test-token",
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            findings: [
+              {
+                severity: "p1",
+                title: "No block delta",
+                body: "The actor claimed progress without inventory or block evidence."
+              }
+            ],
+            proposal: {
+              task_intent: "repair log collection",
+              required_primitives: ["observe", "collect_logs"],
+              known_failure_modes: ["fake_progress"]
+            }
+          })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      )
+  });
+
+  const result = await reviewer.review({
+    job: {
+      schema: "actor-review-job/v1",
+      job_id: "job-1",
+      actor_id: "npc_b",
+      reason: "fake_progress_rejection",
+      created_at: "2026-05-20T00:00:00.000Z",
+      input_refs: [],
+      active_action_skill_snapshot: []
+    },
+    actor_context: {
+      schema: "actor-provider-context/v1"
+    }
+  });
+
+  assert.equal(result.findings[0]?.severity, "p1");
+  assert.equal(result.proposal?.task_intent, "repair log collection");
+  assert.deepEqual(result.proposal?.required_primitives, ["observe", "collect_logs"]);
+});
+
 test("createOpenAICodexProvider stops after exhausting malformed JSON retries", async () => {
   let fetchCount = 0;
   const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
@@ -731,6 +837,37 @@ test("mutual proposal validation rejects unsupported tools", () => {
     () => validateMutualProposal({ tool: "drop_database", args: {} }),
     /Unsupported mutual tool/
   );
+});
+
+test("deterministic mutual tools block scenario actions outside active action skills", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const tools = createMutualTools({
+    runtimeState,
+    memories: { npc_a: createMemory(4) },
+    activeActionSkillsByActor: {
+      npc_a: [runtimeControlActionSkill("npc_a")]
+    }
+  });
+
+  const step = await tools.execute({
+    actorId: "npc_a",
+    actor: createFakeBot("npc_a", 0) as any,
+    targetId: "npc_b",
+    target: createFakeBot("npc_b", 2) as any,
+    proposal: {
+      tool: "say",
+      args: { text: "Need logs?" }
+    },
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+    }
+  });
+
+  assert.equal(step.actorAction.result, "blocked");
+  assert.equal((step.worldStateChange as { status: string }).status, "blocked");
 });
 
 test("mutual observe and reply tools expose heard chat and busy reply behavior", async () => {
@@ -963,6 +1100,44 @@ test("executeMutualTool records converse dispatcher steps with args and provider
       }
     }
   ]);
+});
+
+test("executeMutualTool blocks live mutual tools not backed by active action skills", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const transcriptSteps: MutualStepRecord[] = [];
+
+  const result = await executeMutualTool({
+    proposal: {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, check the marker."
+      }
+    },
+    actor,
+    runtimeState,
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+    },
+    activeActionSkills: [runtimeControlActionSkill("npc_a")],
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step);
+      }
+    }
+  });
+
+  assert.equal(result.tool, "converse");
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "blocked");
+  assert.match(result.message as string, /not backed by active action skills/);
+  assert.deepEqual(actor.chatLog, []);
+  assert.equal(transcriptSteps[0]?.actorAction.tool, "converse");
+  assert.equal((transcriptSteps[0]?.result as { status: string }).status, "blocked");
 });
 
 test("executeMutualTool returns a failed ToolResult when a handler throws", async () => {

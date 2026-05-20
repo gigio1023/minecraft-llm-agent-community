@@ -47,9 +47,9 @@ The active architecture direction is:
 
 ## Current Slice Boundary
 
-The next implementation slice prioritizes actor workspace source of truth,
-action skill lifecycle, actor evidence, provider input snapshots, and per-NPC
-reviewers.
+The next implementation slice prioritizes bounded recipe execution from
+candidate action skills, broader actor evidence coverage for future gameplay
+paths, and LLM-backed reviewer reasoning when explicitly enabled.
 
 Deep reconnect refactoring is deferred unless it is required to keep hot-path
 evidence honest. Reconnect remains a runtime responsibility, but it is not the

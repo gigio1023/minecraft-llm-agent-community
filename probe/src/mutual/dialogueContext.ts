@@ -81,6 +81,7 @@ export type DialogueContextInput = {
   observation: DialogueObservation;
   memory: string[];
   recentTranscript: DialogueTranscriptEntry[];
+  actorProviderContext?: DialogueJsonObject;
 };
 
 export type DialogueContextOutput = Omit<DialogueContextInput, "allowedTools"> & {
@@ -105,6 +106,9 @@ export function buildDialogueContext(input: DialogueContextInput): DialogueConte
     observation: input.observation,
     memory: input.memory,
     recentTranscript: input.recentTranscript,
+    ...(input.actorProviderContext
+      ? { actorProviderContext: input.actorProviderContext }
+      : {}),
     rules: {
       oneToolPerTurn: true,
       allowedTools: input.allowedTools,

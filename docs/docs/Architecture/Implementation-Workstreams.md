@@ -37,20 +37,37 @@ As of the first implementation pass:
   `ALLOW_LEGACY_GENERATED_ACTION_SKILLS`.
 - Worker C has landed provider input snapshot persistence and credential-key
   rejection, with live dialogue provider calls writing snapshots.
-- Worker D has landed actor-scoped evidence writing for failed verification and
-  fake-progress rejection in the deterministic runtime loop.
-- Worker E has landed the per-actor reviewer output schema and writer, but not
-  the asynchronous queue/runner.
+- Worker D has landed actor-scoped evidence writing for every phase-one
+  turn/tool attempt plus failed verification and fake-progress rejection in the
+  deterministic runtime loop.
+- Worker E has landed the per-actor reviewer output schema, actor-scoped review
+  writer, immutable review job queue, deterministic per-NPC runner, and
+  `review:actors` CLI. Deterministic fake-progress/verification-failure
+  reviews write draft candidate proposals; an opt-in `openai-codex` reviewer
+  adapter can provide bounded findings and proposal hints.
+- The lifecycle path has landed bounded recipe trial evidence recording plus
+  explicit promotion/supersession/retirement writing. Reviewers and providers
+  still cannot mutate active action skills directly.
+- Candidate recipe trials can execute bounded primitive steps with per-step
+  timeouts and then record `recipe_trial` evidence through the lifecycle path.
 - The coordinator has landed the phase-one active action-skill gate: current
   `runProbe` reads active actor workspace records, passes them into
   `runAgentLoop`, includes active skill context in provider input, and blocks
   provider proposals whose primitives are not backed by actor-owned active
-  records.
+  records. The mutual live and deterministic dispatchers can also consume
+  actor-owned active records; live mutual runs initialize/read actor workspaces
+  before provider turns.
+- The provider path now has a shared actor-provider-context builder and an
+  opt-in `openai-codex` phase-one gameplay provider. Gameplay and live dialogue
+  provider inputs include active skills, candidates, recent evidence, reviews,
+  and memory.
+- Legacy `build/generated-skills` files can be archived into actor workspace
+  draft candidate proposals through `bun run archive:legacy-skills`.
 
-Remaining work in this slice is to broaden evidence coverage across all
-primitive categories, add the per-NPC async reviewer runner, and wire the same
-active action-skill gate into any legacy or mutual gameplay runner that still
-executes outside the phase-one `runAgentLoop` path.
+Future work after this slice is to broaden evidence coverage for new gameplay
+paths as they are added, harden reviewer prompts/scoring with real run data, and
+convert any still-needed skill-village generated-code behavior into bounded
+recipes.
 
 ## Coordinator
 

@@ -99,17 +99,32 @@ Current code also:
   records;
 - reads active action skill records from actor workspace;
 - gates the phase-one `runAgentLoop` with actor-owned active record primitives;
+- gates mutual live/deterministic dispatchers when actor-owned active records
+  are supplied;
+- queues deterministic per-NPC review jobs under actor workspace reviews when
+  runtime evidence fails verification;
+- writes reviewer-proposed draft candidate action skill records under actor
+  workspace candidates without mutating active records;
+- records bounded candidate recipe trials as actor evidence and promotes passed
+  trials through explicit active/superseded action skill records;
+- runs candidate recipe primitive steps with bounded per-step timeouts before
+  recording trial evidence;
+- retires active action skills through explicit retired records with evidence
+  refs;
+- supports opt-in LLM reviewer reasoning for bounded findings/proposal hints
+  without active mutation;
 - stores generated/candidate proposals under actor workspace candidates by
   default;
+- archives older `build/generated-skills` TypeScript files into actor workspace
+  candidate proposals for manual recipe conversion;
 - keeps exploratory generated TypeScript execution behind explicit legacy
   opt-in.
 
-Still missing:
+Future extensions:
 
-- live recipe trial, promotion, supersession, and retirement execution modules;
-- the async per-NPC reviewer queue/runner;
-- the same active action-skill gate on any legacy or mutual gameplay path still
-  outside `runAgentLoop`.
+- production hardening for LLM reviewer prompt/scoring quality;
+- conversion of any still-needed legacy skill-village generated-code behavior
+  into executable bounded recipes.
 
 ## Action Skill Record
 

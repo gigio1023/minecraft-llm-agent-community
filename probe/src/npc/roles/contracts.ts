@@ -14,7 +14,7 @@ export type RoleContract = {
 const roleContracts: Record<RoleId, RoleContract> = {
   gatherer: {
     roleId: "gatherer",
-    allowedTools: ["observe", "collect_logs", "inspect_chest", "deposit_shared", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "collect_logs", "inspect_chest", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_log",
       "birch_log",
@@ -42,7 +42,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   crafter: {
     roleId: "crafter",
-    allowedTools: ["observe", "craft_item", "inspect_chest", "withdraw_shared", "deposit_shared", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "craft_item", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_planks",
       "birch_planks",
@@ -81,7 +81,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   quartermaster: {
     roleId: "quartermaster",
-    allowedTools: ["observe", "inspect_chest", "deposit_shared", "withdraw_shared", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "inspect_chest", "deposit_shared", "withdraw_shared", "say", "wait", "remember"],
     depositAllowedItemNames: ["*"],
     withdrawAllowedItemNames: ["*"],
     keepItems: {
