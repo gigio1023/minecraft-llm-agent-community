@@ -10,7 +10,8 @@ import { createMemoryCompactor, type StepRecord } from "../memory/summaries/memo
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as mineflayer from "mineflayer";
-import { pathfinder } from "mineflayer-pathfinder";
+import { pathfinder, Movements } from "mineflayer-pathfinder";
+import minecraftData from "minecraft-data";
 
 type JsonValue =
   | string
@@ -261,6 +262,10 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
             viewDistance: "tiny"
           });
           newBot.loadPlugin(pathfinder);
+
+          const mcData = minecraftData(newBot.version || config?.server?.version || "1.20.1");
+          const defaultMovements = new (Movements as any)(newBot, mcData);
+          (newBot as any).pathfinder.setMovements(defaultMovements);
 
           await new Promise<void>((resolve, reject) => {
             const onSpawn = () => {

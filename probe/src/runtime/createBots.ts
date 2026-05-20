@@ -1,6 +1,7 @@
 import * as mineflayer from "mineflayer";
 import type { Bot } from "mineflayer";
-import { pathfinder } from "mineflayer-pathfinder";
+import { pathfinder, Movements } from "mineflayer-pathfinder";
+import minecraftData from "minecraft-data";
 
 import type { ProbeConfig } from "../config.js";
 import { normalizeActorIds } from "./actorRoster.js";
@@ -27,6 +28,12 @@ function createOfflineBot(
   });
 
   bot.loadPlugin(pathfinder);
+
+  bot.once("spawn", () => {
+    const mcData = minecraftData(bot.version || config.server.version || "1.20.1");
+    const defaultMovements = new (Movements as any)(bot, mcData);
+    bot.pathfinder.setMovements(defaultMovements);
+  });
 
   return bot;
 }

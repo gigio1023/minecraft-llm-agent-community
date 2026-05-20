@@ -222,6 +222,7 @@ export async function runProbe(): Promise<ProbeRunResult> {
       transcript,
       config,
       server: server ? { host: server.host, port: server.port } : undefined,
+      maxSteps: Number(process.env.PROBE_MAX_STEPS || 10),
       tools: {
         validateProposal,
         observe: ({ actor, target }) =>

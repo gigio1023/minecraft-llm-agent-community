@@ -68,6 +68,7 @@ export async function collectLogs({ bot }: { bot: MiningBot }): Promise<CollectL
   }
 
   await moveNear(bot, block.position);
+  await bot.lookAt(block.position, true);
   await bot.dig(block);
 
   const droppedItem = bot.nearestEntity?.((entity) => entity.name === "item");
