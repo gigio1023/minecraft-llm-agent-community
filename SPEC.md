@@ -168,8 +168,8 @@ Priority order:
 
 1. Validate `collect_logs` and adjacent boring tasks against live Minecraft
    evidence, not optimistic transcript labels.
-2. Build and use a per-action-skill live harness before returning to broad
-   multi-NPC runs.
+2. Use the per-action-skill live harness before returning to broad multi-NPC
+   runs.
 3. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
    verifier, target-selection, and action-skill gaps.
 4. Harden reviewer prompts/scoring only from immutable run evidence.
@@ -178,6 +178,24 @@ Priority order:
 6. Keep the gameplay hot path bounded and free of blocking critic/generation
    work.
 7. Keep the managed local server path easy to start, inspect, and stop.
+
+Current harness command:
+
+```bash
+cd probe
+bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
+```
+
+This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
+one actor-owned action skill through the real runtime gate and exits non-zero
+when runtime evidence does not satisfy the contract.
+
+Current live `collectLogs` proof:
+
+- command: `bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard`;
+- artifact: `data/evidence/action_skill_probe_collectLogs-1779385755355.json`;
+- result: inventory increased from `0` to `4` logs and verifier passed
+  `collect_4_logs reached 4/4 relevant inventory items`.
 
 ## 5. Non-Negotiable Rules
 

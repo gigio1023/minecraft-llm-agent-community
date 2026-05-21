@@ -797,6 +797,17 @@ test("deterministic provider follows the planned runtime contract sequence", () 
      provider.next({ observation, lastResult: { tool: "say", ok: true, status: "available" } }),
     { tool: "remember", args: { note: "npc_b responded after one busy turn" } }
   );
+
+  assert.deepEqual(
+    provider.next({
+      observation: { ...observation, inventory: [{ name: "oak_log", count: 4 }] },
+      lastResult: { tool: "collect_logs", ok: true, status: "collected" }
+    }),
+    {
+      tool: "remember",
+      args: { note: "collect_4_logs completed with runtime inventory evidence" }
+    }
+  );
 });
 
 test("mutual providers keep actor-specific deterministic order", () => {

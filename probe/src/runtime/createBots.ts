@@ -33,6 +33,7 @@ function createOfflineBot(
     username,
     auth: "offline",
     version: config.server.version,
+    checkTimeoutInterval: config.server.pingTimeoutMs,
     viewDistance: "tiny"
   });
 

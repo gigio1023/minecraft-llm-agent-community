@@ -156,6 +156,13 @@ export function createDeterministicProvider() {
         };
       }
 
+      if (lastResult.tool === "collect_logs") {
+        return {
+          tool: "remember",
+          args: { note: "collect_4_logs completed with runtime inventory evidence" }
+        };
+      }
+
       if (lastResult.tool === "craft_item") {
         return {
           tool: "remember",

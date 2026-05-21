@@ -156,7 +156,8 @@ test("collectLogs does not poll evidence while a block is still being dug", asyn
 
 test("collectLogs blocks optimistic success when log inventory does not increase", async () => {
   const result = await collectLogs({
-    bot: createBot({ blockAfterDig: "oak_log", initialLogCount: 0 })
+    bot: createBot({ blockAfterDig: "oak_log", initialLogCount: 0 }),
+    pickupWaitMs: 10
   });
 
   assert.deepEqual({
@@ -296,4 +297,142 @@ test("collectLogs skips an unreachable log candidate and tries the next one", as
     "dig_blocked",
     "dug"
   ]);
+});
+
+test("collectLogs preserves full Mineflayer block objects from findBlocks before dig", async () => {
+  const fullBlock = {
+    name: "oak_log",
+    position: { x: 2, y: 0, z: 0 },
+    digTime() {
+      return 1;
+    }
+  };
+  let logCount = 0;
+  let receivedFullBlock = false;
+
+  const bot = {
+    entity: {
+      position: { x: 0, y: 0, z: 0 }
+    },
+    inventory: {
+      items() {
+        return [{ name: "oak_log", count: logCount }];
+      }
+    },
+    pathfinder: {
+      async goto() {}
+    },
+    findBlocks() {
+      return [fullBlock.position];
+    },
+    blockAt(position: { x: number; y: number; z: number }) {
+      if (position.x === fullBlock.position.x) {
+        return fullBlock;
+      }
+
+      return { name: "air", position };
+    },
+    async dig(block: typeof fullBlock) {
+      receivedFullBlock = typeof block.digTime === "function";
+      logCount = 1;
+    },
+    nearestEntity() {
+      return null;
+    },
+    async lookAt() {},
+    setControlState() {}
+  };
+
+  const result = await collectLogs({ bot });
+
+  assert.equal(result.status, "collected");
+  assert.equal(receivedFullBlock, true);
+});
+
+test("collectLogs walks back to the broken block when dropped item entity is not visible", async () => {
+  const block = { name: "oak_log", position: { x: 2, y: 0, z: 0 } };
+  let logCount = 0;
+  let gotoCalls = 0;
+
+  const bot = {
+    entity: {
+      position: { x: 0, y: 0, z: 0 }
+    },
+    inventory: {
+      items() {
+        return [{ name: "oak_log", count: logCount }];
+      }
+    },
+    pathfinder: {
+      async goto() {
+        gotoCalls += 1;
+        if (gotoCalls >= 2) {
+          logCount = 1;
+        }
+      }
+    },
+    findBlock() {
+      return block;
+    },
+    async dig() {},
+    nearestEntity() {
+      return null;
+    },
+    blockAt() {
+      return { name: "air" };
+    },
+    async lookAt() {},
+    setControlState() {}
+  };
+
+  const result = await collectLogs({ bot, pickupWaitMs: 10 });
+
+  assert.equal(result.status, "collected");
+  assert.equal(gotoCalls, 2);
+});
+
+test("collectLogs returns progressing when an early log is acquired before a later pickup miss", async () => {
+  const blocks = [
+    { name: "oak_log", position: { x: 2, y: 0, z: 0 } },
+    { name: "oak_log", position: { x: 4, y: 0, z: 0 } }
+  ];
+  let logCount = 0;
+  let digCalls = 0;
+
+  const bot = {
+    entity: {
+      position: { x: 0, y: 0, z: 0 }
+    },
+    inventory: {
+      items() {
+        return [{ name: "oak_log", count: logCount }];
+      }
+    },
+    pathfinder: {
+      async goto() {}
+    },
+    findBlocks() {
+      return blocks.map((block) => block.position);
+    },
+    blockAt(position: { x: number; y: number; z: number }) {
+      return blocks.find((block) => block.position.x === position.x) ?? { name: "air" };
+    },
+    async dig() {
+      digCalls += 1;
+      if (digCalls === 1) {
+        logCount = 1;
+      }
+    },
+    nearestEntity() {
+      return null;
+    },
+    async lookAt() {},
+    setControlState() {}
+  };
+
+  const result = await collectLogs({ bot, targetCount: 2, pickupWaitMs: 10 });
+
+  assert.equal(result.status, "progressing");
+  assert.equal(result.inventoryDelta, 1);
+  assert.match(result.reason, /later pickup did not increase inventory/);
 });

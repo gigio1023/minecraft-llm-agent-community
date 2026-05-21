@@ -278,32 +278,78 @@ That result drove the current `collect_logs` hardening:
 
 ### P0: Per-Action-Skill Live Harness
 
-Build a CLI that runs one action skill at a time against a live Mineflayer bot.
+Initial implementation has landed. The CLI now runs one action skill at a time
+through the real Mineflayer `runAgentLoop` path with a narrowed active action
+skill gate.
 
-Required behavior:
+Implemented behavior:
 
 - select actor id;
 - select action skill id;
 - initialize actor workspace to baseline when requested;
 - start or reuse the managed server;
-- run exactly one action skill scenario;
+- run exactly one action skill scenario through the existing runtime loop;
 - persist pre/post observations, tool attempts, verification result, provider
-  context if used, and dashboard event feed;
+  context if used, and transcript output;
 - exit with non-zero status when runtime evidence does not satisfy the action
   skill verification contract.
 
-Suggested command shape:
+Command:
 
 ```bash
-bun run src/actionSkillProbeCli.ts --actor npc_b --skill collectLogs --max-actions 1 --init-actor-workspace baseline
+cd probe
+bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
 ```
 
 Do not make this a broad NPC simulation runner. It should be a narrow live
 contract runner.
 
+Remaining harness work:
+
+- stream explicit probe events into the dashboard instead of relying only on
+  artifact polling;
+- add optional precondition setup for craft-focused probes, such as giving a
+  crafter logs before probing `craftPlanksAndSticks`;
+- add a small live matrix runner only after the single-skill command is stable.
+
 ### P0: Live `collect_logs` Validation
 
-Run `collectLogs` alone in several nearby-tree conditions.
+Initial live validation has landed through the per-action-skill harness.
+
+Latest confirmed command:
+
+```bash
+cd probe
+bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard
+```
+
+Latest confirmed artifact:
+
+```text
+data/evidence/action_skill_probe_collectLogs-1779385755355.json
+```
+
+Confirmed evidence:
+
+- final status: `success`;
+- final reason: `collect_4_logs completed with runtime inventory evidence`;
+- `collect_logs` attempted four `oak_log` blocks in the prepared fixture;
+- inventory increased from `0` to `4`;
+- verifier reason: `collect_4_logs reached 4/4 relevant inventory items`.
+
+Implementation fixes discovered from the live run:
+
+- preserve the full Mineflayer `Block` object from `bot.blockAt(...)` before
+  `bot.dig(...)`; collapsing it to `{name, position}` removed `digTime()`;
+- after a dig, walk back to the broken block as a pickup fallback when dropped
+  item entity metadata is not visible yet;
+- return `progressing`, not `blocked`, when one log was acquired before a later
+  pickup miss;
+- reset probe actor inventory and prepare a small `oak_log` fixture before the
+  `collectLogs` live probe so repeated runs do not depend on depleted natural
+  trees.
+
+Still validate `collectLogs` alone in several nearby-tree conditions.
 
 Validate:
 
@@ -327,12 +373,17 @@ Do not solve this by accepting block removal without inventory pickup.
 
 The CLI should own server and dashboard process lifecycle cleanly.
 
-Improve:
+Implemented behavior:
+
+- dashboard startup checks whether the fixed port is already accepting
+  connections and treats an existing dashboard as reusable;
+- dashboard startup remains best-effort and does not fail gameplay or action
+  skill probes.
+
+Remaining work:
 
 - fixed ports only, with explicit reuse-or-fail behavior;
 - clear stale process detection;
-- dashboard server should be fire-and-forget from gameplay perspective;
-- dashboard failures must never fail NPC actions;
 - dashboard event ingestion should tolerate missing or partial artifacts.
 
 ### P1: Crafting Table Boundary
@@ -424,10 +475,10 @@ Check:
 
 ## Suggested Next Work Order
 
-1. Add per-action-skill live harness CLI.
-2. Run live `collectLogs` probe until it passes repeatably.
-3. Feed failures into actor evidence and reviewer queue.
-4. Improve dashboard event stream around that probe.
+1. Run live `collectLogs` probe until it passes repeatably.
+2. Feed failures into actor evidence and reviewer queue.
+3. Improve dashboard event stream around that probe.
+4. Add precondition setup for craft probes.
 5. Add crafting-table primitive.
 6. Add generic `mine_block`.
 7. Only then re-run 3-NPC LLM gameplay.

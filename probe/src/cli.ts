@@ -1,5 +1,6 @@
 import { runProbe } from "./runProbe.js";
 import { startDashboardServer, type DashboardServer } from "./dashboard/dashboardServer.js";
+import { probePort } from "./server/serverLifecycle.js";
 
 type CliOptions = {
   provider?: "deterministic" | "openai-codex";
@@ -146,6 +147,11 @@ async function startCliDashboard(options: CliOptions) {
   const port = options.dashboardPort ?? 4173;
 
   try {
+    if ((await probePort(port)).inUse) {
+      console.warn(`dashboard already running: http://127.0.0.1:${port}`);
+      return null;
+    }
+
     const server = startDashboardServer(port);
     console.log(`dashboard ready: ${server.url}`);
     return server;

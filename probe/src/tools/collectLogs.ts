@@ -36,10 +36,11 @@ type MiningBot = {
   canDigBlock?(block: { name: string; position: Positioned }): boolean;
   dig(block: { name: string; position: Positioned }, forceLook?: boolean | "ignore" | "raycast"): Promise<void>;
   nearestEntity?(predicate: (entity: { name?: string; position: Positioned }) => boolean): { name?: string; position: Positioned } | null;
-  blockAt?(position: Positioned): { name: string } | null;
+  blockAt?(position: Positioned): { name: string; position?: Positioned } | null;
   stopDigging?(): void;
   lookAt(target: Positioned, force?: boolean): Promise<void>;
   setControlState(control: string, state: boolean): void;
+  equip?(item: any, destination: any): Promise<void>;
 };
 
 type CollectLogsResult = {
@@ -59,10 +60,45 @@ type CollectLogsResult = {
   reason: string;
 };
 
+const AXE_ITEM_NAMES = [
+  "wooden_axe",
+  "stone_axe",
+  "iron_axe",
+  "golden_axe",
+  "diamond_axe",
+  "netherite_axe"
+] as const;
+
 function delay(ms: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+/**
+ * Best-effort axe equip before digging. Faster dig time is a meaningful live
+ * difference, but missing an axe must not block the action entirely.
+ */
+async function equipAxeIfAvailable(bot: MiningBot): Promise<boolean> {
+  if (!bot.equip || !bot.inventory) {
+    return false;
+  }
+
+  const items = bot.inventory.items();
+  const axe = items.find((item) =>
+    AXE_ITEM_NAMES.includes(item.name as (typeof AXE_ITEM_NAMES)[number])
+  );
+
+  if (!axe) {
+    return false;
+  }
+
+  try {
+    await bot.equip(axe, "hand");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function distance(left: Positioned, right: Positioned) {
@@ -170,13 +206,14 @@ function countInventoryLogs(bot: MiningBot) {
 async function waitForLogInventoryIncrease(
   bot: MiningBot,
   beforeLogCount: number | undefined,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  waitMs = 2_500
 ) {
   if (beforeLogCount === undefined) {
     return undefined;
   }
 
-  const deadline = Date.now() + 2_500;
+  const deadline = Date.now() + waitMs;
   while (Date.now() < deadline) {
     const current = countInventoryLogs(bot);
     if (current !== undefined && current > beforeLogCount) {
@@ -211,7 +248,57 @@ async function moveToNearbyDrop(
     await runAbortable(bot, signal, delay(150));
   }
 
-  return false;
+  try {
+    // Some protocol versions expose the dropped item entity later than the
+    // block break itself. Walk back onto the broken block as a deterministic
+    // pickup fallback instead of declaring failure from missing entity metadata.
+    await moveNear(bot, blockPosition, signal, 1);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitAfterPickupMove(
+  bot: MiningBot,
+  beforeLogCount: number | undefined,
+  signal: AbortSignal | undefined,
+  pickupWaitMs: number
+) {
+  const afterPickupMove = await waitForLogInventoryIncrease(
+    bot,
+    beforeLogCount,
+    signal,
+    pickupWaitMs
+  );
+
+  if (
+    beforeLogCount !== undefined &&
+    afterPickupMove !== undefined &&
+    afterPickupMove > beforeLogCount
+  ) {
+    return afterPickupMove;
+  }
+
+  // Minecraft pickup can lag one short tick behind pathfinder arrival on a busy
+  // local server. Give that final pickup tick a bounded chance before failing.
+  return waitForLogInventoryIncrease(bot, beforeLogCount, signal, 1_000);
+}
+
+async function tryPickupLogDrop(input: {
+  bot: MiningBot;
+  blockPosition: Positioned;
+  beforeLogCount: number | undefined;
+  signal?: AbortSignal;
+  pickupWaitMs: number;
+}) {
+  await moveToNearbyDrop(input.bot, input.blockPosition, input.signal);
+  return waitAfterPickupMove(
+    input.bot,
+    input.beforeLogCount,
+    input.signal,
+    input.pickupWaitMs
+  );
 }
 
 async function digLogBlockToBreak(
@@ -238,7 +325,10 @@ function findReachableLogs(bot: MiningBot) {
   })
     .map((position) => {
       const block = bot.blockAt?.(position);
-      return block && isLogName(block.name) ? { name: block.name, position } : null;
+      // Preserve the full Mineflayer Block object. bot.dig needs methods such
+      // as digTime(); reducing the block to {name, position} creates a live-only
+      // failure that unit doubles will not catch.
+      return block && isLogName(block.name) ? block : null;
     })
     .filter((entry): entry is { name: string; position: Positioned } => entry !== null) ?? [];
   const candidates = fromBlocks.length > 0
@@ -272,14 +362,19 @@ function uniqueCandidateKey(candidate: { position: Positioned }) {
   return `${Math.floor(candidate.position.x)}:${Math.floor(candidate.position.y)}:${Math.floor(candidate.position.z)}`;
 }
 
+const DEFAULT_PICKUP_WAIT_MS = 5_000;
+
 export async function collectLogs({
   bot,
   signal,
-  targetCount
+  targetCount,
+  pickupWaitMs = DEFAULT_PICKUP_WAIT_MS
 }: {
   bot: MiningBot;
   signal?: AbortSignal;
   targetCount?: number;
+  /** Maximum ms to wait for dropped item pickup after a dig. */
+  pickupWaitMs?: number;
 }): Promise<CollectLogsResult> {
   const beforeLogCount = countInventoryLogs(bot);
   const targetLogCount =
@@ -370,6 +465,7 @@ export async function collectLogs({
 
     const attemptBeforeLogCount = afterLogCount;
     try {
+      await equipAxeIfAvailable(bot);
       await digLogBlockToBreak(bot, block, signal);
       attemptedBlocks.push({
         block: block.name,
@@ -400,8 +496,13 @@ export async function collectLogs({
     ) {
       afterLogCount = countImmediatelyAfterDig;
     } else {
-      await moveToNearbyDrop(bot, block.position, signal);
-      afterLogCount = await waitForLogInventoryIncrease(bot, afterLogCount, signal);
+      afterLogCount = await tryPickupLogDrop({
+        bot,
+        blockPosition: block.position,
+        beforeLogCount: afterLogCount,
+        signal,
+        pickupWaitMs
+      });
     }
 
     const blockAfter = bot.blockAt?.(block.position);
@@ -412,6 +513,23 @@ export async function collectLogs({
       afterLogCount !== undefined &&
       afterLogCount <= attemptBeforeLogCount
     ) {
+      const totalInventoryDelta =
+        beforeLogCount !== undefined ? afterLogCount - beforeLogCount : undefined;
+
+      if (totalInventoryDelta !== undefined && totalInventoryDelta > 0) {
+        return {
+          status: "progressing",
+          block: block.name,
+          target: block.position,
+          attemptedBlocks,
+          beforeLogCount,
+          afterLogCount,
+          inventoryDelta: totalInventoryDelta,
+          blockRemoved: lastBlockRemoved,
+          reason: `collect_logs increased log inventory by ${totalInventoryDelta}, but a later pickup did not increase inventory.`
+        };
+      }
+
       return {
         status: "blocked",
         block: block.name,
@@ -420,7 +538,7 @@ export async function collectLogs({
         beforeLogCount,
         afterLogCount,
         inventoryDelta:
-          beforeLogCount !== undefined ? afterLogCount - beforeLogCount : undefined,
+          totalInventoryDelta,
         blockRemoved: lastBlockRemoved,
         reason: "collect_logs dug a log, but log inventory did not increase."
       };
