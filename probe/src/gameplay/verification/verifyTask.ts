@@ -148,27 +148,12 @@ export function verifyTask(
 
     if (
       task.id === "collect_4_logs" &&
-      beforeNearbyBlockCount !== null &&
-      afterNearbyBlockCount !== null &&
-      afterNearbyBlockCount < beforeNearbyBlockCount
+      toolInventoryDelta !== null &&
+      toolInventoryDelta > 0
     ) {
       return {
         status: "progressing",
-        reason: `collect_4_logs removed nearby log-block evidence (${beforeNearbyBlockCount} -> ${afterNearbyBlockCount}) but inventory did not increase yet.`,
-        progress
-      };
-    }
-
-    if (
-      task.id === "collect_4_logs" &&
-      ((toolInventoryDelta !== null && toolInventoryDelta > 0) || toolBlockRemoved === true)
-    ) {
-      return {
-        status: "progressing",
-        reason:
-          toolInventoryDelta !== null && toolInventoryDelta > 0
-            ? `collect_4_logs tool evidence reports inventory delta ${toolInventoryDelta}, but post-observation has not reached target yet.`
-            : "collect_4_logs tool evidence reports a removed log block, but post-observation has not reached target yet.",
+        reason: `collect_4_logs tool evidence reports inventory delta ${toolInventoryDelta}, but post-observation has not reached target yet.`,
         progress
       };
     }
@@ -177,7 +162,7 @@ export function verifyTask(
       status: "failed",
       reason:
         task.id === "collect_4_logs"
-          ? `collect_4_logs saw no relevant inventory increase (${beforeCount} -> ${afterCount}) and no nearby log-block decrease.`
+          ? `collect_4_logs saw no relevant inventory increase (${beforeCount} -> ${afterCount}).`
           : `${task.id} did not increase the relevant inventory count (${beforeCount} -> ${afterCount}).`,
       progress
     };

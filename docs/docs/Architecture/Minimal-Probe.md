@@ -12,18 +12,22 @@ The minimal probe is not a social-simulation demo.
 
 It is a small runtime proof where:
 
-- a single headless bot observes the world;
+- a headless actor observes the world;
 - chooses one bounded action at a time;
 - makes real progress on a boring gameplay task;
 - records enough evidence that a human or coding agent can explain failure.
 
 ## Current Proof Target
 
-The first strong proof should include:
+The current proof target should include:
 
 - `collect_logs` working end-to-end in live Minecraft;
 - follow-up progression beyond the first log attempt;
 - transcript-visible evidence for progress, failure, timeout, or stall;
+- actor workspace evidence and provider input snapshots for LLM-backed paths;
+- active action-skill gates that reject unsupported provider proposals;
+- reviewer output that proposes repairs or relationship updates without
+  mutating active runtime state;
 - truthful reconnect/session evidence when reconnect is exercised;
 - checkpoint-ready runtime artifacts.
 

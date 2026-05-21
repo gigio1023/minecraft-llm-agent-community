@@ -14,6 +14,11 @@ import {
 import { writeActionSkillProposal } from "../skills/proposals/proposalStore.js";
 import type { ActionSkillProposalRecord } from "../skills/proposals/types.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
+import type { RelationshipEventKind } from "../npc/relationships/relationshipLedger.js";
+import {
+  applyReviewerRelationshipEventProposals,
+  type RelationshipProposalApplication
+} from "./relationshipProposalApplier.js";
 
 export type ActorReviewInputRefKind =
   | "evidence"
@@ -55,15 +60,23 @@ export type ActorReviewerRunnerOptions = {
   now?: () => string;
   reviewer?: ActorReviewReasoner;
   actorContext?: JsonValue;
+  applyRelationshipEventProposals?: boolean;
 };
 
 export type ActorReviewerRunResult = {
   jobPath: string;
   reviewPath: string;
+  relationshipApplications?: RelationshipProposalApplication[];
 };
 
 export type ActorReviewReasonerResult = {
   findings: ActorReviewFinding[];
+  relationship_event_proposals?: Array<{
+    kind: RelationshipEventKind;
+    target_actor_id: string;
+    summary: string;
+    evidence_refs?: string[];
+  }>;
   proposal?: {
     task_intent: string;
     preconditions?: string[];
@@ -236,6 +249,7 @@ export function buildDeterministicReviewerOutput(
     input_refs: job.input_refs.map((inputRef) => inputRef.ref),
     findings: deterministicFindings(job),
     candidate_proposals: options.candidateProposalPaths ?? [],
+    relationship_event_proposals: [],
     active_mutation: "forbidden"
   };
 }
@@ -352,6 +366,13 @@ export async function runQueuedActorReviewJobs(
           input_refs: queued.job.input_refs.map((inputRef) => inputRef.ref),
           findings: reasonerResult.findings,
           candidate_proposals: candidateProposalPaths,
+          relationship_event_proposals:
+            reasonerResult.relationship_event_proposals?.map((proposal) => ({
+              kind: proposal.kind,
+              target_actor_id: proposal.target_actor_id,
+              summary: proposal.summary,
+              evidence_refs: proposal.evidence_refs ?? evidenceRefs(queued.job)
+            })) ?? [],
           active_mutation: "forbidden" as const
         }
       : buildDeterministicReviewerOutput(queued.job, {
@@ -360,7 +381,14 @@ export async function runQueuedActorReviewJobs(
           candidateProposalPaths
         });
     const reviewPath = await writeReviewerOutput(rootDir, review);
-    results.push({ jobPath: queued.jobPath, reviewPath });
+    const relationshipApplications = options.applyRelationshipEventProposals
+      ? await applyReviewerRelationshipEventProposals(rootDir, review)
+      : undefined;
+    results.push({
+      jobPath: queued.jobPath,
+      reviewPath,
+      ...(relationshipApplications ? { relationshipApplications } : {})
+    });
   }
 
   return results;

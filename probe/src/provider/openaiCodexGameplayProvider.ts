@@ -11,8 +11,21 @@ export type GameplayProviderInput = {
   observation: unknown;
   lastResult: unknown;
   currentTask?: unknown;
+  goalStack?: unknown;
   activeActionSkillContext?: unknown;
   actorProviderContext?: JsonValue;
+};
+
+export type GameplayProviderTrace = {
+  provider_id: "openai-codex";
+  model: string;
+  raw_output_text: string;
+  parsed_output: JsonValue;
+  proposal: JsonValue;
+};
+
+export type GameplayProviderProposal = ToolProposal & {
+  providerTrace?: GameplayProviderTrace;
 };
 
 type CreateOpenAICodexGameplayProviderArgs = {
@@ -27,7 +40,7 @@ function createPrompt(input: GameplayProviderInput) {
   return [
     "Return exactly one JSON object with keys tool, args, and optional why.",
     "Choose one tool from the allowed runtime primitives in activeActionSkillContext.",
-    "Use actorProviderContext for active action skills, recent evidence, reviews, candidates, and memory.",
+    "Use goalStack and actorProviderContext for profile, relationships, active action skills, recent evidence, reviews, candidates, and memory.",
     "Do not claim success. The Minecraft runtime verifies success from evidence after the tool runs.",
     "Prefer observe or wait when the evidence is stale or the next safe action is unclear.",
     "Do not wrap the JSON in markdown fences.",
@@ -37,6 +50,31 @@ function createPrompt(input: GameplayProviderInput) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toJsonValue(value: unknown): JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(toJsonValue);
+  }
+
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, toJsonValue(entry)])
+    );
+  }
+
+  return null;
 }
 
 function parseGameplayProviderAction(input: unknown): ToolProposal {
@@ -116,7 +154,7 @@ export function createOpenAICodexGameplayProvider({
   }
 
   return {
-    async next(input: GameplayProviderInput): Promise<ToolProposal> {
+    async next(input: GameplayProviderInput): Promise<GameplayProviderProposal> {
       for (let attempt = 0; ; attempt += 1) {
         const payload = await requestResponse(
           fetchImpl,
@@ -127,7 +165,22 @@ export function createOpenAICodexGameplayProvider({
         );
 
         try {
-          return parseGameplayProviderAction(parseOutputText(payload));
+          const rawOutputText = typeof payload.output_text === "string"
+            ? payload.output_text
+            : "";
+          const parsedOutput = parseOutputText(payload);
+          const proposal = parseGameplayProviderAction(parsedOutput);
+
+          return {
+            ...proposal,
+            providerTrace: {
+              provider_id: "openai-codex",
+              model,
+              raw_output_text: rawOutputText,
+              parsed_output: toJsonValue(parsedOutput),
+              proposal: toJsonValue(proposal)
+            }
+          };
         } catch (error) {
           if (attempt < maxRetries && isMalformedJsonError(error)) {
             continue;

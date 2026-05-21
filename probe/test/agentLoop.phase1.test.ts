@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
+import { readRelationshipEdge } from "../src/npc/relationships/relationshipStore.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { validateProposal } from "../src/tools/index.js";
 import {
@@ -503,6 +504,25 @@ test("agent loop writes actor evidence when collect_logs only pretends to progre
     assert.deepEqual(
       reviewJob.active_action_skill_snapshot.map((skill: { skill_id: string }) => skill.skill_id),
       ["collectLogs", "runtimeObserveAndRemember"]
+    );
+
+    const relationshipEdge = await readRelationshipEdge(rootDir, "npc_a", "npc_b");
+    assert.equal(relationshipEdge.trust, "distrusted");
+    assert.equal(relationshipEdge.friction, "resentful");
+    assert.equal(relationshipEdge.familiarity, "acquaintance");
+    assert.deepEqual(
+      relationshipEdge.recent_events.map((event) => event.kind),
+      [
+        "fake_progress_rejected",
+        "fake_progress_rejected",
+        "fake_progress_rejected",
+        "verification_failed"
+      ]
+    );
+    assert.ok(
+      relationshipEdge.recent_events.some((event) =>
+        event.evidence_refs[0]?.includes("fake-progress")
+      )
     );
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });

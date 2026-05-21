@@ -18,6 +18,7 @@ const sidebars = {
         'Architecture/Implementation-Workstreams',
         'Architecture/Bounded-Action-Skill-Creation',
         'Architecture/LLM-Context-And-Actor-Workspace',
+        'Architecture/Social-Actor-Profiles-And-Relationships',
       ],
     },
     {

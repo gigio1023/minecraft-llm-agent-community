@@ -6,7 +6,6 @@ import { createDialogueState } from "./runtime/dialogueState.js";
 import { createMemory } from "./runtime/memory.js";
 import { runAgentLoop } from "./runtime/agentLoop.js";
 import { createTranscript } from "./runtime/transcript.js";
-import { startDockerServer, type ServerHandle } from "./server/dockerServer.js";
 import { loadOpenAICodexAuth } from "./mutual/openaiCodexAuth.js";
 import { validateProposal } from "./tools/index.js";
 import { withActionWrapper } from "./mutual/tools/wrapper.js";
@@ -37,6 +36,10 @@ import {
   initializeActorWorkspaces,
   listActiveActorActionSkillRecords
 } from "./runtime/actorWorkspace.js";
+import {
+  buildLiveSmokeServerContext,
+  ensureLiveSmokeServer
+} from "./server/liveSmokeServer.js";
 
 export type ProbeRunResult = {
   transcriptPath: string;
@@ -73,6 +76,59 @@ function readTicksArg(args: Record<string, unknown>) {
   }
 
   return value;
+}
+
+function readOptionalPositiveIntegerArg(args: Record<string, unknown>, name: string) {
+  const value = args[name];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new Error(`Expected positive integer arg: ${name}`);
+  }
+
+  return value;
+}
+
+export function readManualMinecraftPort(value = process.env.MC_PORT) {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+    throw new Error(`MC_PORT must be an integer between 1 and 65535, got: ${value}`);
+  }
+
+  return port;
+}
+
+export function readProbeObserveMs(value = process.env.PROBE_OBSERVE_MS) {
+  if (value === undefined || value.trim().length === 0) {
+    return 15_000;
+  }
+
+  const milliseconds = Number(value);
+  if (!Number.isInteger(milliseconds) || milliseconds < 0) {
+    throw new Error(`PROBE_OBSERVE_MS must be a non-negative integer, got: ${value}`);
+  }
+
+  return milliseconds;
+}
+
+export function readProbeMaxActions(value = process.env.PROBE_MAX_ACTIONS) {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  const maxActions = Number(value);
+  if (!Number.isInteger(maxActions) || maxActions <= 0) {
+    throw new Error(`PROBE_MAX_ACTIONS must be a positive integer, got: ${value}`);
+  }
+
+  return maxActions;
 }
 
 function assertTarget(targetId: string, expectedTargetId: string) {
@@ -125,7 +181,12 @@ export function finalizeRunProbe({
 
 async function teleportBotsToRequestedSpawn(
   bots: Record<string, import("mineflayer").Bot>,
-  spawnConfig: { x: number; y: number; z: number }
+  spawnConfig: { x: number; y: number; z: number },
+  rcon?: {
+    composeFile: string;
+    composeDir: string;
+    env: NodeJS.ProcessEnv;
+  }
 ) {
   const { x, y, z } = spawnConfig;
 
@@ -134,15 +195,34 @@ async function teleportBotsToRequestedSpawn(
     return;
   }
 
-  const { exec } = await import("child_process");
+  const { execFile } = await import("child_process");
   const util = await import("util");
-  const execAsync = util.promisify(exec);
+  const execFileAsync = util.promisify(execFile);
+  const runRcon = async (args: string[]) => {
+    if (!rcon) {
+      throw new Error("RCON context unavailable");
+    }
+
+    await execFileAsync(
+      "docker",
+      ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
+      {
+        cwd: rcon.composeDir,
+        env: rcon.env
+      }
+    );
+  };
 
   try {
     console.log("Setting server world spawn via RCON...");
-    await execAsync(`docker exec -w / skill-village-manual-mc-1 rcon-cli -- setworldspawn ${x} ${y} ${z}`);
+    await runRcon([
+      "setworldspawn",
+      String(Math.floor(x)),
+      String(Math.floor(y)),
+      String(Math.floor(z))
+    ]);
   } catch (error) {
-    console.warn("Failed to set world spawn via RCON (is the container named skill-village-manual-mc-1?). Error:", error);
+    console.warn("Failed to set world spawn via RCON. Error:", error);
   }
 
   const actorIds = Object.keys(bots);
@@ -161,11 +241,11 @@ async function teleportBotsToRequestedSpawn(
     actorIds.map(async (actorId, index) => {
       const [dx, dy, dz] = offsets[index % offsets.length];
       const bot = bots[actorId];
-      const tpCmd = `tp ${bot.username} ${x + dx} ${y + dy} ${z + dz}`;
-      console.log(`[${actorId}] Sending teleport via RCON: ${tpCmd}`);
+      const tpArgs = ["tp", bot.username, String(x + dx), String(y + dy), String(z + dz)];
+      console.log(`[${actorId}] Sending teleport via RCON: ${tpArgs.join(" ")}`);
       
       try {
-        await execAsync(`docker exec -w / skill-village-manual-mc-1 rcon-cli -- ${tpCmd}`);
+        await runRcon(tpArgs);
       } catch (error) {
         console.warn(`[${actorId}] RCON teleport failed, trying bot.chat fallback...`);
         bot.chat(`/tp @s ${x + dx} ${y + dy} ${z + dz}`);
@@ -179,23 +259,46 @@ async function teleportBotsToRequestedSpawn(
 
 export async function runProbe(): Promise<ProbeRunResult> {
   const config = loadProbeConfig();
-  let server: ServerHandle | null = null;
+  const maxActions = readProbeMaxActions();
+  const gameplayAuth =
+    config.gameplayProvider.providerId === "openai-codex"
+      ? await loadOpenAICodexAuth(config.liveDialogue.authStorePath)
+      : null;
+  let server: { host: string; port: number; stop(): Promise<void> } | null = null;
+  let rconContext: ReturnType<typeof buildLiveSmokeServerContext> | undefined;
   let bots: Awaited<ReturnType<typeof createBots>> | null = null;
   let caughtError: unknown;
   let result: { transcriptPath: string } | null = null;
   const cleanupErrors: unknown[] = [];
 
   try {
-    // Local manual-server mode keeps behavior iteration fast; Docker startup is
-    // still available through startDockerServer when the probe owns the server.
-    // server = await startDockerServer(config);
-    server = { host: "127.0.0.1", port: Number(process.env.MC_PORT || 32769), stop: async () => {} };
+    const manualMinecraftPort = readManualMinecraftPort();
+    if (manualMinecraftPort !== undefined) {
+      server = {
+        host: "127.0.0.1",
+        port: manualMinecraftPort,
+        stop: async () => {}
+      };
+    } else {
+      const liveSmokeServer = await ensureLiveSmokeServer(config);
+      if (!liveSmokeServer.host || !liveSmokeServer.port) {
+        throw new Error("Live smoke server did not return a joinable endpoint");
+      }
+      rconContext = buildLiveSmokeServerContext(config);
+      server = {
+        host: liveSmokeServer.host,
+        port: liveSmokeServer.port,
+        // Keep the managed smoke server running so the user can inspect it.
+        stop: async () => {}
+      };
+    }
+    console.log(`minecraft_direct_connect=${server.host}:${server.port}`);
     bots = await createBots(config, {
       host: server.host,
       port: server.port
     });
     
-    await teleportBotsToRequestedSpawn(bots, config.spawn);
+    await teleportBotsToRequestedSpawn(bots, config.spawn, rconContext);
     
     const activeBots = bots;
     const actorIds = Object.keys(bots);
@@ -232,7 +335,7 @@ export async function runProbe(): Promise<ProbeRunResult> {
     const provider =
       config.gameplayProvider.providerId === "openai-codex"
         ? createOpenAICodexGameplayProvider({
-            accessToken: (await loadOpenAICodexAuth(config.liveDialogue.authStorePath)).accessToken,
+            accessToken: gameplayAuth?.accessToken ?? "",
             model: config.gameplayProvider.model,
             reasoning: config.gameplayProvider.reasoning,
             maxRetries: config.gameplayProvider.maxRetries
@@ -275,10 +378,15 @@ export async function runProbe(): Promise<ProbeRunResult> {
         bots: { actor, target },
         roleId: actorRole,
         provider,
+        maxActions,
         activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
         artifacts: {
           actorWorkspaceRootDir: config.actorWorkspace.rootDir,
           providerInputSnapshots: {
+            provider_id: config.gameplayProvider.providerId,
+            model: config.gameplayProvider.model
+          },
+          providerOutputSnapshots: {
             provider_id: config.gameplayProvider.providerId,
             model: config.gameplayProvider.model
           }
@@ -304,9 +412,14 @@ export async function runProbe(): Promise<ProbeRunResult> {
               { tool: "move_to" }
             );
           },
-          collect_logs: ({ actor }) => {
+          collect_logs: ({ actor, args }) => {
             return withActionWrapper(
-              (signal) => collectLogs({ bot: actor, signal }),
+              (signal) =>
+                collectLogs({
+                  bot: actor,
+                  signal,
+                  targetCount: readOptionalPositiveIntegerArg(args, "targetCount")
+                }),
               { tool: "collect_logs" }
             );
           },
@@ -445,8 +558,11 @@ export async function runProbe(): Promise<ProbeRunResult> {
   } catch (error) {
     caughtError = error;
   } finally {
-    console.log("Waiting 15 seconds before disconnecting bots so you can observe them...");
-    await new Promise((r) => setTimeout(r, 15000));
+    const observeMs = readProbeObserveMs();
+    if (observeMs > 0) {
+      console.log(`Waiting ${observeMs}ms before disconnecting bots so you can observe them...`);
+      await new Promise((r) => setTimeout(r, observeMs));
+    }
     
     if (bots) {
       try {

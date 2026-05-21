@@ -172,6 +172,17 @@ export async function depositToSharedChest(input: {
           : countItems(afterChest, input.itemName) - countItems(beforeChest, input.itemName)
     };
   });
+
+  if (transfer.movedCount <= 0) {
+    return {
+      status: "blocked",
+      chestId: input.chest.chestId,
+      itemName: input.itemName,
+      movedCount: 0,
+      message: `${input.itemName} was not moved into shared storage`
+    };
+  }
+
   const afterInventory = snapshotItems(input.inventory.items());
   const ledgerEntry = input.ledger.recordDeposit({
     actorId: input.actorId,

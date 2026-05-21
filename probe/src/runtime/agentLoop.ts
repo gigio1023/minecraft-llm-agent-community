@@ -4,8 +4,23 @@ import type { ObserveResult } from "../tools/observe.js";
 import { toToolResult } from "../mutual/tools/wrapper.js";
 import { selectDeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
 import { verifyTask, type TaskVerification } from "../gameplay/verification/verifyTask.js";
+import { buildActorGoalStack } from "../npc/goals/goalStack.js";
+import { getActorProfile } from "../npc/profiles.js";
+import {
+  applyRelationshipEvent,
+  createRelationshipEventRef,
+  type RelationshipEventKind
+} from "../npc/relationships/relationshipLedger.js";
+import {
+  readRelationshipEdge,
+  writeRelationshipEdge
+} from "../npc/relationships/relationshipStore.js";
 import { buildActorProviderContext } from "../provider/actorProviderContext.js";
 import { writeProviderInputSnapshot } from "../provider/providerInputStore.js";
+import {
+  writeProviderOutputSnapshot,
+  type ProviderOutputSnapshot
+} from "../provider/providerOutputStore.js";
 import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 import {
@@ -46,6 +61,7 @@ type TranscriptRecorder = {
     pressureContext?: JsonValue;
     tool: AllowedTool;
     args?: Record<string, JsonValue>;
+    providerOutputRef?: string;
     result: JsonValue;
     verification?: JsonValue;
   }): void;
@@ -61,7 +77,15 @@ type Provider = {
       allowedPrimitives: AllowedTool[];
     };
     actorProviderContext?: JsonValue;
-  }): Promise<ToolProposal> | ToolProposal;
+  }): Promise<ToolProposal & { providerTrace?: ProviderTrace }> | ToolProposal;
+};
+
+type ProviderTrace = {
+  provider_id: string;
+  model: string;
+  raw_output_text: string;
+  parsed_output: JsonValue;
+  proposal: JsonValue;
 };
 
 export type AgentLoopTools<TActor extends RuntimeActor> = {
@@ -90,16 +114,21 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
   initialCompletedTaskIds?: string[];
   activeActionSkills: readonly ActorActionSkillRecord[];
   stepDelayMs?: number;
+  maxActions?: number;
   artifacts?: {
     actorWorkspaceRootDir: string;
     providerInputSnapshots?: {
       provider_id: string;
       model: string;
     };
+    providerOutputSnapshots?: {
+      provider_id: string;
+      model: string;
+    };
   };
 };
 
-const MAX_STEPS = 10;
+const DEFAULT_MAX_ACTIONS = 10;
 
 // Terminal notes are the current probe's human-readable stop condition. Keep
 // the classifier conservative so a blocked/stalled transcript is never reported
@@ -112,11 +141,17 @@ function classifyTerminalNote(note: string) {
 
 function toJsonRecord(args: Record<string, unknown>) {
   return Object.fromEntries(
-    Object.entries(args).map(([key, value]) => [key, toJsonValue(value)])
+    Object.entries(args)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, toJsonValue(value)])
   );
 }
 
 function toJsonValue(value: unknown): JsonValue {
+  if (value === undefined) {
+    return null;
+  }
+
   if (
     value === null ||
     typeof value === "string" ||
@@ -132,7 +167,9 @@ function toJsonValue(value: unknown): JsonValue {
 
   if (typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, toJsonValue(entry)])
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, toJsonValue(entry)])
     );
   }
 
@@ -197,6 +234,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   initialCompletedTaskIds = [],
   activeActionSkills,
   stepDelayMs = 1000,
+  maxActions = DEFAULT_MAX_ACTIONS,
   artifacts
 }: AgentLoopArgs<TActor>) {
   const actor = bots.actor;
@@ -214,7 +252,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     allowedPrimitives: activeActionSkillGate.allowedPrimitives
   };
 
-  for (let step = 0; step < MAX_STEPS; step += 1) {
+  for (let step = 0; step < maxActions; step += 1) {
     // Every turn starts from Mineflayer-observed state. The provider can choose
     // a primitive, but it cannot invent progress or carry stale inventory state.
     const observation = await tools.observe({ actor, target });
@@ -231,6 +269,14 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       selectedTask && roleId && !selectedTask.preferredActorRoles.includes(roleId)
         ? null
         : selectedTask;
+    const recentFailure =
+      lastResult?.ok === false ||
+      ["blocked", "failed", "timeout", "cancelled"].includes(String(lastResult?.status ?? ""));
+    const goalStack = buildActorGoalStack({
+      actorProfile: getActorProfile(actor.username),
+      currentTask,
+      recentFailure
+    });
 
     // Pressure/intent context is recorded even while the provider remains
     // deterministic so future agent-loop changes can explain why a primitive
@@ -250,6 +296,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       observation,
       lastResult,
       currentTask,
+      goalStack,
       activeActionSkillContext,
       ...(artifacts
         ? {
@@ -257,7 +304,8 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
               actorWorkspaceRootDir: artifacts.actorWorkspaceRootDir,
               actorId: actor.username,
               activeActionSkills,
-              memory: observation.memory
+              memory: observation.memory,
+              goalStack: toJsonValue(goalStack)
             })
           }
         : {})
@@ -270,6 +318,12 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     });
 
     const proposal = await provider.next(providerInput);
+    const providerOutputSnapshotPath = await recordProviderOutputSnapshotIfRequested({
+      artifacts,
+      actorId: actor.username,
+      turnId,
+      proposal
+    });
     const validated = tools.validateProposal(proposal);
     const preActionPosition = readActorPosition(actor);
     const execution = await executePhaseOneTool({
@@ -287,7 +341,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     const result = execution.result;
     const verification = execution.verification ?? readVerification(result);
 
-    await recordTurnAndAttemptEvidenceIfRequested({
+    const evidenceRefs = await recordTurnAndAttemptEvidenceIfRequested({
       artifacts,
       actor,
       turnId,
@@ -303,7 +357,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       postActionPosition
     });
 
-    await recordVerificationEvidenceIfNeeded({
+    const failureEvidencePath = await recordVerificationEvidenceIfNeeded({
       artifacts,
       actor,
       turnId,
@@ -321,6 +375,17 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       activeActionSkills
     });
 
+    await recordRelationshipEventIfRequested({
+      artifacts,
+      actorId: actor.username,
+      observerActorId: target.username,
+      turnId,
+      currentTask,
+      verification,
+      failureEvidencePath,
+      toolAttemptEvidencePath: evidenceRefs?.toolAttemptEvidencePath
+    });
+
     transcript.recordStep({
       actor: actor.username,
       observation: toJsonValue(observation),
@@ -328,6 +393,9 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       pressureContext: toJsonValue(pressureContext),
       tool: validated.tool,
       args: Object.keys(validated.args).length > 0 ? toJsonRecord(validated.args) : undefined,
+      ...(providerOutputSnapshotPath
+        ? { providerOutputRef: providerOutputSnapshotPath }
+        : {}),
       result: toJsonValue(result),
       ...(verification ? { verification: toJsonValue(verification) } : {})
     });
@@ -357,7 +425,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     }
   }
 
-  throw new Error(`Agent loop exhausted ${MAX_STEPS}-step budget without remember`);
+  throw new Error(`Agent loop exhausted ${maxActions}-action budget without remember`);
 }
 
 function readVerification(result: ToolResult) {
@@ -541,6 +609,35 @@ async function recordProviderInputSnapshotIfRequested(input: {
   });
 }
 
+async function recordProviderOutputSnapshotIfRequested(input: {
+  artifacts: AgentLoopArgs<RuntimeActor>["artifacts"] | undefined;
+  actorId: string;
+  turnId: string;
+  proposal: ToolProposal & { providerTrace?: ProviderTrace };
+}): Promise<string | undefined> {
+  const trace = input.proposal.providerTrace;
+  const snapshotConfig = input.artifacts?.providerOutputSnapshots;
+
+  if (!input.artifacts || !snapshotConfig || !trace) {
+    return undefined;
+  }
+
+  const snapshot: ProviderOutputSnapshot = {
+    schema: "provider-output-snapshot/v1",
+    snapshot_id: input.turnId,
+    actor_id: input.actorId,
+    turn_id: input.turnId,
+    provider_id: trace.provider_id || snapshotConfig.provider_id,
+    model: trace.model || snapshotConfig.model,
+    created_at: new Date().toISOString(),
+    raw_output_text: trace.raw_output_text,
+    parsed_output: trace.parsed_output,
+    proposal: trace.proposal
+  };
+
+  return writeProviderOutputSnapshot(input.artifacts.actorWorkspaceRootDir, snapshot);
+}
+
 async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeActor>(input: {
   artifacts: AgentLoopArgs<TActor>["artifacts"] | undefined;
   actor: TActor;
@@ -557,7 +654,7 @@ async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeAct
   postActionPosition?: ReturnType<typeof readActorPosition>;
 }) {
   if (!input.artifacts) {
-    return;
+    return undefined;
   }
 
   const target =
@@ -575,7 +672,7 @@ async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeAct
     verification: input.verification ?? null
   });
 
-  await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
+  const turnEvidencePath = await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
     schema: "actor-evidence/v1",
     evidence_id: `turn-${input.turnId}`,
     actor_id: input.actor.username,
@@ -588,7 +685,7 @@ async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeAct
     data
   });
 
-  await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
+  const toolAttemptEvidencePath = await writeActorEvidenceRecord(input.artifacts.actorWorkspaceRootDir, {
     schema: "actor-evidence/v1",
     evidence_id: `tool-attempt-${input.turnId}-${input.tool}`,
     actor_id: input.actor.username,
@@ -607,6 +704,11 @@ async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeAct
     missing_delta: toJsonValue(input.verification?.progress ?? null),
     data
   });
+
+  return {
+    turnEvidencePath,
+    toolAttemptEvidencePath
+  };
 }
 
 function readActorPosition(actor: RuntimeActor) {
@@ -651,7 +753,7 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
   activeActionSkills: readonly ActorActionSkillRecord[];
 }) {
   if (!input.artifacts || !input.verification || input.verification.status !== "failed") {
-    return;
+    return undefined;
   }
 
   const category = isFakeProgressFailure(input.result, input.verification)
@@ -706,4 +808,76 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
     ],
     active_action_skill_snapshot: snapshotActiveActionSkills(input.activeActionSkills)
   });
+
+  return evidencePath;
+}
+
+function relationshipEventKindForVerification(input: {
+  currentTask: ReturnType<typeof selectDeterministicTask>;
+  verification?: TaskVerification;
+  failureEvidencePath?: string;
+}): RelationshipEventKind | null {
+  if (!input.currentTask || !input.verification) {
+    return null;
+  }
+
+  if (input.verification.status === "failed") {
+    return input.failureEvidencePath?.includes("fake-progress")
+      ? "fake_progress_rejected"
+      : "verification_failed";
+  }
+
+  if (input.verification.status !== "passed") {
+    return null;
+  }
+
+  switch (input.currentTask.id) {
+    case "deposit_shared_materials":
+      return "shared_storage_updated";
+  }
+
+  return null;
+}
+
+async function recordRelationshipEventIfRequested<TActor extends RuntimeActor>(input: {
+  artifacts: AgentLoopArgs<TActor>["artifacts"] | undefined;
+  actorId: string;
+  observerActorId: string;
+  turnId: string;
+  currentTask: ReturnType<typeof selectDeterministicTask>;
+  verification?: TaskVerification;
+  failureEvidencePath?: string;
+  toolAttemptEvidencePath?: string;
+}) {
+  if (!input.artifacts || input.actorId === input.observerActorId) {
+    return;
+  }
+
+  const eventKind = relationshipEventKindForVerification(input);
+  if (!eventKind) {
+    return;
+  }
+
+  const evidenceRef = input.failureEvidencePath ?? input.toolAttemptEvidencePath;
+  if (!evidenceRef) {
+    return;
+  }
+
+  const currentEdge = await readRelationshipEdge(
+    input.artifacts.actorWorkspaceRootDir,
+    input.observerActorId,
+    input.actorId
+  );
+  const nextEdge = applyRelationshipEvent(
+    currentEdge,
+    createRelationshipEventRef({
+      id: `${eventKind}-${input.turnId}-${input.actorId}`,
+      kind: eventKind,
+      summary: `${input.actorId} ${eventKind} during ${input.currentTask?.id ?? "runtime turn"}`,
+      evidence_refs: [evidenceRef],
+      turn: Number(input.turnId.replace(/^turn-/, ""))
+    })
+  );
+
+  await writeRelationshipEdge(input.artifacts.actorWorkspaceRootDir, nextEdge);
 }

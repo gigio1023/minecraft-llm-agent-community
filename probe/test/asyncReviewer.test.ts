@@ -8,6 +8,7 @@ import {
   enqueueActorReviewJob,
   runQueuedActorReviewJobs
 } from "../src/reviewer/reviewerQueue.js";
+import { readRelationshipEdge } from "../src/npc/relationships/relationshipStore.js";
 import { getActorWorkspacePaths } from "../src/runtime/actorWorkspacePaths.js";
 import { writeActorEvidenceRecord } from "../src/runtime/evidence/actorEvidence.js";
 import { writeActorActionSkillRecord } from "../src/runtime/actorWorkspaceStore.js";
@@ -23,6 +24,7 @@ test("queues per-actor reviewer jobs over actor-scoped immutable artifact refs",
   );
 
   try {
+    await writeActorFiles(rootDir, ["npc_a", "npc_b"]);
     const evidencePath = await writeActorEvidenceRecord(rootDir, {
       schema: "actor-evidence/v1",
       evidence_id: "verification-failure-turn-0001-collect_logs",
@@ -31,7 +33,7 @@ test("queues per-actor reviewer jobs over actor-scoped immutable artifact refs",
       created_at: "2026-05-20T00:00:00.000Z",
       turn_id: "turn-0001",
       target: "oak_log",
-      verifier_reason: "inventory and block evidence did not improve"
+      verifier_reason: "log inventory evidence did not improve"
     });
     await writeActorActionSkillRecord(
       rootDir,
@@ -69,6 +71,20 @@ test("queues per-actor reviewer jobs over actor-scoped immutable artifact refs",
     await fs.rm(rootDir, { recursive: true, force: true });
   }
 });
+
+async function writeActorFiles(rootDir: string, actorIds: readonly string[]) {
+  await Promise.all(
+    actorIds.map(async (actorId) => {
+      const paths = getActorWorkspacePaths(rootDir, actorId);
+      await fs.mkdir(paths.actorDir, { recursive: true });
+      await fs.writeFile(
+        paths.actorFile,
+        JSON.stringify({ schema: "actor-workspace/v1", actor_id: actorId }),
+        "utf8"
+      );
+    })
+  );
+}
 
 test("reviewer job refs cannot point at another actor workspace", async () => {
   const rootDir = path.resolve(
@@ -113,6 +129,7 @@ test("deterministic reviewer runner writes actor reviews without active skill mu
   );
 
   try {
+    await writeActorFiles(rootDir, ["npc_a", "npc_b"]);
     const evidencePath = await writeActorEvidenceRecord(rootDir, {
       schema: "actor-evidence/v1",
       evidence_id: "fake-progress-turn-0001-collect_logs",
@@ -121,7 +138,7 @@ test("deterministic reviewer runner writes actor reviews without active skill mu
       created_at: "2026-05-20T00:00:00.000Z",
       turn_id: "turn-0001",
       target: "oak_log",
-      verifier_reason: "actor swung but did not change inventory or blocks"
+      verifier_reason: "actor swung but did not increase log inventory"
     });
     const activePath = await writeActorActionSkillRecord(
       rootDir,
@@ -171,6 +188,69 @@ test("deterministic reviewer runner writes actor reviews without active skill mu
     assert.equal(proposal.status, "draft");
     assert.deepEqual(proposal.evidence_refs, [evidencePath]);
     assert.equal(await fs.readFile(activePath, "utf8"), beforeActive);
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("reviewer runner can explicitly apply guarded relationship proposals", async () => {
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `async-reviewer-relationship-apply-${process.pid}-${Date.now()}`
+  );
+
+  try {
+    await writeActorFiles(rootDir, ["npc_a", "npc_b"]);
+    const evidencePath = await writeActorEvidenceRecord(rootDir, {
+      schema: "actor-evidence/v1",
+      evidence_id: "fake-progress-turn-0001-collect_logs",
+      actor_id: "npc_b",
+      category: "fake_progress_rejection",
+      created_at: "2026-05-21T00:00:00.000Z",
+      turn_id: "turn-0001",
+      verifier_reason: "actor swung but did not increase log inventory"
+    });
+
+    await enqueueActorReviewJob(rootDir, {
+      schema: "actor-review-job/v1",
+      job_id: "review-job-relationship-0001",
+      actor_id: "npc_b",
+      reason: "fake_progress_rejection",
+      created_at: "2026-05-21T00:00:01.000Z",
+      input_refs: [{ kind: "evidence", ref: evidencePath }],
+      active_action_skill_snapshot: []
+    });
+
+    const results = await runQueuedActorReviewJobs(rootDir, "npc_b", {
+      now: () => "2026-05-21T00:00:02.000Z",
+      applyRelationshipEventProposals: true,
+      reviewer: {
+        review() {
+          return {
+            findings: [
+              {
+                severity: "p1",
+                title: "Fake progress",
+                body: "npc_b claimed progress without inventory evidence."
+              }
+            ],
+            relationship_event_proposals: [
+              {
+                kind: "fake_progress_rejected",
+                target_actor_id: "npc_a",
+                summary: "npc_b claimed progress without inventory evidence."
+              }
+            ]
+          };
+        }
+      }
+    });
+
+    assert.equal(results[0]?.relationshipApplications?.[0]?.status, "applied");
+    const edge = await readRelationshipEdge(rootDir, "npc_a", "npc_b");
+    assert.equal(edge.trust, "cautious");
+    assert.equal(edge.recent_events[0]?.kind, "fake_progress_rejected");
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

@@ -15,6 +15,7 @@ type MovingActor = {
   setControlState(control: string, state: boolean): void;
   pathfinder?: {
     goto(goal: unknown): Promise<void>;
+    stop?(): void;
   };
   entity: {
     position: {
@@ -31,6 +32,7 @@ type MoveToArgs = {
   target: MovingActor & { username: string };
   targetId: string;
   durationMs?: number;
+  timeoutMs?: number;
 };
 
 function delay(ms: number) {
@@ -47,19 +49,21 @@ export async function moveTo({
   actor,
   target,
   targetId,
-  durationMs = 1_200
+  durationMs = 1_200,
+  timeoutMs = 10_000
 }: MoveToArgs): Promise<MoveToResult> {
   if (targetId !== target.username) {
     throw new Error(`Unsupported move target: ${targetId}`);
   }
 
   const beforeDistance = roundDistance(actor.entity.position.distanceTo(target.entity.position));
+  let blockedReason: string | undefined;
 
   if (actor.pathfinder) {
     // Pathfinder arrival is the stronger movement primitive because it accounts
     // for terrain and collision. The manual branch is a bounded fallback for
     // minimal runtimes where pathfinder is unavailable.
-    await actor.pathfinder.goto(
+    const goto = actor.pathfinder.goto(
       new goals.GoalNear(
         target.entity.position.x,
         target.entity.position.y,
@@ -67,6 +71,26 @@ export async function moveTo({
         1
       )
     );
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      await Promise.race([
+        goto,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            actor.pathfinder?.stop?.();
+            reject(new Error(`pathfinder timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+        })
+      ]);
+    } catch (error) {
+      actor.pathfinder.stop?.();
+      blockedReason = error instanceof Error ? error.message : String(error);
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
   } else {
     await actor.lookAt(target.entity.position, true);
     actor.setControlState("forward", true);
@@ -82,18 +106,21 @@ export async function moveTo({
   const distanceDelta = roundDistance(beforeDistance - afterDistance);
   const arrived = afterDistance <= 1.5;
   const movedCloser = distanceDelta > 0;
+  const status = blockedReason ? "blocked" : arrived ? "arrived" : movedCloser ? "moved" : "blocked";
 
   // Status is based on measured distance, not the fact that a movement command
   // was issued. This keeps transcripts from treating attempted motion as proof
   // of interaction range.
   return {
-    status: arrived ? "arrived" : movedCloser ? "moved" : "blocked",
+    status,
     distance: afterDistance,
     beforeDistance,
     afterDistance,
     distanceDelta,
     arrived,
-    reason: arrived
+    reason: blockedReason
+      ? `move_to pathfinder failed for ${targetId}: ${blockedReason}.`
+      : arrived
       ? `move_to arrived within 1.5 blocks of ${targetId}.`
       : movedCloser
         ? `move_to reduced distance to ${targetId} by ${distanceDelta} blocks.`

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { getSeedActionSkill } from "../gameplay/seedSkills/registry.js";
 import type { SeedActionSkillOwnershipRecord } from "../skills/ownership.js";
@@ -44,7 +45,12 @@ export type ActorActionSkillRecord = {
 
 export async function writeJson(filePath: string, value: unknown) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  const tempPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`
+  );
+  await fs.writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await fs.rename(tempPath, filePath);
 }
 
 async function readJson<T>(filePath: string): Promise<T> {
@@ -140,8 +146,10 @@ export function getRequiredActorWorkspaceDirs(rootDir: string, actorId: string) 
     paths.actionSkills.retiredDir,
     paths.actionSkills.rejectedDir,
     paths.memoryDir,
+    paths.relationshipsDir,
     paths.evidenceDir,
     paths.reviewsDir,
-    paths.providerInputsDir
+    paths.providerInputsDir,
+    paths.providerOutputsDir
   ];
 }

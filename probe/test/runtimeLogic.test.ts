@@ -28,7 +28,7 @@ import { replyTo } from "../src/mutual/tools/replyTo.js";
 import type { MutualJsonValue, MutualStepRecord, Proposal, ToolResult } from "../src/mutual/types.js";
 import { runMutualLoop } from "../src/mutual/mutualLoop.js";
 import { toToolResult } from "../src/mutual/tools/wrapper.js";
-import { finalizeRunProbe } from "../src/runProbe.js";
+import { finalizeRunProbe, readManualMinecraftPort } from "../src/runProbe.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -185,6 +185,7 @@ function createPathfindingBot(username: string, x: number) {
       throw new Error("moveTo should not fall back to manual controls in this test");
     },
     pathfinder: {
+      stop: undefined as undefined | (() => void),
       async goto() {
         goals.push("goal-near");
         position.x = 1.5;
@@ -302,7 +303,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
       name: "Mara",
       role: "quartermaster",
       style: "brief but careful",
-      objective: "coordinate the marker handoff"
+      objective: "inspect and rebalance shared storage"
     },
     observation: {
       visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
@@ -571,7 +572,15 @@ test("createOpenAICodexGameplayProvider sends actor workspace context and parses
     }
   });
 
-  assert.deepEqual(proposal, {
+  assert.deepEqual({
+    tool: proposal.tool,
+    args: proposal.args
+  }, {
+    tool: "collect_logs",
+    args: { targetCount: 4 }
+  });
+  assert.equal(proposal.providerTrace?.raw_output_text, "{\"tool\":\"collect_logs\",\"args\":{\"targetCount\":4}}");
+  assert.deepEqual(proposal.providerTrace?.proposal, {
     tool: "collect_logs",
     args: { targetCount: 4 }
   });
@@ -593,15 +602,23 @@ test("createOpenAICodexReviewer parses bounded findings and proposal hints", asy
             findings: [
               {
                 severity: "p1",
-                title: "No block delta",
-                body: "The actor claimed progress without inventory or block evidence."
+                title: "No inventory delta",
+                body: "The actor claimed progress without log inventory evidence."
               }
             ],
             proposal: {
               task_intent: "repair log collection",
               required_primitives: ["observe", "collect_logs"],
               known_failure_modes: ["fake_progress"]
-            }
+            },
+            relationship_event_proposals: [
+              {
+                kind: "fake_progress_rejected",
+                target_actor_id: "npc_a",
+                summary: "Jun claimed log progress without inventory evidence.",
+                evidence_refs: ["actors/npc_b/evidence/fake-progress-turn-0001-collect_logs.json"]
+              }
+            ]
           })
         }),
         {
@@ -631,6 +648,14 @@ test("createOpenAICodexReviewer parses bounded findings and proposal hints", asy
   assert.equal(result.findings[0]?.severity, "p1");
   assert.equal(result.proposal?.task_intent, "repair log collection");
   assert.deepEqual(result.proposal?.required_primitives, ["observe", "collect_logs"]);
+  assert.deepEqual(result.relationship_event_proposals, [
+    {
+      kind: "fake_progress_rejected",
+      target_actor_id: "npc_a",
+      summary: "Jun claimed log progress without inventory evidence.",
+      evidence_refs: ["actors/npc_b/evidence/fake-progress-turn-0001-collect_logs.json"]
+    }
+  ]);
 });
 
 test("createOpenAICodexProvider stops after exhausting malformed JSON retries", async () => {
@@ -1366,6 +1391,27 @@ test("moveTo prefers pathfinder and returns before and after distance details", 
   assert.deepEqual(actor.goals, ["goal-near"]);
 });
 
+test("moveTo stops pathfinder and blocks when goto times out", async () => {
+  const actor = createPathfindingBot("npc_a", 0);
+  const target = createPathfindingBot("npc_b", 3);
+  let stopped = false;
+
+  actor.pathfinder.goto = async () => {
+    actor.goals.push("goal-near");
+    return new Promise<void>(() => {});
+  };
+  actor.pathfinder.stop = () => {
+    stopped = true;
+  };
+
+  const result = await moveTo({ actor, target, targetId: "npc_b", timeoutMs: 5 });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(stopped, true);
+  assert.match(result.reason, /pathfinder timeout/);
+  assert.deepEqual(actor.goals, ["goal-near"]);
+});
+
 test("dropItem seeds the marker item and records dropped marker state", async () => {
   const runtimeState = createMutualRuntimeState({
     busyRepliesBeforeAvailable: 1,
@@ -1530,4 +1576,13 @@ test("finalizeRunProbe keeps failure behavior unchanged when main execution fail
       return true;
     }
   );
+});
+
+test("manual Minecraft port override is validated before bypassing managed server", () => {
+  assert.equal(readManualMinecraftPort(undefined), undefined);
+  assert.equal(readManualMinecraftPort(""), undefined);
+  assert.equal(readManualMinecraftPort("32771"), 32771);
+  assert.throws(() => readManualMinecraftPort("not-a-port"), /MC_PORT must be an integer/);
+  assert.throws(() => readManualMinecraftPort("0"), /MC_PORT must be an integer/);
+  assert.throws(() => readManualMinecraftPort("65536"), /MC_PORT must be an integer/);
 });

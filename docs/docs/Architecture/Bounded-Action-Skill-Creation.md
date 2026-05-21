@@ -35,6 +35,30 @@ compose existing trusted primitives and verifiers. Generated code can be
 considered later, but only outside the hot loop and only after review, tests, and
 explicit promotion.
 
+## Atomic Gameplay Boundaries
+
+Some Minecraft actions lose progress if they are interrupted. Action skills must
+model those operations as atomic gameplay boundaries rather than repeatedly
+checking partial progress.
+
+Example: breaking a block is not "swing, inspect, swing, inspect." Mineflayer
+must keep digging until `bot.dig(...)` resolves or fails. Only after that
+boundary should the runtime inspect block state, dropped items, inventory
+pickup, or verifier evidence.
+
+Apply this rule whenever an in-game operation has hidden continuous progress:
+
+- block breaking;
+- eating or drinking;
+- sleeping;
+- smelting waits;
+- item pickup after a drop appears;
+- container transfer while a window is open.
+
+The action skill can still be bounded by a timeout and AbortSignal. The timeout
+is an outer runtime safety boundary, not a reason to poll and restart the
+in-game operation every few ticks.
+
 ## Reference Synthesis
 
 | Reference | Useful pattern | Reject for this repo |

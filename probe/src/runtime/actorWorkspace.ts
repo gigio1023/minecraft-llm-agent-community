@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { getActorProfile, type ActorProfile } from "../npc/profiles.js";
+import { initializeRelationshipEdges } from "../npc/relationships/relationshipStore.js";
 import type { SeedActionSkillOwnershipRecord } from "../skills/ownership.js";
 import type { ActorSession } from "./session/probeSession.js";
 import { getActorWorkspacePaths } from "./actorWorkspacePaths.js";
@@ -23,6 +25,7 @@ export type ActorWorkspaceRecord = {
   actor_id: string;
   username: string;
   role_id: string;
+  actor_profile: ActorProfile;
   workspace_path: string;
   action_skill_library_path: string;
 };
@@ -55,11 +58,12 @@ export async function initializeActorWorkspaces(
 
   await fs.mkdir(options.rootDir, { recursive: true });
 
-  for (const actor of options.actors) {
+  for (const [actorIndex, actor] of options.actors.entries()) {
     const paths = getActorWorkspacePaths(options.rootDir, actor.actor_id);
     const workspacePath = paths.actorDir;
     const actionSkillLibraryPath = paths.actionSkills.rootDir;
     const workspaceDirs = getRequiredActorWorkspaceDirs(options.rootDir, actor.actor_id);
+    const actorProfile = getActorProfile(actor.actor_id, actorIndex);
 
     await Promise.all(
       workspaceDirs.map((workspaceDir) => fs.mkdir(workspaceDir, { recursive: true }))
@@ -72,6 +76,7 @@ export async function initializeActorWorkspaces(
       actor_id: actor.actor_id,
       username: actor.username,
       role_id: actor.role_id,
+      actor_profile: actorProfile,
       initialized_at: initializedAt,
       action_skill_library: "action-skills/index.json"
     });
@@ -99,10 +104,16 @@ export async function initializeActorWorkspaces(
       actor_id: actor.actor_id,
       username: actor.username,
       role_id: actor.role_id,
+      actor_profile: actorProfile,
       workspace_path: workspacePath,
       action_skill_library_path: actionSkillLibraryPath
     });
   }
+
+  await initializeRelationshipEdges({
+    rootDir: options.rootDir,
+    actorIds: options.actors.map((actor) => actor.actor_id)
+  });
 
   const result: ActorWorkspaceInitResult = {
     rootDir: options.rootDir,

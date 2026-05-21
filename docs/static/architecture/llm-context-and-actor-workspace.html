@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Minecraft Agent Runtime: LLM Context, Memory, Actor Workspace, Action Skills</title>
+  <title>minecraft-llm-agent-community: LLM Context, Memory, Actor Workspace, Action Skills</title>
   <style>
     :root {
       --bg: #f7f7f3;
@@ -307,7 +307,11 @@
         <li><code>probe/src/mutual/runLiveDialogueProbe.ts</code></li>
         <li><code>probe/src/mutual/skillVillageCli.ts</code></li>
         <li><code>probe/src/runtime/actorWorkspace.ts</code></li>
+        <li><code>probe/src/npc/profiles.ts</code></li>
+        <li><code>probe/src/npc/goals/goalStack.ts</code></li>
+        <li><code>probe/src/npc/relationships/relationshipLedger.ts</code></li>
         <li><code>probe/src/gameplay/seedSkills/registry.ts</code></li>
+        <li><code>docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md</code></li>
         <li><code>docs/docs/Architecture/Bounded-Action-Skill-Creation.md</code></li>
       </ul>
     </aside>
@@ -329,10 +333,10 @@
         <p class="ko">현재 bounded gameplay loop는 <code>createDeterministicProvider()</code>를 사용한다. LLM 입력 구조는 live dialogue 경로와 exploratory generated action skill 경로에 있다.</p>
       </div>
       <div class="panel">
-        <span class="status warn">Target contract / 목표 계약</span>
-        <h3>Actor workspace must become source of truth <span class="ko">actor workspace가 source of truth가 되어야 한다</span></h3>
-        <p>The runtime creates per-actor directories and indexes today. The next implementation slice must make active, candidate, retired, rejected, and superseded action skill records live under actor workspace.</p>
-        <p class="ko">현재 runtime은 actor별 디렉터리와 index를 만든다. 다음 구현 slice에서는 active, candidate, retired, rejected, superseded action skill record가 actor workspace 아래에서 관리되도록 해야 한다.</p>
+        <span class="status good">Source of truth / 기준 저장소</span>
+        <h3>Actor workspace now carries owned runtime state <span class="ko">actor workspace가 actor 소유 상태를 담는다</span></h3>
+        <p>The runtime reads actor-owned active action skills from actor workspace records, persists actor profiles, and writes relationship edges from evidence-backed verification events.</p>
+        <p class="ko">runtime은 actor workspace record에서 actor-owned active action skill을 읽고, actor profile을 저장하며, 검증 evidence에서 relationship edge를 갱신한다.</p>
       </div>
     </div>
 
@@ -370,6 +374,8 @@
     SESSION["probe session"]
     OWN["seed action skill ownership"]
     AW["actor workspace indexes"]
+    PROFILE["actor_profile"]
+    REL["relationships/*.json"]
   end
 
   MC --> BOT --> OBS --> LOOP
@@ -380,6 +386,8 @@
   VERIFY --> LOOP
   LOOP --> TRANSCRIPT
   SESSION --> OWN --> AW
+  AW --> PROFILE
+  AW --> REL
   SESSION --> TRANSCRIPT
   OWN --> TRANSCRIPT
   AW --> TRANSCRIPT</pre>
@@ -401,6 +409,9 @@
     MEM2["actor memory tail"]
     RECENT["recentTranscript"]
     SOCIAL["role + mailbox + bulletin + settlement + thread"]
+    PROF2["actor_profile"]
+    GOAL2["goal_stack"]
+    REL2["relationships + incoming_relationships"]
     LAST["lastActionResult"]
   end
 
@@ -408,6 +419,9 @@
   MEM2 --> CTX
   RECENT --> CTX
   SOCIAL --> CTX
+  PROF2 --> CTX
+  GOAL2 --> CTX
+  REL2 --> CTX
   LAST --> CTX
   LDP --> CTX --> OAI --> RESP --> PARSE --> MUTUALTOOLS</pre>
     </div>
@@ -431,6 +445,22 @@
   REQ --> TRACE
   REQ --> TS --> EXEC --> FB --> CONV
   EXEC --> SKMEM</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>Live Server Readiness <span class="ko-inline">라이브 서버 준비</span></h2>
+    <div class="grid two">
+      <div class="panel">
+        <h3>Joinable endpoint <span class="ko">접속 가능한 endpoint</span></h3>
+        <p>Use <code>bun run --cwd probe server:ready</code>. It starts or reports the managed Docker server and prints <code>minecraft_direct_connect=127.0.0.1:25565</code> by default.</p>
+        <p class="ko"><code>bun run --cwd probe server:ready</code>를 쓰면 managed Docker server를 시작하거나 기존 endpoint를 보고하고 기본적으로 <code>minecraft_direct_connect=127.0.0.1:25565</code>를 출력한다.</p>
+      </div>
+      <div class="panel">
+        <h3>Probe alignment <span class="ko">probe 연결 정렬</span></h3>
+        <p>When <code>MC_PORT</code> is not set, <code>runProbe</code> now uses the same managed live-smoke server context and RCON path instead of a hardcoded container name. Manual <code>MC_PORT</code> overrides are validated before the managed server is bypassed.</p>
+        <p class="ko"><code>MC_PORT</code>가 없으면 <code>runProbe</code>도 같은 managed live-smoke server context와 RCON 경로를 사용한다. 더 이상 예전 hardcoded container name에 의존하지 않는다. 수동 <code>MC_PORT</code> override는 managed server를 우회하기 전에 검증된다.</p>
+      </div>
     </div>
   </section>
 
@@ -543,10 +573,11 @@
   <section>
     <h2>LLM Message Structure <span class="ko-inline">LLM 메시지 구조</span></h2>
     <div class="callout">
-      <strong>Stable gameplay loop / 안정 gameplay loop:</strong> no LLM message is sent. The provider input is an in-process
-      object: <code>{ observation, lastResult, currentTask }</code>. This matters because actor workspace
+      <strong>Stable gameplay loop / 안정 gameplay loop:</strong> the default provider is deterministic, so no external LLM
+      request is sent. The in-process provider input now carries <code>{ observation, lastResult, currentTask, goalStack, activeActionSkillContext, actorProviderContext }</code>
+      when actor workspace artifacts are enabled. This matters because actor workspace
       visibility cannot be judged from stable <code>runProbe</code> LLM prompts; there are none.
-      <span class="ko">LLM 메시지는 전송되지 않는다. provider input은 process 내부 객체 <code>{ observation, lastResult, currentTask }</code>다. 따라서 안정 <code>runProbe</code> 경로의 LLM prompt를 보고 actor workspace visibility를 판단할 수 없다. 그 prompt 자체가 없기 때문이다.</span>
+      <span class="ko">기본 provider는 deterministic이므로 외부 LLM request는 전송되지 않는다. actor workspace artifact가 켜진 경우 process 내부 provider input은 <code>{ observation, lastResult, currentTask, goalStack, activeActionSkillContext, actorProviderContext }</code>를 담는다. 따라서 안정 <code>runProbe</code> 경로의 LLM prompt를 보고 actor workspace visibility를 판단할 수 없다. 그 prompt 자체가 없기 때문이다.</span>
     </div>
 
     <h3>1. Live dialogue provider: one JSON packet per request <span class="ko">live dialogue provider는 요청마다 하나의 JSON packet을 보낸다</span></h3>
@@ -572,6 +603,9 @@
       observation,
       memory,
       recentTranscript,
+      actor_profile,
+      goal_stack,
+      relationships,
       rules,
       lastResult
     })
@@ -615,7 +649,7 @@
         <h3>Live dialogue turn 2 <span class="ko">두 번째 live dialogue turn</span></h3>
         <pre><code>{
   "actorId": "npc_b",
-  "persona": {"name": "Jun", "role": "runner", "...": "..."},
+  "persona": {"name": "Jun", "role": "gatherer", "...": "..."},
   "observation": {
     "visibleActors": [{"id": "npc_a", "distance": 1.96, "busy": false}],
     "heardMessages": [{"from": "npc_a", "text": "..." }],
@@ -705,6 +739,126 @@
   </section>
 
   <section>
+    <h2>Actor Profiles, Goals, Relationships <span class="ko-inline">actor profile, goal, 관계 상태</span></h2>
+    <p>
+      Persona text is no longer the behavioral source of truth. The runtime uses a canonical
+      <code>ActorProfile</code>, a categorical <code>ActorGoalStack</code>, and directional
+      <code>RelationshipEdge</code> records. Numeric scores are projections from enum categories,
+      not stored freeform values like <code>trust: 0.73</code>.
+    </p>
+    <p class="ko">
+      persona 문장은 행동의 source of truth가 아니다. runtime은 canonical <code>ActorProfile</code>,
+      category 기반 <code>ActorGoalStack</code>, 방향성이 있는 <code>RelationshipEdge</code> record를 쓴다.
+      숫자 score는 enum category에서 파생되는 값이지 <code>trust: 0.73</code> 같은 임의 float가 아니다.
+    </p>
+
+    <div class="grid three">
+      <div class="panel">
+        <h3>Actor profile <span class="ko">actor profile</span></h3>
+        <pre><code>{
+  "actor_id": "npc_b",
+  "display_name": "Jun",
+  "gameplay_role": "gatherer",
+  "social_archetype": "distracted gatherer",
+  "public_responsibility": "collect logs and deposit usable materials",
+  "private_goal": "finish the current resource task before taking on social coordination",
+  "learning_bias": "learns from task results and direct world observations",
+  "risk_posture": "moderate risk; moves quickly but pauses when a task is blocked",
+  "speech_style": "quick and slightly distracted"
+}</code></pre>
+      </div>
+      <div class="panel">
+        <h3>Goal stack <span class="ko">goal stack</span></h3>
+        <pre><code>{
+  "public_obligation": {
+    "kind": "gather_resource",
+    "priority": "normal",
+    "status": "in_progress",
+    "target_item": "logs"
+  },
+  "private_goal": {
+    "kind": "reduce_friction",
+    "priority": "background",
+    "status": "in_progress"
+  },
+  "relationship_goal": {
+    "kind": "recover_from_failure",
+    "source_pressure_kind": "recovery_social_caution",
+    "action_boundary": "intent_pressure_only",
+    "active_action_skill_required": true
+  },
+  "recovery_goal": null
+}</code></pre>
+      </div>
+      <div class="panel">
+        <h3>Relationship edge <span class="ko">관계 edge</span></h3>
+        <pre><code>{
+  "from_actor_id": "npc_a",
+  "to_actor_id": "npc_b",
+  "trust": "distrusted",
+  "obligation": "overdue",
+  "dependency": "independent",
+  "friction": "resentful",
+  "familiarity": "acquaintance",
+  "recent_events": ["fake_progress_rejected", "verification_failed"]
+}</code></pre>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Axis<br><span class="ko-inline">축</span></th>
+          <th>Categories<br><span class="ko-inline">category</span></th>
+          <th>Runtime use<br><span class="ko-inline">runtime에서 쓰는 방식</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Trust<br><span class="ko-inline">신뢰</span></td>
+          <td><code>unproven</code>, <code>distrusted</code>, <code>cautious</code>, <code>reliable</code>, <code>trusted</code></td>
+          <td>Use for whether claims need verification before reliance.<br><span class="ko-inline">상대의 claim을 믿기 전에 검증을 강화할지 판단한다.</span></td>
+        </tr>
+        <tr>
+          <td>Obligation<br><span class="ko-inline">의무</span></td>
+          <td><code>none</code>, <code>requested</code>, <code>accepted</code>, <code>overdue</code>, <code>fulfilled</code></td>
+          <td>Use for public pressure and blocked teammate routing.<br><span class="ko-inline">공개 pressure와 blocked teammate routing에 쓴다.</span></td>
+        </tr>
+        <tr>
+          <td>Friction<br><span class="ko-inline">마찰</span></td>
+          <td><code>none</code>, <code>annoyed</code>, <code>frustrated</code>, <code>resentful</code>, <code>hostile</code></td>
+          <td>Use for request wording, review attention, and relationship action pressure before changing permissions.<br><span class="ko-inline">permission을 바꾸기 전에 대화 방식, review 우선순위, relationship action pressure에 반영한다.</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="mermaid-wrap">
+      <pre class="mermaid">flowchart LR
+  VERIFY["task verification"]
+  EVID["actor evidence ref"]
+  EVENT["relationship event enum"]
+  EDGE["relationships/&lt;other-actor&gt;.json"]
+  PRESSURE["relationship_pressures"]
+  PROVIDER["actorProviderContext"]
+  REVIEW["per-actor async reviewer"]
+  APPLIER["guarded proposal applier"]
+
+  VERIFY --> EVID --> EVENT --> EDGE --> PROVIDER
+  EDGE --> PRESSURE --> PROVIDER
+  EVID --> REVIEW --> APPLIER --> EVENT</pre>
+    </div>
+
+    <div class="callout">
+      <strong>Guardrail / 가드레일:</strong>
+      relationship pressure changes intent only. It cannot grant tools, bypass active action skill
+      gates, or mutate role contracts. Reviewer relationship proposals are inert until the guarded
+      applier validates target actor workspace, workspace-safe actor id, event enum,
+      actor-workspace evidence refs, and durable application marker.
+      <span class="ko">relationship pressure는 intent만 바꾼다. tool 권한을 부여하거나 active action skill gate, role contract를 우회할 수 없다. reviewer relationship proposal은 guarded applier가 target actor workspace, workspace-safe actor id, event enum, actor-workspace evidence ref, durable application marker를 검증하기 전까지 비활성 제안이다.</span>
+    </div>
+  </section>
+
+  <section>
     <h2>Memory System Implementation <span class="ko-inline">메모리 시스템 구현</span></h2>
     <div class="mermaid-wrap">
       <pre class="mermaid">flowchart TB
@@ -721,6 +875,7 @@
     MAIL["turnPhasedMailbox"]
     BULLETIN["teamBulletin"]
     SETTLEMENT["sharedSettlement snapshot"]
+    RELMEM["actor workspace relationships"]
   end
 
   subgraph "Artifacts"
@@ -734,6 +889,7 @@
   THREAD --> WM
   MAIL --> THREAD
   BULLETIN --> SETTLEMENT
+  RELMEM --> THREAD
   OBSM --> TRANS
   THREAD --> CHECK
   SETTLEMENT --> CHECK
@@ -780,6 +936,13 @@
           <td>Shared chest facts, major events, hostile sighting.<br><span class="ko-inline">공유 chest 사실, 주요 사건, hostile sighting을 담는다.</span></td>
         </tr>
         <tr>
+          <td>Relationship edges<br><span class="ko-inline">관계 edge</span></td>
+          <td><code>npc/relationships/relationshipStore.ts</code></td>
+          <td>Yes, via <code>actorProviderContext.relationships</code> and <code>incoming_relationships</code><br><span class="ko-inline"><code>actorProviderContext.relationships</code>와 <code>incoming_relationships</code>로 전달된다</span></td>
+          <td>Directional enum edge plus recent events<br><span class="ko-inline">방향성 있는 enum edge와 최근 event</span></td>
+          <td>Evidence-backed social state; trust/friction changes only from cited events.<br><span class="ko-inline">evidence 기반 사회 상태이며 trust/friction은 cited event로만 바뀐다.</span></td>
+        </tr>
+        <tr>
           <td>Transcript/canonical parts<br><span class="ko-inline">transcript/canonical part</span></td>
           <td><code>runtime/transcript.ts</code>, <code>transcript/canonical/*</code></td>
           <td>Usually artifact-facing; future checkpoint context can re-inject summaries<br><span class="ko-inline">주로 artifact-facing이며, future checkpoint context에서 summary 재주입 가능</span></td>
@@ -805,15 +968,18 @@
   A --> ASKILLS["action-skills/"]
   A --> AMEM["memory/"]
   A --> AEVID["evidence/"]
+  A --> AREL["relationships/"]
+  A --> REV["reviews/"]
+  A --> PIN["provider-inputs/"]
 
   ASKILLS --> AIDX["index.json"]
   ASKILLS --> ACTIVE["active/"]
   ASKILLS --> CAND["candidates/"]
   ASKILLS --> RET["retired/"]
 
-  AIDX --> SEED["active_seed_action_skills"]
-  CAND --> PROP["future proposal records"]
-  ACTIVE --> PROMOTED["future promoted recipes"]
+  AIDX --> SEED["actor-owned active action skills"]
+  CAND --> PROP["candidate proposal records"]
+  ACTIVE --> PROMOTED["promoted recipes"]
   RET --> HISTORY["superseded or failed history"]</pre>
     </div>
 
@@ -834,10 +1000,10 @@
       <div class="panel">
         <h3>Current limits <span class="ko">현재 한계</span></h3>
         <ul class="note-list">
-          <li>No current module reads candidate action skills from actor workspace before provider calls.<span class="ko">provider call 전에 actor workspace의 candidate action skill을 읽는 모듈은 아직 없다.</span></li>
-          <li>No current recipe validator/promoter writes <code>active/</code>, <code>candidates/</code>, or <code>retired/</code>.<span class="ko">recipe validator/promoter가 <code>active/</code>, <code>candidates/</code>, <code>retired/</code>를 쓰는 구현은 아직 없다.</span></li>
-          <li>Exploratory generated TypeScript action skills still write to <code>build/generated-skills</code>.<span class="ko">탐색적 generated TypeScript action skill은 아직 <code>build/generated-skills</code>에 저장된다.</span></li>
-          <li>Actor workspace is ready as a filesystem contract, not yet the live action skill lifecycle engine.<span class="ko">actor workspace는 filesystem contract로 준비됐지만, 아직 live action skill lifecycle engine은 아니다.</span></li>
+          <li>Runtime action selection trusts only actor-owned active records; candidate records still need explicit promotion before execution.<span class="ko">runtime action selection은 actor-owned active record만 신뢰한다. candidate record는 명시적 promotion 전에는 실행되지 않는다.</span></li>
+          <li>Generated TypeScript action skills are legacy debug output unless archived into actor workspace candidates.<span class="ko">generated TypeScript action skill은 actor workspace candidate로 archive되기 전까지 legacy debug output이다.</span></li>
+          <li>Positive relationship edges are updated from observable social value such as shared storage updates, not private collection alone; future gameplay paths need the same evidence wiring.<span class="ko">긍정적인 relationship edge는 개인 수집만으로 갱신되지 않고 shared storage update 같은 관찰 가능한 사회적 value에서 갱신된다. future gameplay path도 같은 evidence wiring이 필요하다.</span></li>
+          <li>Reviewer relationship proposals are applied only when <code>REVIEW_APPLY_RELATIONSHIP_EVENTS=1</code> requests the guarded runtime applier.<span class="ko">reviewer relationship proposal은 <code>REVIEW_APPLY_RELATIONSHIP_EVENTS=1</code>로 guarded runtime applier를 요청할 때만 적용된다.</span></li>
         </ul>
       </div>
     </div>
@@ -853,6 +1019,9 @@
       retired/
     memory/
     evidence/
+    relationships/
+    reviews/
+    provider-inputs/
   npc_b/
     actor.json
     action-skills/
@@ -861,7 +1030,10 @@
       candidates/
       retired/
     memory/
-    evidence/</code></pre>
+    evidence/
+    relationships/
+    reviews/
+    provider-inputs/</code></pre>
   </section>
 
   <section>

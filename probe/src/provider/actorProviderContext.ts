@@ -1,6 +1,22 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { buildRelationshipGoalFrame, type GoalFrame } from "../npc/goals/goalStack.js";
+import { getActorProfile } from "../npc/profiles.js";
+import {
+  deriveRelationshipActionPressure,
+  deriveRelationshipActionPressures,
+  selectDominantRelationshipActionPressure,
+  type RelationshipActionPressure
+} from "../npc/relationships/actionPressure.js";
+import {
+  listIncomingRelationshipEdges,
+  listRelationshipEdges
+} from "../npc/relationships/relationshipStore.js";
+import {
+  projectRelationshipScores,
+  type RelationshipEdge
+} from "../npc/relationships/relationshipLedger.js";
 import type { ActorActionSkillRecord } from "../runtime/actorWorkspaceStore.js";
 import { getActorWorkspacePaths } from "../runtime/actorWorkspacePaths.js";
 import type { JsonValue } from "./inputSnapshot.js";
@@ -17,7 +33,9 @@ export type ActorProviderContextOptions = {
     reviews?: number;
     candidates?: number;
     memory?: number;
+    relationships?: number;
   };
+  goalStack?: JsonValue;
 };
 
 async function readJsonIfExists<T>(filePath: string): Promise<T | null> {
@@ -110,7 +128,93 @@ function compactReview(actorDir: string, filePath: string, value: JsonRecord): J
     findings: Array.isArray(value.findings) ? value.findings : [],
     candidate_proposals: Array.isArray(value.candidate_proposals)
       ? value.candidate_proposals
+      : [],
+    relationship_event_proposals: Array.isArray(value.relationship_event_proposals)
+      ? value.relationship_event_proposals.map((proposal) =>
+          compactRelationshipEventProposal(proposal)
+        )
       : []
+  };
+}
+
+function compactRelationshipEventProposal(value: unknown): JsonRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      status: "invalid_shape"
+    };
+  }
+
+  const record = value as JsonRecord;
+  return {
+    status: "proposal_only_until_guarded_application",
+    kind: typeof record.kind === "string" ? record.kind : null,
+    target_actor_id:
+      typeof record.target_actor_id === "string" ? record.target_actor_id : null,
+    summary: typeof record.summary === "string" ? record.summary : null,
+    evidence_refs: Array.isArray(record.evidence_refs) ? record.evidence_refs : []
+  };
+}
+
+function compactRelationship(edge: RelationshipEdge): JsonRecord {
+  const scores = projectRelationshipScores(edge);
+  const actionPressure = deriveRelationshipActionPressure(edge);
+
+  return {
+    from_actor_id: edge.from_actor_id,
+    to_actor_id: edge.to_actor_id,
+    trust: edge.trust,
+    trust_score: scores.trust_score,
+    obligation: edge.obligation,
+    obligation_score: scores.obligation_score,
+    dependency: edge.dependency,
+    dependency_score: scores.dependency_score,
+    friction: edge.friction,
+    friction_score: scores.friction_score,
+    familiarity: edge.familiarity,
+    familiarity_score: scores.familiarity_score,
+    recent_events: edge.recent_events.slice(-4),
+    action_pressure: actionPressure ? compactRelationshipPressure(actionPressure) : null
+  };
+}
+
+function compactRelationshipPressure(pressure: RelationshipActionPressure): JsonRecord {
+  return {
+    actor_id: pressure.actor_id,
+    target_actor_id: pressure.target_actor_id,
+    kind: pressure.kind,
+    priority: pressure.priority,
+    summary: pressure.summary,
+    evidence_refs: [...pressure.evidence_refs],
+    derived_from: pressure.derived_from,
+    action_boundary: pressure.action_boundary,
+    active_action_skill_required: pressure.active_action_skill_required,
+    role_contract_boundary: pressure.role_contract_boundary
+  };
+}
+
+function compactGoalFrame(frame: GoalFrame): JsonRecord {
+  return Object.fromEntries(
+    Object.entries(frame).filter(([, value]) => value !== undefined)
+  ) as JsonRecord;
+}
+
+function withRelationshipGoal(
+  goalStack: JsonValue | undefined,
+  pressure: RelationshipActionPressure | null
+): JsonValue | undefined {
+  if (!pressure) {
+    return goalStack;
+  }
+
+  const relationshipGoal = compactGoalFrame(buildRelationshipGoalFrame(pressure));
+
+  if (!goalStack || typeof goalStack !== "object" || Array.isArray(goalStack)) {
+    return { relationship_goal: relationshipGoal };
+  }
+
+  return {
+    ...goalStack,
+    relationship_goal: relationshipGoal
   };
 }
 
@@ -147,10 +251,15 @@ export async function buildActorProviderContext(
     evidence: options.limits?.evidence ?? 6,
     reviews: options.limits?.reviews ?? 3,
     candidates: options.limits?.candidates ?? 5,
-    memory: options.limits?.memory ?? 8
+    memory: options.limits?.memory ?? 8,
+    relationships: options.limits?.relationships ?? 6
   };
   const paths = getActorWorkspacePaths(options.actorWorkspaceRootDir, options.actorId);
   const actorRecord = await readJsonIfExists<JsonRecord>(paths.actorFile);
+  const actorProfile =
+    actorRecord && typeof actorRecord.actor_profile === "object" && actorRecord.actor_profile !== null
+      ? actorRecord.actor_profile
+      : getActorProfile(options.actorId);
   const activeActionSkills = options.activeActionSkills
     .filter((record) => record.owner_actor_id === options.actorId && record.status === "active")
     .map(compactActiveActionSkill)
@@ -176,6 +285,30 @@ export async function buildActorProviderContext(
     compactReview,
     { excludeDirNames: ["queue"] }
   );
+  const relationshipEdges = tail(
+    await listRelationshipEdges(options.actorWorkspaceRootDir, options.actorId),
+    limits.relationships
+  );
+  const incomingRelationshipEdges = tail(
+    await listIncomingRelationshipEdges(options.actorWorkspaceRootDir, options.actorId),
+    limits.relationships
+  );
+  const relationships = relationshipEdges.map(compactRelationship);
+  const incomingRelationships = incomingRelationshipEdges.map(compactRelationship);
+  const relationshipPressureRecords =
+    deriveRelationshipActionPressures(relationshipEdges);
+  const incomingRelationshipPressureRecords =
+    deriveRelationshipActionPressures(incomingRelationshipEdges);
+  const relationshipPressures = relationshipPressureRecords.map(
+    compactRelationshipPressure
+  );
+  const incomingRelationshipPressures = incomingRelationshipPressureRecords.map(
+    compactRelationshipPressure
+  );
+  const goalStack = withRelationshipGoal(
+    options.goalStack,
+    selectDominantRelationshipActionPressure(relationshipPressureRecords)
+  );
 
   return {
     schema: "actor-provider-context/v1",
@@ -186,6 +319,12 @@ export async function buildActorProviderContext(
           ? actorRecord.role_id
           : null
     },
+    actor_profile: actorProfile,
+    ...(goalStack ? { goal_stack: goalStack } : {}),
+    relationships,
+    incoming_relationships: incomingRelationships,
+    relationship_pressures: relationshipPressures,
+    incoming_relationship_pressures: incomingRelationshipPressures,
     active_action_skills: activeActionSkills,
     candidate_action_skills: candidates,
     recent_evidence: recentEvidence,
@@ -195,6 +334,8 @@ export async function buildActorProviderContext(
       providers_propose_only: true,
       runtime_verifies_success: true,
       active_action_skill_required: true,
+      relationship_pressure_changes_intent_only: true,
+      relationship_pressure_does_not_grant_tools: true,
       do_not_claim_progress_without_runtime_evidence: true
     }
   };

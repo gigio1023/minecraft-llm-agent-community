@@ -41,7 +41,7 @@ const DEFAULT_TIMEOUT_POLICY: ActionTimeoutPolicy = {
     say: 2_000,
     remember: 1_000,
     move_to: 8_000,
-    collect_logs: 15_000,
+    collect_logs: 45_000,
     craft_item: 5_000,
     inspect_chest: 3_000,
     deposit_shared: 4_000,

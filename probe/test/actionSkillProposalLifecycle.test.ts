@@ -34,7 +34,7 @@ test("stores candidate action skill proposals under the owning actor workspace",
       preconditions: ["nearby log block is visible"],
       required_primitives: ["observe", "collect_logs"],
       proposed_recipe_id: "recipe-local-log-targeting-v1",
-      success_verifier: "inventory_delta:oak_log>=1 or block_delta:log_removed",
+      success_verifier: "inventory_delta:oak_log>=1",
       known_failure_modes: ["pathing_started_without_inventory_delta"],
       created_at: "2026-05-20T00:00:00.000Z",
       updated_at: "2026-05-20T00:00:00.000Z"
@@ -102,7 +102,7 @@ test("promotes a validated candidate after trial evidence and supersedes the old
         preconditions: ["nearby log block is visible"],
         required_primitives: ["observe", "collect_logs", "wait"],
         proposed_recipe_id: "recipe-collect-logs-v2",
-        success_verifier: "block_delta:log_removed",
+        success_verifier: "inventory_delta:oak_log>=1",
         known_failure_modes: ["walked_away_from_log_target"],
         created_at: "2026-05-20T00:00:00.000Z",
         updated_at: "2026-05-20T00:00:00.000Z"
@@ -125,11 +125,11 @@ test("promotes a validated candidate after trial evidence and supersedes the old
             args: { targetCount: 4 },
             guard: "nearby log block is visible",
             timeout_ms: 4_000,
-            expected_evidence: ["block_delta", "inventory_delta"]
+            expected_evidence: ["inventory_delta"]
           }
         ],
         verifier: {
-          kind: "block_delta",
+          kind: "inventory_delta",
           target: "oak_log",
           minimum_delta: 1
         }
@@ -137,7 +137,7 @@ test("promotes a validated candidate after trial evidence and supersedes the old
       trial: {
         status: "passed",
         evidence_refs: ["evidence/tool-attempt-turn-0002-collect_logs.json"],
-        verifier_reason: "log block delta was observed during bounded trial"
+        verifier_reason: "log inventory delta was observed during bounded trial"
       },
       created_at: "2026-05-20T00:01:00.000Z"
     });
@@ -232,7 +232,7 @@ test("runs candidate recipe steps through bounded primitive trial execution", as
       preconditions: [],
       required_primitives: ["observe", "collect_logs"],
       proposed_recipe_id: "recipe-trial-collect-logs",
-      success_verifier: "block_delta:oak_log",
+      success_verifier: "inventory_delta:oak_log>=1",
       known_failure_modes: [],
       created_at: "2026-05-20T00:00:00.000Z",
       updated_at: "2026-05-20T00:00:00.000Z"
@@ -253,11 +253,11 @@ test("runs candidate recipe steps through bounded primitive trial execution", as
           primitive: "collect_logs" as const,
           args: { targetCount: 1 },
           timeout_ms: 1_000,
-          expected_evidence: ["block_delta"]
+          expected_evidence: ["inventory_delta"]
         }
       ],
       verifier: {
-        kind: "block_delta" as const,
+        kind: "inventory_delta" as const,
         target: "oak_log",
         minimum_delta: 1
       }

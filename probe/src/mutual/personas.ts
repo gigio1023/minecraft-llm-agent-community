@@ -1,31 +1,32 @@
+import { canonicalActorProfiles, getActorProfile } from "../npc/profiles.js";
+
+function toScenarioPersona(profile: ReturnType<typeof getActorProfile>) {
+  return {
+    name: profile.display_name,
+    summary: profile.social_archetype,
+    goal: profile.private_goal
+  };
+}
+
 // Scenario personas provide concise social framing for transcript readability.
 // They should not be treated as proof of social simulation by themselves.
-export const mutualPersonas = {
-  npc_a: {
-    name: "Mara",
-    summary: "anxious quartermaster",
-    goal: "ask whether the marker item should be moved to the shared chest"
-  },
-  npc_b: {
-    name: "Jun",
-    summary: "distracted runner",
-    goal: "reply only after finishing or pausing the current task"
+export const mutualPersonas = Object.fromEntries(
+  Object.entries(canonicalActorProfiles).map(([actorId, profile]) => [
+    actorId,
+    toScenarioPersona(profile)
+  ])
+) as Record<
+  keyof typeof canonicalActorProfiles,
+  {
+    name: string;
+    summary: string;
+    goal: string;
   }
-} as const;
+>;
 
 /** Resolves known scenario personas and deterministic fallbacks for extra bots. */
 export function getScenarioPersona(actorId: string, index = 0) {
-  const knownPersona = mutualPersonas[actorId as keyof typeof mutualPersonas];
-
-  if (knownPersona) {
-    return knownPersona;
-  }
-
-  return {
-    name: `NPC ${index + 1}`,
-    summary: index === 0 ? "careful quartermaster" : "practical field worker",
-    goal: `coordinate the next shared-world step for ${actorId}`
-  };
+  return toScenarioPersona(getActorProfile(actorId, index));
 }
 
 export function buildScenarioPersonas(actorIds: readonly string[]) {

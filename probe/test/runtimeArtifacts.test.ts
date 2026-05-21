@@ -12,6 +12,12 @@ import { writeProviderInputSnapshot } from "../src/provider/providerInputStore.j
 import { buildActorProviderContext } from "../src/provider/actorProviderContext.js";
 import { writeReviewerOutput } from "../src/reviewer/reviewerStore.js";
 import { writeActionSkillProposal } from "../src/skills/proposals/proposalStore.js";
+import {
+  applyRelationshipEvent,
+  createDefaultRelationshipEdge,
+  createRelationshipEventRef
+} from "../src/npc/relationships/relationshipLedger.js";
+import { writeRelationshipEdge } from "../src/npc/relationships/relationshipStore.js";
 import { writeActorActionSkillRecord, writeJson } from "../src/runtime/actorWorkspaceStore.js";
 import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
 
@@ -112,7 +118,7 @@ test("writes provider snapshots and reviewer outputs into actor workspace paths"
         {
           severity: "p1",
           title: "fake progress",
-          body: "The actor moved away from the target without inventory or block delta evidence."
+          body: "The actor moved away from the target without log inventory evidence."
         }
       ],
       candidate_proposals: [],
@@ -144,7 +150,18 @@ test("builds provider-facing actor context from workspace artifacts", async () =
       schema: "actor-workspace/v1",
       actor_id: "npc_b",
       username: "npc_b",
-      role_id: "gatherer"
+      role_id: "gatherer",
+      actor_profile: {
+        actor_id: "npc_b",
+        gameplay_role: "gatherer",
+        display_name: "Jun",
+        social_archetype: "distracted gatherer",
+        public_responsibility: "collect logs and deposit usable materials",
+        private_goal: "finish the current resource task before taking on social coordination",
+        learning_bias: "learns from task results and direct world observations",
+        risk_posture: "moderate risk; moves quickly but pauses when a task is blocked",
+        speech_style: "quick and slightly distracted"
+      }
     });
     const activeSkill = testActionSkillRecord(
       "collectLogs",
@@ -160,7 +177,7 @@ test("builds provider-facing actor context from workspace artifacts", async () =
       created_at: "2026-05-20T00:00:00.000Z",
       turn_id: "turn-0001",
       target: "oak_log",
-      verifier_reason: "no block or inventory delta"
+      verifier_reason: "no inventory delta"
     });
     await writeActionSkillProposal(rootDir, {
       schema: "action-skill-proposal/v1",
@@ -174,11 +191,24 @@ test("builds provider-facing actor context from workspace artifacts", async () =
       preconditions: ["nearby log block is visible"],
       required_primitives: ["observe", "collect_logs"],
       proposed_recipe_id: "recipe-repair-collect-logs",
-      success_verifier: "block_delta:oak_log",
+      success_verifier: "inventory_delta:oak_log>=1",
       known_failure_modes: ["fake_progress"],
       created_at: "2026-05-20T00:00:01.000Z",
       updated_at: "2026-05-20T00:00:01.000Z"
     });
+    await writeRelationshipEdge(
+      rootDir,
+      applyRelationshipEvent(
+        createDefaultRelationshipEdge("npc_a", "npc_b"),
+        createRelationshipEventRef({
+          id: "resource-delivered-turn-0001",
+          kind: "resource_delivered",
+          summary: "npc_b delivered logs",
+          evidence_refs: [evidencePath],
+          turn: 1
+        })
+      )
+    );
 
     const context = await buildActorProviderContext({
       actorWorkspaceRootDir: rootDir,
@@ -189,6 +219,27 @@ test("builds provider-facing actor context from workspace artifacts", async () =
 
     assert.equal(context.schema, "actor-provider-context/v1");
     assert.deepEqual(context.actor, { actor_id: "npc_b", role_id: "gatherer" });
+    assert.equal((context.actor_profile as { display_name: string }).display_name, "Jun");
+    assert.equal(
+      (
+        context.incoming_relationships as Array<{
+          from_actor_id: string;
+          trust: string;
+          trust_score: number;
+        }>
+      )[0]?.trust,
+      "reliable"
+    );
+    assert.equal(
+      (
+        context.incoming_relationships as Array<{
+          from_actor_id: string;
+          trust: string;
+          trust_score: number;
+        }>
+      )[0]?.trust_score,
+      3
+    );
     assert.equal(
       (context.active_action_skills as Array<{ skill_id: string }>)[0]?.skill_id,
       "collectLogs"

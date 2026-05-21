@@ -4,25 +4,32 @@ sidebar_position: 6
 
 # Implementation Workstreams
 
-This document is the parallel implementation plan for the next architecture
-slice.
+This document tracks the implementation slices that turned the rebuild spec into
+the current runtime surface.
 
-The goal is not to finish every historical `SPEC.md` item. The goal is to make
+The goal is still not to finish every historical plan. The active goal is to keep
 actor workspace, action skill lifecycle, hot-path evidence, provider snapshots,
-and per-NPC async reviewers coherent without blocking gameplay turns.
+relationship pressure, and per-NPC async reviewers coherent without blocking
+gameplay turns.
 
-## Immediate Slice
+## Delivered Runtime Surface
 
-The next slice should deliver:
+The current implementation now includes:
 
 1. actor workspace source-of-truth layout;
 2. action skill recipe schema and validator;
 3. active seed action skill materialization;
-4. shutdown or migration path for legacy `build/generated-skills` output;
+4. shutdown and archive path for legacy `build/generated-skills` output;
 5. actor-scoped evidence files;
-6. provider input snapshots for LLM-backed paths;
-7. per-NPC reviewer output schema and guardrails;
-8. subagent-friendly implementation boundaries.
+6. provider input snapshots for LLM-backed gameplay and dialogue paths;
+7. per-NPC reviewer output schema, queue, store, CLI, and provider adapter;
+8. bounded recipe trial evidence, promotion, supersession, and retirement
+   helpers;
+9. phase-one active action-skill gate for provider gameplay proposals;
+10. actor profiles, goal stacks, relationships, and relationship-derived action
+    pressure;
+11. guarded relationship proposal application from reviewer evidence;
+12. managed local live-smoke server readiness without provider auth.
 
 ## Current Slice Status
 
@@ -40,7 +47,7 @@ As of the first implementation pass:
 - Worker D has landed actor-scoped evidence writing for every phase-one
   turn/tool attempt plus failed verification and fake-progress rejection in the
   deterministic runtime loop.
-- Worker E has landed the per-actor reviewer output schema, actor-scoped review
+- Worker E landed the per-actor reviewer output schema, actor-scoped review
   writer, immutable review job queue, deterministic per-NPC runner, and
   `review:actors` CLI. Deterministic fake-progress/verification-failure
   reviews write draft candidate proposals; an opt-in `openai-codex` reviewer
@@ -63,6 +70,13 @@ As of the first implementation pass:
   and memory.
 - Legacy `build/generated-skills` files can be archived into actor workspace
   draft candidate proposals through `bun run archive:legacy-skills`.
+- The social feedback slice has landed canonical actor profiles, goal stacks,
+  directional relationship ledgers, reviewer relationship event proposals, a
+  guarded runtime-owned proposal applier, and relationship-derived action
+  pressure in provider context.
+- The managed live-smoke server CLI now starts or reports a local Docker
+  endpoint without provider auth and can be used by `runProbe` when `MC_PORT` is
+  not set.
 
 Future work after this slice is to broaden evidence coverage for new gameplay
 paths as they are added, harden reviewer prompts/scoring with real run data, and

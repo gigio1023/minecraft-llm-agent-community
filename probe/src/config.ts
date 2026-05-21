@@ -42,8 +42,9 @@ export type ProbeConfig = {
     image: string;
     version: string;
     host: string;
+    hostPort: number;
     containerPort: number;
-    publishStrategy: "ephemeral-host-port";
+    publishStrategy: "fixed-host-port";
     pingTimeoutMs: number;
   };
   bots: string[];
@@ -76,6 +77,19 @@ export function parseBooleanEnv(value: string | undefined, defaultValue: boolean
   }
 
   throw new Error(`Expected boolean environment value, received: ${value}`);
+}
+
+export function parsePortEnv(value: string | undefined, defaultValue: number) {
+  if (value === undefined || value.trim().length === 0) {
+    return defaultValue;
+  }
+
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`Expected TCP port environment value, received: ${value}`);
+  }
+
+  return port;
 }
 
 function parseGameplayProviderId(value: string | undefined): ProbeConfig["gameplayProvider"]["providerId"] {
@@ -143,8 +157,9 @@ export function loadProbeConfig(): ProbeConfig {
       image: "itzg/minecraft-server:java21",
       version: "1.21.11",
       host: "127.0.0.1",
+      hostPort: parsePortEnv(process.env.MC_HOST_PORT, 25565),
       containerPort: 25565,
-      publishStrategy: "ephemeral-host-port",
+      publishStrategy: "fixed-host-port",
       pingTimeoutMs: 120000
     },
     bots: normalizeActorIds(envBots),
@@ -167,6 +182,7 @@ export function buildServerEnv(config: ProbeConfig) {
   return {
     MC_IMAGE: config.server.image,
     MC_DATA_DIR: path.resolve(here, "../../tmp/probe-server"),
+    MC_HOST_PORT: String(config.server.hostPort),
     EULA: "TRUE",
     VERSION: config.server.version,
     TYPE: "VANILLA",
@@ -179,8 +195,9 @@ export function buildServerEnv(config: ProbeConfig) {
     SPAWN_NPCS: "true",
     SPAWN_ANIMALS: "true",
     SPAWN_MONSTERS: "false",
-    VIEW_DISTANCE: "6",
-    SIMULATION_DISTANCE: "6",
-    ENABLE_COMMAND_BLOCK: "true"
+    VIEW_DISTANCE: "10",
+    SIMULATION_DISTANCE: "10",
+    ENABLE_COMMAND_BLOCK: "true",
+    ENABLE_RCON: "true"
   } satisfies Record<string, string>;
 }

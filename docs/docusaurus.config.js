@@ -9,7 +9,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'minecraft-llm-agent-community',
-  tagline: 'Project for Minecraft LLM Agent Community',
+  tagline: 'Headless Minecraft agent-loop runtime research.',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
@@ -47,17 +47,13 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+            'https://github.com/naem1023/minecraft-llm-agent-community/tree/feature/agent-loop-evolution/docs/',
         },
         blog: {
           showReadingTime: true,
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+            'https://github.com/naem1023/minecraft-llm-agent-community/tree/feature/agent-loop-evolution/docs/',
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -74,7 +70,7 @@ const config = {
       navbar: {
         title: 'minecraft-llm-agent-community',
         logo: {
-          alt: 'My Site Logo',
+          alt: 'minecraft-llm-agent-community logo',
           src: 'img/logo.svg',
         },
         items: [
@@ -99,8 +95,16 @@ const config = {
             title: 'Docs',
             items: [
               {
-                label: 'Docs',
+                label: 'Overview',
                 to: '/docs/intro',
+              },
+              {
+                label: 'Architecture Spec',
+                to: '/docs/Architecture/SPEC',
+              },
+              {
+                label: 'Headless Server',
+                to: '/docs/Setup/Headless-Server',
               },
             ],
           },
@@ -113,12 +117,12 @@ const config = {
               },
               {
                 label: 'GitHub',
-                href: 'https://github.com/gigio1023/minecraft-llm-agent-community',
+                href: 'https://github.com/naem1023/minecraft-llm-agent-community',
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} minecraft-llm-agent-community Project. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} minecraft-llm-agent-community. Built with Docusaurus.`,
       },
       prism: {
         theme: prismThemes.github,
@@ -128,4 +132,3 @@ const config = {
 };
 
 export default config;
- config;

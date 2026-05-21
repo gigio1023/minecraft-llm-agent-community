@@ -10,7 +10,7 @@ research without confusing archived plans for the active implementation path.
 | Search Token | Core Meaning | Primary References |
 |--------------|--------------|-------------------|
 | `MINECRAFT_AGENT_LOOP_MIGRATION` | Current bounded-runtime rebuild direction and non-negotiable scope | `SPEC.md`, `Architecture/Runtime-Loop-And-Verification.md`, `AGENTS.md` |
-| `HEADLESS_MINEFLAYER_PROBE` | Headless Mineflayer runtime on a local server | `Setup/Headless-Server.md`, `Architecture/Minimal-Probe.md`, `Architecture/Runtime-Loop-And-Verification.md` |
+| `HEADLESS_MINEFLAYER_PROBE` | Headless Mineflayer runtime on a local server; use `bun run --cwd probe server:ready` for a user-joinable Docker endpoint | `Setup/Headless-Server.md`, `Architecture/Minimal-Probe.md`, `Architecture/Runtime-Loop-And-Verification.md` |
 | `MINECRAFT_GAMEPLAY_MODEL` | Real boring gameplay competence before larger social goals | `Architecture/Runtime-Loop-And-Verification.md`, `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md` |
 | `SKILL_VILLAGE_FAILURE` | Why the prior village-style direction failed | `Research/2026-05-19-skill-village-failure-report.md` |
 | `NO_VOYAGER_EVAL_LOOP` | Do not return to raw eval-based gameplay execution | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `AGENTS.md` |
@@ -20,14 +20,19 @@ research without confusing archived plans for the active implementation path.
 | `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH` | CLI login and gameplay auth are different concerns | `AGENTS.md` |
 | `SOCIAL_SIMULATION_SEED` | Long-term north star: society seed, not immediate product scope | `SPEC.md`, `Architecture/Runtime-Loop-And-Verification.md`, `intro.md` |
 | `SPEED_BOUNDED_SOCIAL_SIMULATION` | Social simulation must keep bounded actor turns; long critic/review work cannot block runtime progress | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Async-Reviewer-Sidecars.md`, `Architecture/LLM-Context-And-Actor-Workspace.md` |
+| `SOCIAL_ACTOR_PROFILES` | Canonical actor profile, goal stack, and relationship enums for evidence-backed social behavior | `Architecture/Social-Actor-Profiles-And-Relationships.md`, `Architecture/LLM-Context-And-Actor-Workspace.md` |
 | `LIVE_TRANSCRIPT_FIRST` | Live transcript is the primary runtime evidence | `Architecture/Transcript-And-Runtime-Artifacts.md`, `AGENTS.md` |
 | `CHECKPOINT_READY_RUNTIME` | Phase 1 should be checkpoint-ready even before full arbitrary resume | `Architecture/Transcript-And-Runtime-Artifacts.md`, `SPEC.md` |
 | `MINIMAL_ACTION_SKILL_MEMORY_HOOK` | Add per-agent action skill ownership hook now, not full autonomous evolution | `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Terminology.md` |
 | `BOUNDED_ACTION_SKILL_CREATION` | Evidence-backed action skill proposals and recipe validation, not hot-loop generated code | `Architecture/Bounded-Action-Skill-Creation.md`, `SPEC.md`, `Terminology.md` |
 | `ACTIVE_ACTION_SKILL_GATE` | Runtime provider proposals execute only when backed by actor-owned active action skill records | `SPEC.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md` |
+| `ACTION_SKILL_VERIFICATION` | Implemented action skills must have Mineflayer boundary evidence and checked-in protection tests | `Architecture/Action-Skill-Verification.md`, `Architecture/Runtime-Loop-And-Verification.md`, `AGENTS.md` |
+| `CURRENT_HANDOFF_NEXT_WORK` | Current rebuild handoff, landed work, verified commands, live evidence, and next improvement order | `Architecture/Current-Handoff-And-Next-Work.md`, `SPEC.md`, `Architecture/Implementation-Workstreams.md` |
 | `GENERATED_ACTION_SKILL_LEGACY_STORE` | `build/generated-skills` is legacy debug output, not actor-owned candidate or active action skill memory | `SPEC.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md` |
 | `PER_NPC_ASYNC_REVIEWER` | One async reviewer sidecar per NPC; global reviewer may summarize only | `Architecture/Async-Reviewer-Sidecars.md`, `Architecture/LLM-Context-And-Actor-Workspace.md`, `Architecture/Implementation-Workstreams.md` |
 | `REVIEW_ACTORS_CLI` | Runs queued deterministic per-actor reviewer jobs without blocking runtime turns | `Architecture/Async-Reviewer-Sidecars.md`, `SPEC.md` |
+| `REVIEW_RELATIONSHIP_APPLIER` | Explicitly applies reviewer relationship event proposals through runtime-owned guards | `Architecture/Async-Reviewer-Sidecars.md`, `Architecture/Social-Actor-Profiles-And-Relationships.md`, `SPEC.md` |
+| `RELATIONSHIP_ACTION_PRESSURE` | Enum-derived relationship pressure exposed to provider context without granting tools | `Architecture/Social-Actor-Profiles-And-Relationships.md`, `Architecture/LLM-Context-And-Actor-Workspace.md`, `SPEC.md` |
 | `ACTOR_PROVIDER_CONTEXT` | Provider-facing context packet built from actor workspace active skills, candidates, evidence, reviews, and memory | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md` |
 | `OPENAI_CODEX_GAMEPLAY_PROVIDER` | Opt-in phase-one gameplay provider selected with `PROBE_GAMEPLAY_PROVIDER=openai-codex` | `Architecture/Runtime-Loop-And-Verification.md`, `Setup/Provider-Setup.md` |
 | `OPENAI_CODEX_REVIEWER` | Opt-in per-actor reviewer reasoning selected with `REVIEW_ACTORS_PROVIDER=openai-codex` | `Architecture/Async-Reviewer-Sidecars.md`, `SPEC.md` |
@@ -51,13 +56,16 @@ For any onboarding developer or agent, read in this order:
 8. `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 9. `Architecture/Async-Reviewer-Sidecars.md`
 10. `Architecture/Implementation-Workstreams.md`
-11. `Architecture/Bounded-Action-Skill-Creation.md`
-12. `Architecture/LLM-Context-And-Actor-Workspace.md`
-13. `Setup/Headless-Server.md`
-14. `Setup/Provider-Setup.md`
-15. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
-16. `Research/2026-05-19-skill-village-failure-report.md`
-17. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
+11. `Architecture/Action-Skill-Verification.md`
+12. `Architecture/Current-Handoff-And-Next-Work.md`
+13. `Architecture/Bounded-Action-Skill-Creation.md`
+14. `Architecture/LLM-Context-And-Actor-Workspace.md`
+15. `Architecture/Social-Actor-Profiles-And-Relationships.md`
+16. `Setup/Headless-Server.md`
+17. `Setup/Provider-Setup.md`
+18. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
+19. `Research/2026-05-19-skill-village-failure-report.md`
+20. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
 
 ## Active vs Historical Docs
 
@@ -73,8 +81,11 @@ Treat these as active, project-defining documents:
 - `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 - `Architecture/Async-Reviewer-Sidecars.md`
 - `Architecture/Implementation-Workstreams.md`
+- `Architecture/Action-Skill-Verification.md`
+- `Architecture/Current-Handoff-And-Next-Work.md`
 - `Architecture/Bounded-Action-Skill-Creation.md`
 - `Architecture/LLM-Context-And-Actor-Workspace.md`
+- `Architecture/Social-Actor-Profiles-And-Relationships.md`
 - `Setup/Headless-Server.md`
 - `Setup/Provider-Setup.md`
 

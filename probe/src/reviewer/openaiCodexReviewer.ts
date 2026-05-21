@@ -2,6 +2,7 @@ import type {
   ActorReviewReasoner,
   ActorReviewReasonerResult
 } from "./reviewerQueue.js";
+import { RELATIONSHIP_EVENT_KINDS } from "../npc/relationships/relationshipLedger.js";
 import type { ActorReviewFinding } from "./reviewerStore.js";
 
 const RESPONSES_API_URL = "https://api.openai.com/v1/responses";
@@ -23,6 +24,7 @@ function createPrompt(input: Parameters<ActorReviewReasoner["review"]>[0]) {
     "Return exactly one JSON object with keys findings and optional proposal.",
     "findings must be an array of {severity,title,body}; severity is p0,p1,p2,or p3.",
     "proposal, if present, may include task_intent, preconditions, required_primitives, known_failure_modes, and notes.",
+    "relationship_event_proposals, if present, must be an array of {kind,target_actor_id,summary,evidence_refs}; kind must use the documented relationship event enum.",
     "Do not claim runtime success. Do not mutate active action skills.",
     JSON.stringify(input)
   ].join("\n");
@@ -65,6 +67,37 @@ function parseStringArray(value: unknown) {
     : undefined;
 }
 
+function parseRelationshipEventProposals(value: unknown): ActorReviewReasonerResult["relationship_event_proposals"] {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error("Reviewer relationship_event_proposals must be an array");
+  }
+
+  return value.map((entry) => {
+    if (!isRecord(entry)) {
+      throw new Error("Reviewer relationship event proposal must be an object");
+    }
+
+    if (!RELATIONSHIP_EVENT_KINDS.includes(entry.kind as (typeof RELATIONSHIP_EVENT_KINDS)[number])) {
+      throw new Error(`Unsupported relationship event kind: ${String(entry.kind)}`);
+    }
+
+    if (typeof entry.target_actor_id !== "string" || typeof entry.summary !== "string") {
+      throw new Error("Reviewer relationship event proposal requires target_actor_id and summary");
+    }
+
+    return {
+      kind: entry.kind as (typeof RELATIONSHIP_EVENT_KINDS)[number],
+      target_actor_id: entry.target_actor_id,
+      summary: entry.summary,
+      evidence_refs: parseStringArray(entry.evidence_refs)
+    };
+  });
+}
+
 function parseReviewerResult(value: unknown): ActorReviewReasonerResult {
   if (!isRecord(value)) {
     throw new Error("Reviewer response must be an object");
@@ -85,6 +118,13 @@ function parseReviewerResult(value: unknown): ActorReviewReasonerResult {
 
   return {
     findings: parseFindings(value.findings),
+    ...(value.relationship_event_proposals !== undefined
+      ? {
+          relationship_event_proposals: parseRelationshipEventProposals(
+            value.relationship_event_proposals
+          )
+        }
+      : {}),
     ...(proposal ? { proposal } : {})
   };
 }

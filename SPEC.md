@@ -1,6 +1,6 @@
 # SPEC
 
-Updated: 2026-05-20
+Updated: 2026-05-21
 
 ## 1. What This Is
 
@@ -41,63 +41,75 @@ to carry the whole architecture:
    - detailed future action skill proposal and recipe model.
 7. `docs/docs/Architecture/LLM-Context-And-Actor-Workspace.md`
    - route to the visual HTML architecture page.
+8. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+   - enum-first actor profiles, goal stack, and relationship state model.
+9. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+   - current handoff;
+   - landed implementation surfaces;
+   - verified commands;
+   - next improvement order.
 
 Treat this file as the source of truth for priority and scope. Treat the split
 docs as the source of truth for detailed implementation contracts.
 
-## 2. Current Implementation Status
+## 2. Architecture Concepts Reflected In Code
 
-The current bounded runtime implementation satisfies this spec's immediate
-delivery scope.
+The current implementation is important because it encodes the right boundaries,
+not because it has a long feature checklist.
 
-Implemented:
+### Runtime-Owned Truth
 
-- bounded Mineflayer runtime primitives;
-- deterministic provider path for the stable probe and opt-in
-  `openai-codex` gameplay provider path for phase-one runs;
-- transcript and canonical transcript artifacts;
-- runtime verification for key task progress;
-- actor sessions and seed action skill ownership metadata;
-- non-destructive actor workspace initialization under `data/actors`;
-- actor workspace path/store API with `reviews/`, `provider-inputs/`,
-  active/candidate/retired/rejected action skill paths, and active seed
-  materialization;
-- bounded action skill recipe schema, validator, proposal records, and lifecycle
-  transition guard;
-- bounded trial evidence recording and promotion/supersession module for
-  candidate action skill recipes;
-- bounded candidate recipe trial runner that executes primitive steps with
-  per-step timeouts and records recipe-trial evidence;
-- explicit active action skill retirement helper that moves records out of the
-  active set with evidence refs;
-- default shutdown of legacy generated TypeScript hot-loop execution, with
-  generated proposals stored as actor workspace candidates unless explicitly
-  opted into as legacy debug behavior;
-- archive tooling for older `build/generated-skills` files that migrates legacy
-  TypeScript into actor workspace candidate proposals and moves source files to
-  `build/generated-skills-archive`;
-- actor-scoped runtime evidence writer for every phase-one turn/tool attempt,
-  verification failures, and fake-progress rejection in the deterministic loop;
-- provider input snapshot store with credential-key rejection, phase-one
-  gameplay snapshot wiring, and live dialogue snapshot wiring;
-- provider-facing actor context builder that injects active action skills,
-  candidate proposals, recent evidence, recent reviews, and memory into
-  LLM-backed gameplay/dialogue calls;
-- per-actor reviewer output schema, actor-scoped review writer, per-NPC review
-  job queue, deterministic sidecar runner, opt-in `openai-codex` reviewer
-  reasoning, draft candidate proposal writing, and `review:actors` CLI;
-- phase-one runtime action-skill gate: `runProbe` reads actor workspace active
-  action skill records, passes them into `runAgentLoop`, records the active
-  skill context in provider input, and blocks provider proposals whose
-  primitives are not backed by the actor's active records;
-- mutual live and deterministic dispatchers can be gated by actor-owned active
-  action skill records, and live mutual runs now initialize/read actor
-  workspaces before provider turns;
-- role contracts now expose bounded movement/social primitives required for
-  implemented social seed action skills to become real actor-owned skills;
-- initial terminology and seed action skill registry;
-- a visual architecture review page for LLM context, memory, actor workspace,
-  and action skill lifecycle.
+`runAgentLoop` starts each turn from Mineflayer-observed state, gives the
+provider a bounded context packet, validates the proposal against the actor's
+active action-skill gate, executes one primitive, observes again, and verifies
+progress from world, inventory, position, container, or transcript evidence.
+
+Providers propose. Runtime verification decides. Reviewers explain. Neither
+provider nor reviewer can turn optimistic text into success.
+
+### Actor-Local Ownership
+
+`data/actors/<actor_id>/` is the source of truth for actor-owned state:
+profile, memory, evidence, provider inputs, reviews, relationship edges, and
+active/candidate/retired/rejected action skill records.
+
+Action skill evolution follows a lifecycle:
+
+```text
+proposal -> bounded recipe -> role/primitive validation -> timed trial evidence
+-> promotion, supersession, retirement, or rejection
+```
+
+Legacy generated TypeScript is archive material until it is converted into this
+bounded lifecycle. It is not active runtime capability.
+
+### Replayable Evidence
+
+The runtime persists the packet a provider saw, the turn record, tool attempt,
+pre/post observations, verifier reason, fake-progress rejection, and review refs.
+The goal is that a failed run can be audited from artifacts without immediately
+reproducing the world.
+
+### Bounded Social Pressure
+
+Actor profile, goal stack, relationship edge, and relationship-derived pressure
+are structured provider context. They influence intent selection only.
+
+Relationship pressure carries explicit boundaries:
+
+- action boundary: intent pressure only;
+- active action skill still required;
+- role contract unchanged;
+- relationship state must come from durable evidence refs.
+
+### Async Repair
+
+Per-NPC reviewers read immutable actor artifacts after the turn and write
+findings, candidate proposals, or relationship event proposals. Runtime-owned
+guards apply relationship events and action skill lifecycle transitions.
+
+The hot path must stay small: observe, choose, gate, execute, verify, record,
+release.
 
 Future extensions outside the current bounded delivery scope:
 
@@ -119,7 +131,7 @@ Deferred unless the user re-approves:
 - a global critic that owns actor repair decisions.
 
 Reconnect/session lifecycle remains a runtime-owned concern when implemented.
-For the next slice, do only the reconnect work required to keep hot-path
+For future slices, do only the reconnect work required to keep hot-path
 evidence honest. Do not let a deep reconnect refactor displace actor workspace,
 action skill lifecycle, provider snapshots, or per-NPC review.
 
@@ -147,22 +159,25 @@ must not block the current actor turn.
 
 ## 4. Immediate Implementation Priority
 
-The next implementation should optimize for a coherent runtime architecture, not
-for completing every old item in the previous monolithic spec.
+The actor-workspace and social-feedback slices are now implemented enough to be
+the active runtime baseline. The next implementation should use real run
+evidence to harden boring gameplay competence without expanding into a larger
+society prematurely.
 
 Priority order:
 
-1. Make actor workspace the source of truth for actor-owned artifacts.
-2. Add action skill recipe schema and validation.
-3. Materialize active seed action skills in actor workspace through an explicit
-   adapter from current seed ownership records.
-4. End the action skill split brain: candidate/generated action skills must go
-   through actor workspace, not `build/generated-skills`.
-5. Write actor-scoped evidence and provider input snapshots during runs.
-6. Add per-NPC async reviewer sidecar output paths and schemas.
-7. Keep the gameplay hot path bounded and free of blocking critic/generation
+1. Validate `collect_logs` and adjacent boring tasks against live Minecraft
+   evidence, not optimistic transcript labels.
+2. Build and use a per-action-skill live harness before returning to broad
+   multi-NPC runs.
+3. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
+   verifier, target-selection, and action-skill gaps.
+4. Harden reviewer prompts/scoring only from immutable run evidence.
+5. Convert any still-useful legacy generated-code experiments into bounded
+   candidate recipes before runtime use.
+6. Keep the gameplay hot path bounded and free of blocking critic/generation
    work.
-8. Add cross-actor summarization only after per-actor reviews exist.
+7. Keep the managed local server path easy to start, inspect, and stop.
 
 ## 5. Non-Negotiable Rules
 
@@ -188,9 +203,9 @@ Priority order:
 - A global reviewer may summarize cross-actor patterns only. It must not own
   actor memory, actor action skill lifecycle, or actor-specific repair proposals.
 
-## 6. Done Criteria For The Next Slice
+## 6. Done Criteria For The Actor-Workspace Slice
 
-The next slice is done when:
+The actor-workspace slice is done when:
 
 1. `data/actors/<actor_id>/` has the intended source-of-truth layout:
    `memory/`, `evidence/`, `reviews/`, `provider-inputs/`,
@@ -215,7 +230,35 @@ The next slice is done when:
 11. deterministic mode still performs zero network calls;
 12. docs and index routes point to the split spec documents.
 
-## 7. Read Next
+## 7. Done Criteria For The Social Feedback Slice
+
+The social feedback slice is done when:
+
+1. reviewer `relationship_event_proposals` can be applied by an explicit
+   runtime-owned command/module, never by the reviewer itself;
+2. the applier rejects unknown actor workspaces, path-like actor ids, unknown
+   event kinds, missing evidence refs, self-targets, and evidence refs that are
+   not inside the relevant actor workspace;
+3. applied relationship events update
+   `data/actors/<from_actor_id>/relationships/<to_actor_id>.json`;
+4. applied events are idempotent by event id and a durable application marker,
+   so repeated reviewer runs do not duplicate social state after the compact
+   relationship event window rolls forward;
+5. actor provider context exposes relationship-derived pressure as categorical
+   goal/decision context, not as arbitrary `0..1` personality floats;
+6. runtime action selection may use relationship pressure to choose between
+   already-allowed bounded actions, but it cannot bypass active action-skill
+   gates or role contracts;
+7. provider input snapshots include actor profile, goal stack, active action
+   skills, relationship state, recent evidence, recent reviews, and memory;
+8. live gameplay/provider smoke setup can be run without printing secrets and
+   leaves a server endpoint the user can join; `MC_PORT` manual overrides are
+   validated before bypassing the managed server;
+9. deterministic test paths still perform zero network calls;
+10. docs and the static architecture page explain the completed social feedback
+    loop accurately.
+
+## 8. Read Next
 
 For implementation, read in this order:
 

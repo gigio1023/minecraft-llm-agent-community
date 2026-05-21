@@ -75,7 +75,8 @@ const coreActionSkills: SeedActionSkill[] = [
     id: "collectLogs",
     summary: "Mine nearby trees to gather logs",
     runtimeStatus: "implemented",
-    implementationNotes: "Uses Mineflayer block search, pathfinder movement, dig, and local block/inventory evidence.",
+    implementationNotes:
+      "Uses Mineflayer block search, pathfinder movement, dig, dropped-item pickup, and inventory-increase evidence.",
     intentKinds: ["bootstrap_progress", "resupply_shared_storage", "recover_basic_tools"],
     validRoles: ["gatherer"],
     preconditions: [],

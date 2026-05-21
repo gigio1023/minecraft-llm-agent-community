@@ -20,6 +20,7 @@ type TranscriptStep = {
   tool: string;
   result: JsonValue;
   args?: Record<string, JsonValue>;
+  providerOutputRef?: string;
 };
 
 type TranscriptFinal = Record<string, JsonValue> & {

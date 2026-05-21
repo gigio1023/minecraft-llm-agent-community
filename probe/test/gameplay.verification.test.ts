@@ -82,7 +82,7 @@ test("collect_4_logs verification uses inventory deltas instead of claimed tool 
   );
 });
 
-test("collect_4_logs verification rejects claimed success without inventory or block evidence", () => {
+test("collect_4_logs verification rejects claimed success without inventory pickup", () => {
   const task = selectDeterministicTask({
     visibleActors: [],
     inventory: [{ name: "oak_log", count: 0 }]
@@ -103,7 +103,7 @@ test("collect_4_logs verification rejects claimed success without inventory or b
     }),
     {
       status: "failed",
-      reason: "collect_4_logs saw no relevant inventory increase (0 -> 0) and no nearby log-block decrease.",
+      reason: "collect_4_logs saw no relevant inventory increase (0 -> 0).",
       progress: {
         itemNames: [
           "oak_log",
@@ -125,7 +125,7 @@ test("collect_4_logs verification rejects claimed success without inventory or b
   );
 });
 
-test("collect_4_logs verification accepts nearby block removal as concrete progress", () => {
+test("collect_4_logs verification rejects nearby block removal without inventory pickup", () => {
   const task = selectDeterministicTask({
     visibleActors: [],
     inventory: [{ name: "oak_log", count: 0 }]
@@ -144,11 +144,11 @@ test("collect_4_logs verification accepts nearby block removal as concrete progr
       },
       result: { tool: "collect_logs", ok: true, status: "collected" }
     }).status,
-    "progressing"
+    "failed"
   );
 });
 
-test("collect_4_logs verification accepts tool-local block removal evidence", () => {
+test("collect_4_logs verification rejects tool-local block removal without inventory pickup", () => {
   const task = selectDeterministicTask({
     visibleActors: [],
     inventory: [{ name: "oak_log", count: 0 }]
@@ -174,8 +174,8 @@ test("collect_4_logs verification accepts tool-local block removal evidence", ()
       }
     }),
     {
-      status: "progressing",
-      reason: "collect_4_logs tool evidence reports a removed log block, but post-observation has not reached target yet.",
+      status: "failed",
+      reason: "collect_4_logs saw no relevant inventory increase (0 -> 0).",
       progress: {
         itemNames: [
           "oak_log",

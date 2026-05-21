@@ -41,7 +41,13 @@ Phase-one gameplay uses the deterministic provider by default.
 To opt into the live OpenAI Codex gameplay provider:
 
 ```bash
-PROBE_GAMEPLAY_PROVIDER=openai-codex bun run probe:v0
+bun run src/cli.ts --provider openai-codex --npcs 3 --observe-ms 120000
+```
+
+Equivalent environment form:
+
+```bash
+PROBE_GAMEPLAY_PROVIDER=openai-codex PROBE_BOTS=npc_a,npc_b,npc_c PROBE_OBSERVE_MS=120000 bun run probe:v0
 ```
 
 The live gameplay provider receives:
@@ -56,6 +62,30 @@ The live gameplay provider receives:
 The provider still returns only one bounded runtime primitive. Runtime action
 skill gates and verification decide whether the proposed action can execute or
 counts as progress.
+
+## Live Dashboard
+
+The probe CLI starts the local Elysia dashboard server by default while a probe
+is running:
+
+```bash
+bun run src/cli.ts --provider openai-codex --npcs 3 --observe-ms 120000
+```
+
+Open `http://127.0.0.1:4173`. It refreshes from local files and shows, per NPC:
+
+- latest status and tool evidence;
+- raw provider input snapshots;
+- raw provider output snapshots when a live provider is used;
+- memory files;
+- active and candidate action skills;
+- relationship edges.
+
+If `provider-outputs/` is empty, the current run either used deterministic mode
+or failed before the live provider returned an LLM response.
+
+Use `--no-dashboard` to disable the server or `--dashboard-port <port>` to move
+it off the default port.
 
 ## Reviewer Provider Switch
 

@@ -2,66 +2,61 @@
 sidebar_position: 1
 ---
 
-# Welcome to minecraft-llm-agent-community
+# Overview
 
-**minecraft-llm-agent-community** is currently rebuilding a headless Minecraft
-agent-loop runtime.
+**minecraft-llm-agent-community** is a headless Mineflayer probe for evaluating
+LLM agents in Minecraft.
 
-The project is not currently trying to prove a full NPC society.
-It is trying to build a small, bounded, observable runtime that can later grow
-into a social simulation seed.
+The project is intentionally small. It tests whether an actor can perform
+bounded game actions and leave enough evidence to explain the result.
 
-## Current Goal
+## What It Does
 
-The current goal is to make one bot reliably perform boring gameplay tasks while
-leaving enough transcript and runtime evidence that failures are easy to inspect
-and improve.
+- starts or connects to a local Minecraft server;
+- runs Mineflayer actors through a bounded TypeScript loop;
+- lets a provider propose one action at a time;
+- verifies progress from Minecraft state, not model text;
+- writes transcripts, provider inputs, evidence, and review artifacts.
 
-The first proof is not persona richness.
-The first proof is competence plus observability.
+## Core Model
 
-## Long-Term Direction
+Each actor has a workspace under `data/actors/<actor_id>/`.
 
-The long-term north star remains a **social simulation seed**:
+That workspace owns the actor's active action skills, candidate repairs, memory,
+evidence, provider inputs, reviews, and relationships. Runtime code reads from
+that workspace before it allows a primitive to execute.
 
-- bots with role pressure;
-- eventually distinct action skill ownership;
-- memory and bounded action skill evolution;
-- cooperation with each other and later with a human player.
+The hot path stays narrow:
 
-That future depends on the runtime being small, inspectable, and trustworthy now.
+```text
+observe -> gate -> execute -> verify -> record
+```
 
-## What We Are Not Optimizing For Yet
+Reviewer and repair work runs after the turn from saved artifacts.
 
-- long-run autonomy as a product goal;
-- rich social roleplay as a content goal;
-- large multi-bot society behavior before single-bot competence is trustworthy.
+## What It Is Not
 
-## Current Technical Foundation
+This is not a raw generated-code gameplay loop. It is also not a persona-first
+NPC demo.
 
-The active architecture is built around these rules:
+The current proof is simpler: complete concrete Minecraft tasks, reject fake
+progress, and make failures easy to inspect.
 
-- **Headless Runtime**: local Minecraft server, no manual GUI requirement
-- **Mineflayer Bots**: embodied TypeScript bots using the game client API
-- **Bounded Tool Loop**: the runtime validates actions; the model only selects valid tools
-- **No Raw Eval Loop**: do not return to open-ended JavaScript gameplay execution
-- **Live Transcript First**: transcript and runtime artifacts are the primary evidence
-- **Checkpoint-Ready Runtime**: phase 1 should leave useful artifacts and progress snapshots
-- **Actor Workspace Source Of Truth**: actor-owned memory, evidence, provider inputs, reviews, and action skill lifecycle records should live under the actor workspace
-- **Bounded Action Skill Creation**: future action skill evolution should start from runtime evidence and validated recipes, not generated code in the hot loop
-- **Per-NPC Async Reviewers**: each NPC gets its own reviewer sidecar; global review only summarizes cross-actor patterns
+This is not a revival of raw Voyager-style generated-code execution.
 
-## Read These Next
+The repo should not treat a model-written JavaScript file, a progress-looking
+animation, or an optimistic provider explanation as success. Success belongs to
+runtime verification backed by world, inventory, position, container, or
+transcript evidence.
 
-- [Canonical Rebuild Spec](Architecture/SPEC.md)
-- [Agent Search Index](Agent-Search-Index.md)
-- [Terminology](Terminology.md)
-- [Minimal Probe](Architecture/Minimal-Probe.md)
+## Read Next
+
 - [Runtime Loop And Verification](Architecture/Runtime-Loop-And-Verification.md)
-- [Transcript And Runtime Artifacts](Architecture/Transcript-And-Runtime-Artifacts.md)
 - [Actor Workspace And Action Skill Memory](Architecture/Actor-Workspace-And-Action-Skill-Memory.md)
 - [Async Reviewer Sidecars](Architecture/Async-Reviewer-Sidecars.md)
-- [Implementation Workstreams](Architecture/Implementation-Workstreams.md)
-- [Bounded Action Skill Creation](Architecture/Bounded-Action-Skill-Creation.md)
+- [Social Actor Profiles And Relationships](Architecture/Social-Actor-Profiles-And-Relationships.md)
 - [Headless Server Setup](Setup/Headless-Server.md)
 - [Provider Setup](Setup/Provider-Setup.md)
+- [Architecture Spec](Architecture/SPEC.md)
+- [Agent Search Index](Agent-Search-Index.md)
+- [Terminology](Terminology.md)

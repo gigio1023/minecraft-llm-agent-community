@@ -76,17 +76,21 @@ instruction.
 - Bun 1.3+
 - Node.js 22+ for docs builds
 
-### Start the headless server
-
-```bash
-docker compose -f probe/compose.yaml up -d
-```
-
 ### Install probe dependencies
 
 ```bash
 cd probe && bun install
 ```
+
+### Start the headless server
+
+```bash
+bun run --cwd probe server:ready
+```
+
+The command prints `minecraft_direct_connect=127.0.0.1:25565` for a local
+Minecraft Java client. It starts the Docker server if needed or reports the
+existing managed endpoint. Stop it with `bun run --cwd probe server:stop`.
 
 ### Provider auth
 
@@ -103,6 +107,21 @@ Deterministic mode should remain usable without live provider access.
 ```bash
 bun run --cwd probe src/cli.ts
 ```
+
+Useful runtime options:
+
+```bash
+bun run --cwd probe src/cli.ts --npcs 3 --observe-ms 60000
+bun run --cwd probe src/cli.ts --provider openai-codex --npcs 3 --observe-ms 120000
+bun run --cwd probe src/cli.ts --npcs 3 --dashboard-port 4174
+bun run --cwd probe src/cli.ts --npcs 3 --no-dashboard
+```
+
+The CLI starts the dashboard by default at `http://127.0.0.1:4173` while the
+probe runs. The dashboard is a read-only local artifact server: it reads actor
+workspace files, provider inputs/outputs, evidence, memory, relationships, and
+action skills. If the dashboard port is already in use, the probe continues and
+the existing dashboard can be reused.
 
 Run artifacts should be inspectable after execution.
 

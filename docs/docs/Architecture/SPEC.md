@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Architecture Specification
 
-This page is now a thin architecture overview.
+This page is the public architecture overview for the active rebuild.
 
 The canonical rebuild spec lives in the repo root at:
 
@@ -20,19 +20,18 @@ Use that file as the source of truth for:
 
 ## Current Architecture Summary
 
-The active architecture direction is:
+The active architecture is defined by boundaries more than feature count:
 
-- a small, headless, bounded Minecraft runtime;
-- one-bot boring gameplay competence before larger social claims;
-- runtime-owned validation, timeout, verification, transcript, artifacts, and
-  reconnect/session lifecycle when reconnect is explicitly in scope;
-- live transcript and runtime artifacts as the primary evidence;
-- checkpoint-ready runtime design;
-- actor workspaces for per-NPC memory, evidence, review notes, and action skill
-  lifecycle records;
-- per-NPC asynchronous reviewer sidecars that read immutable evidence without
-  blocking runtime turns;
-- room for later per-agent action skill ownership and social simulation growth.
+- **Runtime-owned truth**: model proposals are gated, executed, verified, and
+  recorded by runtime code.
+- **Actor-local ownership**: each NPC owns its action skills, memory, evidence,
+  reviews, provider inputs, and relationships under actor workspace.
+- **Replayable evidence**: provider packets, turn evidence, verifier deltas, and
+  review refs make failures inspectable.
+- **Bounded social pressure**: profiles, goals, obligations, and relationships
+  shape intent without granting tools or bypassing action-skill gates.
+- **Async repair**: reviewers diagnose from immutable artifacts after the turn;
+  runtime guards own mutation and promotion.
 
 ## Important Constraints
 
@@ -47,9 +46,11 @@ The active architecture direction is:
 
 ## Current Slice Boundary
 
-The next implementation slice prioritizes bounded recipe execution from
-candidate action skills, broader actor evidence coverage for future gameplay
-paths, and LLM-backed reviewer reasoning when explicitly enabled.
+The actor-workspace and social-feedback slices are now implemented enough to be
+the active public architecture. The next useful work is not to add a larger
+society. It is to validate the runtime against more real Minecraft task
+failures, harden provider/reviewer prompts from actual evidence, and migrate any
+still-useful legacy generated-code experiments into bounded recipes.
 
 Deep reconnect refactoring is deferred unless it is required to keep hot-path
 evidence honest. Reconnect remains a runtime responsibility, but it is not the
@@ -65,8 +66,9 @@ driver of the next slice.
 6. `Implementation-Workstreams.md`
 7. `Bounded-Action-Skill-Creation.md`
 8. `LLM-Context-And-Actor-Workspace.md`
-9. `../Setup/Headless-Server.md`
-10. `../Setup/Provider-Setup.md`
+9. `Social-Actor-Profiles-And-Relationships.md`
+10. `../Setup/Headless-Server.md`
+11. `../Setup/Provider-Setup.md`
 
 ## Historical Note
 

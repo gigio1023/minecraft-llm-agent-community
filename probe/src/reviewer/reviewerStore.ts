@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import type { RelationshipEventKind } from "../npc/relationships/relationshipLedger.js";
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "../runtime/actorWorkspacePaths.js";
 import { writeJson } from "../runtime/actorWorkspaceStore.js";
 
@@ -17,6 +18,12 @@ export type ActorReviewOutput = {
   input_refs: string[];
   findings: ActorReviewFinding[];
   candidate_proposals: string[];
+  relationship_event_proposals?: Array<{
+    kind: RelationshipEventKind;
+    target_actor_id: string;
+    summary: string;
+    evidence_refs: string[];
+  }>;
   active_mutation: "forbidden";
 };
 

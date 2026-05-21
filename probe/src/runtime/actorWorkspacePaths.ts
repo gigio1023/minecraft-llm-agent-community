@@ -6,9 +6,11 @@ export type ActorWorkspacePaths = {
   actorDir: string;
   actorFile: string;
   memoryDir: string;
+  relationshipsDir: string;
   evidenceDir: string;
   reviewsDir: string;
   providerInputsDir: string;
+  providerOutputsDir: string;
   actionSkills: {
     rootDir: string;
     indexFile: string;
@@ -41,9 +43,11 @@ export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorW
     actorDir,
     actorFile: path.join(actorDir, "actor.json"),
     memoryDir: path.join(actorDir, "memory"),
+    relationshipsDir: path.join(actorDir, "relationships"),
     evidenceDir: path.join(actorDir, "evidence"),
     reviewsDir: path.join(actorDir, "reviews"),
     providerInputsDir: path.join(actorDir, "provider-inputs"),
+    providerOutputsDir: path.join(actorDir, "provider-outputs"),
     actionSkills: {
       rootDir: actionSkillRootDir,
       indexFile: path.join(actionSkillRootDir, "index.json"),

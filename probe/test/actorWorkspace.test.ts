@@ -9,6 +9,7 @@ import {
   listActiveActorActionSkillRecords
 } from "../src/runtime/actorWorkspace.js";
 import { getActorWorkspacePaths } from "../src/runtime/actorWorkspacePaths.js";
+import { readRelationshipEdge } from "../src/npc/relationships/relationshipStore.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const testArtifactRoot = path.resolve(
@@ -20,7 +21,7 @@ const testArtifactRoot = path.resolve(
 test("initializes actor workspaces without deleting existing actor artifacts", async () => {
   const keepPath = path.join(
     testArtifactRoot,
-    "npc_a",
+    "npc_b",
     "action-skills",
     "candidates",
     "keep.json"
@@ -35,15 +36,20 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       initializedAt: "2026-05-20T00:00:00.000Z",
       actors: [
         {
+          actor_id: "npc_b",
+          username: "npc_b",
+          role_id: "gatherer"
+        },
+        {
           actor_id: "npc_a",
           username: "npc_a",
-          role_id: "gatherer"
+          role_id: "quartermaster"
         }
       ],
       seedActionSkillOwnership: [
         {
           skill_id: "collectLogs",
-          owner_actor_id: "npc_a",
+          owner_actor_id: "npc_b",
           source_kind: "seed",
           status: "active",
           supersession: null
@@ -51,17 +57,19 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       ]
     });
 
-    assert.equal(result.actors.length, 1);
+    assert.equal(result.actors.length, 2);
     assert.equal(await fs.readFile(keepPath, "utf8"), "{\"kept\":true}\n");
 
     const actorFile = JSON.parse(
-      await fs.readFile(path.join(testArtifactRoot, "npc_a", "actor.json"), "utf8")
+      await fs.readFile(path.join(testArtifactRoot, "npc_b", "actor.json"), "utf8")
     );
     assert.equal(actorFile.schema, "actor-workspace/v1");
-    assert.equal(actorFile.actor_id, "npc_a");
+    assert.equal(actorFile.actor_id, "npc_b");
+    assert.equal(actorFile.actor_profile.display_name, "Jun");
+    assert.equal(actorFile.actor_profile.gameplay_role, "gatherer");
     assert.equal(actorFile.action_skill_library, "action-skills/index.json");
 
-    const paths = getActorWorkspacePaths(testArtifactRoot, "npc_a");
+    const paths = getActorWorkspacePaths(testArtifactRoot, "npc_b");
     const actionSkillIndex = JSON.parse(
       await fs.readFile(
         paths.actionSkills.indexFile,
@@ -71,12 +79,12 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     assert.equal(actionSkillIndex.schema, "action-skill-library/v1");
     assert.deepEqual(actionSkillIndex.active, ["collectLogs"]);
 
-    const activeRecords = await listActiveActorActionSkillRecords(testArtifactRoot, "npc_a");
+    const activeRecords = await listActiveActorActionSkillRecords(testArtifactRoot, "npc_b");
     assert.deepEqual(activeRecords, [
       {
         schema: "actor-action-skill/v1",
         skill_id: "collectLogs",
-        owner_actor_id: "npc_a",
+        owner_actor_id: "npc_b",
         source_kind: "seed",
         status: "active",
         created_at: "2026-05-20T00:00:00.000Z",
@@ -98,7 +106,14 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     await fs.access(paths.memoryDir);
     await fs.access(paths.evidenceDir);
     await fs.access(paths.reviewsDir);
+    await fs.access(paths.relationshipsDir);
+    const relationshipEdge = await readRelationshipEdge(testArtifactRoot, "npc_a", "npc_b");
+    assert.equal(relationshipEdge.from_actor_id, "npc_a");
+    assert.equal(relationshipEdge.to_actor_id, "npc_b");
+    assert.equal(relationshipEdge.trust, "unproven");
+    assert.equal(relationshipEdge.friction, "none");
     await fs.access(paths.providerInputsDir);
+    await fs.access(paths.providerOutputsDir);
     await fs.access(path.join(testArtifactRoot, "index.json"));
   } finally {
     await fs.rm(testArtifactRoot, { recursive: true, force: true });

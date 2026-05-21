@@ -24,26 +24,69 @@ It is transcript plus runtime artifacts.
 
 ## Recommended Setup
 
-Use Docker for a repeatable local vanilla server.
+Use the probe CLI for a repeatable local vanilla server:
 
-Example shape:
-
-```yaml
-services:
-  mc:
-    image: itzg/minecraft-server:java21
-    ports:
-      - "25565:25565"
-    environment:
-      EULA: "TRUE"
-      VERSION: "1.21.1"
-      TYPE: "VANILLA"
-      ONLINE_MODE: "FALSE"
-      ENABLE_RCON: "true"
+```bash
+bun run --cwd probe server:ready
 ```
 
-The exact compose file should live under `probe/` and be treated as the runtime
-source of truth.
+This command uses `probe/compose.yaml`, starts a managed Docker Compose project
+named `minecraft-agent-live-smoke` when needed, waits for a Minecraft protocol
+ping, and prints a user-joinable endpoint.
+
+Example output:
+
+```text
+status=ready
+source=started
+endpoint=127.0.0.1:25565
+minecraft_direct_connect=127.0.0.1:25565
+compose_project=minecraft-agent-live-smoke
+data_dir=/Users/.../probe/tmp/live-smoke-server
+stop_command=bun run --cwd probe server:stop
+```
+
+Use the `minecraft_direct_connect` value in the Minecraft Java client Direct
+Connect dialog. By default the managed server uses fixed local port `25565`.
+Override `MC_HOST_PORT` only when that port is already occupied.
+
+To inspect or stop the managed server:
+
+```bash
+bun run --cwd probe server:status
+bun run --cwd probe server:stop
+```
+
+To watch NPC state, provider packets, memory, and action skills while a probe is
+running:
+
+```bash
+bun run --cwd probe dashboard
+```
+
+Then open `http://127.0.0.1:4173`.
+
+`server:ready` and `server:status` do not use provider auth and do not inspect
+`build/provider-auth/openai-codex-auth.json`.
+
+The exact Docker server definition lives in `probe/compose.yaml` and is the
+runtime source of truth.
+
+## Probe Connection Behavior
+
+`probe/src/runProbe.ts` now uses the managed live-smoke server when `MC_PORT` is
+not set:
+
+- it calls the same readiness path as `bun run --cwd probe server:ready`;
+- it keeps the managed server running after the probe so the user can inspect
+  it;
+- spawn setup uses `docker compose exec mc rcon-cli` against the managed compose
+  context instead of a hardcoded container name.
+
+Set `MC_PORT=<port>` only when intentionally connecting to a manually managed
+server. The probe validates this override before bypassing the managed server.
+In manual mode, RCON setup may be unavailable and the probe falls back to chat
+commands.
 
 ## Important Rules
 

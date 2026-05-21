@@ -56,6 +56,7 @@ Allowed outputs:
 - fake-progress diagnosis;
 - pressure/task hint;
 - candidate action skill proposal;
+- relationship event proposal with evidence refs;
 - recipe revision suggestion;
 - retirement or supersession recommendation;
 - evidence links that justify the recommendation.
@@ -67,6 +68,11 @@ Forbidden outputs:
 - direct promotion of a candidate recipe;
 - generated code import;
 - another actor's lifecycle record.
+
+Relationship event proposals are not active mutations by themselves. They are
+applied only by the runtime-owned relationship proposal applier, which validates
+the target actor, event enum, and evidence refs before updating a directional
+relationship edge.
 
 ## Async Contract
 
@@ -102,6 +108,11 @@ The current code has the deterministic sidecar boundary in place:
 - deterministic fake-progress and verification-failure reviews also write draft
   candidate action skill proposals under
   `data/actors/<actor_id>/action-skills/candidates/`;
+- reviewer outputs can include `relationship_event_proposals`, but they are inert
+  unless an explicit applier is requested;
+- `REVIEW_APPLY_RELATIONSHIP_EVENTS=1 bun run review:actors [actor_id...]`
+  applies valid relationship proposals through the guarded applier after review
+  output is written;
 - `REVIEW_ACTORS_PROVIDER=openai-codex bun run review:actors [actor_id...]`
   can use the bounded LLM reviewer adapter for findings/proposal hints;
 - reviewer output always declares `active_mutation: "forbidden"`.
@@ -139,5 +150,7 @@ should use deterministic or stubbed reviewer outputs to prove:
 - reviewer outputs are actor-scoped;
 - reviewer code cannot call runtime success APIs;
 - reviewer code cannot write active action skill records directly;
+- relationship proposals require actor-workspace evidence refs and are
+  idempotent by runtime-generated event id;
 - global summaries read per-actor reviews only;
 - deterministic test paths perform zero network calls.

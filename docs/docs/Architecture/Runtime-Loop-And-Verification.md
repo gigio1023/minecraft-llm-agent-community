@@ -144,6 +144,12 @@ include:
 
 Verification is task-specific and evidence-backed.
 
+Verification must respect atomic gameplay boundaries. If interrupting an action
+would reset in-game progress, the primitive should await that action's natural
+completion or failure before collecting evidence. For `collect_logs`, this means
+the runtime does not poll block or inventory evidence while `bot.dig(...)` is
+still breaking the block.
+
 Valid verifier evidence includes:
 
 - inventory delta;
@@ -171,7 +177,7 @@ Deterministic mode must perform zero network calls.
 
 ## Immediate Validation Checks
 
-- `collect_logs` only passes with real log/block/inventory evidence.
+- `collect_logs` only passes with real inventory pickup evidence.
 - `move_to` only passes with distance or arrival evidence.
 - repeated identical failures become visible blockers, not hidden retries.
 - transcript ties every tool attempt to pre/post observation.

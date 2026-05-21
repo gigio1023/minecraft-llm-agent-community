@@ -43,7 +43,9 @@ async function main() {
         config.actorWorkspace.rootDir,
         actorId,
         {
-          ...(reviewer ? { reviewer, actorContext } : {})
+          ...(reviewer ? { reviewer, actorContext } : {}),
+          applyRelationshipEventProposals:
+            process.env.REVIEW_APPLY_RELATIONSHIP_EVENTS === "1"
         }
       );
       results.push({ actorId, reviews: actorResults });

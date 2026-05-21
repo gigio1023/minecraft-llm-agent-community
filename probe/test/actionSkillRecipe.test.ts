@@ -20,7 +20,7 @@ const validCollectLogsRecipe: ActionSkillRecipe = {
       primitive: "collect_logs",
       args: {},
       timeout_ms: 6_000,
-      expected_evidence: ["inventory_delta", "block_delta"]
+      expected_evidence: ["inventory_delta"]
     }
   ],
   verifier: {

@@ -143,6 +143,48 @@ test("depositToSharedChest blocks keep-items violations without mutating ledger 
   assert.equal(ledger.entries().length, 0);
 });
 
+test("depositToSharedChest blocks zero-move adapters without writing contribution evidence", async () => {
+  const ledger = createSharedStorageLedger();
+  const bulletin = createTeamBulletin();
+  const inventory = createInventoryStore({ oak_log: 4 });
+  const chest = {
+    chestId: "shared-chest-1",
+    async open() {
+      return {
+        items() {
+          return [];
+        },
+        deposit() {
+          return 0;
+        },
+        withdraw() {
+          return 0;
+        },
+        close() {}
+      };
+    }
+  };
+
+  const result = await depositToSharedChest({
+    actorId: "npc_a",
+    roleId: "gatherer",
+    chest,
+    inventory: {
+      items: inventory.items
+    },
+    ledger,
+    bulletin,
+    itemName: "oak_log",
+    count: 2,
+    currentTask: "deposit logs"
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.movedCount, 0);
+  assert.deepEqual(ledger.entries(), []);
+  assert.deepEqual(bulletin.snapshot(), []);
+});
+
 test("withdrawFromSharedChest lets a crafter take needed inputs and updates bulletin state", async () => {
   const ledger = createSharedStorageLedger();
   const bulletin = createTeamBulletin();

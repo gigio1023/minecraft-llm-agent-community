@@ -167,7 +167,21 @@ function runCommand(
   });
 }
 
-function parsePublishedEndpoint(output: string, fallbackHost: string) {
+function parsePublishedPort(value: string, line: string) {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`Unable to parse published port: ${line}`);
+  }
+
+  const port = Number(value);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Unable to parse published port: ${line}`);
+  }
+
+  return port;
+}
+
+export function parsePublishedEndpoint(output: string, fallbackHost: string) {
   const line = output
     .split(/\r?\n/)
     .map((entry) => entry.trim())
@@ -186,11 +200,7 @@ function parsePublishedEndpoint(output: string, fallbackHost: string) {
     }
 
     const rawHost = line.slice(1, bracketIndex);
-    const port = Number.parseInt(line.slice(separatorIndex + 1), 10);
-
-    if (!Number.isInteger(port)) {
-      throw new Error(`Unable to parse published port: ${line}`);
-    }
+    const port = parsePublishedPort(line.slice(separatorIndex + 1), line);
 
     return {
       host: normalizePublishedHost(rawHost, fallbackHost),
@@ -205,11 +215,7 @@ function parsePublishedEndpoint(output: string, fallbackHost: string) {
   }
 
   const rawHost = line.slice(0, separatorIndex);
-  const port = Number.parseInt(line.slice(separatorIndex + 1), 10);
-
-  if (!Number.isInteger(port)) {
-    throw new Error(`Unable to parse published port: ${line}`);
-  }
+  const port = parsePublishedPort(line.slice(separatorIndex + 1), line);
 
   return {
     host: normalizePublishedHost(rawHost, fallbackHost),
@@ -232,7 +238,7 @@ function delay(ms: number) {
   });
 }
 
-async function waitForServerReady(
+export async function waitForServerReady(
   host: string,
   port: number,
   version: string,

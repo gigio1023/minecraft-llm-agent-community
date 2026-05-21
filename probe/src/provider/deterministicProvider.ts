@@ -18,6 +18,7 @@ type NextInput = {
   };
   lastResult: ToolResult | null;
   currentTask?: DeterministicTask | null;
+  goalStack?: JsonValue;
   activeActionSkillContext?: {
     activeSkillIds: string[];
     allowedPrimitives: string[];

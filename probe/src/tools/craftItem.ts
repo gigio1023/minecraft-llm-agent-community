@@ -15,6 +15,9 @@ type CraftingBot = {
   registry: {
     itemsByName: Record<string, { id: number }>;
   };
+  inventory?: {
+    items(): Array<{ name: string; count: number }>;
+  };
   recipesFor(itemId: number, metadata: null, minResultCount: number, craftingTable: unknown): Recipe[];
   craft(recipe: Recipe, count: number, craftingTable: unknown): Promise<void>;
 };
@@ -22,6 +25,9 @@ type CraftingBot = {
 type CraftResult = {
   status: "crafted";
   itemName: string;
+  beforeCount?: number;
+  afterCount?: number;
+  inventoryDelta?: number;
 };
 
 function resolveCraftTarget(bot: CraftingBot, itemName: string) {
@@ -33,6 +39,17 @@ function resolveCraftTarget(bot: CraftingBot, itemName: string) {
   }
 
   return itemName;
+}
+
+function countInventoryItem(bot: CraftingBot, itemName: string) {
+  if (!bot.inventory) {
+    return undefined;
+  }
+
+  return bot.inventory
+    .items()
+    .filter((item) => item.name === itemName)
+    .reduce((sum, item) => sum + item.count, 0);
 }
 
 export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName: string }): Promise<CraftResult> {
@@ -57,10 +74,18 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
     throw new Error(`No craftable recipe found for ${resolvedItemName}`);
   }
 
+  const beforeCount = countInventoryItem(bot, resolvedItemName);
   await bot.craft(recipe, 1, null);
+  const afterCount = countInventoryItem(bot, resolvedItemName);
 
   return {
     status: "crafted",
-    itemName: resolvedItemName
+    itemName: resolvedItemName,
+    beforeCount,
+    afterCount,
+    inventoryDelta:
+      beforeCount !== undefined && afterCount !== undefined
+        ? afterCount - beforeCount
+        : undefined
   };
 }

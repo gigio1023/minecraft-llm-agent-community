@@ -42,9 +42,12 @@ Read these first:
 6. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 7. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
 8. `docs/docs/Architecture/Implementation-Workstreams.md`
-9. `docs/docs/Architecture/Minimal-Probe.md`
-10. `docs/docs/Setup/Headless-Server.md`
-11. `docs/docs/Setup/Provider-Setup.md`
+9. `docs/docs/Architecture/Action-Skill-Verification.md`
+10. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+11. `docs/docs/Architecture/Minimal-Probe.md`
+12. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+13. `docs/docs/Setup/Headless-Server.md`
+14. `docs/docs/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -77,6 +80,8 @@ Important search tokens:
 - `LIVE_TRANSCRIPT_FIRST`
 - `CHECKPOINT_READY_RUNTIME`
 - `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
+- `ACTION_SKILL_VERIFICATION`
+- `CURRENT_HANDOFF_NEXT_WORK`
 - `GENERATED_ACTION_SKILL_LEGACY_STORE`
 - `PER_NPC_ASYNC_REVIEWER`
 - `IMPLEMENTATION_WORKSTREAMS`
@@ -113,6 +118,10 @@ Important search tokens:
 - Failures should be explainable from artifacts without immediate reproduction.
 - Progress must be real. Do not confuse partial motion, initial animation, or
   optimistic status text with success.
+- Treat interruption-sensitive Minecraft actions as atomic action skill
+  boundaries. For example, block breaking must keep Mineflayer digging until
+  `bot.dig(...)` resolves or fails; do not stop to check progress mid-dig,
+  because that resets block-breaking progress.
 - Actor workspace is the source of truth for actor-owned action skill state.
 - Treat `build/generated-skills` as legacy exploratory output, not as active or
   candidate actor-owned action skill memory.
