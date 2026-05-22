@@ -51,6 +51,17 @@ export type ProbeMatrixEvidenceGap = {
   transcriptPath?: string;
 };
 
+export type ProbeMatrixSkillStatus = {
+  skillId: SeedActionSkillId;
+  status: "passed" | "pending_live_evidence" | "environment_blocked" | "failed" | "error";
+  reason: string;
+  requiredEvidence: {
+    contract: string[];
+    postcondition: string[];
+  };
+  transcriptPath?: string;
+};
+
 export type ProbeMatrixReport = {
   schema: "action-skill-probe-matrix-report/v1";
   mode: "dry_run" | "live" | "evidence_audit";
@@ -61,6 +72,7 @@ export type ProbeMatrixReport = {
   preflight?: ProbeMatrixPreflight;
   results?: ActionSkillProbeResult[];
   verdict: ProbeMatrixVerdict;
+  skillStatuses: ProbeMatrixSkillStatus[];
   evidenceGaps: ProbeMatrixEvidenceGap[];
   summary: {
     passed: number;
@@ -141,6 +153,53 @@ export function buildProbeMatrixEvidenceGaps(input: {
       requiredEvidence,
       ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {})
     }];
+  });
+}
+
+export function buildProbeMatrixSkillStatuses(input: {
+  cases: ProbeMatrixCase[];
+  preflight?: ProbeMatrixPreflight;
+  results?: ActionSkillProbeResult[];
+}): ProbeMatrixSkillStatus[] {
+  const resultsBySkill = new Map((input.results ?? []).map((result) => [result.skillId, result]));
+
+  return input.cases.map((testCase) => {
+    const result = resultsBySkill.get(testCase.skillId);
+    const requiredEvidence = {
+      contract: [...testCase.contractEvidence],
+      postcondition: [...testCase.postconditionEvidence]
+    };
+
+    if (!result) {
+      if (input.preflight?.status === "environment_blocked") {
+        return {
+          skillId: testCase.skillId,
+          status: "environment_blocked",
+          reason: input.preflight.reason,
+          requiredEvidence
+        };
+      }
+
+      return {
+        skillId: testCase.skillId,
+        status: "pending_live_evidence",
+        reason: "live probe has not produced runtime evidence for this action skill",
+        requiredEvidence
+      };
+    }
+
+    return {
+      skillId: testCase.skillId,
+      status: result.status,
+      reason:
+        result.errorMessage ??
+        result.finalWhy ??
+        (result.status === "passed"
+          ? "probe transcript satisfies the action skill postcondition"
+          : "probe did not satisfy the action skill contract"),
+      requiredEvidence,
+      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {})
+    };
   });
 }
 
@@ -511,6 +570,11 @@ export function buildProbeMatrixReport(input: {
     verdict: classifyProbeMatrixReport({
       ...summary,
       preflight: input.preflight
+    }),
+    skillStatuses: buildProbeMatrixSkillStatuses({
+      cases: input.cases,
+      preflight: input.preflight,
+      results
     }),
     evidenceGaps: buildProbeMatrixEvidenceGaps({
       cases: input.cases,

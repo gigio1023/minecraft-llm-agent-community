@@ -367,8 +367,10 @@ skill verification gaps to reviewer sidecars or later agents. The report has a
 top-level `verdict` field: `passed`, `failed`, `environment_blocked`, or
 `incomplete`. This keeps Docker/OrbStack blockers separate from actual action
 skill failures and from partial runs that stopped before the whole matrix was
-observed. The same report includes `evidenceGaps`, which lists every unproven
-action skill with its blocker status, reason, and required contract and
+observed. The same report includes `skillStatuses`, one row per selected action
+skill, so dashboards and reviewer sidecars can render the whole matrix without
+reconstructing it from `results` and `evidenceGaps`. `evidenceGaps` lists every
+unproven action skill with its blocker status, reason, and required contract and
 postcondition evidence.
 
 Remaining harness work:

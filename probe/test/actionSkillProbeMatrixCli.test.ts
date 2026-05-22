@@ -9,6 +9,7 @@ import {
   buildProbeMatrixEvidenceGaps,
   buildProbeMatrixReport,
   buildProbeMatrixCases,
+  buildProbeMatrixSkillStatuses,
   classifyProbeMatrixReport,
   normalizeDockerPreflightResult
 } from "../src/actionSkillProbeMatrixCli.js";
@@ -96,6 +97,9 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.summary.planned, 1);
   assert.equal(report.summary.completed, 0);
   assert.equal(report.verdict, "incomplete");
+  assert.equal(report.skillStatuses.length, 1);
+  assert.equal(report.skillStatuses[0].skillId, "collectLogs");
+  assert.equal(report.skillStatuses[0].status, "pending_live_evidence");
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
@@ -125,6 +129,8 @@ test("action skill probe matrix report counts environment preflight blockers as 
 
   assert.equal(report.summary.error, 1);
   assert.equal(report.verdict, "environment_blocked");
+  assert.equal(report.skillStatuses.length, 1);
+  assert.equal(report.skillStatuses[0].status, "environment_blocked");
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "environment_blocked");
   assert.match(report.evidenceGaps[0].reason, /docker unavailable/);
@@ -219,6 +225,59 @@ test("action skill probe matrix evidence gaps explain failed and unrun cases", (
   assert.ok(gaps[1].requiredEvidence.postcondition.length > 0);
 });
 
+test("action skill probe matrix skill statuses provide one row per case", () => {
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs", "craftCraftingTable"],
+    maxActions: 8
+  });
+  const statuses = buildProbeMatrixSkillStatuses({
+    cases,
+    results: [
+      {
+        status: "passed",
+        skillId: "collectLogs",
+        actorId: "npc_b",
+        contract: {
+          skillId: "collectLogs",
+          primitiveIds: ["observe", "collect_logs", "wait"],
+          evidence: ["inventory delta"],
+          protectedBy: ["test/collectLogs.test.ts"]
+        },
+        allowedPrimitives: ["observe", "collect_logs", "wait"],
+        transcriptPath: "data/evidence/collect.json",
+        finalWhy: "collect_4_logs completed with runtime inventory evidence"
+      }
+    ]
+  });
+
+  assert.deepEqual(statuses.map((entry) => entry.skillId), ["collectLogs", "craftCraftingTable"]);
+  assert.equal(statuses[0].status, "passed");
+  assert.equal(statuses[0].transcriptPath, "data/evidence/collect.json");
+  assert.match(statuses[0].reason, /runtime inventory evidence/);
+  assert.equal(statuses[1].status, "pending_live_evidence");
+  assert.ok(statuses[1].requiredEvidence.postcondition.length > 0);
+});
+
+test("action skill probe matrix skill statuses mark all unrun cases as environment blocked after preflight failure", () => {
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs", "craftCraftingTable"],
+    maxActions: 8
+  });
+  const statuses = buildProbeMatrixSkillStatuses({
+    cases,
+    preflight: {
+      status: "environment_blocked",
+      reason: "docker unavailable"
+    },
+    results: []
+  });
+
+  assert.deepEqual(statuses.map((entry) => entry.status), ["environment_blocked", "environment_blocked"]);
+  assert.ok(statuses.every((entry) => entry.reason === "docker unavailable"));
+});
+
 test("action skill probe matrix audits existing transcript evidence without Docker", async () => {
   const evidenceDir = await mkdtemp(path.join(tmpdir(), "action-skill-matrix-evidence-"));
   const cases = buildProbeMatrixCases({
@@ -305,6 +364,7 @@ test("action skill probe matrix audits existing transcript evidence without Dock
   assert.equal(report.verdict, "incomplete");
   assert.equal(report.summary.passed, 1);
   assert.equal(report.summary.completed, 1);
+  assert.deepEqual(report.skillStatuses.map((entry) => entry.status), ["passed", "pending_live_evidence"]);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].skillId, "craftCraftingTable");
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
