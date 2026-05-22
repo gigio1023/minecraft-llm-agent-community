@@ -21,12 +21,12 @@ export function createDialogueState({
   let remainingBusyReplies = busyRepliesBeforeAvailable;
 
   function isSupported(actorId?: string, targetId?: string) {
-    return actorId === "npc_a" && targetId === "npc_b";
+    return Boolean(actorId && targetId && actorId !== targetId);
   }
 
   return {
     peek(targetId: string): DialogueAvailability {
-      if (targetId !== "npc_b") {
+      if (!targetId) {
         return "unavailable";
       }
 
@@ -47,7 +47,7 @@ export function createDialogueState({
 
         return {
           status: "busy",
-          reason: "npc_b is busy"
+          reason: `${targetId} is busy`
         };
       }
 

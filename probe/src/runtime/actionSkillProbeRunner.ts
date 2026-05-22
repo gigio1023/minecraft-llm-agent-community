@@ -476,6 +476,12 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
         if (input.lastResult.tool === "deposit_shared" && input.lastResult.status === "deposited") {
           return { tool: "say", args: { target: targetActorId, text: "I left a crafting table in the shared chest." } };
         }
+        if (input.lastResult.tool === "say" && input.lastResult.status === "busy") {
+          return { tool: "wait", args: { ticks: 20 } };
+        }
+        if (input.lastResult.tool === "wait") {
+          return { tool: "say", args: { target: targetActorId, text: "I left a crafting table in the shared chest." } };
+        }
         if (input.lastResult.tool === "say" && input.lastResult.status === "delivered") {
           return { tool: "remember", args: { note: "handoffItemAtChest deposited and announced the handoff" } };
         }

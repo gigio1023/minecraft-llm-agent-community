@@ -1,4 +1,5 @@
 import type { Vec3 } from "vec3";
+import { goals } from "mineflayer-pathfinder";
 import type { ItemStack } from "../gameplay/storage/sharedStorageLedger.js";
 
 type InventoryItem = {
@@ -17,6 +18,7 @@ type SharedChestWindow = {
 
 type ChestBlock = {
   name: string;
+  position?: Vec3;
 };
 
 type SharedChestBot = {
@@ -26,6 +28,15 @@ type SharedChestBot = {
     count: number;
   }) => unknown;
   openChest?: (block: any, direction?: number, cursorPos?: Vec3) => Promise<SharedChestWindow>;
+  entity?: {
+    position: {
+      distanceTo(other: { x: number; y: number; z: number }): number;
+    };
+  };
+  pathfinder?: {
+    goto(goal: unknown): Promise<void>;
+    stop?(): void;
+  };
   inventory?: {
     items(): InventoryItem[];
   };
@@ -37,6 +48,8 @@ type SharedChestBot = {
 type CreateMineflayerSharedChestAccessorOptions = {
   chestId?: string;
   maxDistance?: number;
+  openDistance?: number;
+  moveTimeoutMs?: number;
 };
 
 function snapshotItems(items: InventoryItem[]): ItemStack[] {
@@ -68,9 +81,61 @@ function readItemType(bot: SharedChestBot, item: InventoryItem) {
   return bot.registry?.itemsByName?.[item.name]?.id;
 }
 
+async function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          onTimeout();
+          reject(new Error(`shared chest pathfinder timeout after ${timeoutMs}ms`));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+async function moveNearSharedChest(
+  bot: SharedChestBot,
+  block: ChestBlock,
+  openDistance: number,
+  moveTimeoutMs: number
+) {
+  if (!block.position || !bot.entity || !bot.pathfinder) {
+    return;
+  }
+
+  const distance = bot.entity.position.distanceTo(block.position);
+  if (distance <= openDistance) {
+    return;
+  }
+
+  // Opening a chest is an embodied Mineflayer action, not a pure read. Move
+  // into interaction range first so storage action skills are atomic at the
+  // primitive boundary instead of timing out on a distant windowOpen event.
+  await raceWithTimeout(
+    bot.pathfinder.goto(
+      new goals.GoalNear(block.position.x, block.position.y, block.position.z, Math.max(1, Math.floor(openDistance)))
+    ),
+    moveTimeoutMs,
+    () => bot.pathfinder?.stop?.()
+  );
+}
+
 export function createMineflayerSharedChestAccessor(
   bot: SharedChestBot,
-  { chestId = "shared-chest-1", maxDistance = 12 }: CreateMineflayerSharedChestAccessorOptions = {}
+  {
+    chestId = "shared-chest-1",
+    maxDistance = 12,
+    openDistance = 2.5,
+    moveTimeoutMs = 8_000
+  }: CreateMineflayerSharedChestAccessorOptions = {}
 ) {
   return {
     chestId,
@@ -83,6 +148,7 @@ export function createMineflayerSharedChestAccessor(
         return null;
       }
 
+      await moveNearSharedChest(bot, block as ChestBlock, openDistance, moveTimeoutMs);
       const chest = await bot.openChest(block);
 
       try {
@@ -100,6 +166,7 @@ export function createMineflayerSharedChestAccessor(
         throw new Error("shared chest is not available nearby");
       }
 
+      await moveNearSharedChest(bot, block as ChestBlock, openDistance, moveTimeoutMs);
       const chest = await bot.openChest(block);
 
       return {
