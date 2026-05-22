@@ -43,6 +43,7 @@ export type ProbeMatrixVerdict = "passed" | "failed" | "environment_blocked" | "
 export type ProbeMatrixEvidenceGap = {
   skillId: SeedActionSkillId;
   status: "pending_live_evidence" | "environment_blocked" | "failed" | "error";
+  evidenceScope: ProbeMatrixEvidenceScope;
   reason: string;
   requiredEvidence: {
     contract: string[];
@@ -55,6 +56,7 @@ export type ProbeMatrixEvidenceGap = {
 export type ProbeMatrixSkillStatus = {
   skillId: SeedActionSkillId;
   status: "passed" | "pending_live_evidence" | "environment_blocked" | "failed" | "error";
+  evidenceScope: ProbeMatrixEvidenceScope;
   reason: string;
   requiredEvidence: {
     contract: string[];
@@ -63,6 +65,12 @@ export type ProbeMatrixSkillStatus = {
   transcriptPath?: string;
   freshEvidenceCommand: string;
 };
+
+export type ProbeMatrixEvidenceScope =
+  | "current_run"
+  | "historical_transcript"
+  | "missing"
+  | "environment_blocked";
 
 export type ProbeMatrixStatusCounts = {
   passed: number;
@@ -122,6 +130,7 @@ export function classifyProbeMatrixReport(input: {
 }
 
 export function buildProbeMatrixEvidenceGaps(input: {
+  mode?: ProbeMatrixReport["mode"];
   cases: ProbeMatrixCase[];
   preflight?: ProbeMatrixPreflight;
   results?: ActionSkillProbeResult[];
@@ -141,6 +150,7 @@ export function buildProbeMatrixEvidenceGaps(input: {
         return [{
           skillId: testCase.skillId,
           status: "environment_blocked",
+          evidenceScope: "environment_blocked",
           reason: input.preflight.reason,
           requiredEvidence,
           freshEvidenceCommand
@@ -150,6 +160,7 @@ export function buildProbeMatrixEvidenceGaps(input: {
       return [{
         skillId: testCase.skillId,
         status: "pending_live_evidence",
+        evidenceScope: "missing",
         reason: "live probe has not produced runtime evidence for this action skill",
         requiredEvidence,
         freshEvidenceCommand
@@ -163,6 +174,7 @@ export function buildProbeMatrixEvidenceGaps(input: {
     return [{
       skillId: testCase.skillId,
       status: result.status,
+      evidenceScope: input.mode === "evidence_audit" ? "historical_transcript" : "current_run",
       reason: result.errorMessage ?? result.finalWhy ?? "probe did not satisfy the action skill contract",
       requiredEvidence,
       ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {}),
@@ -183,6 +195,7 @@ export function buildFreshEvidenceCommand(testCase: ActionSkillProbeConfig) {
 }
 
 export function buildProbeMatrixSkillStatuses(input: {
+  mode?: ProbeMatrixReport["mode"];
   cases: ProbeMatrixCase[];
   preflight?: ProbeMatrixPreflight;
   results?: ActionSkillProbeResult[];
@@ -202,6 +215,7 @@ export function buildProbeMatrixSkillStatuses(input: {
         return {
           skillId: testCase.skillId,
           status: "environment_blocked",
+          evidenceScope: "environment_blocked",
           reason: input.preflight.reason,
           requiredEvidence,
           freshEvidenceCommand
@@ -211,6 +225,7 @@ export function buildProbeMatrixSkillStatuses(input: {
       return {
         skillId: testCase.skillId,
         status: "pending_live_evidence",
+        evidenceScope: "missing",
         reason: "live probe has not produced runtime evidence for this action skill",
         requiredEvidence,
         freshEvidenceCommand
@@ -220,6 +235,7 @@ export function buildProbeMatrixSkillStatuses(input: {
     return {
       skillId: testCase.skillId,
       status: result.status,
+      evidenceScope: input.mode === "evidence_audit" ? "historical_transcript" : "current_run",
       reason:
         result.errorMessage ??
         result.finalWhy ??
@@ -593,6 +609,7 @@ export function buildProbeMatrixReport(input: {
     input.preflight?.status === "environment_blocked" && results.length === 0 ? 1 : 0;
   const error = results.filter((result) => result.status === "error").length + preflightError;
   const skillStatuses = buildProbeMatrixSkillStatuses({
+    mode: input.mode,
     cases: input.cases,
     preflight: input.preflight,
     results
@@ -621,6 +638,7 @@ export function buildProbeMatrixReport(input: {
     }),
     skillStatuses,
     evidenceGaps: buildProbeMatrixEvidenceGaps({
+      mode: input.mode,
       cases: input.cases,
       preflight: input.preflight,
       results
@@ -657,7 +675,7 @@ function printEvidenceGapSummary(gaps: readonly ProbeMatrixEvidenceGap[]) {
 
   console.log(`matrix_evidence_gaps count=${gaps.length}`);
   for (const gap of gaps.slice(0, 5)) {
-    console.log(`  ${gap.skillId}: ${gap.status} - ${gap.reason.split("\n")[0]}`);
+    console.log(`  ${gap.skillId}: ${gap.status}/${gap.evidenceScope} - ${gap.reason.split("\n")[0]}`);
   }
 }
 

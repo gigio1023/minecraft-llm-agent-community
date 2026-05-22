@@ -109,9 +109,11 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].skillId, "collectLogs");
   assert.equal(report.skillStatuses[0].status, "pending_live_evidence");
+  assert.equal(report.skillStatuses[0].evidenceScope, "missing");
   assert.match(report.skillStatuses[0].freshEvidenceCommand, /--skill collectLogs/);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
+  assert.equal(report.evidenceGaps[0].evidenceScope, "missing");
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
   assert.equal(report.cases[0].skillId, "collectLogs");
   assert.ok(report.cases[0].contractEvidence.length > 0);
@@ -148,9 +150,11 @@ test("action skill probe matrix report counts environment preflight blockers as 
   assert.equal(report.verdict, "environment_blocked");
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].status, "environment_blocked");
+  assert.equal(report.skillStatuses[0].evidenceScope, "environment_blocked");
   assert.match(report.skillStatuses[0].freshEvidenceCommand, /--skill craftPlanksAndSticks/);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "environment_blocked");
+  assert.equal(report.evidenceGaps[0].evidenceScope, "environment_blocked");
   assert.match(report.evidenceGaps[0].reason, /docker unavailable/);
   assert.equal(report.summary.completed, 0);
   assert.equal(report.summary.planned, 1);
@@ -235,10 +239,12 @@ test("action skill probe matrix evidence gaps explain failed and unrun cases", (
   assert.equal(gaps.length, 2);
   assert.equal(gaps[0].skillId, "collectLogs");
   assert.equal(gaps[0].status, "failed");
+  assert.equal(gaps[0].evidenceScope, "current_run");
   assert.match(gaps[0].reason, /log inventory did not increase/);
   assert.equal(gaps[0].transcriptPath, "data/evidence/collect.json");
   assert.equal(gaps[1].skillId, "craftCraftingTable");
   assert.equal(gaps[1].status, "pending_live_evidence");
+  assert.equal(gaps[1].evidenceScope, "missing");
   assert.match(gaps[1].freshEvidenceCommand, /--skill craftCraftingTable/);
   assert.ok(gaps[1].requiredEvidence.contract.length > 0);
   assert.ok(gaps[1].requiredEvidence.postcondition.length > 0);
@@ -285,10 +291,12 @@ test("action skill probe matrix skill statuses provide one row per case", () => 
 
   assert.deepEqual(statuses.map((entry) => entry.skillId), ["collectLogs", "craftCraftingTable"]);
   assert.equal(statuses[0].status, "passed");
+  assert.equal(statuses[0].evidenceScope, "current_run");
   assert.equal(statuses[0].transcriptPath, "data/evidence/collect.json");
   assert.match(statuses[0].reason, /runtime inventory evidence/);
   assert.match(statuses[0].freshEvidenceCommand, /--skill collectLogs/);
   assert.equal(statuses[1].status, "pending_live_evidence");
+  assert.equal(statuses[1].evidenceScope, "missing");
   assert.match(statuses[1].freshEvidenceCommand, /--skill craftCraftingTable/);
   assert.ok(statuses[1].requiredEvidence.postcondition.length > 0);
 });
@@ -309,6 +317,7 @@ test("action skill probe matrix skill statuses mark all unrun cases as environme
   });
 
   assert.deepEqual(statuses.map((entry) => entry.status), ["environment_blocked", "environment_blocked"]);
+  assert.deepEqual(statuses.map((entry) => entry.evidenceScope), ["environment_blocked", "environment_blocked"]);
   assert.ok(statuses.every((entry) => entry.reason === "docker unavailable"));
   assert.ok(statuses.every((entry) => entry.freshEvidenceCommand.includes("--init-actor-workspace baseline")));
 });
@@ -318,6 +327,7 @@ test("action skill probe matrix counts status rows for summary coverage", () => 
     {
       skillId: "collectLogs",
       status: "passed",
+      evidenceScope: "current_run",
       reason: "proved",
       requiredEvidence: {
         contract: [],
@@ -328,6 +338,7 @@ test("action skill probe matrix counts status rows for summary coverage", () => 
     {
       skillId: "craftPlanksAndSticks",
       status: "pending_live_evidence",
+      evidenceScope: "missing",
       reason: "not run",
       requiredEvidence: {
         contract: [],
@@ -338,6 +349,7 @@ test("action skill probe matrix counts status rows for summary coverage", () => 
     {
       skillId: "craftCraftingTable",
       status: "failed",
+      evidenceScope: "current_run",
       reason: "missing inventory",
       requiredEvidence: {
         contract: [],
@@ -348,6 +360,7 @@ test("action skill probe matrix counts status rows for summary coverage", () => 
     {
       skillId: "inspectSharedChest",
       status: "environment_blocked",
+      evidenceScope: "environment_blocked",
       reason: "docker unavailable",
       requiredEvidence: {
         contract: [],
@@ -358,6 +371,7 @@ test("action skill probe matrix counts status rows for summary coverage", () => 
     {
       skillId: "depositSharedItems",
       status: "error",
+      evidenceScope: "current_run",
       reason: "unexpected error",
       requiredEvidence: {
         contract: [],
@@ -470,6 +484,7 @@ test("action skill probe matrix audits existing transcript evidence without Dock
     environmentBlocked: 0
   });
   assert.deepEqual(report.skillStatuses.map((entry) => entry.status), ["passed", "pending_live_evidence"]);
+  assert.deepEqual(report.skillStatuses.map((entry) => entry.evidenceScope), ["historical_transcript", "missing"]);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].skillId, "craftCraftingTable");
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
