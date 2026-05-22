@@ -7,6 +7,7 @@ function createCraftBot(options?: {
   recipeNames?: string[];
   initialCounts?: Record<string, number>;
   craftedCount?: number;
+  includeInventory?: boolean;
 }) {
   const recipeNames = new Set(options?.recipeNames ?? ["oak_planks", "stick", "crafting_table"]);
   const counts = new Map(Object.entries(options?.initialCounts ?? {}));
@@ -22,11 +23,15 @@ function createCraftBot(options?: {
         crafting_table: { id: 4 }
       }
     },
-    inventory: {
-      items() {
-        return [...counts.entries()].map(([name, count]) => ({ name, count }));
-      }
-    },
+    ...(options?.includeInventory === false
+      ? {}
+      : {
+          inventory: {
+            items() {
+              return [...counts.entries()].map(([name, count]) => ({ name, count }));
+            }
+          }
+        }),
     recipesFor(itemId: number) {
       const itemName = Object.entries(this.registry.itemsByName).find(
         ([, item]) => item.id === itemId
@@ -83,6 +88,19 @@ test("craftItem blocks optimistic craft completion without inventory increase", 
     inventoryDelta: 0
   });
   assert.deepEqual(bot.craftCalls, [{ recipe: "stick", count: 1, table: null }]);
+});
+
+test("craftItem blocks when inventory evidence is unavailable", async () => {
+  const bot = createCraftBot({ includeInventory: false });
+
+  const result = await craftItem({ bot, itemName: "stick" });
+
+  assert.deepEqual(result, {
+    status: "blocked",
+    itemName: "stick",
+    reason: "craft_item cannot verify stick without inventory evidence"
+  });
+  assert.deepEqual(bot.craftCalls, []);
 });
 
 test("craftItem rejects unknown item names before calling Mineflayer craft", async () => {

@@ -94,8 +94,10 @@ Required evidence:
 - `recipesFor(...)` returns an available recipe;
 - `bot.craft(recipe, count, craftingTable)` is awaited;
 - crafted item inventory count is reported when available;
-- when inventory counts are available, the primitive must not return
-  `crafted` unless the target item count increased.
+- the primitive must not call `bot.craft(...)` or return `crafted` when
+  inventory evidence is unavailable;
+- the primitive must not return `crafted` unless the target item count
+  increased.
 
 Inventory-only crafting is intentionally separate from table-bound crafting.
 Table-bound recipes need their own primitive that can find/place/use a crafting

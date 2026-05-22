@@ -82,14 +82,29 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
   }
 
   const beforeCount = countInventoryItem(bot, resolvedItemName);
+  if (beforeCount === undefined) {
+    return {
+      status: "blocked",
+      itemName: resolvedItemName,
+      reason: `craft_item cannot verify ${resolvedItemName} without inventory evidence`
+    };
+  }
+
   await bot.craft(recipe, 1, null);
   const afterCount = countInventoryItem(bot, resolvedItemName);
-  const inventoryDelta =
-    beforeCount !== undefined && afterCount !== undefined
-      ? afterCount - beforeCount
-      : undefined;
+  if (afterCount === undefined) {
+    return {
+      status: "blocked",
+      itemName: resolvedItemName,
+      reason: `craft_item lost ${resolvedItemName} inventory evidence after craft`,
+      beforeCount
+    };
+  }
 
-  if (inventoryDelta !== undefined && inventoryDelta <= 0) {
+  const inventoryDelta =
+    afterCount - beforeCount;
+
+  if (inventoryDelta <= 0) {
     return {
       status: "blocked",
       itemName: resolvedItemName,
