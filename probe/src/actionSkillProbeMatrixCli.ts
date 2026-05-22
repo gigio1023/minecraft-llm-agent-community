@@ -144,6 +144,7 @@ export type ProbeMatrixNextAction = {
     | "fix_failed_probe"
     | "restore_environment";
   skillId?: SeedActionSkillId;
+  skillIds?: SeedActionSkillId[];
   priority: "P0";
   reason: string;
   command?: string;
@@ -153,6 +154,8 @@ export type ProbeMatrixNextAction = {
     postcondition: string[];
   };
 };
+
+const dockerPreflightCommand = "docker info --format '{{.ServerVersion}}'";
 
 function buildProbeMatrixReadinessItems(input: {
   skillId: SeedActionSkillId;
@@ -386,21 +389,24 @@ export function countProbeMatrixEvidenceScopes(
 export function buildProbeMatrixNextActions(
   gaps: readonly ProbeMatrixEvidenceGap[]
 ): ProbeMatrixNextAction[] {
-  return gaps.map((gap) => {
-    if (gap.status === "environment_blocked") {
-      return {
-        kind: "restore_environment",
-        priority: "P0",
-        reason: gap.reason,
-        evidenceScope: gap.evidenceScope,
-        command: gap.freshEvidenceCommand,
-        skillId: gap.skillId,
-        requiredEvidence: gap.requiredEvidence
-      };
-    }
+  const environmentBlocked = gaps.filter((gap) => gap.status === "environment_blocked");
+  const actionable = gaps.filter((gap) => gap.status !== "environment_blocked");
+  const actions: ProbeMatrixNextAction[] = [];
 
+  if (environmentBlocked.length > 0) {
+    actions.push({
+      kind: "restore_environment",
+      priority: "P0",
+      reason: environmentBlocked[0]?.reason ?? "runtime environment is blocked",
+      evidenceScope: "environment_blocked",
+      command: dockerPreflightCommand,
+      skillIds: environmentBlocked.map((gap) => gap.skillId)
+    });
+  }
+
+  for (const gap of actionable) {
     if (gap.status === "pending_live_evidence") {
-      return {
+      actions.push({
         kind: "run_fresh_live_probe",
         priority: "P0",
         reason: gap.reason,
@@ -408,10 +414,11 @@ export function buildProbeMatrixNextActions(
         command: gap.freshEvidenceCommand,
         skillId: gap.skillId,
         requiredEvidence: gap.requiredEvidence
-      };
+      });
+      continue;
     }
 
-    return {
+    actions.push({
       kind: "fix_failed_probe",
       priority: "P0",
       reason: gap.reason,
@@ -419,8 +426,10 @@ export function buildProbeMatrixNextActions(
       command: gap.freshEvidenceCommand,
       skillId: gap.skillId,
       requiredEvidence: gap.requiredEvidence
-    };
-  });
+    });
+  }
+
+  return actions;
 }
 
 type ExistingEvidencePayload = {
@@ -925,7 +934,11 @@ function printNextActions(actions: readonly ProbeMatrixNextAction[]) {
 
   console.log(`matrix_next_actions count=${actions.length}`);
   for (const action of actions) {
-    const skill = action.skillId ? `${action.skillId}: ` : "";
+    const skill = action.skillId
+      ? `${action.skillId}: `
+      : action.skillIds && action.skillIds.length > 0
+        ? `${action.skillIds.length} skill(s): `
+        : "";
     console.log(`  ${action.priority} ${action.kind} ${skill}${action.reason.split("\n")[0]}`);
     if (action.command) {
       console.log(`    ${action.command}`);

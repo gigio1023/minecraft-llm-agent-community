@@ -191,7 +191,8 @@ test("action skill probe matrix report counts environment preflight blockers as 
   assert.equal(report.evidenceGaps[0].evidenceScope, "environment_blocked");
   assert.equal(report.nextActions.length, 1);
   assert.equal(report.nextActions[0].kind, "restore_environment");
-  assert.match(report.nextActions[0].command ?? "", /--skill craftPlanksAndSticks/);
+  assert.match(report.nextActions[0].command ?? "", /docker info/);
+  assert.deepEqual(report.nextActions[0].skillIds, ["craftPlanksAndSticks"]);
   assert.match(report.evidenceGaps[0].reason, /docker unavailable/);
   assert.equal(report.summary.completed, 0);
   assert.equal(report.summary.planned, 1);
@@ -345,12 +346,15 @@ test("action skill probe matrix next actions classify missing, failed, and envir
   const actions = buildProbeMatrixNextActions([missingGap, blockedGap, failedGap]);
 
   assert.deepEqual(actions.map((action) => action.kind), [
-    "run_fresh_live_probe",
     "restore_environment",
+    "run_fresh_live_probe",
     "fix_failed_probe"
   ]);
   assert.ok(actions.every((action) => action.priority === "P0"));
-  assert.ok(actions.every((action) => action.command?.includes("--init-actor-workspace baseline")));
+  assert.match(actions[0].command ?? "", /docker info/);
+  assert.match(actions[1].command ?? "", /--init-actor-workspace baseline/);
+  assert.match(actions[2].command ?? "", /--init-actor-workspace baseline/);
+  assert.deepEqual(actions[0].skillIds, ["collectLogs"]);
   assert.equal(actions[2].skillId, "craftCraftingTable");
   assert.match(actions[2].reason, /missing crafting table inventory/);
 });

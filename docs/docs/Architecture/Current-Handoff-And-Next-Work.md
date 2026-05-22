@@ -410,6 +410,8 @@ reason, required contract and postcondition evidence, and the same
 fresh-evidence command. `nextActions` derives P0 reviewer/dashboard actions
 from those gaps, classifying each row as environment restoration, fresh live
 proof, or failed-probe repair with the exact command to run when available.
+Environment restoration is de-duplicated into one Docker preflight command;
+per-skill fresh probe commands remain on `skillStatuses` and `evidenceGaps`.
 Live and audited rows also preserve structured
 terminal/postcondition diagnosis fields when available:
 `terminalStatus`, `terminalWhy`, `postconditionStatus`,
