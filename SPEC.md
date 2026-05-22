@@ -241,7 +241,9 @@ real action skill evidence failures. It also includes `skillStatuses`, one row
 per selected action skill, so dashboards and reviewers can render the current
 verification state without deriving it from mixed result and gap arrays. Each
 status row carries a `freshEvidenceCommand`, the exact single-skill probe command
-to run when that row still needs live Minecraft proof.
+to run when that row still needs live Minecraft proof. `summary.statusCounts`
+aggregates the same rows into `passed`, `failed`, `error`,
+`pendingLiveEvidence`, and `environmentBlocked` counts.
 `evidenceGaps` remains the focused list of non-passing or unrun action skills,
 with the missing contract and postcondition evidence needed before the action
 skill can be considered proven.

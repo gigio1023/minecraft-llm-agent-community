@@ -12,6 +12,7 @@ import {
   buildProbeMatrixCases,
   buildProbeMatrixSkillStatuses,
   classifyProbeMatrixReport,
+  countProbeMatrixSkillStatuses,
   normalizeDockerPreflightResult
 } from "../src/actionSkillProbeMatrixCli.js";
 import { listImplementedSeedActionSkills } from "../src/gameplay/seedSkills/registry.js";
@@ -97,6 +98,13 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.actorId, "npc_b");
   assert.equal(report.summary.planned, 1);
   assert.equal(report.summary.completed, 0);
+  assert.deepEqual(report.summary.statusCounts, {
+    passed: 0,
+    failed: 0,
+    error: 0,
+    pendingLiveEvidence: 1,
+    environmentBlocked: 0
+  });
   assert.equal(report.verdict, "incomplete");
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].skillId, "collectLogs");
@@ -130,6 +138,13 @@ test("action skill probe matrix report counts environment preflight blockers as 
   });
 
   assert.equal(report.summary.error, 1);
+  assert.deepEqual(report.summary.statusCounts, {
+    passed: 0,
+    failed: 0,
+    error: 0,
+    pendingLiveEvidence: 0,
+    environmentBlocked: 1
+  });
   assert.equal(report.verdict, "environment_blocked");
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].status, "environment_blocked");
@@ -298,6 +313,69 @@ test("action skill probe matrix skill statuses mark all unrun cases as environme
   assert.ok(statuses.every((entry) => entry.freshEvidenceCommand.includes("--init-actor-workspace baseline")));
 });
 
+test("action skill probe matrix counts status rows for summary coverage", () => {
+  const counts = countProbeMatrixSkillStatuses([
+    {
+      skillId: "collectLogs",
+      status: "passed",
+      reason: "proved",
+      requiredEvidence: {
+        contract: [],
+        postcondition: []
+      },
+      freshEvidenceCommand: "run collect"
+    },
+    {
+      skillId: "craftPlanksAndSticks",
+      status: "pending_live_evidence",
+      reason: "not run",
+      requiredEvidence: {
+        contract: [],
+        postcondition: []
+      },
+      freshEvidenceCommand: "run craft"
+    },
+    {
+      skillId: "craftCraftingTable",
+      status: "failed",
+      reason: "missing inventory",
+      requiredEvidence: {
+        contract: [],
+        postcondition: []
+      },
+      freshEvidenceCommand: "run table"
+    },
+    {
+      skillId: "inspectSharedChest",
+      status: "environment_blocked",
+      reason: "docker unavailable",
+      requiredEvidence: {
+        contract: [],
+        postcondition: []
+      },
+      freshEvidenceCommand: "run inspect"
+    },
+    {
+      skillId: "depositSharedItems",
+      status: "error",
+      reason: "unexpected error",
+      requiredEvidence: {
+        contract: [],
+        postcondition: []
+      },
+      freshEvidenceCommand: "run deposit"
+    }
+  ]);
+
+  assert.deepEqual(counts, {
+    passed: 1,
+    failed: 1,
+    error: 1,
+    pendingLiveEvidence: 1,
+    environmentBlocked: 1
+  });
+});
+
 test("action skill probe matrix audits existing transcript evidence without Docker", async () => {
   const evidenceDir = await mkdtemp(path.join(tmpdir(), "action-skill-matrix-evidence-"));
   const cases = buildProbeMatrixCases({
@@ -384,6 +462,13 @@ test("action skill probe matrix audits existing transcript evidence without Dock
   assert.equal(report.verdict, "incomplete");
   assert.equal(report.summary.passed, 1);
   assert.equal(report.summary.completed, 1);
+  assert.deepEqual(report.summary.statusCounts, {
+    passed: 1,
+    failed: 0,
+    error: 0,
+    pendingLiveEvidence: 1,
+    environmentBlocked: 0
+  });
   assert.deepEqual(report.skillStatuses.map((entry) => entry.status), ["passed", "pending_live_evidence"]);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].skillId, "craftCraftingTable");

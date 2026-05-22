@@ -371,9 +371,11 @@ observed. The same report includes `skillStatuses`, one row per selected action
 skill, so dashboards and reviewer sidecars can render the whole matrix without
 reconstructing it from `results` and `evidenceGaps`. Each status row includes a
 `freshEvidenceCommand`, the exact single-skill probe command to run for fresh
-live Minecraft proof. `evidenceGaps` lists every unproven action skill with its
-blocker status, reason, required contract and postcondition evidence, and the
-same fresh-evidence command.
+live Minecraft proof. `summary.statusCounts` aggregates those rows by
+`passed`, `failed`, `error`, `pendingLiveEvidence`, and `environmentBlocked`.
+`evidenceGaps` lists every unproven action skill with its blocker status,
+reason, required contract and postcondition evidence, and the same
+fresh-evidence command.
 
 Remaining harness work:
 

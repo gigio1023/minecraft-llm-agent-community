@@ -86,6 +86,8 @@ Per-action-skill probes add a second gate after transcript write:
 - matrix reports include `skillStatuses`, one row per selected action skill,
   for dashboard and reviewer consumption. Each row carries the exact
   `freshEvidenceCommand` for a one-skill live probe.
+- matrix reports include `summary.statusCounts`, so coverage can be read without
+  scanning every status row.
 - matrix reports also include `evidenceGaps`, which repeats the required
   contract and postcondition evidence for every unproven action skill and the
   same fresh-evidence command.

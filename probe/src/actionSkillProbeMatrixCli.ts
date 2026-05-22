@@ -64,6 +64,14 @@ export type ProbeMatrixSkillStatus = {
   freshEvidenceCommand: string;
 };
 
+export type ProbeMatrixStatusCounts = {
+  passed: number;
+  failed: number;
+  error: number;
+  pendingLiveEvidence: number;
+  environmentBlocked: number;
+};
+
 export type ProbeMatrixReport = {
   schema: "action-skill-probe-matrix-report/v1";
   mode: "dry_run" | "live" | "evidence_audit";
@@ -82,6 +90,7 @@ export type ProbeMatrixReport = {
     error: number;
     completed: number;
     planned: number;
+    statusCounts: ProbeMatrixStatusCounts;
   };
 };
 
@@ -222,6 +231,18 @@ export function buildProbeMatrixSkillStatuses(input: {
       freshEvidenceCommand
     };
   });
+}
+
+export function countProbeMatrixSkillStatuses(
+  skillStatuses: readonly ProbeMatrixSkillStatus[]
+): ProbeMatrixStatusCounts {
+  return {
+    passed: skillStatuses.filter((entry) => entry.status === "passed").length,
+    failed: skillStatuses.filter((entry) => entry.status === "failed").length,
+    error: skillStatuses.filter((entry) => entry.status === "error").length,
+    pendingLiveEvidence: skillStatuses.filter((entry) => entry.status === "pending_live_evidence").length,
+    environmentBlocked: skillStatuses.filter((entry) => entry.status === "environment_blocked").length
+  };
 }
 
 type ExistingEvidencePayload = {
@@ -571,12 +592,18 @@ export function buildProbeMatrixReport(input: {
   const preflightError =
     input.preflight?.status === "environment_blocked" && results.length === 0 ? 1 : 0;
   const error = results.filter((result) => result.status === "error").length + preflightError;
+  const skillStatuses = buildProbeMatrixSkillStatuses({
+    cases: input.cases,
+    preflight: input.preflight,
+    results
+  });
   const summary = {
     passed,
     failed,
     error,
     completed: results.length,
-    planned: input.cases.length
+    planned: input.cases.length,
+    statusCounts: countProbeMatrixSkillStatuses(skillStatuses)
   };
 
   return {
@@ -592,11 +619,7 @@ export function buildProbeMatrixReport(input: {
       ...summary,
       preflight: input.preflight
     }),
-    skillStatuses: buildProbeMatrixSkillStatuses({
-      cases: input.cases,
-      preflight: input.preflight,
-      results
-    }),
+    skillStatuses,
     evidenceGaps: buildProbeMatrixEvidenceGaps({
       cases: input.cases,
       preflight: input.preflight,
