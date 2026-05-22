@@ -49,6 +49,7 @@ export type ProbeMatrixEvidenceGap = {
     postcondition: string[];
   };
   transcriptPath?: string;
+  freshEvidenceCommand: string;
 };
 
 export type ProbeMatrixSkillStatus = {
@@ -60,6 +61,7 @@ export type ProbeMatrixSkillStatus = {
     postcondition: string[];
   };
   transcriptPath?: string;
+  freshEvidenceCommand: string;
 };
 
 export type ProbeMatrixReport = {
@@ -119,6 +121,7 @@ export function buildProbeMatrixEvidenceGaps(input: {
 
   return input.cases.flatMap((testCase): ProbeMatrixEvidenceGap[] => {
     const result = resultsBySkill.get(testCase.skillId);
+    const freshEvidenceCommand = buildFreshEvidenceCommand(testCase);
     const requiredEvidence = {
       contract: [...testCase.contractEvidence],
       postcondition: [...testCase.postconditionEvidence]
@@ -130,7 +133,8 @@ export function buildProbeMatrixEvidenceGaps(input: {
           skillId: testCase.skillId,
           status: "environment_blocked",
           reason: input.preflight.reason,
-          requiredEvidence
+          requiredEvidence,
+          freshEvidenceCommand
         }];
       }
 
@@ -138,7 +142,8 @@ export function buildProbeMatrixEvidenceGaps(input: {
         skillId: testCase.skillId,
         status: "pending_live_evidence",
         reason: "live probe has not produced runtime evidence for this action skill",
-        requiredEvidence
+        requiredEvidence,
+        freshEvidenceCommand
       }];
     }
 
@@ -151,9 +156,21 @@ export function buildProbeMatrixEvidenceGaps(input: {
       status: result.status,
       reason: result.errorMessage ?? result.finalWhy ?? "probe did not satisfy the action skill contract",
       requiredEvidence,
-      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {})
+      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {}),
+      freshEvidenceCommand
     }];
   });
+}
+
+export function buildFreshEvidenceCommand(testCase: ActionSkillProbeConfig) {
+  return [
+    "bun run probe:skill --",
+    `--actor ${testCase.actorId}`,
+    `--skill ${testCase.skillId}`,
+    `--max-actions ${testCase.maxActions}`,
+    "--init-actor-workspace baseline",
+    "--no-dashboard"
+  ].join(" ");
 }
 
 export function buildProbeMatrixSkillStatuses(input: {
@@ -165,6 +182,7 @@ export function buildProbeMatrixSkillStatuses(input: {
 
   return input.cases.map((testCase) => {
     const result = resultsBySkill.get(testCase.skillId);
+    const freshEvidenceCommand = buildFreshEvidenceCommand(testCase);
     const requiredEvidence = {
       contract: [...testCase.contractEvidence],
       postcondition: [...testCase.postconditionEvidence]
@@ -176,7 +194,8 @@ export function buildProbeMatrixSkillStatuses(input: {
           skillId: testCase.skillId,
           status: "environment_blocked",
           reason: input.preflight.reason,
-          requiredEvidence
+          requiredEvidence,
+          freshEvidenceCommand
         };
       }
 
@@ -184,7 +203,8 @@ export function buildProbeMatrixSkillStatuses(input: {
         skillId: testCase.skillId,
         status: "pending_live_evidence",
         reason: "live probe has not produced runtime evidence for this action skill",
-        requiredEvidence
+        requiredEvidence,
+        freshEvidenceCommand
       };
     }
 
@@ -198,7 +218,8 @@ export function buildProbeMatrixSkillStatuses(input: {
           ? "probe transcript satisfies the action skill postcondition"
           : "probe did not satisfy the action skill contract"),
       requiredEvidence,
-      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {})
+      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {}),
+      freshEvidenceCommand
     };
   });
 }

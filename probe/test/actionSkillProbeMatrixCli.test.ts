@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   auditExistingActionSkillEvidence,
+  buildFreshEvidenceCommand,
   buildProbeMatrixEvidenceGaps,
   buildProbeMatrixReport,
   buildProbeMatrixCases,
@@ -100,6 +101,7 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].skillId, "collectLogs");
   assert.equal(report.skillStatuses[0].status, "pending_live_evidence");
+  assert.match(report.skillStatuses[0].freshEvidenceCommand, /--skill collectLogs/);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
@@ -131,6 +133,7 @@ test("action skill probe matrix report counts environment preflight blockers as 
   assert.equal(report.verdict, "environment_blocked");
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].status, "environment_blocked");
+  assert.match(report.skillStatuses[0].freshEvidenceCommand, /--skill craftPlanksAndSticks/);
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "environment_blocked");
   assert.match(report.evidenceGaps[0].reason, /docker unavailable/);
@@ -221,8 +224,22 @@ test("action skill probe matrix evidence gaps explain failed and unrun cases", (
   assert.equal(gaps[0].transcriptPath, "data/evidence/collect.json");
   assert.equal(gaps[1].skillId, "craftCraftingTable");
   assert.equal(gaps[1].status, "pending_live_evidence");
+  assert.match(gaps[1].freshEvidenceCommand, /--skill craftCraftingTable/);
   assert.ok(gaps[1].requiredEvidence.contract.length > 0);
   assert.ok(gaps[1].requiredEvidence.postcondition.length > 0);
+});
+
+test("action skill probe matrix builds concrete fresh evidence commands", () => {
+  const [testCase] = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs"],
+    maxActions: 20
+  });
+
+  assert.equal(
+    buildFreshEvidenceCommand(testCase),
+    "bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard"
+  );
 });
 
 test("action skill probe matrix skill statuses provide one row per case", () => {
@@ -255,7 +272,9 @@ test("action skill probe matrix skill statuses provide one row per case", () => 
   assert.equal(statuses[0].status, "passed");
   assert.equal(statuses[0].transcriptPath, "data/evidence/collect.json");
   assert.match(statuses[0].reason, /runtime inventory evidence/);
+  assert.match(statuses[0].freshEvidenceCommand, /--skill collectLogs/);
   assert.equal(statuses[1].status, "pending_live_evidence");
+  assert.match(statuses[1].freshEvidenceCommand, /--skill craftCraftingTable/);
   assert.ok(statuses[1].requiredEvidence.postcondition.length > 0);
 });
 
@@ -276,6 +295,7 @@ test("action skill probe matrix skill statuses mark all unrun cases as environme
 
   assert.deepEqual(statuses.map((entry) => entry.status), ["environment_blocked", "environment_blocked"]);
   assert.ok(statuses.every((entry) => entry.reason === "docker unavailable"));
+  assert.ok(statuses.every((entry) => entry.freshEvidenceCommand.includes("--init-actor-workspace baseline")));
 });
 
 test("action skill probe matrix audits existing transcript evidence without Docker", async () => {

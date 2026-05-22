@@ -84,9 +84,11 @@ Per-action-skill probes add a second gate after transcript write:
 - matrix reports include a top-level verdict, so `environment_blocked` remains
   separate from runtime verifier failures and incomplete runs.
 - matrix reports include `skillStatuses`, one row per selected action skill,
-  for dashboard and reviewer consumption.
+  for dashboard and reviewer consumption. Each row carries the exact
+  `freshEvidenceCommand` for a one-skill live probe.
 - matrix reports also include `evidenceGaps`, which repeats the required
-  contract and postcondition evidence for every unproven action skill.
+  contract and postcondition evidence for every unproven action skill and the
+  same fresh-evidence command.
 - `--audit-existing-evidence` can re-score saved raw action skill probe
   transcripts without starting Docker. This is historical proof, not a
   substitute for a fresh live matrix after code changes.
