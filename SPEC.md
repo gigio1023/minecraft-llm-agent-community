@@ -264,10 +264,12 @@ the expected inventory outputs, not merely any passed verifier. Ordered social
 probes must prove the causal sequence, such as arrival before request, deposit
 before handoff chat, and busy response before wait before follow-up. Storage
 probes must prove named positive item movement or a non-empty item snapshot, not
-just an opened container or an unqualified moved count. Social probes must prove
-the delivered chat text matches the action skill intent; generic delivered chat
-or untargeted chat is not sufficient evidence. Runtime control probes must prove
-an observe snapshot happened before a terminal memory note.
+just an opened container or an unqualified moved count, and must keep the chest
+id in evidence. Wood probes should verify supported log/plank item families
+rather than overfitting to one wood species. Social probes must prove the
+delivered chat text matches the action skill intent; generic delivered chat or
+untargeted chat is not sufficient evidence. Runtime control probes must prove an
+observe snapshot happened before a terminal memory note.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero

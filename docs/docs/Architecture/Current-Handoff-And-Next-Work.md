@@ -401,16 +401,16 @@ Current postcondition rules:
 
 - `runtimeObserveAndRemember` requires an observe result with an observation
   snapshot before a non-empty memory note;
-- `collectLogs` requires passed runtime verifier progress with log inventory at
-  the target count;
+- `collectLogs` requires passed runtime verifier progress with supported
+  log-family inventory at the target count;
 - `craftPlanksAndSticks` requires passed runtime verifier progress with both
-  plank and stick output counts;
+  supported plank-family and stick output counts;
 - `craftCraftingTable` requires passed runtime verifier progress with crafting
   table inventory output;
 - `inspectSharedChest` requires an `inspect_chest` result with a non-empty
-  positive item snapshot;
+  positive item snapshot and chest id;
 - `depositSharedItems` requires `deposit_shared` with `itemName` and
-  `movedCount > 0`;
+  `chestId` and `movedCount > 0`;
 - `handoffItemAtChest` requires a named positive deposit before delivered
   handoff chat with matching handoff text;
 - `approachAndRequestItem` requires measured arrival distance evidence before

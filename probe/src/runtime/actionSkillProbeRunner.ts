@@ -450,6 +450,28 @@ export type ActionSkillPostconditionSpec = {
   validate(steps: ProbeTranscriptStep[]): string | null;
 };
 
+const logItemNames = [
+  "oak_log",
+  "birch_log",
+  "spruce_log",
+  "jungle_log",
+  "acacia_log",
+  "dark_oak_log",
+  "mangrove_log",
+  "cherry_log"
+] as const;
+
+const plankItemNames = [
+  "oak_planks",
+  "birch_planks",
+  "spruce_planks",
+  "jungle_planks",
+  "acacia_planks",
+  "dark_oak_planks",
+  "mangrove_planks",
+  "cherry_planks"
+] as const;
+
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
 }
@@ -477,19 +499,21 @@ function hasPassedVerificationProgress(
 
 function progressHasTargetInventory(input: {
   progress: Record<string, unknown>;
-  itemName: string;
+  itemNames: readonly string[];
   minimumAfterCount?: number;
 }) {
   const itemNames = arrayField(input.progress, "itemNames");
   const afterCount = numberField(input.progress, "afterCount") ?? 0;
   const targetCount = numberField(input.progress, "targetCount") ?? input.minimumAfterCount ?? 1;
 
-  return itemNames.includes(input.itemName) && afterCount >= targetCount && afterCount >= (input.minimumAfterCount ?? 1);
+  return input.itemNames.some((itemName) => itemNames.includes(itemName)) &&
+    afterCount >= targetCount &&
+    afterCount >= (input.minimumAfterCount ?? 1);
 }
 
 function progressHasCraftOutputs(
   progress: Record<string, unknown>,
-  requirements: readonly { itemName: string; minimumAfterCount: number }[]
+  requirements: readonly { itemNames: readonly string[]; minimumAfterCount: number }[]
 ) {
   const outputs = arrayField(progress, "outputs").map(asRecord);
 
@@ -499,11 +523,15 @@ function progressHasCraftOutputs(
       const afterCount = numberField(output, "afterCount") ?? 0;
       const targetCount = numberField(output, "targetCount") ?? requirement.minimumAfterCount;
 
-      return itemNames.includes(requirement.itemName) &&
+      return requirement.itemNames.some((itemName) => itemNames.includes(itemName)) &&
         afterCount >= targetCount &&
         afterCount >= requirement.minimumAfterCount;
     })
   );
+}
+
+function hasChestId(result: Record<string, unknown>) {
+  return typeof result.chestId === "string" && result.chestId.trim().length > 0;
 }
 
 function itemSnapshotHasPositiveCount(items: unknown[]) {
@@ -514,6 +542,7 @@ function itemSnapshotHasPositiveCount(items: unknown[]) {
 
 function hasPositiveTransfer(result: Record<string, unknown>) {
   return result.status === "deposited" &&
+    hasChestId(result) &&
     typeof result.itemName === "string" &&
     (numberField(result, "movedCount") ?? 0) > 0;
 }
@@ -615,7 +644,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         verification: {
           status: "passed",
           progress: {
-            itemNames: ["oak_log"],
+            itemNames: [...logItemNames],
             beforeCount: 0,
             afterCount: 4,
             targetCount: 4
@@ -627,7 +656,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       return hasPassedVerificationProgress(steps, (progress) =>
         progressHasTargetInventory({
           progress,
-          itemName: "oak_log",
+          itemNames: logItemNames,
           minimumAfterCount: 4
         })
       )
@@ -646,7 +675,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
           status: "passed",
           progress: {
             outputs: [
-              { itemNames: ["oak_planks"], beforeCount: 0, afterCount: 4, targetCount: 4 },
+              { itemNames: [...plankItemNames], beforeCount: 0, afterCount: 4, targetCount: 4 },
               { itemNames: ["stick"], beforeCount: 0, afterCount: 4, targetCount: 2 }
             ]
           }
@@ -656,8 +685,8 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     validate(steps) {
       return hasPassedVerificationProgress(steps, (progress) =>
         progressHasCraftOutputs(progress, [
-          { itemName: "oak_planks", minimumAfterCount: 4 },
-          { itemName: "stick", minimumAfterCount: 2 }
+          { itemNames: plankItemNames, minimumAfterCount: 4 },
+          { itemNames: ["stick"], minimumAfterCount: 2 }
         ])
       )
         ? null
@@ -686,7 +715,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       return hasPassedVerificationProgress(steps, (progress) =>
         progressHasTargetInventory({
           progress,
-          itemName: "crafting_table",
+          itemNames: ["crafting_table"],
           minimumAfterCount: 1
         })
       )
@@ -696,23 +725,25 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   inspectSharedChest: {
     skillId: "inspectSharedChest",
-    evidenceSummary: ["shared chest inspection returned a non-empty positive item snapshot"],
+    evidenceSummary: ["shared chest inspection returned a chest id and non-empty positive item snapshot"],
     minimumPassingTranscript: {
-      steps: [{ tool: "inspect_chest", result: { status: "inspected", items: [{ name: "oak_log", count: 2 }] } }]
+      steps: [{ tool: "inspect_chest", result: { status: "inspected", chestId: "shared_spawn_chest", items: [{ name: "oak_log", count: 2 }] } }]
     },
     validate(steps) {
       return hasToolResult(steps, "inspect_chest", (result) =>
-        result.status === "inspected" && itemSnapshotHasPositiveCount(arrayField(result, "items"))
+        result.status === "inspected" &&
+        hasChestId(result) &&
+        itemSnapshotHasPositiveCount(arrayField(result, "items"))
       )
         ? null
-        : "inspectSharedChest did not inspect a live shared chest with item evidence";
+        : "inspectSharedChest did not inspect a live shared chest with chest id and item evidence";
     }
   },
   depositSharedItems: {
     skillId: "depositSharedItems",
-    evidenceSummary: ["deposit_shared moved a named item with a positive count"],
+    evidenceSummary: ["deposit_shared moved a named item with a chest id and positive count"],
     minimumPassingTranscript: {
-      steps: [{ tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } }]
+      steps: [{ tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }]
     },
     validate(steps) {
       return hasToolResult(steps, "deposit_shared", hasPositiveTransfer)
@@ -785,7 +816,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     evidenceSummary: ["deposit_shared moved a positive item count", "say delivered a handoff message"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } },
+        { tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
         { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } }
       ]
     },

@@ -34,8 +34,8 @@ Required evidence:
 - selected candidate log block;
 - pathfinder did not move farther from that block;
 - `bot.dig(block, true)` resolved or failed;
-- log inventory count increased after the dig or after moving toward a nearby
-  dropped item.
+- any supported log-family inventory count increased after the dig or after
+  moving toward a nearby dropped item.
 
 Failure handling:
 
@@ -119,7 +119,7 @@ Required evidence:
 - opened shared chest accessor;
 - before/after chest snapshot;
 - before/after inventory snapshot when available;
-- positive moved count for deposit/withdraw ledger events.
+- chest id plus positive moved count for deposit/withdraw ledger events.
 
 Per-action-skill probes currently use a tiny RCON-placed chest fixture. The
 probe passes only when the transcript shows actual chest inspection or positive
