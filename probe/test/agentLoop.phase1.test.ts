@@ -69,6 +69,7 @@ test("agent loop repeats move_to until the current approach task is verified", a
         async observe() {
           return {
             status: "ok" as const,
+            observerId: "npc_b",
             visibleActors: [
               {
                 id: "npc_b",
@@ -173,6 +174,7 @@ test("agent loop blocks the fourth repeated failed move_to for the active approa
       async observe() {
         return {
           status: "ok" as const,
+          observerId: "npc_b",
           visibleActors: [
             {
               id: "npc_b",
@@ -252,6 +254,7 @@ test("agent loop does not assign collect_logs to a role that cannot gather", asy
       async observe() {
         return {
           status: "ok" as const,
+          observerId: "npc_b",
           visibleActors: [],
           inventory: [],
           memory: []
@@ -326,6 +329,7 @@ test("agent loop advances through collect logs, craft materials, and craft craft
       async observe() {
         return {
           status: "ok" as const,
+          observerId: "npc_b",
           visibleActors: [
             {
               id: "npc_b",
@@ -437,6 +441,7 @@ test("agent loop writes actor evidence when collect_logs only pretends to progre
         async observe() {
           return {
             status: "ok" as const,
+            observerId: "npc_b",
             visibleActors: [],
             inventory: [{ name: "oak_log", count: 0 }],
             nearbyBlocks: [{ name: "oak_log", distance: 3 }],
@@ -554,6 +559,7 @@ test("agent loop blocks provider proposals not backed by actor workspace active 
       async observe() {
         return {
           status: "ok" as const,
+          observerId: "npc_b",
           visibleActors: [],
           inventory: [{ name: "oak_log", count: 0 }],
           memory: []

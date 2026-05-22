@@ -520,9 +520,20 @@ test("action skill probe postcondition rejects remember without observation snap
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     });
+  const missingObserver = await writeTranscriptPayload({
+      steps: [
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } },
+        { tool: "remember", result: { status: "remembered", note: "observed" } }
+      ]
+    });
 
   assert.match(
     await validateProbePostcondition("runtimeObserveAndRemember", weakRuntimeControl) ?? "",
+    /observation snapshot/
+  );
+  assert.match(
+    await validateProbePostcondition("runtimeObserveAndRemember", missingObserver) ?? "",
     /observation snapshot/
   );
 });
@@ -530,20 +541,20 @@ test("action skill probe postcondition rejects remember without observation snap
 test("action skill probe postcondition requires wait before runtime control memory", async () => {
   const skippedWait = await writeTranscriptPayload({
       steps: [
-        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", observerId: "npc_b", visibleActors: [], memory: [] } } },
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     });
   const rememberedBeforeWait = await writeTranscriptPayload({
       steps: [
-        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", observerId: "npc_b", visibleActors: [], memory: [] } } },
         { tool: "remember", result: { status: "remembered", note: "observed" } },
         { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } }
       ]
     });
   const waitedWithoutDuration = await writeTranscriptPayload({
       steps: [
-        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", observerId: "npc_b", visibleActors: [], memory: [] } } },
         { tool: "wait", result: { status: "waited", ticks: 20 } },
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]

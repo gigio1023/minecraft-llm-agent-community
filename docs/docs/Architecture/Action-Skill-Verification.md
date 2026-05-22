@@ -70,6 +70,20 @@ Required evidence:
 - transcript-visible bounded duration in milliseconds;
 - later world, chat, memory, or inventory evidence for actual progress.
 
+### Observation
+
+`observe` is the runtime-facing state boundary for provider context and
+postcondition checks. A successful observation snapshot must identify the
+observer and preserve structured arrays instead of becoming a bare status flag.
+
+Required evidence:
+
+- observer actor id;
+- visible actors array, even when empty;
+- memory array, even when empty;
+- optional inventory, nearby-block, and shared-chest snapshots only when the
+  runtime could actually inspect them.
+
 ### Crafting
 
 `craft_item` must resolve a real Mineflayer recipe before calling craft.
@@ -221,10 +235,11 @@ when the terminal note is failed, so reviewers can distinguish terminal control
 failure from missing Minecraft evidence.
 The matrix report preserves that distinction in structured fields on `results`,
 `skillStatuses`, and `evidenceGaps`.
-`runtimeObserveAndRemember` also requires a real observe result, a completed
-bounded wait after that observation, and only then a memory write. A naked
-terminal memory note, or observe-to-remember without wait evidence, cannot prove
-runtime control flow.
+`runtimeObserveAndRemember` also requires a real observe result with observer
+id, visible actor array, and memory array; a completed bounded wait after that
+observation; and only then a memory write. A naked terminal memory note, a bare
+`status: ok` observation, or observe-to-remember without wait evidence cannot
+prove runtime control flow.
 
 Planned action skills may remain in the registry without verification contracts.
 They must not become active until their primitive boundaries and evidence rules

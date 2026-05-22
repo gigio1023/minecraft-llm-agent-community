@@ -690,6 +690,18 @@ function hasBoundedWaitResult(step: ProbeTranscriptStep) {
     (numberField(result, "durationMs") ?? -1) >= 0;
 }
 
+function hasObservationSnapshot(step: ProbeTranscriptStep) {
+  const result = asRecord(step.result);
+  const observation = asRecord(result.observation);
+  return step.tool === "observe" &&
+    result.status === "ok" &&
+    observation.status === "ok" &&
+    typeof observation.observerId === "string" &&
+    observation.observerId.trim().length > 0 &&
+    Array.isArray(observation.visibleActors) &&
+    Array.isArray(observation.memory);
+}
+
 function isRequestText(text: string) {
   return /request|need|spare|share|give|bring/i.test(text) &&
     /\b(oak\s+log|log|plank|stick|crafting\s+table|chest|food|coal|cobblestone)\b/i.test(text);
@@ -717,18 +729,13 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     evidenceSummary: ["observation snapshot was captured", "bounded wait completed before memory note was persisted"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", observerId: "npc_b", visibleActors: [], memory: [] } } },
         { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } },
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     },
     validate(steps) {
-      const observeIndex = steps.findIndex((step) => {
-        const result = asRecord(step.result);
-        return step.tool === "observe" &&
-          result.status === "ok" &&
-          asRecord(result.observation).status === "ok";
-      });
+      const observeIndex = steps.findIndex(hasObservationSnapshot);
 
       if (observeIndex < 0) {
         return "runtimeObserveAndRemember did not capture an observation snapshot";

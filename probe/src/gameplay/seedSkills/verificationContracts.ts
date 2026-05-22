@@ -19,7 +19,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     skillId: "runtimeObserveAndRemember",
     primitiveIds: ["observe", "wait", "remember"],
     evidence: [
-      "observation snapshot is available to the provider",
+      "observation snapshot includes observer id, visible actors array, and memory array",
       "wait resolves with positive ticks and bounded duration evidence",
       "memory note is persisted in runtime memory"
     ],

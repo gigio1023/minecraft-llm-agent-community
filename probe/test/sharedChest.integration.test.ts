@@ -64,6 +64,7 @@ test("agent loop deposits crafted resource into shared chest and stops after pub
       async observe() {
         return {
           status: "ok" as const,
+          observerId: "npc_b",
           visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
           inventory: craftingTableDeposited
             ? []

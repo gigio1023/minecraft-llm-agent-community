@@ -29,6 +29,7 @@ type PositionedActor = {
 
 export type ObserveResult = {
   status: "ok";
+  observerId: string;
   visibleActors: Array<{
     id: string;
     distance: number;
@@ -106,6 +107,7 @@ export async function observe({
   // test doubles without fabricating evidence.
   return {
     status: "ok",
+    observerId: actor.username,
     visibleActors:
       target.username === actor.username
         ? []

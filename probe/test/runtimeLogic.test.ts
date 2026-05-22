@@ -1000,6 +1000,7 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
 
   assert.deepEqual(await observe({ actor, target, dialogueState, memory }), {
     status: "ok",
+    observerId: "npc_a",
     visibleActors: [{ id: "npc_b", distance: 2, busy: true }],
     memory: ["saw npc_b near spawn"]
   });
@@ -1502,6 +1503,7 @@ test("agent loop records six steps and succeeds when remember changes the next a
       async observe() {
         return {
           status: "ok",
+          observerId: "npc_b",
           visibleActors: [{ id: "npc_b", distance: 1.5, busy: true }],
           memory: []
         };

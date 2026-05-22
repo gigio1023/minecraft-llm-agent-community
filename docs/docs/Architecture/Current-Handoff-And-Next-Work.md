@@ -199,6 +199,8 @@ Implemented surfaces:
 - `move_to` bounds `pathfinder.goto(...)` with timeout and `pathfinder.stop()`;
 - `wait` reports positive tick and bounded duration evidence for ordered
   action-skill postconditions;
+- `observe` reports observer id plus structured visible-actor and memory arrays
+  for runtime-control postconditions;
 - `craft_item` resolves real registry/recipe data and awaits `bot.craft(...)`;
 - `craft_item` returns blocked, not crafted, when available inventory evidence
   shows no target item increase after `bot.craft(...)`;
@@ -423,8 +425,9 @@ Remaining harness work:
 Current postcondition rules:
 
 - `runtimeObserveAndRemember` requires an observe result with an observation
-  snapshot, a completed bounded wait with positive tick/duration evidence after
-  that observation, and then a non-empty memory note;
+  snapshot containing observer id, visible actor array, and memory array; a
+  completed bounded wait with positive tick/duration evidence after that
+  observation; and then a non-empty memory note;
 - `collectLogs` requires passed runtime verifier progress with supported
   log-family inventory at the target count;
 - `craftPlanksAndSticks` requires passed runtime verifier progress with both
