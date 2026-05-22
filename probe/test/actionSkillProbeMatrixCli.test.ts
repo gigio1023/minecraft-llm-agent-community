@@ -30,6 +30,7 @@ test("action skill probe matrix builds one case for every implemented seed actio
   assert.ok(cases.every((entry) => entry.actorId === "npc_b"));
   assert.ok(cases.every((entry) => entry.maxActions === 8));
   assert.ok(cases.every((entry) => entry.roleId.length > 0));
+  assert.ok(cases.every((entry) => entry.probePreconditionMode.length > 0));
   assert.ok(cases.every((entry) => entry.primitiveIds.length > 0));
   assert.ok(cases.every((entry) => entry.contractEvidence.length > 0));
   assert.ok(cases.every((entry) => entry.postconditionEvidence.length > 0));
@@ -45,6 +46,7 @@ test("action skill probe matrix can narrow to selected implemented skills", () =
   assert.deepEqual(cases.map((entry) => entry.skillId), ["collectLogs", "craftCraftingTable"]);
   assert.deepEqual(cases.map((entry) => entry.roleId), ["gatherer", "crafter"]);
   assert.deepEqual(cases.map((entry) => entry.preconditions), [[], ["inventory has planks"]]);
+  assert.deepEqual(cases.map((entry) => entry.probePreconditionMode), ["placed_logs", "inventory_planks_and_sticks"]);
 });
 
 test("action skill probe matrix rejects planned or unknown skill ids", () => {
@@ -124,6 +126,7 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.evidenceGaps[0].evidenceScope, "missing");
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
   assert.equal(report.cases[0].skillId, "collectLogs");
+  assert.equal(report.cases[0].probePreconditionMode, "placed_logs");
   assert.ok(report.cases[0].contractEvidence.length > 0);
   assert.ok(report.cases[0].postconditionEvidence.length > 0);
 });

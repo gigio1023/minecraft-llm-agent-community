@@ -360,8 +360,14 @@ world. It prints each implemented action skill with:
 - selected role;
 - primitive ownership;
 - declared preconditions;
+- deterministic probe fixture/precondition mode;
 - verification contract evidence;
 - postcondition evidence.
+
+Implemented action skills are now required to have explicit deterministic live
+probe driver coverage and a probe fixture/precondition mode. A newly implemented
+action skill without either one fails validation instead of flowing to a generic
+terminal `remember` note.
 
 The existing-evidence audit also avoids Docker and Minecraft startup. It scans
 raw `action_skill_probe_*` transcripts under the evidence directory, skips
@@ -439,6 +445,8 @@ Checked-in protection:
   a failure came from control flow, evidence, or both;
 - existing-evidence audit uses the newest raw probe transcript per action skill,
   rather than selecting the best historical pass;
+- implemented action skills must have deterministic probe driver and fixture
+  mode coverage before the matrix accepts them;
 - the same test file includes a minimum accepted evidence payload for every
   implemented action skill through the runtime-owned
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill

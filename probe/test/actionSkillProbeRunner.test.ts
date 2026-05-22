@@ -7,6 +7,8 @@ import {
   actionSkillPostconditionSpecs,
   buildSkillProbeActionSkillRecords,
   classifyActionSkillProbeOutcome,
+  getActionSkillProbePreconditionMode,
+  hasDeterministicActionSkillProbeDriver,
   loadSkillProbeContract,
   validateSkillProbeConfig,
   validateProbePostcondition,
@@ -181,6 +183,20 @@ test("actionSkillProbeRunner throws for maxActions less than 1", () => {
       }),
     /--max-actions must be at least 1/
   );
+});
+
+test("actionSkillProbeRunner requires deterministic live probe coverage for every implemented action skill", () => {
+  for (const skill of listImplementedSeedActionSkills()) {
+    assert.equal(
+      hasDeterministicActionSkillProbeDriver(skill.id),
+      true,
+      `${skill.id} must have a deterministic live probe driver`
+    );
+    assert.ok(
+      getActionSkillProbePreconditionMode(skill.id),
+      `${skill.id} must declare a live probe precondition mode`
+    );
+  }
 });
 
 test("actionSkillProbeRunner classifies final status and postcondition evidence separately", () => {

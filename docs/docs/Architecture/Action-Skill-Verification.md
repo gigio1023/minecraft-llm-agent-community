@@ -84,6 +84,10 @@ Per-action-skill probes add a second gate after transcript write:
   `craftCraftingTable`;
 - probe fixtures may give the actor starting logs, planks, or sticks, but the
   final claim must still come from post-action inventory observation.
+- every implemented action skill must declare an explicit deterministic live
+  probe driver and probe fixture/precondition mode. Missing driver coverage is
+  a validation failure, not permission to terminate through a generic
+  `remember` note.
 - matrix reports include a top-level verdict, so `environment_blocked` remains
   separate from runtime verifier failures and incomplete runs.
 - matrix reports include `skillStatuses`, one row per selected action skill,

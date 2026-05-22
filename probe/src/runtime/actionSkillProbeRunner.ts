@@ -91,6 +91,54 @@ const probeFixtureOffsets = {
   sharedChest: [1, 0, -4]
 } as const;
 
+const deterministicProbeDriverSkillIds = [
+  "runtimeObserveAndRemember",
+  "collectLogs",
+  "craftPlanksAndSticks",
+  "craftCraftingTable",
+  "inspectSharedChest",
+  "depositSharedItems",
+  "approachAndRequestItem",
+  "announceResourceDiscovery",
+  "handoffItemAtChest",
+  "waitForBusyCrafter"
+] as const satisfies readonly SeedActionSkillId[];
+
+const deterministicProbeDriverSkillIdSet = new Set<SeedActionSkillId>(deterministicProbeDriverSkillIds);
+
+export type ActionSkillProbePreconditionMode =
+  | "none"
+  | "placed_logs"
+  | "inventory_logs"
+  | "inventory_planks_and_sticks"
+  | "inspectable_shared_chest"
+  | "depositable_shared_chest"
+  | "social_bootstrap_inventory";
+
+const actionSkillProbePreconditionModes = {
+  runtimeObserveAndRemember: "none",
+  collectLogs: "placed_logs",
+  craftPlanksAndSticks: "inventory_logs",
+  craftCraftingTable: "inventory_planks_and_sticks",
+  inspectSharedChest: "inspectable_shared_chest",
+  depositSharedItems: "depositable_shared_chest",
+  approachAndRequestItem: "social_bootstrap_inventory",
+  announceResourceDiscovery: "social_bootstrap_inventory",
+  handoffItemAtChest: "depositable_shared_chest",
+  waitForBusyCrafter: "social_bootstrap_inventory"
+} as const satisfies Partial<Record<SeedActionSkillId, ActionSkillProbePreconditionMode>>;
+
+const actionSkillProbePreconditionModeBySkill =
+  actionSkillProbePreconditionModes as Partial<Record<SeedActionSkillId, ActionSkillProbePreconditionMode>>;
+
+export function hasDeterministicActionSkillProbeDriver(skillId: SeedActionSkillId) {
+  return deterministicProbeDriverSkillIdSet.has(skillId);
+}
+
+export function getActionSkillProbePreconditionMode(skillId: SeedActionSkillId) {
+  return actionSkillProbePreconditionModeBySkill[skillId];
+}
+
 function asObserveActor(bot: import("mineflayer").Bot): ObserveActor {
   return bot as unknown as ObserveActor;
 }
@@ -263,6 +311,12 @@ async function setupProbePreconditions(input: {
   runRcon?: RconRunner;
 }) {
   const { bots, actorId, skillId, spawnConfig, runRcon } = input;
+  const preconditionMode = getActionSkillProbePreconditionMode(skillId);
+
+  if (!preconditionMode) {
+    throw new Error(`Missing action skill probe precondition mode for implemented skill: ${skillId}`);
+  }
+
   if (!runRcon) {
     return;
   }
@@ -296,7 +350,7 @@ async function setupProbePreconditions(input: {
 
   await clearChestFixture();
 
-  if (skillId === "collectLogs") {
+  if (preconditionMode === "placed_logs") {
     const base = fixturePosition(spawnConfig, probeFixtureOffsets.collectLogBase);
 
     // The collectLogs live probe owns a tiny repeatable tree fixture. Relying
@@ -309,29 +363,25 @@ async function setupProbePreconditions(input: {
     );
   }
 
-  if (skillId === "craftPlanksAndSticks") {
+  if (preconditionMode === "inventory_logs") {
     await give("oak_log", 4);
   }
 
-  if (skillId === "craftCraftingTable") {
+  if (preconditionMode === "inventory_planks_and_sticks") {
     await Promise.allSettled([give("oak_planks", 4), give("stick", 2)]);
   }
 
-  if (skillId === "inspectSharedChest") {
+  if (preconditionMode === "inspectable_shared_chest") {
     await Promise.allSettled([give("crafting_table", 1)]);
     await placeChestFixture('{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}');
   }
 
-  if (skillId === "depositSharedItems" || skillId === "handoffItemAtChest") {
+  if (preconditionMode === "depositable_shared_chest") {
     await give("crafting_table", skillId === "handoffItemAtChest" ? 2 : 1);
     await placeChestFixture();
   }
 
-  if (
-    skillId === "approachAndRequestItem" ||
-    skillId === "announceResourceDiscovery" ||
-    skillId === "waitForBusyCrafter"
-  ) {
+  if (preconditionMode === "social_bootstrap_inventory") {
     // A local crafting table in inventory suppresses the bootstrap curriculum,
     // letting social probes validate their own primitives instead of being
     // redirected to wood gathering.
@@ -342,6 +392,10 @@ async function setupProbePreconditions(input: {
 }
 
 function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorId: string) {
+  if (!hasDeterministicActionSkillProbeDriver(skillId)) {
+    throw new Error(`Missing deterministic action skill probe driver for implemented skill: ${skillId}`);
+  }
+
   let turn = 0;
   return {
     next(input: {
@@ -437,7 +491,7 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
         return { tool: "collect_logs", args: { targetCount: 4 } };
       }
 
-      return { tool: "remember", args: { note: `${skillId} probe stopped after ${turn} turns` } };
+      throw new Error(`Unhandled deterministic action skill probe driver branch: ${skillId}`);
     }
   };
 }
@@ -1068,6 +1122,14 @@ export function validateSkillProbeConfig(config: ActionSkillProbeConfig): void {
 
   if (config.maxActions < 1) {
     throw new Error("--max-actions must be at least 1");
+  }
+
+  if (!hasDeterministicActionSkillProbeDriver(config.skillId)) {
+    throw new Error(`Action skill ${config.skillId} is implemented but has no deterministic live probe driver`);
+  }
+
+  if (!getActionSkillProbePreconditionMode(config.skillId)) {
+    throw new Error(`Action skill ${config.skillId} is implemented but has no live probe precondition mode`);
   }
 }
 

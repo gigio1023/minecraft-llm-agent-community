@@ -10,6 +10,7 @@ import { loadProbeConfig } from "./config.js";
 import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 import {
   actionSkillPostconditionSpecs,
+  getActionSkillProbePreconditionMode,
   runLiveActionSkillProbe,
   validateProbePostcondition,
   validateSkillProbeConfig,
@@ -33,6 +34,7 @@ type MatrixCliOptions = {
 type ProbeMatrixCase = ActionSkillProbeConfig & {
   summary: string;
   preconditions: string[];
+  probePreconditionMode: string;
   primitiveIds: string[];
   contractEvidence: string[];
   postconditionEvidence: string[];
@@ -523,12 +525,17 @@ export function buildProbeMatrixCases(input: {
     if (!postconditionSpec) {
       throw new Error(`Missing postcondition spec for implemented action skill: ${skill.id}`);
     }
+    const probePreconditionMode = getActionSkillProbePreconditionMode(skill.id);
+    if (!probePreconditionMode) {
+      throw new Error(`Missing live probe precondition mode for implemented action skill: ${skill.id}`);
+    }
     const contract = getActionSkillVerificationContract(skill.id);
 
     return {
       ...probeConfig,
       summary: skill.summary,
       preconditions: [...skill.preconditions],
+      probePreconditionMode,
       primitiveIds: [...skill.primitiveIds],
       contractEvidence: [...contract.evidence],
       postconditionEvidence: [...postconditionSpec.evidenceSummary]
@@ -721,6 +728,7 @@ function printDryRun(cases: ProbeMatrixCase[]) {
     console.log(`  summary:       ${testCase.summary}`);
     console.log(`  primitives:    ${testCase.primitiveIds.join(", ")}`);
     console.log(`  preconditions: ${testCase.preconditions.length > 0 ? testCase.preconditions.join("; ") : "(none)"}`);
+    console.log(`  probe fixture: ${testCase.probePreconditionMode}`);
     console.log(`  contract:      ${testCase.contractEvidence.join("; ")}`);
     console.log(`  postcondition: ${testCase.postconditionEvidence.join("; ")}`);
   }
