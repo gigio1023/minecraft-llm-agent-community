@@ -3,6 +3,8 @@ import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.
 import { getActionSkillVerificationContract } from "./gameplay/seedSkills/verificationContracts.js";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import type { RoleId } from "./npc/roles/contracts.js";
 import { loadProbeConfig } from "./config.js";
 import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
@@ -22,6 +24,7 @@ type MatrixCliOptions = {
   initActorWorkspace?: boolean;
   continueOnFailure?: boolean;
   dryRun?: boolean;
+  reportPath?: string;
 };
 
 type ProbeMatrixCase = ActionSkillProbeConfig & {
@@ -30,6 +33,24 @@ type ProbeMatrixCase = ActionSkillProbeConfig & {
   primitiveIds: string[];
   contractEvidence: string[];
   postconditionEvidence: string[];
+};
+
+export type ProbeMatrixReport = {
+  schema: "action-skill-probe-matrix-report/v1";
+  mode: "dry_run" | "live";
+  createdAt: string;
+  actorId: string;
+  maxActions: number;
+  cases: ProbeMatrixCase[];
+  preflight?: ProbeMatrixPreflight;
+  results?: ActionSkillProbeResult[];
+  summary: {
+    passed: number;
+    failed: number;
+    error: number;
+    completed: number;
+    planned: number;
+  };
 };
 
 export type ProbeMatrixPreflight =
@@ -74,6 +95,9 @@ function parseArgs(argv: readonly string[]): MatrixCliOptions {
       case "--dry-run":
         options.dryRun = true;
         break;
+      case "--report":
+        options.reportPath = next();
+        break;
       case "--help":
         printUsage();
         process.exit(0);
@@ -99,6 +123,7 @@ function printUsage() {
     "  --init-actor-workspace baseline   Initialize actor workspace before each run",
     "  --continue-on-failure     Continue after failed/error probes",
     "  --dry-run                 Print action skill verification checklist without Docker",
+    "  --report <path>           Write a JSON matrix report artifact",
     "  --help                    Show this help"
   ].join("\n"));
 }
@@ -268,6 +293,47 @@ function printResult(result: ActionSkillProbeResult) {
   }
 }
 
+export function buildProbeMatrixReport(input: {
+  mode: ProbeMatrixReport["mode"];
+  actorId: string;
+  maxActions: number;
+  cases: ProbeMatrixCase[];
+  preflight?: ProbeMatrixPreflight;
+  results?: ActionSkillProbeResult[];
+  createdAt?: string;
+}): ProbeMatrixReport {
+  const results = input.results ?? [];
+  const passed = results.filter((result) => result.status === "passed").length;
+  const failed = results.filter((result) => result.status === "failed").length;
+  const preflightError =
+    input.preflight?.status === "environment_blocked" && results.length === 0 ? 1 : 0;
+  const error = results.filter((result) => result.status === "error").length + preflightError;
+
+  return {
+    schema: "action-skill-probe-matrix-report/v1",
+    mode: input.mode,
+    createdAt: input.createdAt ?? new Date().toISOString(),
+    actorId: input.actorId,
+    maxActions: input.maxActions,
+    cases: input.cases,
+    ...(input.preflight ? { preflight: input.preflight } : {}),
+    ...(input.results ? { results } : {}),
+    summary: {
+      passed,
+      failed,
+      error,
+      completed: results.length,
+      planned: input.cases.length
+    }
+  };
+}
+
+async function writeMatrixReport(reportPath: string, report: ProbeMatrixReport) {
+  await mkdir(path.dirname(reportPath), { recursive: true });
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  console.log(`matrix_report ${reportPath}`);
+}
+
 function printDryRun(cases: ProbeMatrixCase[]) {
   console.log("Action skill verification checklist:");
   for (const [index, testCase] of cases.entries()) {
@@ -300,6 +366,17 @@ async function main() {
     if (options.dryRun) {
       printDryRun(cases);
       console.log(`matrix_dry_run total=${cases.length}`);
+      if (options.reportPath) {
+        await writeMatrixReport(
+          options.reportPath,
+          buildProbeMatrixReport({
+            mode: "dry_run",
+            actorId,
+            maxActions: options.maxActions ?? 8,
+            cases
+          })
+        );
+      }
       return;
     }
 
@@ -308,6 +385,19 @@ async function main() {
       console.log("matrix_preflight status=environment_blocked");
       console.log(preflight.reason);
       console.log(`matrix_summary passed=0 failed=0 error=1 total=0/${cases.length}`);
+      if (options.reportPath) {
+        await writeMatrixReport(
+          options.reportPath,
+          buildProbeMatrixReport({
+            mode: "live",
+            actorId,
+            maxActions: options.maxActions ?? 8,
+            cases,
+            preflight,
+            results: []
+          })
+        );
+      }
       process.exitCode = 1;
       return;
     }
@@ -336,6 +426,20 @@ async function main() {
     const failed = results.filter((result) => result.status === "failed").length;
     const errored = results.filter((result) => result.status === "error").length;
     console.log(`matrix_summary passed=${passed} failed=${failed} error=${errored} total=${results.length}/${cases.length}`);
+
+    if (options.reportPath) {
+      await writeMatrixReport(
+        options.reportPath,
+        buildProbeMatrixReport({
+          mode: "live",
+          actorId,
+          maxActions: options.maxActions ?? 8,
+          cases,
+          preflight,
+          results
+        })
+      );
+    }
 
     if (passed !== cases.length || failed > 0 || errored > 0) {
       process.exitCode = 1;

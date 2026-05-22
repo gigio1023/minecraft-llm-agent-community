@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildProbeMatrixReport,
   buildProbeMatrixCases,
   normalizeDockerPreflightResult
 } from "../src/actionSkillProbeMatrixCli.js";
@@ -67,4 +68,52 @@ test("action skill probe matrix preflight separates docker environment blockers"
 
   assert.equal(blocked.status, "environment_blocked");
   assert.match(blocked.reason, /failed to connect to the docker API/);
+});
+
+test("action skill probe matrix builds a reusable JSON report shape", () => {
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs"],
+    maxActions: 8
+  });
+  const report = buildProbeMatrixReport({
+    mode: "dry_run",
+    actorId: "npc_b",
+    maxActions: 8,
+    cases,
+    createdAt: "2026-05-22T00:00:00.000Z"
+  });
+
+  assert.equal(report.schema, "action-skill-probe-matrix-report/v1");
+  assert.equal(report.mode, "dry_run");
+  assert.equal(report.actorId, "npc_b");
+  assert.equal(report.summary.planned, 1);
+  assert.equal(report.summary.completed, 0);
+  assert.equal(report.cases[0].skillId, "collectLogs");
+  assert.ok(report.cases[0].contractEvidence.length > 0);
+  assert.ok(report.cases[0].postconditionEvidence.length > 0);
+});
+
+test("action skill probe matrix report counts environment preflight blockers as errors", () => {
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["craftPlanksAndSticks"],
+    maxActions: 8
+  });
+  const report = buildProbeMatrixReport({
+    mode: "live",
+    actorId: "npc_b",
+    maxActions: 8,
+    cases,
+    preflight: {
+      status: "environment_blocked",
+      reason: "docker unavailable"
+    },
+    results: [],
+    createdAt: "2026-05-22T00:00:00.000Z"
+  });
+
+  assert.equal(report.summary.error, 1);
+  assert.equal(report.summary.completed, 0);
+  assert.equal(report.summary.planned, 1);
 });

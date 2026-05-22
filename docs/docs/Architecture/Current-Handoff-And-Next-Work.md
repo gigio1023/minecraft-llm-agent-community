@@ -323,6 +323,13 @@ cd probe
 bun run probe:skills -- --dry-run
 ```
 
+Report artifact command:
+
+```bash
+cd probe
+bun run probe:skills -- --dry-run --report ../tmp/action-skill-checklist.json
+```
+
 This command enumerates implemented seed action skills from the registry and
 runs them one-by-one through the same live probe harness. It exists to make the
 full action skill verification checklist reproducible after individual probes
@@ -341,6 +348,10 @@ world. It prints each implemented action skill with:
 - declared preconditions;
 - verification contract evidence;
 - postcondition evidence.
+
+`--report <path>` writes the same matrix checklist or live result as JSON with
+schema `action-skill-probe-matrix-report/v1`. Use this when handing off action
+skill verification gaps to reviewer sidecars or later agents.
 
 Remaining harness work:
 

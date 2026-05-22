@@ -200,6 +200,13 @@ cd probe
 bun run probe:skills -- --dry-run
 ```
 
+Optional matrix report artifact:
+
+```bash
+cd probe
+bun run probe:skills -- --dry-run --report ../tmp/action-skill-checklist.json
+```
+
 Use the matrix command after single-skill probes are stable. It enumerates
 implemented seed action skills from the registry, rejects planned action skills,
 runs each case through the same live harness, and reports
@@ -214,6 +221,8 @@ matrix run. It prints the implemented action skill checklist, including role,
 primitive ownership, preconditions, verification contract evidence, and
 postcondition evidence, without Docker, actor workspace initialization, or world
 mutation.
+Use `--report <path>` to persist the same checklist or live matrix result as a
+JSON artifact with schema `action-skill-probe-matrix-report/v1`.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero
