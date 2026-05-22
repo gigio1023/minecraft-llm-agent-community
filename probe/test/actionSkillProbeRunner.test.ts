@@ -10,6 +10,17 @@ import {
   validateProbePostcondition,
   type ActionSkillProbeConfig
 } from "../src/runtime/actionSkillProbeRunner.js";
+import {
+  listImplementedSeedActionSkills,
+  type SeedActionSkillId
+} from "../src/gameplay/seedSkills/registry.js";
+
+async function writeTranscriptPayload(payload: unknown) {
+  const dir = await mkdtemp(path.join(tmpdir(), "action-skill-probe-"));
+  const transcriptPath = path.join(dir, "transcript.json");
+  await writeFile(transcriptPath, JSON.stringify(payload));
+  return transcriptPath;
+}
 
 test("actionSkillProbeRunner builds active records restricted to the target skill primitives", () => {
   const baseConfig: ActionSkillProbeConfig = {
@@ -172,11 +183,7 @@ test("actionSkillProbeRunner throws for maxActions less than 1", () => {
 });
 
 test("action skill probe postcondition rejects craft completion without passed verification", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "action-skill-probe-"));
-  const transcriptPath = path.join(dir, "transcript.json");
-  await writeFile(
-    transcriptPath,
-    JSON.stringify({
+  const transcriptPath = await writeTranscriptPayload({
       steps: [
         {
           tool: "craft_item",
@@ -188,8 +195,7 @@ test("action skill probe postcondition rejects craft completion without passed v
           result: { status: "remembered", note: "looks done" }
         }
       ]
-    })
-  );
+    });
 
   const failure = await validateProbePostcondition("craftCraftingTable", transcriptPath);
 
@@ -197,11 +203,7 @@ test("action skill probe postcondition rejects craft completion without passed v
 });
 
 test("action skill probe postcondition accepts shared storage movement evidence", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "action-skill-probe-"));
-  const transcriptPath = path.join(dir, "transcript.json");
-  await writeFile(
-    transcriptPath,
-    JSON.stringify({
+  const transcriptPath = await writeTranscriptPayload({
       steps: [
         {
           tool: "deposit_shared",
@@ -212,10 +214,88 @@ test("action skill probe postcondition accepts shared storage movement evidence"
           result: { status: "remembered", note: "done" }
         }
       ]
-    })
-  );
+    });
 
   const failure = await validateProbePostcondition("depositSharedItems", transcriptPath);
 
   assert.equal(failure, null);
+});
+
+test("action skill probe postcondition rejects empty transcripts for every implemented action skill", async () => {
+  const transcriptPath = await writeTranscriptPayload({ steps: [] });
+
+  for (const skill of listImplementedSeedActionSkills()) {
+    const failure = await validateProbePostcondition(skill.id, transcriptPath);
+    assert.notEqual(failure, null, `${skill.id} must require explicit postcondition evidence`);
+  }
+});
+
+test("action skill probe postcondition accepts minimum evidence for every implemented action skill", async () => {
+  const positivePayloads: Record<SeedActionSkillId, unknown> = {
+    runtimeObserveAndRemember: {
+      steps: [{ tool: "remember", result: { status: "remembered", note: "observed" } }]
+    },
+    collectLogs: {
+      steps: [{ tool: "collect_logs", result: { status: "collected" }, verification: { status: "passed" } }]
+    },
+    craftPlanksAndSticks: {
+      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
+    },
+    craftCraftingTable: {
+      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
+    },
+    inspectSharedChest: {
+      steps: [{ tool: "inspect_chest", result: { status: "inspected", items: [{ name: "oak_log", count: 2 }] } }]
+    },
+    depositSharedItems: {
+      steps: [{ tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }]
+    },
+    approachAndRequestItem: {
+      steps: [
+        { tool: "move_to", result: { status: "arrived", arrived: true } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    },
+    announceResourceDiscovery: {
+      steps: [{ tool: "say", result: { status: "delivered" } }]
+    },
+    handoffItemAtChest: {
+      steps: [
+        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    },
+    waitForBusyCrafter: {
+      steps: [
+        { tool: "say", result: { status: "busy" } },
+        { tool: "wait", result: { status: "waited" } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    },
+    craftWoodenPickaxe: { steps: [] },
+    mineCobblestone: { steps: [] },
+    craftStonePickaxe: { steps: [] },
+    craftFurnace: { steps: [] },
+    mineCoal: { steps: [] },
+    smeltRawIron: { steps: [] },
+    collectDroppedItems: { steps: [] },
+    exploreForMaterials: { steps: [] },
+    placeCraftingTable: { steps: [] },
+    equipBestTool: { steps: [] },
+    placeTorchLightArea: { steps: [] },
+    eatFoodWhenHungry: { steps: [] },
+    sleepAtNight: { steps: [] },
+    fleeDanger: { steps: [] },
+    setupSharedStash: { steps: [] },
+    patrolArea: { steps: [] },
+    threatenApproach: { steps: [] },
+    stealFromChestIfExposed: { steps: [] },
+    attackThenRetreat: { steps: [] }
+  };
+
+  for (const skill of listImplementedSeedActionSkills()) {
+    const transcriptPath = await writeTranscriptPayload(positivePayloads[skill.id]);
+    const failure = await validateProbePostcondition(skill.id, transcriptPath);
+    assert.equal(failure, null, `${skill.id} should accept its minimum evidence payload`);
+  }
 });

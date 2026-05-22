@@ -348,6 +348,14 @@ Current postcondition rules:
 - `waitForBusyCrafter` requires busy response, bounded wait, and delivered
   follow-up.
 
+Checked-in protection:
+
+- `probe/test/actionSkillProbeRunner.test.ts` rejects empty transcripts for
+  every currently implemented action skill;
+- the same test file includes a minimum accepted evidence payload for every
+  implemented action skill, so adding a new implemented action skill without a
+  postcondition rule becomes visible in tests.
+
 Latest local limitation:
 
 On 2026-05-22, the craft live probe was attempted with:

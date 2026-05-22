@@ -124,6 +124,11 @@ The contract test requires every implemented seed action skill to declare:
 - required evidence;
 - checked-in tests that protect the behavior.
 
+The live probe postcondition test also requires every implemented action skill
+to fail on an empty transcript and to define a minimum accepted evidence
+payload. This protects the gap where a provider terminal note or no-op result
+could otherwise look like success.
+
 Planned action skills may remain in the registry without verification contracts.
 They must not become active until their primitive boundaries and evidence rules
 exist.
