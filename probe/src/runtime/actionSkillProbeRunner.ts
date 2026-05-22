@@ -435,6 +435,7 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
 export type ProbeTranscriptPayload = {
   steps?: Array<{
     tool?: string;
+    args?: Record<string, unknown>;
     result?: Record<string, unknown>;
     verification?: { status?: string; reason?: string; progress?: Record<string, unknown> };
   }>;
@@ -541,6 +542,27 @@ function hasToolResultAfter(
   return steps
     .slice(afterIndex + 1)
     .some((step) => step.tool === input.tool && input.predicate(asRecord(step.result)));
+}
+
+function textArgMatches(step: ProbeTranscriptStep, predicate: (text: string) => boolean) {
+  const text = asRecord(step.args).text;
+  return typeof text === "string" && predicate(text);
+}
+
+function isRequestText(text: string) {
+  return /request|need|spare|share|starter|item/i.test(text);
+}
+
+function isResourceAnnouncementText(text: string) {
+  return /found|located|discovered|near/i.test(text) && /log|wood|resource|oak/i.test(text);
+}
+
+function isHandoffText(text: string) {
+  return /left|deposited|placed|shared|chest|handoff/i.test(text);
+}
+
+function isFollowUpText(text: string) {
+  return /check|checking|ready|again|follow/i.test(text);
 }
 
 export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, ActionSkillPostconditionSpec>> = {
@@ -680,7 +702,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   approachAndRequestItem: {
     skillId: "approachAndRequestItem",
-    evidenceSummary: ["move_to arrived within range", "say delivered the request"],
+    evidenceSummary: ["move_to arrived within range", "say delivered a request-like message"],
     minimumPassingTranscript: {
       steps: [
         {
@@ -693,7 +715,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
             distanceDelta: 2
           }
         },
-        { tool: "say", result: { status: "delivered" } }
+        { tool: "say", args: { text: "can you spare one starter item?" }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
@@ -711,30 +733,38 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }
       return steps
         .slice(arrived + 1)
-        .some((step) => step.tool === "say" && asRecord(step.result).status === "delivered")
+        .some((step) =>
+          step.tool === "say" &&
+          asRecord(step.result).status === "delivered" &&
+          textArgMatches(step, isRequestText)
+        )
         ? null
-        : "approachAndRequestItem did not deliver a request after arriving";
+        : "approachAndRequestItem did not deliver a request-like message after arriving";
     }
   },
   announceResourceDiscovery: {
     skillId: "announceResourceDiscovery",
-    evidenceSummary: ["say delivered the resource announcement"],
+    evidenceSummary: ["say delivered a resource-discovery announcement"],
     minimumPassingTranscript: {
-      steps: [{ tool: "say", result: { status: "delivered" } }]
+      steps: [{ tool: "say", args: { text: "I found oak logs near spawn." }, result: { status: "delivered" } }]
     },
     validate(steps) {
-      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+      return steps.some((step) =>
+        step.tool === "say" &&
+        asRecord(step.result).status === "delivered" &&
+        textArgMatches(step, isResourceAnnouncementText)
+      )
         ? null
-        : "announceResourceDiscovery did not deliver chat";
+        : "announceResourceDiscovery did not deliver a resource-discovery message";
     }
   },
   handoffItemAtChest: {
     skillId: "handoffItemAtChest",
-    evidenceSummary: ["deposit_shared moved a positive item count", "say delivered the handoff"],
+    evidenceSummary: ["deposit_shared moved a positive item count", "say delivered a handoff message"],
     minimumPassingTranscript: {
       steps: [
         { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } },
-        { tool: "say", result: { status: "delivered" } }
+        { tool: "say", args: { text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
@@ -748,19 +778,23 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }
       return steps
         .slice(depositIndex + 1)
-        .some((step) => step.tool === "say" && asRecord(step.result).status === "delivered")
+        .some((step) =>
+          step.tool === "say" &&
+          asRecord(step.result).status === "delivered" &&
+          textArgMatches(step, isHandoffText)
+        )
         ? null
-        : "handoffItemAtChest did not announce the shared chest handoff";
+        : "handoffItemAtChest did not announce the shared chest handoff with handoff text";
     }
   },
   waitForBusyCrafter: {
     skillId: "waitForBusyCrafter",
-    evidenceSummary: ["say observed busy", "wait completed", "say delivered follow-up"],
+    evidenceSummary: ["say observed busy", "wait completed", "say delivered a follow-up message"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "say", result: { status: "busy" } },
+        { tool: "say", args: { text: "are you free to talk?" }, result: { status: "busy" } },
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", result: { status: "delivered" } }
+        { tool: "say", args: { text: "checking again when you are ready" }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
@@ -778,9 +812,13 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }
       return steps
         .slice(waitIndex + 1)
-        .some((step) => step.tool === "say" && asRecord(step.result).status === "delivered")
+        .some((step) =>
+          step.tool === "say" &&
+          asRecord(step.result).status === "delivered" &&
+          textArgMatches(step, isFollowUpText)
+        )
         ? null
-        : "waitForBusyCrafter did not deliver a follow-up after waiting";
+        : "waitForBusyCrafter did not deliver a follow-up message after waiting";
     }
   }
 };

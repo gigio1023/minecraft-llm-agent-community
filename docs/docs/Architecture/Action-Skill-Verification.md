@@ -134,16 +134,18 @@ text was proposed by the provider.
 Required evidence:
 
 - `approachAndRequestItem`: measured arrival within interaction range, including
-  before/after distance fields, and delivered chat;
-- `announceResourceDiscovery`: delivered chat;
+  before/after distance fields, and delivered request-like chat;
+- `announceResourceDiscovery`: delivered resource-discovery chat;
 - `handoffItemAtChest`: named positive shared-chest deposit and delivered
-  handoff chat;
-- `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up.
+  handoff chat with matching handoff text;
+- `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up
+  chat.
 
 For ordered social action skills, evidence order matters. A delivered request
 before arrival, a handoff message before deposit, or a follow-up before waiting
 does not satisfy the postcondition even if each individual primitive appears in
-the transcript.
+the transcript. The text intent also matters: generic delivered chat is not
+accepted as a resource discovery, request, handoff, or follow-up.
 
 ## Current Coverage
 

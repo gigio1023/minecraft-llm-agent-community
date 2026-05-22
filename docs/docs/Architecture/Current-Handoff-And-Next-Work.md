@@ -410,12 +410,12 @@ Current postcondition rules:
 - `depositSharedItems` requires `deposit_shared` with `itemName` and
   `movedCount > 0`;
 - `handoffItemAtChest` requires a named positive deposit before delivered
-  handoff chat;
+  handoff chat with matching handoff text;
 - `approachAndRequestItem` requires measured arrival distance evidence before
-  delivered chat;
-- `announceResourceDiscovery` requires delivered chat;
+  delivered request-like chat;
+- `announceResourceDiscovery` requires delivered resource-discovery chat;
 - `waitForBusyCrafter` requires busy response before bounded wait before
-  delivered follow-up.
+  delivered follow-up chat.
 
 Checked-in protection:
 
