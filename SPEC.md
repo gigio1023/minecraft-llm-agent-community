@@ -186,10 +186,12 @@ cd probe
 bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
 ```
 
-The single-skill harness runs the same Docker preflight before actor workspace
-initialization, dashboard startup, or Minecraft startup. When Docker is
-unavailable, it reports `environment_blocked` with the Docker preflight command
-and exits without mutating actor workspace state.
+The single-skill harness runs Docker preflight before actor workspace
+initialization, dashboard startup, or Minecraft startup unless `MC_PORT` points
+at an already-running manual Minecraft server that is accepting connections.
+When Docker is unavailable and no live manual server override exists, it reports
+`environment_blocked` with the Docker preflight command and exits without
+mutating actor workspace state.
 
 Current matrix command:
 
@@ -235,7 +237,9 @@ or failed-probe repair. Environment restoration is de-duplicated into one
 Docker preflight command instead of repeating every blocked action-skill probe
 command.
 It also runs a Docker preflight before actor workspace initialization or
-Minecraft startup. When Docker is unavailable, it reports
+Minecraft startup unless `MC_PORT` points at an already-running manual
+Minecraft server that is accepting connections. When Docker is unavailable and
+no live manual server override exists, it reports
 `matrix_preflight status=environment_blocked` and exits without mutating the
 actor workspace or probe world.
 

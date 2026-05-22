@@ -16,6 +16,7 @@ import { startDashboardServer, type DashboardServer } from "./dashboard/dashboar
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
 import { probePort } from "./server/serverLifecycle.js";
 import { checkDockerPreflight, dockerPreflightCommand } from "./server/dockerPreflight.js";
+import { readManualMinecraftPort } from "./server/manualMinecraftPort.js";
 
 type SkillProbeCliOptions = {
   actor?: string;
@@ -174,15 +175,30 @@ async function main() {
     console.log(`  evidence:   ${contract.evidence.join("; ")}`);
     console.log(`─────────────────────────\n`);
 
-    const preflight = await checkDockerPreflight();
-    if (preflight.status === "environment_blocked") {
-      console.log(`─── Environment Blocked ───`);
-      console.log(`  status: environment_blocked`);
-      console.log(`  command: ${dockerPreflightCommand}`);
-      console.log(`  reason: ${preflight.reason.split("\n")[0]}`);
-      console.log(`───────────────────────────\n`);
-      process.exitCode = 1;
-      return;
+    const manualMinecraftPort = readManualMinecraftPort();
+    if (manualMinecraftPort === undefined) {
+      const preflight = await checkDockerPreflight();
+      if (preflight.status === "environment_blocked") {
+        console.log(`─── Environment Blocked ───`);
+        console.log(`  status: environment_blocked`);
+        console.log(`  command: ${dockerPreflightCommand}`);
+        console.log(`  reason: ${preflight.reason.split("\n")[0]}`);
+        console.log(`───────────────────────────\n`);
+        process.exitCode = 1;
+        return;
+      }
+    } else {
+      const manualPortStatus = await probePort(manualMinecraftPort);
+      if (!manualPortStatus.inUse) {
+        console.log(`─── Environment Blocked ───`);
+        console.log(`  status: environment_blocked`);
+        console.log(`  command: MC_PORT=${manualMinecraftPort}`);
+        console.log(`  reason: manual Minecraft server is not accepting connections`);
+        console.log(`───────────────────────────\n`);
+        process.exitCode = 1;
+        return;
+      }
+      console.log(`manual minecraft server: 127.0.0.1:${manualMinecraftPort}`);
     }
 
     // Initialize actor workspace if requested

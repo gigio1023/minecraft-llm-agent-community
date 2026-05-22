@@ -38,6 +38,7 @@ import {
   buildLiveSmokeServerContext,
   ensureLiveSmokeServer
 } from "../server/liveSmokeServer.js";
+import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
 
 export type ActionSkillProbeConfig = {
   actorId: string;
@@ -209,16 +210,12 @@ async function ensureProbeServer(config: ProbeConfig): Promise<{
   server: ServerEndpoint;
   rconContext?: RconContext;
 }> {
-  if (process.env.MC_PORT && process.env.MC_PORT.trim().length > 0) {
-    const port = Number(process.env.MC_PORT);
-    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-      throw new Error(`MC_PORT must be an integer between 1 and 65535, got: ${process.env.MC_PORT}`);
-    }
-
+  const manualMinecraftPort = readManualMinecraftPort();
+  if (manualMinecraftPort !== undefined) {
     return {
       server: {
         host: "127.0.0.1",
-        port,
+        port: manualMinecraftPort,
         stop: async () => {}
       }
     };

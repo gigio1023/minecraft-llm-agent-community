@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -12,6 +13,7 @@ import {
   buildProbeMatrixReport,
   buildProbeMatrixCases,
   buildProbeMatrixSkillStatuses,
+  checkProbeMatrixEnvironment,
   classifyProbeMatrixReport,
   countProbeMatrixEvidenceScopes,
   countProbeMatrixSkillStatuses,
@@ -83,6 +85,55 @@ test("action skill probe matrix preflight separates docker environment blockers"
 
   assert.equal(blocked.status, "environment_blocked");
   assert.match(blocked.reason, /failed to connect to the docker API/);
+});
+
+test("action skill probe matrix preflight accepts manual Minecraft port overrides", async () => {
+  const previous = process.env.MC_PORT;
+  const server = createServer();
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  process.env.MC_PORT = String(address.port);
+  try {
+    assert.deepEqual(await checkProbeMatrixEnvironment(), { status: "ready" });
+  } finally {
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+    if (previous === undefined) {
+      delete process.env.MC_PORT;
+    } else {
+      process.env.MC_PORT = previous;
+    }
+  }
+});
+
+test("action skill probe matrix preflight blocks disconnected manual Minecraft port overrides", async () => {
+  const previous = process.env.MC_PORT;
+  const server = createServer();
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const port = address.port;
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+  process.env.MC_PORT = String(port);
+  try {
+    const result = await checkProbeMatrixEnvironment();
+    assert.equal(result.status, "environment_blocked");
+    assert.match(result.reason, new RegExp(`MC_PORT=${port}`));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.MC_PORT;
+    } else {
+      process.env.MC_PORT = previous;
+    }
+  }
 });
 
 test("action skill probe matrix builds a reusable JSON report shape", () => {
@@ -357,6 +408,23 @@ test("action skill probe matrix next actions classify missing, failed, and envir
   assert.deepEqual(actions[0].skillIds, ["collectLogs"]);
   assert.equal(actions[2].skillId, "craftCraftingTable");
   assert.match(actions[2].reason, /missing crafting table inventory/);
+});
+
+test("action skill probe matrix next action uses manual port diagnostics for MC_PORT blockers", () => {
+  const [testCase] = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs"],
+    maxActions: 8
+  });
+  const [blockedGap] = buildProbeMatrixEvidenceGaps({
+    cases: [testCase],
+    preflight: { status: "environment_blocked", reason: "MC_PORT=32771 is not accepting connections" }
+  });
+
+  const [action] = buildProbeMatrixNextActions([blockedGap]);
+
+  assert.equal(action.kind, "restore_environment");
+  assert.equal(action.command, "lsof -nP -iTCP:32771 -sTCP:LISTEN");
 });
 
 test("action skill probe matrix skill statuses provide one row per case", () => {

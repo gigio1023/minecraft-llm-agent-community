@@ -23,6 +23,8 @@ import {
   dockerPreflightCommand,
   type DockerPreflight
 } from "./server/dockerPreflight.js";
+import { readManualMinecraftPort } from "./server/manualMinecraftPort.js";
+import { probePort } from "./server/serverLifecycle.js";
 export { normalizeDockerPreflightResult } from "./server/dockerPreflight.js";
 
 type MatrixCliOptions = {
@@ -395,12 +397,13 @@ export function buildProbeMatrixNextActions(
   const actions: ProbeMatrixNextAction[] = [];
 
   if (environmentBlocked.length > 0) {
+    const reason = environmentBlocked[0]?.reason ?? "runtime environment is blocked";
     actions.push({
       kind: "restore_environment",
       priority: "P0",
-      reason: environmentBlocked[0]?.reason ?? "runtime environment is blocked",
+      reason,
       evidenceScope: "environment_blocked",
-      command: dockerPreflightCommand,
+      command: buildEnvironmentRestoreCommand(reason),
       skillIds: environmentBlocked.map((gap) => gap.skillId)
     });
   }
@@ -431,6 +434,15 @@ export function buildProbeMatrixNextActions(
   }
 
   return actions;
+}
+
+function buildEnvironmentRestoreCommand(reason: string) {
+  const manualPort = reason.match(/MC_PORT=(\d+)/)?.[1];
+  if (manualPort) {
+    return `lsof -nP -iTCP:${manualPort} -sTCP:LISTEN`;
+  }
+
+  return dockerPreflightCommand;
 }
 
 type ExistingEvidencePayload = {
@@ -683,6 +695,19 @@ export function buildProbeMatrixCases(input: {
 }
 
 export async function checkProbeMatrixEnvironment(): Promise<ProbeMatrixPreflight> {
+  const manualMinecraftPort = readManualMinecraftPort();
+  if (manualMinecraftPort !== undefined) {
+    const manualPortStatus = await probePort(manualMinecraftPort);
+    if (!manualPortStatus.inUse) {
+      return {
+        status: "environment_blocked",
+        reason: `MC_PORT=${manualMinecraftPort} is not accepting connections`
+      };
+    }
+
+    return { status: "ready" };
+  }
+
   return checkDockerPreflight();
 }
 

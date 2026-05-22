@@ -318,9 +318,11 @@ bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init
 ```
 
 The single-skill command runs Docker preflight before actor workspace
-initialization, dashboard startup, or Minecraft startup. If Docker/OrbStack is
-unavailable, it reports `environment_blocked` with the Docker preflight command
-and exits without mutating actor workspace state.
+initialization, dashboard startup, or Minecraft startup unless `MC_PORT` points
+at an already-running manual Minecraft server that is accepting connections. If
+Docker/OrbStack is unavailable and no live manual server override exists, it reports
+`environment_blocked` with the Docker preflight command and exits without
+mutating actor workspace state.
 
 Do not make this a broad NPC simulation runner. It should be a narrow live
 contract runner.
@@ -359,9 +361,11 @@ full action skill verification checklist reproducible after individual probes
 are stable.
 
 The matrix command runs a Docker preflight before actor workspace initialization
-or Minecraft startup. If Docker/OrbStack is unavailable, it reports an
-environment blocker instead of mutating actor workspace state or turning the
-first action skill into a misleading runtime failure.
+or Minecraft startup unless `MC_PORT` points at an already-running manual
+Minecraft server that is accepting connections. If Docker/OrbStack is
+unavailable and no live manual server override exists, it reports an environment
+blocker instead of mutating actor workspace state or turning the first action
+skill into a misleading runtime failure.
 
 Every matrix mode also prints `matrix_status_counts`, a terminal-readable mirror
 of `summary.statusCounts`, so coverage can be checked without opening the JSON
