@@ -75,4 +75,15 @@ test("deterministic curriculum selects the next unmet early-game milestone from 
     }),
     null
   );
+
+  assert.equal(
+    selectDeterministicTask({
+      visibleActors: [],
+      inventory: [
+        { name: "wooden_pickaxe", count: 1 },
+        { name: "cobblestone", count: 0 }
+      ]
+    })?.id,
+    "mine_cobblestone"
+  );
 });

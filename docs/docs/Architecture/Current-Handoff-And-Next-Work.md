@@ -521,13 +521,13 @@ action-skill matrix passed:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-table-crafting.json
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json
 ```
 
 ```text
-matrix_summary verdict=passed passed=11 failed=0 error=0 total=11/11
-matrix_status_counts passed=11 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=11 historical_transcript=0 missing=0 environment_blocked=0
+matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12
+matrix_status_counts passed=12 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -538,6 +538,7 @@ Fresh current-run transcripts were produced for:
 - `craftPlanksAndSticks`;
 - `craftCraftingTable`;
 - `craftWoodenPickaxe`;
+- `mineCobblestone`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;
@@ -548,6 +549,18 @@ Fresh current-run transcripts were produced for:
 The generated transcripts and matrix report live under ignored `data/evidence/`
 and `tmp/` paths. Treat the command output as the current durable handoff
 summary, not as committed artifact content.
+
+Implementation notes from this pass:
+
+- `collectLogs` uses actor-relative log fixtures and a bounded post-dig pickup
+  sweep, closing a live matrix failure where four logs were dug but only three
+  were observed before the provider repeated the action.
+- `mineCobblestone` uses an actor-relative stone fixture, preserves the full
+  Mineflayer block object for `bot.dig(...)`, and separates pickup movement from
+  dig-range look-at behavior.
+- `observe` no longer lets optional shared-chest inspection failures abort an
+  observation, while storage probes clear nearby stale chests before placing the
+  managed fixture.
 
 Latest deterministic 3-NPC smoke:
 
@@ -598,9 +611,9 @@ bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-e
 Current result:
 
 ```text
-matrix_summary verdict=incomplete passed=11 failed=0 error=0 total=11/11
-matrix_status_counts passed=11 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=0 historical_transcript=11 missing=0 environment_blocked=0
+matrix_summary verdict=incomplete passed=12 failed=0 error=0 total=12/12
+matrix_status_counts passed=12 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=0 historical_transcript=12 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -719,20 +732,26 @@ Remaining placement boundary:
 
 Do not overload inventory-only `craft_item` with table discovery and placement.
 
-### P1: Generic Mine Block Primitive
+### Implemented: Narrow Mine Block Primitive
 
-Add `mine_block` only after `collect_logs` is live-stable.
+`mine_block` now exists for the first bounded progression contract:
+`mineCobblestone`.
 
-Required evidence:
+Implemented behavior:
 
-- block target type;
-- required tool check;
-- pathfinder movement;
-- atomic `bot.dig(...)`;
-- inventory delta for target drop;
-- failure reason for wrong tool, unreachable block, or missing drop.
+- live fixture gives a wooden pickaxe and places exposed nearby `stone`;
+- primitive checks a pickaxe before digging;
+- nearby in-range stone is looked at and dug without letting pathfinding become
+  the proof;
+- postcondition requires `status=mined`, `equippedTool` containing `pickaxe`,
+  a dug `stone` attempt, `blockRemoved=true`, positive `cobblestone`
+  `inventoryDelta`, and passed verifier evidence.
 
-Use it for cobblestone, coal, and later ore progression.
+Remaining mining expansion:
+
+- coal, ores, branch mining, underground target selection, and large target
+  counts remain future action-skill contracts. Do not treat the narrow
+  `mineCobblestone` proof as broad mining autonomy.
 
 ### P1: Dashboard As Runtime Observer
 
@@ -800,7 +819,7 @@ Check:
    the dashboard as an observer, not a control plane.
 4. Feed live failures into actor evidence and reviewer queue.
 5. Add crafting-table primitive.
-6. Add generic `mine_block`.
+6. Expand mining only after the narrow `mineCobblestone` proof remains stable.
 7. Only then re-run broader 3-NPC LLM gameplay as a product smoke, not as a
    substitute for per-action-skill proof.
 

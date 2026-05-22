@@ -8,6 +8,7 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
     "observe",
     "move_to",
     "collect_logs",
+    "mine_block",
     "craft_item",
     "craft_with_table",
     "inspect_chest",
@@ -21,5 +22,9 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
     id: "move_to",
     category: "movement"
   });
-  assert.throws(() => getRuntimePrimitive("mine_block"), /Unknown runtime primitive/);
+  assert.deepEqual(getRuntimePrimitive("mine_block"), {
+    id: "mine_block",
+    category: "gathering"
+  });
+  assert.throws(() => getRuntimePrimitive("teleport_anywhere"), /Unknown runtime primitive/);
 });

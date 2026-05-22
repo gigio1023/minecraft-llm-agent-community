@@ -23,6 +23,7 @@ import { remember } from "../tools/remember.js";
 import { say } from "../tools/say.js";
 import { wait } from "../tools/wait.js";
 import { collectLogs } from "../tools/collectLogs.js";
+import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
 import { getRoleContract } from "../npc/roles/contracts.js";
@@ -84,11 +85,11 @@ type RconRunner = (args: string[]) => Promise<void>;
 
 const probeCompletedTaskHints: Partial<Record<SeedActionSkillId, string[]>> = {
   craftPlanksAndSticks: ["collect_4_logs"],
-  craftCraftingTable: ["collect_4_logs", "craft_planks_and_sticks"]
+  craftCraftingTable: ["collect_4_logs", "craft_planks_and_sticks"],
+  mineCobblestone: ["collect_4_logs", "craft_planks_and_sticks", "craft_crafting_table", "craft_wooden_pickaxe"]
 };
 
 const probeFixtureOffsets = {
-  collectLogBase: [3, 0, -3],
   sharedChest: [1, 0, -4],
   craftingTable: [2, 0, -2]
 } as const;
@@ -99,6 +100,7 @@ const deterministicProbeDriverSkillIds = [
   "craftPlanksAndSticks",
   "craftCraftingTable",
   "craftWoodenPickaxe",
+  "mineCobblestone",
   "inspectSharedChest",
   "depositSharedItems",
   "approachAndRequestItem",
@@ -120,6 +122,7 @@ export type ActionSkillProbePreconditionMode =
   | "inventory_logs"
   | "inventory_planks_and_sticks"
   | "table_craft_inputs"
+  | "placed_stone_with_pickaxe"
   | "inspectable_shared_chest"
   | "depositable_shared_chest"
   | "social_bootstrap_inventory";
@@ -130,6 +133,7 @@ const actionSkillProbePreconditionModes = {
   craftPlanksAndSticks: "inventory_logs",
   craftCraftingTable: "inventory_planks_and_sticks",
   craftWoodenPickaxe: "table_craft_inputs",
+  mineCobblestone: "placed_stone_with_pickaxe",
   inspectSharedChest: "inspectable_shared_chest",
   depositSharedItems: "depositable_shared_chest",
   approachAndRequestItem: "social_bootstrap_inventory",
@@ -342,6 +346,10 @@ export function buildProbePreconditionRconCommands(input: {
     commands.push(["give", input.actorUsername, `minecraft:${itemName}`, String(count)]);
   };
   const placeChestFixture = (itemsNbt?: string) => {
+    commands.push(
+      ["execute", "at", input.actorUsername, "run", "fill", "~-12", "~-1", "~-12", "~12", "~3", "~12", "air", "replace", "chest"],
+      ["execute", "at", input.actorUsername, "run", "fill", "~-12", "~-1", "~-12", "~12", "~3", "~12", "air", "replace", "trapped_chest"]
+    );
     commands.push(["setblock", String(chest.x), String(chest.y), String(chest.z), "chest"]);
     if (itemsNbt) {
       commands.push([
@@ -357,10 +365,29 @@ export function buildProbePreconditionRconCommands(input: {
   };
 
   if (preconditionMode === "placed_logs") {
-    const base = fixturePosition(input.spawnConfig, probeFixtureOffsets.collectLogBase);
-    for (let index = 0; index < 4; index += 1) {
-      commands.push(["setblock", String(base.x + index), String(base.y), String(base.z), "oak_log"]);
-    }
+    // Keep the log fixture at the actor's settled Y. Absolute spawn-Y logs can
+    // become high targets after the bot falls to terrain, creating delayed
+    // pickups and "3/4 progress" loops in the live matrix.
+    commands.push(
+      ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~-1", "~-3", "~6", "~-1", "~3", "stone"],
+      ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~0", "~-3", "~6", "~3", "~3", "air"],
+      ["execute", "at", input.actorUsername, "run", "setblock", "~2", "~0", "~0", "oak_log"],
+      ["execute", "at", input.actorUsername, "run", "setblock", "~3", "~0", "~0", "oak_log"],
+      ["execute", "at", input.actorUsername, "run", "setblock", "~4", "~0", "~0", "oak_log"],
+      ["execute", "at", input.actorUsername, "run", "setblock", "~5", "~0", "~0", "oak_log"]
+    );
+  }
+
+  if (preconditionMode === "placed_stone_with_pickaxe") {
+    // The mining proof must be relative to the actor, not the configured spawn
+    // Y. Probe spawn is intentionally one block high, and bots can settle at a
+    // slightly different Y before their Mineflayer client loads nearby blocks.
+    commands.push(
+      ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~-1", "~-3", "~3", "~-1", "~3", "stone"],
+      ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~0", "~-3", "~3", "~3", "~3", "air"],
+      ["execute", "at", input.actorUsername, "run", "setblock", "~2", "~0", "~0", "stone"]
+    );
+    give("wooden_pickaxe", 1);
   }
 
   if (preconditionMode === "inventory_logs") {
@@ -554,6 +581,14 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
         }
 
         return { tool: "craft_with_table", args: { itemName: "wooden_pickaxe" } };
+      }
+
+      if (skillId === "mineCobblestone") {
+        if (input.lastResult.tool === "mine_block" && input.lastResult.status === "mined") {
+          return { tool: "remember", args: { note: "mineCobblestone completed stone mining attempt" } };
+        }
+
+        return { tool: "mine_block", args: { blockName: "stone", itemName: "cobblestone", targetCount: 1 } };
       }
 
       if (skillId === "collectLogs") {
@@ -1004,6 +1039,73 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       )
         ? null
         : "craftWoodenPickaxe never produced passed wooden_pickaxe inventory evidence in transcript";
+    }
+  },
+  mineCobblestone: {
+    skillId: "mineCobblestone",
+    evidenceSummary: [
+      "mine_block result reports positive cobblestone inventory delta",
+      "mine_block result includes at least one dug stone attempt",
+      "runtime verifier passed after cobblestone inventory reached the target count"
+    ],
+    minimumPassingTranscript: {
+      steps: [{
+        tool: "mine_block",
+        result: {
+          status: "mined",
+          blockName: "stone",
+          itemName: "cobblestone",
+          inventoryDelta: 1,
+          afterCount: 1,
+          attemptedBlocks: [{ block: "stone", outcome: "dug" }],
+          equippedTool: "wooden_pickaxe"
+        },
+        verification: {
+          status: "passed",
+          progress: {
+            itemNames: ["cobblestone"],
+            beforeCount: 0,
+            afterCount: 1,
+            targetCount: 1
+          }
+        }
+      }]
+    },
+    validate(steps) {
+      const minedStep = steps.find((step) => {
+        if (step.tool !== "mine_block") {
+          return false;
+        }
+
+        const result = asRecord(step.result);
+        const attemptedBlocks = arrayField(result, "attemptedBlocks").map(asRecord);
+
+        return result.status === "mined" &&
+          result.blockName === "stone" &&
+          result.itemName === "cobblestone" &&
+          typeof result.equippedTool === "string" &&
+          result.equippedTool.includes("pickaxe") &&
+          (numberField(result, "inventoryDelta") ?? 0) > 0 &&
+          (numberField(result, "afterCount") ?? 0) >= 1 &&
+          attemptedBlocks.some((attempt) =>
+            attempt.block === "stone" &&
+            attempt.outcome === "dug"
+          );
+      });
+
+      if (!minedStep) {
+        return "mineCobblestone did not record a mined result with pickaxe, positive cobblestone inventory delta, and dug stone evidence";
+      }
+
+      return hasPassedToolVerificationProgress(steps, "mine_block", (progress) =>
+        progressHasTargetInventory({
+          progress,
+          itemNames: ["cobblestone"],
+          minimumAfterCount: 1
+        })
+      )
+        ? null
+        : "mineCobblestone never produced passed cobblestone inventory target evidence in transcript";
     }
   },
   inspectSharedChest: {
@@ -1484,6 +1586,18 @@ export async function runLiveActionSkillProbe(
                 targetCount: readOptionalPositiveIntegerArg(args, "targetCount")
               }),
             { tool: "collect_logs" }
+          ),
+        mine_block: ({ actor, args }) =>
+          withActionWrapper(
+            (signal) =>
+              mineBlock({
+                bot: actor,
+                signal,
+                blockName: readStringArg(args, "blockName"),
+                itemName: readStringArg(args, "itemName"),
+                targetCount: readOptionalPositiveIntegerArg(args, "targetCount")
+              }),
+            { tool: "mine_block" }
           ),
         craft_item: ({ actor, args }) =>
           withActionWrapper(

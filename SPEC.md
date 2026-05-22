@@ -348,6 +348,8 @@ Current harness capabilities:
 - deterministic fixture setup through RCON for `collectLogs`,
   `craftPlanksAndSticks`, `craftCraftingTable`, `inspectSharedChest`,
   `depositSharedItems`, `handoffItemAtChest`, and social probes;
+- actor-relative live fixtures for log and stone block work, so probes do not
+  depend on stale absolute spawn-Y assumptions after a bot settles on terrain;
 - table-bound crafting fixture setup for `craftWoodenPickaxe`, including a
   nearby `crafting_table` block and bounded `craft_with_table` primitive
   evidence;
@@ -361,19 +363,21 @@ Current harness capabilities:
   `bot.craft(...)`;
 - shared-storage probes require positive item movement into the shared chest
   and transcript-visible actor/ledger identity for the storage contribution.
+- observation treats optional shared-chest inspection as non-fatal, while
+  storage action skills still require explicit open/deposit evidence.
 
 Current live action-skill matrix proof:
 
 - command:
-  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-table-crafting.json`;
+  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json`;
 - result:
-  `matrix_summary verdict=passed passed=11 failed=0 error=0 total=11/11`;
+  `matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12`;
 - evidence scope:
-  `matrix_scope_counts current_run=11 historical_transcript=0 missing=0 environment_blocked=0`;
+  `matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0`;
 - implemented action skills with fresh live proof:
   `runtimeObserveAndRemember`, `collectLogs`, `craftPlanksAndSticks`,
-  `craftCraftingTable`, `craftWoodenPickaxe`, `inspectSharedChest`,
-  `depositSharedItems`, `approachAndRequestItem`,
+  `craftCraftingTable`, `craftWoodenPickaxe`, `mineCobblestone`,
+  `inspectSharedChest`, `depositSharedItems`, `approachAndRequestItem`,
   `announceResourceDiscovery`, `handoffItemAtChest`, and
   `waitForBusyCrafter`.
 

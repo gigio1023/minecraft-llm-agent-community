@@ -114,11 +114,15 @@ export async function observe({
 }: ObserveArgs): Promise<ObserveResult> {
   const inventory = inspectInventory(actor);
   const nearbyBlocks = scanNearbyBlocks(actor);
-  const sharedChestItems = sharedChest ? await sharedChest.inspect() : null;
+  const sharedChestItems = sharedChest
+    ? await Promise.resolve(sharedChest.inspect()).catch(() => null)
+    : null;
 
   // Observe is the transcript-facing state boundary. Optional capabilities stay
   // optional so the same primitive can run against Mineflayer bots and narrow
-  // test doubles without fabricating evidence.
+  // test doubles without fabricating evidence. Chest inspection is especially
+  // non-fatal because stale world fixtures should not turn observation into a
+  // storage action.
   return {
     status: "ok",
     observerId: actor.username,

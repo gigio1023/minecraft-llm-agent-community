@@ -105,6 +105,7 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   observe(input: { actor: TActor; target: TActor }): Promise<ObserveResult> | ObserveResult;
   move_to(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   collect_logs(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  mine_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_with_table?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   inspect_chest(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -243,6 +244,15 @@ async function executeTool<TActor extends RuntimeActor>(
       return tools.move_to({ actor, target, args: validated.args });
     case "collect_logs":
       return tools.collect_logs({ actor, target, args: validated.args });
+    case "mine_block":
+      return tools.mine_block
+        ? tools.mine_block({ actor, target, args: validated.args })
+        : {
+            tool: "mine_block",
+            ok: false,
+            status: "blocked",
+            message: "mine_block handler is not installed"
+          };
     case "craft_item":
       return tools.craft_item({ actor, target, args: validated.args });
     case "craft_with_table":

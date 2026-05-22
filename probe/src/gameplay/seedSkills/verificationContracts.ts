@@ -74,6 +74,18 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     liveProbe: "bun run probe:skill -- --actor npc_c --skill craftWoodenPickaxe --max-actions 8 --init-actor-workspace baseline --no-dashboard"
   },
   {
+    skillId: "mineCobblestone",
+    primitiveIds: ["observe", "mine_block", "wait"],
+    evidence: [
+      "nearby stone block is selected from live block search",
+      "pickaxe requirement is checked before digging",
+      "Mineflayer dig promise resolves without interruption",
+      "cobblestone inventory count increases after dig or nearby drop pickup"
+    ],
+    protectedBy: ["test/mineBlock.test.ts", "test/actionSkillProbeRunner.test.ts"],
+    liveProbe: "bun run probe:skill -- --actor npc_b --skill mineCobblestone --max-actions 8 --init-actor-workspace baseline --no-dashboard"
+  },
+  {
     skillId: "inspectSharedChest",
     primitiveIds: ["observe", "inspect_chest", "wait"],
     evidence: [

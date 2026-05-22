@@ -66,7 +66,7 @@ test("assigns visible active seed action skill ownership per actor role", () => 
     "quartermaster must not actively own collectLogs because its role contract cannot use collect_logs"
   );
   assert.equal(
-    ownership.some((record) => record.skill_id === "mineCobblestone"),
+    ownership.some((record) => record.skill_id === "mineCoal"),
     false,
     "planned Minecraft roadmap action skills must not appear as active ownership"
   );

@@ -42,6 +42,7 @@ const DEFAULT_TIMEOUT_POLICY: ActionTimeoutPolicy = {
     remember: 1_000,
     move_to: 8_000,
     collect_logs: 45_000,
+    mine_block: 20_000,
     craft_item: 5_000,
     craft_with_table: 6_000,
     inspect_chest: 3_000,

@@ -87,7 +87,7 @@ test("actionSkillProbeRunner does not duplicate runtimeObserveAndRemember when p
 test("actionSkillProbeRunner throws for planned unimplemented skills", () => {
   const config: ActionSkillProbeConfig = {
     actorId: "npc_a",
-    skillId: "mineCobblestone",
+    skillId: "mineCoal",
     roleId: "gatherer",
     maxActions: 1
   };
@@ -175,7 +175,7 @@ test("actionSkillProbeRunner throws for a planned skill", () => {
     () =>
       validateSkillProbeConfig({
         actorId: "npc_a",
-        skillId: "mineCobblestone",
+        skillId: "mineCoal",
         roleId: "gatherer",
         maxActions: 1
       }),
@@ -213,6 +213,7 @@ test("actionSkillProbeRunner requires deterministic live probe coverage for ever
 test("actionSkillProbeRunner identifies action skills that require managed RCON fixtures", () => {
   assert.equal(actionSkillProbeRequiresManagedFixture("runtimeObserveAndRemember"), false);
   assert.equal(actionSkillProbeRequiresManagedFixture("collectLogs"), true);
+  assert.equal(actionSkillProbeRequiresManagedFixture("mineCobblestone"), true);
   assert.equal(actionSkillProbeRequiresManagedFixture("craftPlanksAndSticks"), true);
   assert.equal(actionSkillProbeRequiresManagedFixture("inspectSharedChest"), true);
 });
@@ -272,6 +273,44 @@ test("actionSkillProbeRunner plans deterministic craft precondition fixtures", (
   );
 });
 
+test("actionSkillProbeRunner plans actor-relative log collection fixtures", () => {
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "collectLogs",
+      spawnConfig: { x: 10, y: 64, z: -5 }
+    }),
+    [
+      ["setblock", "11", "64", "-9", "air"],
+      ["setblock", "12", "64", "-7", "air"],
+      ["execute", "at", "npc_b", "run", "fill", "~-3", "~-1", "~-3", "~6", "~-1", "~3", "stone"],
+      ["execute", "at", "npc_b", "run", "fill", "~-3", "~0", "~-3", "~6", "~3", "~3", "air"],
+      ["execute", "at", "npc_b", "run", "setblock", "~2", "~0", "~0", "oak_log"],
+      ["execute", "at", "npc_b", "run", "setblock", "~3", "~0", "~0", "oak_log"],
+      ["execute", "at", "npc_b", "run", "setblock", "~4", "~0", "~0", "oak_log"],
+      ["execute", "at", "npc_b", "run", "setblock", "~5", "~0", "~0", "oak_log"]
+    ]
+  );
+});
+
+test("actionSkillProbeRunner plans deterministic stone mining fixtures", () => {
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "mineCobblestone",
+      spawnConfig: { x: 10, y: 64, z: -5 }
+    }),
+    [
+      ["setblock", "11", "64", "-9", "air"],
+      ["setblock", "12", "64", "-7", "air"],
+      ["execute", "at", "npc_b", "run", "fill", "~-3", "~-1", "~-3", "~3", "~-1", "~3", "stone"],
+      ["execute", "at", "npc_b", "run", "fill", "~-3", "~0", "~-3", "~3", "~3", "~3", "air"],
+      ["execute", "at", "npc_b", "run", "setblock", "~2", "~0", "~0", "stone"],
+      ["give", "npc_b", "minecraft:wooden_pickaxe", "1"]
+    ]
+  );
+});
+
 test("actionSkillProbeRunner plans deterministic storage and social fixtures", () => {
   assert.deepEqual(
     buildProbePreconditionRconCommands({
@@ -283,6 +322,8 @@ test("actionSkillProbeRunner plans deterministic storage and social fixtures", (
       ["setblock", "1", "70", "-4", "air"],
       ["setblock", "2", "70", "-2", "air"],
       ["give", "npc_b", "minecraft:crafting_table", "1"],
+      ["execute", "at", "npc_b", "run", "fill", "~-12", "~-1", "~-12", "~12", "~3", "~12", "air", "replace", "chest"],
+      ["execute", "at", "npc_b", "run", "fill", "~-12", "~-1", "~-12", "~12", "~3", "~12", "air", "replace", "trapped_chest"],
       ["setblock", "1", "70", "-4", "chest"],
       [
         "data",
@@ -306,6 +347,8 @@ test("actionSkillProbeRunner plans deterministic storage and social fixtures", (
       ["setblock", "1", "70", "-4", "air"],
       ["setblock", "2", "70", "-2", "air"],
       ["give", "npc_b", "minecraft:crafting_table", "2"],
+      ["execute", "at", "npc_b", "run", "fill", "~-12", "~-1", "~-12", "~12", "~3", "~12", "air", "replace", "chest"],
+      ["execute", "at", "npc_b", "run", "fill", "~-12", "~-1", "~-12", "~12", "~3", "~12", "air", "replace", "trapped_chest"],
       ["setblock", "1", "70", "-4", "chest"]
     ]
   );

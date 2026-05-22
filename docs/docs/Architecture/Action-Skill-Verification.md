@@ -236,13 +236,13 @@ OrbStack/Docker was restored:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-table-crafting.json
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json
 ```
 
 ```text
-matrix_summary verdict=passed passed=11 failed=0 error=0 total=11/11
-matrix_status_counts passed=11 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=11 historical_transcript=0 missing=0 environment_blocked=0
+matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12
+matrix_status_counts passed=12 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -254,6 +254,7 @@ Mineflayer harness and their postcondition checks:
 - `craftPlanksAndSticks`;
 - `craftCraftingTable`;
 - `craftWoodenPickaxe`;
+- `mineCobblestone`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;
@@ -277,6 +278,19 @@ that `bot.craft(...)` completed against the table block, and that
 `wooden_pickaxe` inventory increased. A future placement action skill can own
 crafting-table placement; this contract only covers using an already nearby
 station.
+
+Stone mining is now covered by `mineCobblestone` through `mine_block`.
+The live proof is intentionally narrow: a nearby exposed `stone` block must be
+dug with a pickaxe, the primitive must report `blockRemoved`, positive
+`cobblestone` `inventoryDelta`, and the runtime verifier must pass from the
+post-action inventory snapshot. Coal, ore, and broader exploration remain
+future action-skill contracts.
+
+The same live matrix also protects the earlier `collectLogs` boundary from a
+real pickup race: the fixture is actor-relative, and `collect_logs` now performs
+a bounded sweep over recently dug log positions before reporting target-miss
+progress. This keeps success strict on inventory evidence while avoiding a
+false 3/4 stall when the fourth dropped log arrives one tick late.
 
 The live probe postcondition test also requires every implemented action skill
 to fail on an empty transcript and to define a minimum accepted evidence

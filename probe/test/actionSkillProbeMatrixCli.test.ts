@@ -63,7 +63,7 @@ test("action skill probe matrix rejects planned or unknown skill ids", () => {
     () =>
       buildProbeMatrixCases({
         actorId: "npc_b",
-        skillIds: ["mineCobblestone"],
+        skillIds: ["mineCoal"],
         maxActions: 5
       }),
     /Unknown or non-implemented action skill/

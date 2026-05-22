@@ -116,13 +116,13 @@ const coreActionSkills: SeedActionSkill[] = [
   {
     id: "mineCobblestone",
     summary: "Mine stone blocks to gather cobblestone",
-    runtimeStatus: "planned",
-    implementationNotes: "Requires a generic mine_block primitive with tool gating; collect_logs is not valid for stone.",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses the bounded mine_block primitive for nearby stone and verifies cobblestone inventory increase.",
     intentKinds: ["bootstrap_progress"],
     validRoles: ["gatherer"],
     preconditions: ["inventory has wooden_pickaxe or stone_pickaxe"],
-    primitiveIds: ["observe", "wait"],
-    missingPrimitives: ["mine_block"]
+    primitiveIds: ["observe", "mine_block", "wait"]
   },
   {
     id: "craftStonePickaxe",

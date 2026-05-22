@@ -46,7 +46,7 @@ test("rejects unknown primitives before a candidate can be trialed", () => {
       steps: [
         ...validCollectLogsRecipe.steps,
         {
-          primitive: "mine_block",
+          primitive: "teleport_anywhere",
           args: {},
           timeout_ms: 1_000,
           expected_evidence: ["block_delta"]
@@ -57,7 +57,7 @@ test("rejects unknown primitives before a candidate can be trialed", () => {
   );
 
   assert.equal(result.ok, false);
-  assert.match(result.errors.join("\n"), /Unknown runtime primitive: mine_block/);
+  assert.match(result.errors.join("\n"), /Unknown runtime primitive: teleport_anywhere/);
 });
 
 test("rejects primitives outside the actor role contract", () => {

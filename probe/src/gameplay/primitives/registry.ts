@@ -5,6 +5,7 @@ export const runtimePrimitives = [
   { id: "observe", category: "sensing" },
   { id: "move_to", category: "movement" },
   { id: "collect_logs", category: "gathering" },
+  { id: "mine_block", category: "gathering" },
   { id: "craft_item", category: "crafting" },
   { id: "craft_with_table", category: "crafting" },
   { id: "inspect_chest", category: "storage" },

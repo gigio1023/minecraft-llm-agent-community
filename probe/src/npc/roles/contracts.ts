@@ -14,7 +14,7 @@ export type RoleContract = {
 const roleContracts: Record<RoleId, RoleContract> = {
   gatherer: {
     roleId: "gatherer",
-    allowedTools: ["observe", "move_to", "collect_logs", "inspect_chest", "deposit_shared", "say", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "collect_logs", "mine_block", "inspect_chest", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_log",
       "birch_log",
@@ -32,7 +32,8 @@ const roleContracts: Record<RoleId, RoleContract> = {
       "dark_oak_planks",
       "mangrove_planks",
       "cherry_planks",
-      "crafting_table"
+      "crafting_table",
+      "cobblestone"
     ],
     withdrawAllowedItemNames: [],
     keepItems: {

@@ -101,7 +101,8 @@ export function verifyTask(
   if (
     task.id === "collect_4_logs" ||
     task.id === "craft_crafting_table" ||
-    task.id === "craft_wooden_pickaxe"
+    task.id === "craft_wooden_pickaxe" ||
+    task.id === "mine_cobblestone"
   ) {
     const beforeCount = countItems(input.before, task.success.itemNames);
     const afterCount = countItems(input.after, task.success.itemNames);
@@ -110,11 +111,13 @@ export function verifyTask(
     const afterNearbyBlockCount =
       task.id === "collect_4_logs" ? countNearbyBlocks(input.after, task.success.itemNames) : null;
     const toolInventoryDelta =
-      task.id === "collect_4_logs" && typeof input.result.inventoryDelta === "number"
+      (task.id === "collect_4_logs" || task.id === "mine_cobblestone") &&
+      typeof input.result.inventoryDelta === "number"
         ? input.result.inventoryDelta
         : null;
     const toolBlockRemoved =
-      task.id === "collect_4_logs" && typeof input.result.blockRemoved === "boolean"
+      (task.id === "collect_4_logs" || task.id === "mine_cobblestone") &&
+      typeof input.result.blockRemoved === "boolean"
         ? input.result.blockRemoved
         : null;
     const progress = {
@@ -122,7 +125,7 @@ export function verifyTask(
       beforeCount,
       afterCount,
       targetCount: task.success.targetCount,
-      ...(task.id === "collect_4_logs"
+      ...(task.id === "collect_4_logs" || task.id === "mine_cobblestone"
         ? {
             beforeNearbyBlockCount,
             afterNearbyBlockCount,
@@ -132,12 +135,29 @@ export function verifyTask(
         : {})
     };
 
-    // Verification is observation-led: tool-local evidence can show progress, but
-    // the task only passes when the post-action world/inventory snapshot proves it.
-    if (afterCount >= task.success.targetCount) {
+    const mineBlockHasToolEvidence =
+      task.id !== "mine_cobblestone" ||
+      (input.result.status === "mined" &&
+        toolInventoryDelta !== null &&
+        toolInventoryDelta > 0 &&
+        toolBlockRemoved === true);
+
+    // Verification is observation-led, but mining must also prove the primitive
+    // itself dug a block and produced the inventory delta. This rejects fixture
+    // or pickup side effects that make inventory look correct after a blocked
+    // mine_block result.
+    if (afterCount >= task.success.targetCount && mineBlockHasToolEvidence) {
       return {
         status: "passed",
         reason: `${task.id} reached ${afterCount}/${task.success.targetCount} relevant inventory items.`,
+        progress
+      };
+    }
+
+    if (task.id === "mine_cobblestone" && afterCount >= task.success.targetCount) {
+      return {
+        status: "failed",
+        reason: "mine_cobblestone inventory reached target without a mined block result and positive tool-local delta.",
         progress
       };
     }
@@ -162,11 +182,25 @@ export function verifyTask(
       };
     }
 
+    if (
+      task.id === "mine_cobblestone" &&
+      toolInventoryDelta !== null &&
+      toolInventoryDelta > 0
+    ) {
+      return {
+        status: "progressing",
+        reason: `mine_cobblestone tool evidence reports inventory delta ${toolInventoryDelta}, but post-observation has not reached target yet.`,
+        progress
+      };
+    }
+
     return {
       status: "failed",
       reason:
         task.id === "collect_4_logs"
           ? `collect_4_logs saw no relevant inventory increase (${beforeCount} -> ${afterCount}).`
+          : task.id === "mine_cobblestone"
+            ? `mine_cobblestone saw no cobblestone inventory increase (${beforeCount} -> ${afterCount}).`
           : `${task.id} did not increase the relevant inventory count (${beforeCount} -> ${afterCount}).`,
       progress
     };

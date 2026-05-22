@@ -532,6 +532,7 @@ function html() {
       crafter: "crafting_table",
       quartermaster: "chest",
       collect_logs: "oak_log",
+      mine_block: "cobblestone",
       craft_item: "crafting_table",
       craft_with_table: "crafting_table",
       inspect_chest: "chest",

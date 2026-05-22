@@ -102,6 +102,15 @@ type CraftWoodenPickaxeTask = {
   success: InventoryGoal;
 };
 
+type MineCobblestoneTask = {
+  id: "mine_cobblestone";
+  reason: string;
+  blockers: string[];
+  preferredActorRoles: string[];
+  primitiveIds: RuntimePrimitiveId[];
+  success: InventoryGoal;
+};
+
 type DepositSharedMaterialsTask = {
   id: "deposit_shared_materials";
   reason: string;
@@ -122,6 +131,7 @@ export type DeterministicTask =
   | CraftPlanksAndSticksTask
   | CraftCraftingTableTask
   | CraftWoodenPickaxeTask
+  | MineCobblestoneTask
   | DepositSharedMaterialsTask;
 
 const APPROACH_DISTANCE = 1.5;
@@ -150,6 +160,7 @@ export function selectDeterministicTask(
     const stickCount = countItems(state.inventory, ["stick"]);
     const craftingTableCount = countItems(state.inventory, ["crafting_table"]);
     const woodenPickaxeCount = countItems(state.inventory, ["wooden_pickaxe"]);
+    const cobblestoneCount = countItems(state.inventory, ["cobblestone"]);
     const nearbyCraftingTableCount =
       state.nearbyBlocks?.filter((block) => block.name === "crafting_table").length ?? 0;
     const sharedChestResourceCount = countItems(state.sharedChest?.items, [
@@ -180,8 +191,23 @@ export function selectDeterministicTask(
       };
     }
 
-    if (woodenPickaxeCount >= 1 || completedTaskIds.has("craft_wooden_pickaxe")) {
+    if (cobblestoneCount >= 1 || completedTaskIds.has("mine_cobblestone")) {
       return null;
+    }
+
+    if (woodenPickaxeCount >= 1) {
+      return {
+        id: "mine_cobblestone",
+        reason: "Need cobblestone from a real mined stone block before stone-tool progression.",
+        blockers: [],
+        preferredActorRoles: ["gatherer"],
+        primitiveIds: ["observe", "mine_block", "wait"],
+        success: {
+          kind: "inventory_at_least",
+          itemNames: ["cobblestone"],
+          targetCount: 1
+        }
+      };
     }
 
     if (

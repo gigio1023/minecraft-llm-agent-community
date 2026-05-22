@@ -229,9 +229,10 @@ async function waitForLogInventoryIncrease(
 async function moveToNearbyDrop(
   bot: MiningBot,
   blockPosition: Positioned,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  searchWaitMs = 2_000
 ) {
-  const deadline = Date.now() + 2_000;
+  const deadline = Date.now() + searchWaitMs;
 
   while (Date.now() < deadline) {
     const droppedItem = bot.nearestEntity?.((entity) => entity.name === "item");
@@ -263,7 +264,8 @@ async function waitAfterPickupMove(
   bot: MiningBot,
   beforeLogCount: number | undefined,
   signal: AbortSignal | undefined,
-  pickupWaitMs: number
+  pickupWaitMs: number,
+  finalGraceMs = 1_000
 ) {
   const afterPickupMove = await waitForLogInventoryIncrease(
     bot,
@@ -282,7 +284,7 @@ async function waitAfterPickupMove(
 
   // Minecraft pickup can lag one short tick behind pathfinder arrival on a busy
   // local server. Give that final pickup tick a bounded chance before failing.
-  return waitForLogInventoryIncrease(bot, beforeLogCount, signal, 1_000);
+  return waitForLogInventoryIncrease(bot, beforeLogCount, signal, finalGraceMs);
 }
 
 async function tryPickupLogDrop(input: {
@@ -291,14 +293,53 @@ async function tryPickupLogDrop(input: {
   beforeLogCount: number | undefined;
   signal?: AbortSignal;
   pickupWaitMs: number;
+  searchWaitMs?: number;
+  finalGraceMs?: number;
 }) {
-  await moveToNearbyDrop(input.bot, input.blockPosition, input.signal);
+  await moveToNearbyDrop(input.bot, input.blockPosition, input.signal, input.searchWaitMs);
   return waitAfterPickupMove(
     input.bot,
     input.beforeLogCount,
     input.signal,
-    input.pickupWaitMs
+    input.pickupWaitMs,
+    input.finalGraceMs
   );
+}
+
+async function sweepDugLogDrops(input: {
+  bot: MiningBot;
+  attemptedBlocks: NonNullable<CollectLogsResult["attemptedBlocks"]>;
+  afterLogCount: number | undefined;
+  targetLogCount: number | undefined;
+  signal?: AbortSignal;
+}) {
+  let currentLogCount = input.afterLogCount;
+  const dugPositions = input.attemptedBlocks
+    .filter((attempt) => attempt.outcome === "dug")
+    .map((attempt) => attempt.position)
+    .reverse();
+
+  for (const position of dugPositions) {
+    if (
+      currentLogCount !== undefined &&
+      input.targetLogCount !== undefined &&
+      currentLogCount >= input.targetLogCount
+    ) {
+      break;
+    }
+
+    currentLogCount = await tryPickupLogDrop({
+      bot: input.bot,
+      blockPosition: position,
+      beforeLogCount: currentLogCount,
+      signal: input.signal,
+      pickupWaitMs: 150,
+      searchWaitMs: 150,
+      finalGraceMs: 150
+    });
+  }
+
+  return currentLogCount;
 }
 
 async function digLogBlockToBreak(
@@ -412,6 +453,36 @@ export async function collectLogs({
         inventoryDelta > 0 &&
         targetLogCount !== undefined &&
         (afterLogCount ?? 0) < targetLogCount;
+
+      if (targetNotMetAfterProgress) {
+        afterLogCount = await sweepDugLogDrops({
+          bot,
+          attemptedBlocks,
+          afterLogCount,
+          targetLogCount,
+          signal
+        });
+
+        const settledInventoryDelta =
+          beforeLogCount !== undefined && afterLogCount !== undefined
+            ? afterLogCount - beforeLogCount
+            : inventoryDelta;
+
+        if (afterLogCount !== undefined && afterLogCount >= targetLogCount) {
+          return {
+            status: "collected",
+            block: lastBlock?.name,
+            target: lastBlock?.position,
+            attemptedBlocks,
+            beforeLogCount,
+            afterLogCount,
+            inventoryDelta: settledInventoryDelta,
+            blockRemoved: lastBlockRemoved,
+            reason: `collect_logs increased log inventory by ${settledInventoryDelta}.`
+          };
+        }
+      }
+
       const dugWithoutPickup =
         attemptedBlocks.some((attemptedBlock) => attemptedBlock.outcome === "dug") &&
         inventoryDelta !== undefined &&

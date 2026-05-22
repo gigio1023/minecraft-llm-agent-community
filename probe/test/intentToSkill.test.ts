@@ -14,7 +14,7 @@ test("intent-to-action-skill compiler returns bootstrap action skills for a gath
 
   const ids = candidates.map((c) => c.id);
   assert.ok(ids.includes("collectLogs"), "gatherer can collect logs during bootstrap");
-  assert.ok(!ids.includes("mineCobblestone"), "planned stone mining is not an active runtime candidate");
+  assert.ok(ids.includes("mineCobblestone"), "gatherer can mine stone after tool progression is available");
   assert.ok(!ids.includes("mineCoal"), "planned coal mining is not an active runtime candidate");
   assert.ok(!ids.includes("craftPlanksAndSticks"), "gatherer cannot craft during bootstrap");
 });

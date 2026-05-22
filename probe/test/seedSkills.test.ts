@@ -54,16 +54,17 @@ test("seed action skill registry separates implemented action skills from planne
   assert.ok(implementedIds.includes("runtimeObserveAndRemember"));
   assert.ok(implementedIds.includes("collectLogs"));
   assert.ok(implementedIds.includes("craftCraftingTable"));
-  assert.ok(plannedIds.includes("mineCobblestone"));
+  assert.ok(implementedIds.includes("mineCobblestone"));
   assert.ok(plannedIds.includes("mineCoal"));
   assert.ok(plannedIds.includes("smeltRawIron"));
   assert.ok(plannedIds.includes("eatFoodWhenHungry"));
   assert.ok(plannedIds.includes("setupSharedStash"));
 
   const mineCobblestone = getSeedActionSkill("mineCobblestone");
-  assert.equal(mineCobblestone.runtimeStatus, "planned");
-  assert.deepEqual(mineCobblestone.missingPrimitives, ["mine_block"]);
+  assert.equal(mineCobblestone.runtimeStatus, "implemented");
+  assert.equal(mineCobblestone.missingPrimitives, undefined);
   assert.ok(!mineCobblestone.primitiveIds.includes("collect_logs"));
+  assert.ok(mineCobblestone.primitiveIds.includes("mine_block"));
 });
 
 test("reference-derived initial abilities stay planned until their primitives exist", () => {

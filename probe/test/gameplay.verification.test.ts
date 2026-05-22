@@ -199,6 +199,98 @@ test("collect_4_logs verification rejects tool-local block removal without inven
   );
 });
 
+test("mine_cobblestone verification requires cobblestone inventory pickup", () => {
+  const task = selectDeterministicTask({
+    visibleActors: [],
+      inventory: [
+        { name: "wooden_pickaxe", count: 1 },
+        { name: "cobblestone", count: 0 }
+    ]
+  });
+
+  assert.ok(task);
+  assert.deepEqual(
+    verifyTask(task, {
+      before: {
+        inventory: [
+          { name: "wooden_pickaxe", count: 1 },
+          { name: "cobblestone", count: 0 }
+        ]
+      },
+      after: {
+        inventory: [
+          { name: "wooden_pickaxe", count: 1 },
+          { name: "cobblestone", count: 1 }
+        ]
+      },
+      result: {
+        tool: "mine_block",
+        ok: true,
+        status: "mined",
+        inventoryDelta: 1,
+        blockRemoved: true
+      }
+    }),
+    {
+      status: "passed",
+      reason: "mine_cobblestone reached 1/1 relevant inventory items.",
+      progress: {
+        itemNames: ["cobblestone"],
+        beforeCount: 0,
+        afterCount: 1,
+        targetCount: 1,
+        beforeNearbyBlockCount: null,
+        afterNearbyBlockCount: null,
+        toolInventoryDelta: 1,
+        toolBlockRemoved: true
+      }
+    }
+  );
+
+  assert.equal(
+    verifyTask(task, {
+      before: { inventory: [{ name: "cobblestone", count: 0 }] },
+      after: { inventory: [{ name: "cobblestone", count: 0 }] },
+      result: {
+        tool: "mine_block",
+        ok: true,
+        status: "mined",
+        inventoryDelta: 0,
+        blockRemoved: true
+      }
+    }).status,
+    "failed"
+  );
+
+  assert.deepEqual(
+    verifyTask(task, {
+      before: { inventory: [{ name: "cobblestone", count: 0 }] },
+      after: { inventory: [{ name: "cobblestone", count: 1 }] },
+      result: {
+        tool: "mine_block",
+        ok: false,
+        status: "blocked",
+        inventoryDelta: 0,
+        blockRemoved: false
+      }
+    }),
+    {
+      status: "failed",
+      reason: "mine_cobblestone inventory reached target without a mined block result and positive tool-local delta.",
+      progress: {
+        itemNames: ["cobblestone"],
+        beforeCount: 0,
+        afterCount: 1,
+        targetCount: 1,
+        beforeNearbyBlockCount: null,
+        afterNearbyBlockCount: null,
+        toolInventoryDelta: 0,
+        toolBlockRemoved: false
+      }
+    }
+  );
+});
+
 test("move_to verification rejects arrived status without post-action distance evidence", () => {
   const task = selectDeterministicTask({
     visibleActors: [{ id: "npc_b", distance: 4 }]
