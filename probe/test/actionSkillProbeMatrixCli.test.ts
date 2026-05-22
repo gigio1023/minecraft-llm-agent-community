@@ -12,9 +12,11 @@ import {
   buildProbeMatrixCases,
   buildProbeMatrixSkillStatuses,
   classifyProbeMatrixReport,
+  countProbeMatrixEvidenceScopes,
   countProbeMatrixSkillStatuses,
   normalizeDockerPreflightResult
 } from "../src/actionSkillProbeMatrixCli.js";
+import type { ProbeMatrixSkillStatus } from "../src/actionSkillProbeMatrixCli.js";
 import { listImplementedSeedActionSkills } from "../src/gameplay/seedSkills/registry.js";
 
 test("action skill probe matrix builds one case for every implemented seed action skill", () => {
@@ -105,6 +107,12 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
     pendingLiveEvidence: 1,
     environmentBlocked: 0
   });
+  assert.deepEqual(report.summary.evidenceScopeCounts, {
+    currentRun: 0,
+    historicalTranscript: 0,
+    missing: 1,
+    environmentBlocked: 0
+  });
   assert.equal(report.verdict, "incomplete");
   assert.equal(report.skillStatuses.length, 1);
   assert.equal(report.skillStatuses[0].skillId, "collectLogs");
@@ -145,6 +153,12 @@ test("action skill probe matrix report counts environment preflight blockers as 
     failed: 0,
     error: 0,
     pendingLiveEvidence: 0,
+    environmentBlocked: 1
+  });
+  assert.deepEqual(report.summary.evidenceScopeCounts, {
+    currentRun: 0,
+    historicalTranscript: 0,
+    missing: 0,
     environmentBlocked: 1
   });
   assert.equal(report.verdict, "environment_blocked");
@@ -323,7 +337,7 @@ test("action skill probe matrix skill statuses mark all unrun cases as environme
 });
 
 test("action skill probe matrix counts status rows for summary coverage", () => {
-  const counts = countProbeMatrixSkillStatuses([
+  const statuses: ProbeMatrixSkillStatus[] = [
     {
       skillId: "collectLogs",
       status: "passed",
@@ -379,13 +393,19 @@ test("action skill probe matrix counts status rows for summary coverage", () => 
       },
       freshEvidenceCommand: "run deposit"
     }
-  ]);
+  ];
 
-  assert.deepEqual(counts, {
+  assert.deepEqual(countProbeMatrixSkillStatuses(statuses), {
     passed: 1,
     failed: 1,
     error: 1,
     pendingLiveEvidence: 1,
+    environmentBlocked: 1
+  });
+  assert.deepEqual(countProbeMatrixEvidenceScopes(statuses), {
+    currentRun: 3,
+    historicalTranscript: 0,
+    missing: 1,
     environmentBlocked: 1
   });
 });
@@ -481,6 +501,12 @@ test("action skill probe matrix audits existing transcript evidence without Dock
     failed: 0,
     error: 0,
     pendingLiveEvidence: 1,
+    environmentBlocked: 0
+  });
+  assert.deepEqual(report.summary.evidenceScopeCounts, {
+    currentRun: 0,
+    historicalTranscript: 1,
+    missing: 1,
     environmentBlocked: 0
   });
   assert.deepEqual(report.skillStatuses.map((entry) => entry.status), ["passed", "pending_live_evidence"]);

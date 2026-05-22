@@ -80,6 +80,13 @@ export type ProbeMatrixStatusCounts = {
   environmentBlocked: number;
 };
 
+export type ProbeMatrixEvidenceScopeCounts = {
+  currentRun: number;
+  historicalTranscript: number;
+  missing: number;
+  environmentBlocked: number;
+};
+
 export type ProbeMatrixReport = {
   schema: "action-skill-probe-matrix-report/v1";
   mode: "dry_run" | "live" | "evidence_audit";
@@ -99,6 +106,7 @@ export type ProbeMatrixReport = {
     completed: number;
     planned: number;
     statusCounts: ProbeMatrixStatusCounts;
+    evidenceScopeCounts: ProbeMatrixEvidenceScopeCounts;
   };
 };
 
@@ -258,6 +266,17 @@ export function countProbeMatrixSkillStatuses(
     error: skillStatuses.filter((entry) => entry.status === "error").length,
     pendingLiveEvidence: skillStatuses.filter((entry) => entry.status === "pending_live_evidence").length,
     environmentBlocked: skillStatuses.filter((entry) => entry.status === "environment_blocked").length
+  };
+}
+
+export function countProbeMatrixEvidenceScopes(
+  skillStatuses: readonly ProbeMatrixSkillStatus[]
+): ProbeMatrixEvidenceScopeCounts {
+  return {
+    currentRun: skillStatuses.filter((entry) => entry.evidenceScope === "current_run").length,
+    historicalTranscript: skillStatuses.filter((entry) => entry.evidenceScope === "historical_transcript").length,
+    missing: skillStatuses.filter((entry) => entry.evidenceScope === "missing").length,
+    environmentBlocked: skillStatuses.filter((entry) => entry.evidenceScope === "environment_blocked").length
   };
 }
 
@@ -620,7 +639,8 @@ export function buildProbeMatrixReport(input: {
     error,
     completed: results.length,
     planned: input.cases.length,
-    statusCounts: countProbeMatrixSkillStatuses(skillStatuses)
+    statusCounts: countProbeMatrixSkillStatuses(skillStatuses),
+    evidenceScopeCounts: countProbeMatrixEvidenceScopes(skillStatuses)
   };
 
   return {
@@ -693,6 +713,19 @@ function printStatusCountsSummary(report: ProbeMatrixReport) {
   );
 }
 
+function printEvidenceScopeCountsSummary(report: ProbeMatrixReport) {
+  const counts = report.summary.evidenceScopeCounts;
+  console.log(
+    [
+      "matrix_scope_counts",
+      `current_run=${counts.currentRun}`,
+      `historical_transcript=${counts.historicalTranscript}`,
+      `missing=${counts.missing}`,
+      `environment_blocked=${counts.environmentBlocked}`
+    ].join(" ")
+  );
+}
+
 function printFreshEvidenceCommands(gaps: readonly ProbeMatrixEvidenceGap[]) {
   if (gaps.length === 0) {
     console.log("matrix_fresh_commands count=0");
@@ -730,6 +763,7 @@ async function main() {
       });
       console.log(`matrix_dry_run total=${cases.length}`);
       printStatusCountsSummary(report);
+      printEvidenceScopeCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       printFreshEvidenceCommands(report.evidenceGaps);
       if (options.reportPath) {
@@ -756,6 +790,7 @@ async function main() {
       }
       console.log(`matrix_summary verdict=${report.verdict} passed=${report.summary.passed} failed=${report.summary.failed} error=${report.summary.error} total=${report.summary.completed}/${report.summary.planned}`);
       printStatusCountsSummary(report);
+      printEvidenceScopeCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       printFreshEvidenceCommands(report.evidenceGaps);
       if (options.reportPath) {
@@ -781,6 +816,7 @@ async function main() {
       });
       console.log(`matrix_summary verdict=${report.verdict} passed=0 failed=0 error=1 total=0/${cases.length}`);
       printStatusCountsSummary(report);
+      printEvidenceScopeCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       printFreshEvidenceCommands(report.evidenceGaps);
       if (options.reportPath) {
@@ -831,6 +867,7 @@ async function main() {
       results
     });
     printStatusCountsSummary(report);
+    printEvidenceScopeCountsSummary(report);
     printEvidenceGapSummary(report.evidenceGaps);
     printFreshEvidenceCommands(report.evidenceGaps);
 

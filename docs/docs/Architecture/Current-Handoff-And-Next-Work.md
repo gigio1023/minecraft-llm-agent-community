@@ -349,8 +349,10 @@ runtime failure.
 
 Every matrix mode also prints `matrix_status_counts`, a terminal-readable mirror
 of `summary.statusCounts`, so coverage can be checked without opening the JSON
-report. When gaps remain, it also prints `matrix_fresh_commands` with the first
-few one-skill probe commands to run for fresh live evidence.
+report. It also prints `matrix_scope_counts`, which separates fresh current-run
+evidence from historical transcript evidence, missing evidence, and environment
+blockers. When gaps remain, it also prints `matrix_fresh_commands` with the
+first few one-skill probe commands to run for fresh live evidence.
 
 The dry-run checklist does not touch Docker, actor workspace, or the Minecraft
 world. It prints each implemented action skill with:
@@ -381,6 +383,8 @@ live Minecraft proof. Each status row also includes `evidenceScope`:
 reviewers can distinguish historical transcript proof from fresh live proof.
 `summary.statusCounts` aggregates those rows by
 `passed`, `failed`, `error`, `pendingLiveEvidence`, and `environmentBlocked`.
+`summary.evidenceScopeCounts` aggregates those rows by `currentRun`,
+`historicalTranscript`, `missing`, and `environmentBlocked`.
 `evidenceGaps` lists every unproven action skill with its blocker status,
 reason, required contract and postcondition evidence, and the same
 fresh-evidence command.

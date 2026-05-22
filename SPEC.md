@@ -220,6 +220,8 @@ runs each case through the same live harness, and reports
 `matrix_summary verdict=<verdict> passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
 It also prints `matrix_status_counts`, which mirrors
 `summary.statusCounts` for quick terminal inspection.
+It prints `matrix_scope_counts`, which separates fresh current-run evidence from
+historical transcript evidence, missing evidence, and environment blockers.
 When unproven action skills remain, it prints `matrix_fresh_commands` with the
 first few single-skill probe commands needed to collect fresh live evidence.
 It also runs a Docker preflight before actor workspace initialization or
@@ -250,7 +252,9 @@ carries `evidenceScope`: `current_run`, `historical_transcript`, `missing`, or
 `environment_blocked`, so a historical audit pass is not confused with a fresh
 live matrix pass. `summary.statusCounts`
 aggregates the same rows into `passed`, `failed`, `error`,
-`pendingLiveEvidence`, and `environmentBlocked` counts.
+`pendingLiveEvidence`, and `environmentBlocked` counts. `summary.evidenceScopeCounts`
+aggregates the same rows into `currentRun`, `historicalTranscript`, `missing`,
+and `environmentBlocked` counts.
 `evidenceGaps` remains the focused list of non-passing or unrun action skills,
 with the missing contract and postcondition evidence needed before the action
 skill can be considered proven.

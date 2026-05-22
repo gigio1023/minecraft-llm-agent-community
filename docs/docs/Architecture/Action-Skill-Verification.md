@@ -90,8 +90,12 @@ Per-action-skill probes add a second gate after transcript write:
   `historical_transcript`, `missing`, or `environment_blocked`.
 - matrix reports include `summary.statusCounts`, so coverage can be read without
   scanning every status row.
+- matrix reports include `summary.evidenceScopeCounts`, so fresh current-run
+  proof is counted separately from historical transcript proof.
 - matrix CLI output prints `matrix_status_counts`, the same coverage summary in
   terminal-readable form.
+- matrix CLI output prints `matrix_scope_counts`, the same evidence-scope
+  summary in terminal-readable form.
 - matrix CLI output prints `matrix_fresh_commands` for the first few unproven
   action skills, so fresh live probes can be launched without opening the JSON
   report.
