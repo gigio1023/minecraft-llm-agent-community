@@ -35,6 +35,8 @@ type ProbeMatrixCase = ActionSkillProbeConfig & {
   postconditionEvidence: string[];
 };
 
+export type ProbeMatrixVerdict = "passed" | "failed" | "environment_blocked" | "incomplete";
+
 export type ProbeMatrixReport = {
   schema: "action-skill-probe-matrix-report/v1";
   mode: "dry_run" | "live";
@@ -44,6 +46,7 @@ export type ProbeMatrixReport = {
   cases: ProbeMatrixCase[];
   preflight?: ProbeMatrixPreflight;
   results?: ActionSkillProbeResult[];
+  verdict: ProbeMatrixVerdict;
   summary: {
     passed: number;
     failed: number;
@@ -56,6 +59,29 @@ export type ProbeMatrixReport = {
 export type ProbeMatrixPreflight =
   | { status: "ready" }
   | { status: "environment_blocked"; reason: string };
+
+export function classifyProbeMatrixReport(input: {
+  planned: number;
+  completed: number;
+  passed: number;
+  failed: number;
+  error: number;
+  preflight?: ProbeMatrixPreflight;
+}): ProbeMatrixVerdict {
+  if (input.preflight?.status === "environment_blocked" && input.completed === 0) {
+    return "environment_blocked";
+  }
+
+  if (input.failed > 0 || input.error > 0) {
+    return "failed";
+  }
+
+  if (input.planned > 0 && input.completed === input.planned && input.passed === input.planned) {
+    return "passed";
+  }
+
+  return "incomplete";
+}
 
 function parseArgs(argv: readonly string[]): MatrixCliOptions {
   const options: MatrixCliOptions = {};
@@ -308,6 +334,13 @@ export function buildProbeMatrixReport(input: {
   const preflightError =
     input.preflight?.status === "environment_blocked" && results.length === 0 ? 1 : 0;
   const error = results.filter((result) => result.status === "error").length + preflightError;
+  const summary = {
+    passed,
+    failed,
+    error,
+    completed: results.length,
+    planned: input.cases.length
+  };
 
   return {
     schema: "action-skill-probe-matrix-report/v1",
@@ -318,13 +351,11 @@ export function buildProbeMatrixReport(input: {
     cases: input.cases,
     ...(input.preflight ? { preflight: input.preflight } : {}),
     ...(input.results ? { results } : {}),
-    summary: {
-      passed,
-      failed,
-      error,
-      completed: results.length,
-      planned: input.cases.length
-    }
+    verdict: classifyProbeMatrixReport({
+      ...summary,
+      preflight: input.preflight
+    }),
+    summary
   };
 }
 
@@ -384,7 +415,7 @@ async function main() {
     if (preflight.status !== "ready") {
       console.log("matrix_preflight status=environment_blocked");
       console.log(preflight.reason);
-      console.log(`matrix_summary passed=0 failed=0 error=1 total=0/${cases.length}`);
+      console.log(`matrix_summary verdict=environment_blocked passed=0 failed=0 error=1 total=0/${cases.length}`);
       if (options.reportPath) {
         await writeMatrixReport(
           options.reportPath,
@@ -425,7 +456,15 @@ async function main() {
     const passed = results.filter((result) => result.status === "passed").length;
     const failed = results.filter((result) => result.status === "failed").length;
     const errored = results.filter((result) => result.status === "error").length;
-    console.log(`matrix_summary passed=${passed} failed=${failed} error=${errored} total=${results.length}/${cases.length}`);
+    const verdict = classifyProbeMatrixReport({
+      planned: cases.length,
+      completed: results.length,
+      passed,
+      failed,
+      error: errored,
+      preflight
+    });
+    console.log(`matrix_summary verdict=${verdict} passed=${passed} failed=${failed} error=${errored} total=${results.length}/${cases.length}`);
 
     if (options.reportPath) {
       await writeMatrixReport(

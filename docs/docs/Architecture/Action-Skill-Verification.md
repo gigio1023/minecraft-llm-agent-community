@@ -81,6 +81,8 @@ Per-action-skill probes add a second gate after transcript write:
   is not enough;
 - probe fixtures may give the actor starting logs, planks, or sticks, but the
   final claim must still come from post-action inventory observation.
+- matrix reports include a top-level verdict, so `environment_blocked` remains
+  separate from runtime verifier failures and incomplete runs.
 
 ### Shared Storage
 

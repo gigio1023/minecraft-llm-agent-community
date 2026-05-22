@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildProbeMatrixReport,
   buildProbeMatrixCases,
+  classifyProbeMatrixReport,
   normalizeDockerPreflightResult
 } from "../src/actionSkillProbeMatrixCli.js";
 import { listImplementedSeedActionSkills } from "../src/gameplay/seedSkills/registry.js";
@@ -89,6 +90,7 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.actorId, "npc_b");
   assert.equal(report.summary.planned, 1);
   assert.equal(report.summary.completed, 0);
+  assert.equal(report.verdict, "incomplete");
   assert.equal(report.cases[0].skillId, "collectLogs");
   assert.ok(report.cases[0].contractEvidence.length > 0);
   assert.ok(report.cases[0].postconditionEvidence.length > 0);
@@ -114,6 +116,57 @@ test("action skill probe matrix report counts environment preflight blockers as 
   });
 
   assert.equal(report.summary.error, 1);
+  assert.equal(report.verdict, "environment_blocked");
   assert.equal(report.summary.completed, 0);
   assert.equal(report.summary.planned, 1);
+});
+
+test("action skill probe matrix classifies reusable report verdicts", () => {
+  assert.equal(
+    classifyProbeMatrixReport({
+      planned: 2,
+      completed: 2,
+      passed: 2,
+      failed: 0,
+      error: 0
+    }),
+    "passed"
+  );
+
+  assert.equal(
+    classifyProbeMatrixReport({
+      planned: 2,
+      completed: 1,
+      passed: 1,
+      failed: 0,
+      error: 0
+    }),
+    "incomplete"
+  );
+
+  assert.equal(
+    classifyProbeMatrixReport({
+      planned: 2,
+      completed: 1,
+      passed: 0,
+      failed: 1,
+      error: 0
+    }),
+    "failed"
+  );
+
+  assert.equal(
+    classifyProbeMatrixReport({
+      planned: 2,
+      completed: 0,
+      passed: 0,
+      failed: 0,
+      error: 1,
+      preflight: {
+        status: "environment_blocked",
+        reason: "docker unavailable"
+      }
+    }),
+    "environment_blocked"
+  );
 });

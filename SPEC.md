@@ -210,7 +210,7 @@ bun run probe:skills -- --dry-run --report ../tmp/action-skill-checklist.json
 Use the matrix command after single-skill probes are stable. It enumerates
 implemented seed action skills from the registry, rejects planned action skills,
 runs each case through the same live harness, and reports
-`matrix_summary passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
+`matrix_summary verdict=<verdict> passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
 It also runs a Docker preflight before actor workspace initialization or
 Minecraft startup. When Docker is unavailable, it reports
 `matrix_preflight status=environment_blocked` and exits without mutating the
@@ -222,7 +222,10 @@ primitive ownership, preconditions, verification contract evidence, and
 postcondition evidence, without Docker, actor workspace initialization, or world
 mutation.
 Use `--report <path>` to persist the same checklist or live matrix result as a
-JSON artifact with schema `action-skill-probe-matrix-report/v1`.
+JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
+includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or
+`incomplete`, so later reviewers can distinguish live environment blockers from
+real action skill evidence failures.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero

@@ -351,7 +351,11 @@ world. It prints each implemented action skill with:
 
 `--report <path>` writes the same matrix checklist or live result as JSON with
 schema `action-skill-probe-matrix-report/v1`. Use this when handing off action
-skill verification gaps to reviewer sidecars or later agents.
+skill verification gaps to reviewer sidecars or later agents. The report has a
+top-level `verdict` field: `passed`, `failed`, `environment_blocked`, or
+`incomplete`. This keeps Docker/OrbStack blockers separate from actual action
+skill failures and from partial runs that stopped before the whole matrix was
+observed.
 
 Remaining harness work:
 
