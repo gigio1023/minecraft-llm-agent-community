@@ -83,7 +83,7 @@ This is exactly the sort of structured state this repo should send into its tool
 
 ### Inventory-aware craft/smelt logic is a major competence signal
 
-`library/skills.js` and `utils/mcdata.js` contain practical checks for:
+`library/skills.js` and `utils/mcdata.js` contain practical action skill checks for:
 
 - crafting table requirement;
 - furnace requirement;

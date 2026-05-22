@@ -1,690 +1,500 @@
 # SPEC
 
-작성 기준 시점: 2026-05-20
-
-## 1. 목표
-
-이 레포의 다음 큰 목표는 단순한 headless probe를 넘어서, Minecraft 안에서
- "살아 숨쉬는 페르소나를 가진 사람처럼 보이는 NPC 사회"의 최소 유효 버전을
- 만드는 것이다.
-
-하지만 이 목표는 persona prompt를 더 쓰는 것으로 달성되지 않는다. 다음 세 축이
- 동시에 맞아야 한다.
-
-1. Minecraft를 숙련된 플레이어처럼 다루는 gameplay competence
-2. 역할, 자원, 저장소, 위험, 의무를 기반으로 한 social pressure
-3. 긴 시뮬레이션을 버티는 transcript, memory, compaction architecture
-
-## 2. 핵심 판단
-
-### 지금까지 실패한 이유
-
-기존 실패는 모델이 멍청해서가 아니라 runtime이 Minecraft를 실제 게임처럼 주지
- 않았기 때문이다.
-
-주요 원인:
-
-- concrete curriculum 부재
-- trusted gameplay primitives 부재
-- seed skill이 social/visibility 위주였고 survival progression 위주가 아님
-- shared storage, obligations, scarcity 같은 사회 압력이 없음
-- post-action refresh와 anti-repeat policy가 약함
-- 긴 세션을 버틸 메시지/메모리 관리 구조가 아직 없음
-
-### 새로운 방향
-
-다음 단계의 중심 질문은 다음이다.
-
-> 어떻게 하면 NPC가 Minecraft 안에서 실제 플레이어처럼 자원을 모으고,
-> 제작하고, 저장하고, 역할을 나누고, 서로 돕거나 제한적으로 적대하면서,
-> 장기적으로도 일관된 기억과 행동을 유지할 수 있는가?
-
-### 현재 branch-local 설계 묶음
-
-이번 branch의 pressure/intent/lifecycle 확장 설계는 아래 문서 묶음에서
-유지한다.
-
-- `docs/plans/2026-05-20-pressure-intent-lifecycle/README.md`
-- `docs/plans/2026-05-20-pressure-intent-lifecycle/architecture.md`
-- `docs/plans/2026-05-20-pressure-intent-lifecycle/implementation-phases.md`
-- `docs/plans/2026-05-20-pressure-intent-lifecycle/pressure-data-model.md`
-
-`SPEC.md`는 canonical 방향만 유지하고, branch-local 상세 설계는 위 문서
-묶음에 쌓는다.
-
-## 3. 리서치 결론 요약
-
-### Voyager에서 가져올 것
-
-- one-task-at-a-time curriculum
-- trusted gameplay primitives
-- early-game progression seed skills
-- task verification
-- chest/world memory
-
-### mc-multimodal-agent에서 가져올 것
-
-- post-action refresh
-- layered memory
-- goal/blocker tracking
-- craft/material planner
-- loop detection
-
-### mineflayer-chatgpt에서 가져올 것
-
-- event-driven multi-bot brain
-- role restrictions
-- team bulletin
-- per-bot failure memory
-- shared stash cooperation
-- one bounded combat-capable role
-
-### mindcraft-ce에서 가져올 것
-
-- single active action gate
-- interruption/timeout/resume policy
-- compact world helper queries
-- inventory-aware craft/smelt logic
-- busy-aware conversation scheduling
-- small survival reflexes
-
-### opencode에서 가져올 것
-
-- part-based transcript model
-- explicit tool lifecycle records
-- summary + recent raw tail compaction
-- derived UI/debug timeline separate from replay state
-- child-session branching
-
-### codex에서 가져올 것
-
-- thread-store abstraction
-- append-oriented rollout persistence
-- replacement-history compaction checkpoints
-- turn-context baselines and diff reinjection
-- mailbox delivery phases for multi-agent coordination
-- separate transcript persistence from offline memory extraction
-
-## 4. 목표 상태
-
-목표 상태의 최소 사회는 다음과 같다.
-
-### NPC 구성
-
-- 3~4명의 cooperative NPC
-- 1명의 bounded hostile NPC
-
-### cooperative NPC 예시 역할
-
-- gatherer
-- crafter
-- scout/forager
-- guard or quartermaster
-
-### hostile NPC 원칙
-
-- 정확히 1명만 둔다
-- 모든 NPC에게 전투 권한을 열지 않는다
-- 공격/방해는 role-based, bounded, cooldown-based여야 한다
-- 짧은 leash, retreat rule, engagement timeout이 있어야 한다
-
-### 사회가 성립하는 최소 조건
-
-- shared chest 또는 shared storage 존재
-- public/private resource 구분 존재
-- role별 keep-items 정책 존재
-- obligations/promises 존재
-- recent social ledger 존재
-- scarcity or competition 존재
-- busy/idle state를 반영한 대화 존재
-
-## 5. 아키텍처 원칙
-
-### A. Gameplay First, Persona Second
-
-persona text는 마지막 층이다. 먼저 아래가 있어야 한다.
-
-- bootstrap/recovery scaffold
-- primitives
-- seed skills
-- verification
-- anti-repeat
-- resource/storage model
-
-### B. Runtime Owns Reality
-
-runtime이 반드시 소유해야 하는 것:
-
-- world observation normalization
-- tool validation
-- action timeout/interruption
-- inventory/craft/smelt/path checks
-- shared storage ledger
-- hostility bounds
-- transcript persistence
-- compaction and replay
-- mailbox timing
-
-LLM이 소유하는 것:
-
-- next intent
-- short plan
-- intent switching and delegation
-- obligation triage
-- utterance style
-- role-consistent prioritization
-
-### C. Society Emerges From Material Pressure
-
-협력과 적대는 prompt가 아니라 아래에서 나와야 한다.
-
-- logs, cobblestone, coal, iron, food, beds, torches, chests
-- workstation access
-- shared stash upkeep
-- crafting dependency
-- scout reports
-- danger around hostile entities or hostile NPC
-
-### D. Long Runs Need Real Session Architecture
-
-flat transcript로는 장기 시뮬레이션을 버틸 수 없다.
-
-필수 요소:
-
-- part-based transcript
-- canonical replay history
-- derived debug timeline
-- explicit tool records
-- compaction checkpoints
-- per-agent thread store
-- optional shared thread/store
-- offline memory extraction
-
-## 6. Domain Model
-
-### 6.1 Agent Thread
-
-각 NPC는 독립 agent thread를 가진다.
-
-필드 예시:
-
-- agent id
-- role
-- persona style
-- current task
-- active action
-- recent events
-- last observation
-- last result
-- private memory summary
-- mailbox queue
-- thread lineage
-
-### 6.2 Shared Settlement State
-
-shared society state는 별도 구조로 둔다.
-
-최소 필드:
-
-- known shared chests
-- workstation registry
-- settlement resources summary
-- public obligations ledger
-- recent major events
-- danger/tension state
-- hostile NPC last known state
-
-### 6.3 Tool Transcript Part
-
-각 tool execution은 flat text가 아니라 structured part로 남긴다.
-
-필드 예시:
-
-- tool name
-- validated args
-- start/end time
-- status
-- code
-- message
-- post-observation snapshot
-- inventory diff
-- position diff
-- attachments/evidence refs
-
-### 6.4 Memory Layers
-
-#### Private episodic memory
-
-- 최근 실제 경험
-- 누가 무엇을 했는지
-- 실패와 성공
-
-#### Private procedural memory
-
-- 이 NPC가 익힌 작업 절차
-- 예: furnace restock, chest deposit
-
-#### Shared semantic memory
-
-- shared chest 위치
-- village/forest/cave anchor
-- who usually crafts what
-
-#### Working memory
-
-- 현재 task
-- current blocker
-- current promise
-- next intended action
-
-## 7. Gameplay Competence Layer
-
-### 7.1 Bootstrap And Recovery Scaffold
-
-초기 progression spine은 중요하지만 영구 스크립트가 되어서는 안 된다.
-
-이 scaffold는 다음 상황에서 foreground로 올라와야 한다.
-
-- 새 world bootstrap
-- death와 gear loss 이후 recovery
-- shared storage/station collapse
-- severe scarcity
-
-초기 bootstrap/recovery objective 예시:
-
-- `Collect 4 logs`
-- `Craft planks and sticks`
-- `Craft crafting table`
-- `Craft wooden pickaxe`
-- `Mine 8 cobblestone`
-- `Craft stone pickaxe`
-- `Craft furnace`
-- `Mine coal`
-- `Smelt raw iron`
-- `Inspect village chest`
-- `Deposit shared materials`
-
-이 scaffold는 LLM의 행동을 직접 강제하지 않는다. runtime은 current
-world, memory, bulletin, role, recent failure를 바탕으로 pressure를
-계산하고, LLM은 그 pressure 위에서 current intent를 고른다.
-
-settlement가 안정되면 bootstrap pressure는 약해져야 한다. 반대로 death,
-scarcity, gear loss, storage collapse가 오면 recovery pressure와 함께 다시
-강해져야 한다.
-
-각 bootstrap/recovery objective는 다음을 가져야 한다.
-
-- reason
-- machine-checkable success condition
-- blockers
-- preferred actor roles
-
-### 7.1.1 Pressure And Intent Loop
-
-runtime은 각 actor에 대해 compact pressure set을 계산해야 한다.
-
-pressure 예시:
-
-- bootstrap missing progress
-- shared shortage
-- blocked teammate
-- public obligation due
-- nearby opportunity
-- hostile risk
-- recovery after death
-
-LLM은 direct next task 대신 one current intent를 선택해야 한다.
-
-그 intent는:
-
-- 여러 turn에 걸쳐 유지될 수 있고
-- stronger interrupting pressure가 오면 교체될 수 있으며
-- bounded skill/tool 집합으로만 실행되어야 한다
-
-### 7.2 Gameplay Primitives
-
-반드시 runtime-owned TypeScript helper로 제공한다.
-
-초기 필수 primitives:
-
-- `mineBlock`
-- `collectLogs`
-- `craftItem`
-- `smeltItem`
-- `exploreUntilFound`
-- `collectDroppedItems`
-- `inspectChest`
-- `depositToSharedChest`
-- `withdrawFromSharedChest`
-- `equipItem`
-- `attackTarget` for bounded hostile role only
-- `retreatFromThreat`
-
-### 7.3 Seed Skills
-
-초기 curated seed skills:
-
-1. `collectLogs`
-2. `craftPlanksAndSticks`
-3. `craftCraftingTable`
-4. `craftWoodenPickaxe`
-5. `mineCobblestone`
-6. `craftStonePickaxe`
-7. `craftFurnace`
-8. `mineCoal`
-9. `smeltRawIron`
-10. `inspectSharedChest`
-11. `depositSharedItems`
-12. `collectDroppedItems`
-
-추가 social seed skills:
-
-- `approachAndRequestItem`
-- `announceResourceDiscovery`
-- `handoffItemAtChest`
-- `waitForBusyCrafter`
-
-bounded hostile seed skills:
-
-- `patrolArea`
-- `threatenApproach`
-- `stealFromChestIfExposed`
-- `attackThenRetreat`
-
-## 8. Social Simulation Layer
-
-### 8.1 Role Contract
-
-각 role은 최소한 아래를 가진다.
-
-- allowed tools
-- allowed skills
-- keep-items policy
-- home/leash radius
-- priority list
-- public obligations type
-- hostility policy
-
-### 8.2 Team Bulletin
-
-모든 cooperative NPC는 shared bulletin을 본다.
-
-bulletin 예시 필드:
-
-- current role status
-- current task
-- last successful contribution
-- current blocker
-- resource needs
-- danger warning
-- last known hostile sighting
-
-### 8.3 Conversation Scheduler
-
-대화는 action-independent free chat가 아니어야 한다.
-
-필수 규칙:
-
-- busy/idle-aware delay
-- one conversation partner lock for short window
-- queue and batch inbound social messages
-- same-turn vs next-turn mailbox phase separation
-- interrupt messages should explain why the action changed
-
-### 8.4 Hostile NPC Policy
-
-hostile NPC는 작은 드라마 장치이지 chaos engine이 아니다.
-
-필수 제한:
-
-- single hostile agent only
-- explicit target selection policy
-- short patrol/home radius
-- engagement timeout
-- retreat condition on low health or after short conflict
-- theft/sabotage limited to clear resource points
-- no world-spanning vendetta loops
-
-## 9. Runtime Loop
-
-권장 루프는 다음과 같다.
+Updated: 2026-05-22
+
+## 1. What This Is
+
+This is the canonical gateway spec for the current bounded Minecraft
+agent-loop runtime.
+
+The detailed contracts are intentionally split so no single Markdown file has
+to carry the whole architecture:
+
+1. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+   - product direction;
+   - Voyager distinction;
+   - speed-bounded social simulation contract;
+   - hot-path rules;
+   - runtime verification;
+   - non-goals.
+2. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+   - transcript and canonical artifact contract;
+   - actor evidence files;
+   - provider input snapshots;
+   - reviewer input evidence.
+3. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+   - actor workspace source-of-truth model;
+   - action skill lifecycle;
+   - recipe and validator requirements;
+   - non-destructive initialization.
+4. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+   - per-NPC reviewer ownership;
+   - reviewer inputs and outputs;
+   - cross-actor summarizer limits.
+5. `docs/docs/Architecture/Implementation-Workstreams.md`
+   - immediate implementation slices;
+   - parallel subagent ownership;
+   - dependency graph;
+   - validation plan;
+   - deferred work.
+6. `docs/docs/Architecture/Bounded-Action-Skill-Creation.md`
+   - detailed future action skill proposal and recipe model.
+7. `docs/docs/Architecture/LLM-Context-And-Actor-Workspace.md`
+   - route to the visual HTML architecture page.
+8. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+   - enum-first actor profiles, goal stack, and relationship state model.
+9. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+   - current handoff;
+   - landed implementation surfaces;
+   - verified commands;
+   - next improvement order.
+
+Treat this file as the source of truth for priority and scope. Treat the split
+docs as the source of truth for detailed implementation contracts.
+
+## 2. Architecture Concepts Reflected In Code
+
+The current implementation is important because it encodes the right boundaries,
+not because it has a long feature checklist.
+
+### Runtime-Owned Truth
+
+`runAgentLoop` starts each turn from Mineflayer-observed state, gives the
+provider a bounded context packet, validates the proposal against the actor's
+active action-skill gate, executes one primitive, observes again, and verifies
+progress from world, inventory, position, container, or transcript evidence.
+
+Providers propose. Runtime verification decides. Reviewers explain. Neither
+provider nor reviewer can turn optimistic text into success.
+
+### Actor-Local Ownership
+
+`data/actors/<actor_id>/` is the source of truth for actor-owned state:
+profile, memory, evidence, provider inputs, reviews, relationship edges, and
+active/candidate/retired/rejected action skill records.
+
+Action skill evolution follows a lifecycle:
 
 ```text
-observe compact world state
--> merge mailbox / bulletin / role state
--> choose one task or continue current task
--> choose one validated tool or bounded skill
--> execute through single-action gate
--> attach post-action observation and diffs
--> update private memory and shared ledger
--> run critic / verification
--> possibly compact or checkpoint
--> continue
+proposal -> bounded recipe -> role/primitive validation -> timed trial evidence
+-> promotion, supersession, retirement, or rejection
 ```
 
-### 9.1 Event-Driven Brain
+Legacy generated TypeScript is archive material until it is converted into this
+bounded lifecycle. It is not active runtime capability.
 
-loop는 constant polling보다 event-driven이 좋다.
+### Replayable Evidence
 
-핵심 이벤트:
+The runtime persists the packet a provider saw, the turn record, tool attempt,
+pre/post observations, verifier reason, fake-progress rejection, and review refs.
+The goal is that a failed run can be audited from artifacts without immediately
+reproducing the world.
 
-- strategic tick
-- reactive safety
-- social message received
-- action finished
-- critic needed
-- hostile seen
-- hunger/health threshold crossed
-- stash changed
+### Bounded Social Pressure
 
-### 9.2 Single Active Action Gate
+Actor profile, goal stack, relationship edge, and relationship-derived pressure
+are structured provider context. They influence intent selection only.
 
-항상 world action은 하나만 active여야 한다.
+Relationship pressure carries explicit boundaries:
 
-필수 요소:
+- action boundary: intent pressure only;
+- active action skill still required;
+- role contract unchanged;
+- relationship state must come from durable evidence refs.
 
-- timeout
-- interrupt
-- resumable small subset only
-- repeat-loop detection
-- summarized result
+### Async Repair
 
-### 9.3 Post-Action Refresh
+Per-NPC reviewers read immutable actor artifacts after the turn and write
+findings, candidate proposals, or relationship event proposals. Runtime-owned
+guards apply relationship events and action skill lifecycle transitions.
 
-중요 tool/skill 이후에는 runtime이 자동으로 fresh post-state를 붙인다.
+The hot path must stay small: observe, choose, gate, execute, verify, record,
+release.
 
-필수 post-state 예시:
+Future extensions outside the current bounded delivery scope:
 
-- position diff
-- inventory diff
-- nearby blocks/resources diff
-- nearby actors diff
-- danger diff
-- task progress diff
+- production hardening of LLM-backed reviewer prompts and scoring beyond the
+  current opt-in bounded reviewer adapter;
+- provider input snapshots for future LLM-backed gameplay paths outside
+  phase-one gameplay and live dialogue;
+- actor-scoped evidence coverage for future gameplay paths outside phase-one
+  `runAgentLoop` and mutual dispatchers;
+- migration of the legacy skill-village path from generated TypeScript proposals
+  into executable bounded recipes, if that path remains needed.
 
-## 10. Transcript, Replay, Compaction
+Deferred unless the user re-approves:
 
-### 10.1 Transcript Layers
+- full arbitrary checkpoint resume;
+- deep single-bot reconnect refactor;
+- generated TypeScript action skill hot-loop execution;
+- long-term memory compaction workers;
+- a global critic that owns actor repair decisions.
 
-세 층을 분리한다.
+Reconnect/session lifecycle remains a runtime-owned concern when implemented.
+For future slices, do only the reconnect work required to keep hot-path
+evidence honest. Do not let a deep reconnect refactor displace actor workspace,
+action skill lifecycle, provider snapshots, or per-NPC review.
 
-1. canonical replay transcript
-2. derived debug/event timeline
-3. metadata index
+## 3. Product Direction
 
-### 10.2 Part-Based Transcript
+The short-term product is a tiny, headless, bounded Minecraft runtime that can
+make real end-to-end progress on boring gameplay tasks and leave enough evidence
+to explain success, failure, stall, and fake progress.
 
-message/turn은 다음 같은 part를 가질 수 있다.
+The long-term north star is a social simulation seed:
 
-- observation
-- task
-- plan
-- tool call
-- tool result
-- chat utterance
-- reasoning summary
-- world event
-- memory update
-- compaction marker
-- checkpoint
+- role pressure;
+- action skill ownership;
+- shared and private memory;
+- bounded action skill evolution;
+- per-NPC review and repair loops;
+- later human-in-the-loop social play.
 
-### 10.3 Compaction Strategy
+This is not a Voyager-style long-horizon single-agent autonomy project.
+Voyager can wait a long time for planning, critic, generated code, retries, and
+skill-library growth. This project needs speed-bounded actor turns because
+social simulation requires NPCs to remain observable and responsive. Slow critic,
+reflection, and repair loops must run asynchronously from immutable evidence and
+must not block the current actor turn.
 
-compaction은 summary-only가 아니라 replacement-history checkpoint를 남겨야 한다.
+## 4. Immediate Implementation Priority
 
-compact summary에는 최소한 다음이 필요하다.
+The actor-workspace and social-feedback slices are now implemented enough to be
+the active runtime baseline. The next implementation should use real run
+evidence to harden boring gameplay competence without expanding into a larger
+society prematurely.
 
-- overall mission
-- per-agent role and constraints
-- shared settlement state
-- key world anchors
-- inventory/resource summary
-- active tensions and hostilities
-- unresolved blockers
-- next expected actions
+Priority order:
 
-또한 recent raw tail을 소량 보존해야 한다.
+1. Validate `collect_logs` and adjacent boring tasks against live Minecraft
+   evidence, not optimistic transcript labels.
+2. Use the per-action-skill live harness before returning to broad multi-NPC
+   runs.
+3. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
+   verifier, target-selection, and action-skill gaps.
+4. Harden reviewer prompts/scoring only from immutable run evidence.
+5. Convert any still-useful legacy generated-code experiments into bounded
+   candidate recipes before runtime use.
+6. Keep the gameplay hot path bounded and free of blocking critic/generation
+   work.
+7. Keep the managed local server path easy to start, inspect, and stop.
 
-### 10.4 Persistence Modes
+Current harness command:
 
-두 가지 persistence mode를 둔다.
-
-- `limited`: semantic action/result/checkpoint only
-- `extended`: raw observations, traces, diagnostics, path logs 포함
-
-## 11. Memory Extraction
-
-hot loop와 long-term memory extraction은 분리한다.
-
-### Hot loop memory
-
-- bounded
-- deterministic
-- replay-safe
-
-### Offline memory worker
-
-- recurring summaries
-- social pattern extraction
-- trust/reputation summaries
-- settlement history summaries
-
-external/manual context가 섞였을 때는 memory trust를 낮추는 policy도 필요하다.
-
-## 12. 제안 디렉토리 구조
-
-```text
-probe/src/
-  runtime/
-    loop/
-    actions/
-    mailbox/
-    compaction/
-    checkpoints/
-  transcript/
-    canonical/
-    projectors/
-    persistence/
-  memory/
-    private/
-    shared/
-    summaries/
-    extraction/
-  observation/
-    worldHelpers/
-    snapshots/
-  gameplay/
-    curriculum/
-    primitives/
-    seedSkills/
-    planners/
-    verification/
-    storage/
-  npc/
-    roles/
-    social/
-    hostile/
-  provider/
-    promptCompiler/
-    replayCompiler/
-  server/
-  cli/
+```bash
+cd probe
+bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
 ```
 
-## 13. 단계별 실행 계획
+The single-skill harness runs Docker preflight before actor workspace
+initialization, dashboard startup, or Minecraft startup unless `MC_PORT` points
+at an already-running manual Minecraft server that passes a Minecraft protocol
+ping.
+Manual `MC_PORT` probes are allowed only for action skills whose precondition
+mode is `none`; fixture-backed probes require the managed server because their
+RCON setup is part of the evidence contract.
+Fixture-backed probes derive their setup from a pure RCON command planner, so
+crafting, storage, and social preconditions can be reviewed and tested without
+starting Minecraft. `none`-mode probes do not emit setup commands; they must not
+mutate the probe world merely because the managed server is available.
+When Docker is unavailable and no live manual server override exists, it reports
+`environment_blocked` with the Docker preflight command and exits without
+mutating actor workspace state.
+When the dashboard is enabled, the harness sends best-effort `agent-loop-event`
+runtime events to `/api/runtime-events` for turn observation, provider proposal,
+tool completion, and loop completion. These events are fire-and-forget:
+dashboard failure must not reject, delay, or relabel NPC action execution, and
+the dashboard still falls back to artifact polling.
+If the fixed dashboard port is already occupied, the CLI reuses it only when
+`/api/state` proves it is this repo's dashboard. A random stale listener is
+reported as a dashboard availability issue instead of being mislabeled as an
+active runtime dashboard. The health check is bounded by a short timeout so a
+stale listener cannot hang probe startup.
 
-### Phase 1. Gameplay competence foundation
+Current matrix command:
 
-- bootstrap/recovery scaffold 도입
-- pressure engine 도입
-- intent selector 도입
-- gameplay primitives 도입
-- early-game seed skills 도입
-- task verification 도입
-- anti-repeat policy 도입
+```bash
+cd probe
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline
+```
 
-### Phase 2. Shared storage and role society
+Current matrix checklist command:
 
-- shared chest/storage ledger
-- role contracts
-- keep-items policy
-- team bulletin
-- obligation routing
-- intent-to-skill role filtering
-- cooperative handoff skills
+```bash
+cd probe
+bun run probe:skills -- --dry-run
+```
 
-### Phase 3. Transcript and memory architecture
+Current existing-evidence audit command:
 
-- per-agent thread store
-- canonical replay transcript
-- derived debug timeline
-- compaction checkpoints
-- private/shared memory separation
+```bash
+cd probe
+bun run probe:skills -- --audit-existing-evidence
+```
 
-### Phase 4. Bounded hostile NPC
+Optional matrix report artifact:
 
-- exactly one hostile role
-- patrol/leash/retreat logic
-- theft/sabotage/attack policy
-- tension ledger and hostile sighting memory
+```bash
+cd probe
+bun run probe:skills -- --dry-run --report ../tmp/action-skill-checklist.json
+```
 
-### Phase 5. Long-run stability
+Use the matrix command after single-skill probes are stable. It enumerates
+implemented seed action skills from the registry, rejects planned action skills,
+runs each case through the same live harness, and reports
+`matrix_summary verdict=<verdict> passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
+It also prints `matrix_status_counts`, which mirrors
+`summary.statusCounts` for quick terminal inspection.
+It prints `matrix_scope_counts`, which separates fresh current-run evidence from
+historical transcript evidence, missing evidence, and environment blockers.
+When unproven action skills remain, it prints `matrix_fresh_commands` with the
+first few single-skill probe commands needed to collect fresh live evidence.
+It also prints `matrix_next_actions`, a reviewer-friendly list of P0 follow-up
+actions that classifies each gap as environment restoration, fresh live proof,
+or failed-probe repair. Environment restoration is de-duplicated into one
+actionable command instead of repeating every blocked action-skill probe
+command; fixture-backed `MC_PORT` blockers tell the reviewer to unset
+`MC_PORT` before checking the managed Docker server.
+It also runs a Docker preflight before actor workspace initialization or
+Minecraft startup unless `MC_PORT` points at an already-running manual
+Minecraft server that passes a Minecraft protocol ping. When Docker is
+unavailable and no live manual server override exists, it reports
+`matrix_preflight status=environment_blocked` and exits without mutating the
+actor workspace or probe world.
 
-- mailbox delivery phases
-- resumable action subset
-- offline memory extraction
-- long-run checkpoint/replay validation
+Use `--dry-run` when the Minecraft runtime is unavailable or before a live
+matrix run. It prints the implemented action skill checklist, including role,
+primitive ownership, gameplay preconditions, deterministic probe fixture mode,
+verification contract evidence, postcondition evidence, and planned RCON
+fixture commands, without Docker, actor workspace initialization, or world
+mutation. Every implemented action skill must have an explicit deterministic
+probe driver and fixture/precondition mode before it can appear in the matrix; a
+missing branch is a validation error, not a fallback terminal memory note.
+Use `--audit-existing-evidence` when Docker is unavailable but existing
+transcripts should be re-scored. It scans raw `action_skill_probe_*` evidence
+artifacts, skips canonical transcript projections, re-applies each action
+skill's postcondition rule, and reports which skills already have historical
+live proof versus which still need fresh runtime evidence. For each action
+skill, the audit reports the newest raw probe transcript instead of
+cherry-picking an older pass, so a recent regression cannot be hidden behind
+stale historical success.
+Use `--report <path>` to persist the same checklist or live matrix result as a
+JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
+includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or
+`incomplete`, so later reviewers can distinguish live environment blockers from
+real action skill evidence failures. Each `cases[]` row includes
+`readinessItems` for the implemented registry entry, role, primitive ownership,
+verification contract, postcondition spec, deterministic probe driver, and
+fixture/precondition mode. The report also includes `skillStatuses`, one row per
+selected action skill, so dashboards and reviewers can render the current
+verification state without deriving it from mixed result and gap arrays. Each
+status row carries a `freshEvidenceCommand`, the exact single-skill probe
+command to run when that row still needs live Minecraft proof. Each status row also
+carries `evidenceScope`: `current_run`, `historical_transcript`, `missing`, or
+`environment_blocked`, so a historical audit pass is not confused with a fresh
+live matrix pass. `summary.statusCounts`
+aggregates the same rows into `passed`, `failed`, `error`,
+`pendingLiveEvidence`, and `environmentBlocked` counts. `summary.evidenceScopeCounts`
+aggregates the same rows into `currentRun`, `historicalTranscript`, `missing`,
+and `environmentBlocked` counts.
+`evidenceGaps` remains the focused list of non-passing or unrun action skills,
+with the missing contract and postcondition evidence needed before the action
+skill can be considered proven. Live and audited result rows also carry
+structured `terminalStatus`, `terminalWhy`, `postconditionStatus`,
+`postconditionFailure`, and `failureKind` fields when available. Reviewers and
+dashboards should read those fields instead of parsing the human `reason`
+string.
+The report also includes `nextActions`, derived from `evidenceGaps`, so
+dashboards and reviewer sidecars can show what to do next without inferring it:
+restore Docker/server environment, run the listed fresh probe command, or fix a
+failed probe before re-running it. When the environment is blocked,
+`nextActions` points at the Docker preflight check; per-skill fresh probe
+commands remain on `skillStatuses` and `evidenceGaps`. In
+`--audit-existing-evidence` mode, a historical pass also creates a
+`refresh_historical_evidence` next action because historical proof is not a
+fresh current-run proof after code changes.
+An evidence audit report must not return top-level `verdict: "passed"` from
+historical transcript rows alone. Even if every selected action skill has a
+historical pass, the report remains `incomplete` until the current run produces
+fresh `current_run` proof for every selected action skill.
 
-## 14. 수용 기준
+The per-action-skill postcondition is output-specific. Craft probes must prove
+the expected inventory outputs, not merely any passed verifier. Ordered social
+probes must prove the causal sequence, such as arrival before request, deposit
+before handoff chat, and busy response before wait before follow-up. Storage
+probes must prove named positive item movement or a non-empty item snapshot, not
+just an opened container or an unqualified moved count, and must keep the chest
+id in evidence. Wood probes should verify supported log/plank item families
+rather than overfitting to one wood species, and `collectLogs` must tie the
+passed verifier to `collect_logs` primitive-result evidence: positive
+`inventoryDelta`, target `afterLogCount`, and at least one dug log attempt.
+Inventory progress must be attached to the expected primitive rather than an
+unrelated successful step.
+Social probes must prove the delivered chat result itself carries target and
+text evidence that matches the action skill intent; generic delivered chat,
+untargeted chat, or intent text that appears only in provider args is not
+sufficient evidence.
+Runtime control probes must prove an observe snapshot happened before a terminal
+memory note. When a live probe writes a transcript, terminal status and
+postcondition evidence are classified separately so reviewers can see whether
+the failure was terminal-control flow, missing Minecraft evidence, or both.
 
-다음 작업의 최소 완료 기준은 아래다.
+This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
+one actor-owned action skill through the real runtime gate and exits non-zero
+when runtime evidence does not satisfy the contract.
 
-1. NPC들이 random wandering이 아니라 early-game progression bootstrap을 수행한다.
-2. NPC들이 bootstrap/recovery progression을 필요할 때 수행하고, 더 강한
-   shared or personal pressure가 있을 때는 이를 유연하게 뒤로 미룰 수 있다.
-3. 최소 3개 이상의 cooperative role이 shared storage와 obligations를 통해 상호작용한다.
-4. 1개의 hostile NPC가 bounded policy 안에서만 적대 행동을 한다.
-5. 대화는 busy/idle, recent events, shared bulletin을 반영한다.
-6. 각 agent는 private memory와 shared settlement state를 구분해 사용한다.
-7. canonical replay transcript와 compaction checkpoint가 존재한다.
-8. 긴 세션에서도 recent raw tail + compact summary 구조로 재개 가능하다.
-9. transcript만 읽어도 누가 무엇을 왜 했는지 재구성 가능하다.
+Current harness capabilities:
 
-## 15. 당장 하지 말아야 할 것
+- deterministic fixture setup through RCON for `collectLogs`,
+  `craftPlanksAndSticks`, `craftCraftingTable`, `inspectSharedChest`,
+  `depositSharedItems`, `handoffItemAtChest`, and social probes;
+- actor-relative live fixtures for log and stone block work, so probes do not
+  depend on stale absolute spawn-Y assumptions after a bot settles on terrain;
+- table-bound crafting fixture setup for `craftWoodenPickaxe`, including a
+  nearby `crafting_table` block and bounded `craft_with_table` primitive
+  evidence;
+- one action-skill-specific deterministic driver for each implemented seed
+  action skill; the action-skill probe harness does not switch to OpenAI auth or
+  an LLM provider based on `PROBE_GAMEPLAY_PROVIDER`;
+- transcript postcondition checks after the run, so a terminal `remember` note
+  cannot make the probe pass unless the action skill produced required state
+  evidence;
+- craft probes require a passed runtime verifier, not only a non-throwing
+  `bot.craft(...)`;
+- shared-storage probes require positive item movement into the shared chest
+  and transcript-visible actor/ledger identity for the storage contribution.
+- observation treats optional shared-chest inspection as non-fatal, while
+  storage action skills still require explicit open/deposit evidence.
 
-- persona prompt만 늘리는 작업
-- generated JS / eval loop 재도입
-- full village/economy grand simulation부터 시작
-- 모든 NPC에게 combat authority 부여
-- giant monolith runner 추가
-- UI/debug event stream을 canonical replay source로 쓰는 설계
+Current live action-skill matrix proof:
 
-## 16. 즉시 다음 구현 슬라이스 제안
+- command:
+  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json`;
+- result:
+  `matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12`;
+- evidence scope:
+  `matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0`;
+- implemented action skills with fresh live proof:
+  `runtimeObserveAndRemember`, `collectLogs`, `craftPlanksAndSticks`,
+  `craftCraftingTable`, `craftWoodenPickaxe`, `mineCobblestone`,
+  `inspectSharedChest`, `depositSharedItems`, `approachAndRequestItem`,
+  `announceResourceDiscovery`, `handoffItemAtChest`, and
+  `waitForBusyCrafter`.
 
-현재 branch의 즉시 다음 구현 슬라이스는 아래 3단계다.
+The corresponding transcript artifacts under `data/evidence/` and the JSON
+matrix report under `tmp/` are intentionally ignored runtime evidence. Preserve
+the command and summary in docs, but do not commit those generated artifacts.
 
-1. `pressure engine` + `lifecycle state` + `intent selector`
-2. `bounded seed skills` + `intent-to-skill compiler` + `role obligation routing`
-3. `memory/transcript wiring` + `bootstrap/recovery reinjection` + `checkpoint-ready lifecycle summary`
+Current deterministic 3-NPC product smoke:
 
-상세 설계는 `docs/plans/2026-05-20-pressure-intent-lifecycle/` 아래 문서 묶음을 기준으로 유지한다.
+- command:
+  `bun run src/cli.ts --provider deterministic --npcs 3 --max-actions 20 --observe-ms 0 --no-dashboard`;
+- result:
+  `final.status=success`;
+- meaningful gameplay evidence:
+  `npc_b` ran `collect_logs`, reached `afterLogCount=4`, then deposited
+  `oak_log` into the shared chest with `movedCount=1`;
+- artifact:
+  `data/evidence/agent_loop_probe_v0-1779431536545.json`.
+
+Existing-evidence audits are still historical by design. Running
+`bun run probe:skills -- --audit-existing-evidence` after the live matrix
+re-scores the latest saved transcripts as 10 historical passes, but it returns
+top-level `verdict=incomplete` because a historical audit is not a fresh
+current-run proof.
+
+## 5. Non-Negotiable Rules
+
+- Runtime owns reality: validation, timeout, cancellation, verification,
+  transcript, artifacts, and lifecycle guards.
+- Providers propose. They do not decide success.
+- Progress must be backed by world, inventory, position, container, or transcript
+  evidence.
+- Do not confuse animation, partial motion, optimistic text, or provider claims
+  with success.
+- The hot path must not await critic, reflection, generated code, or slow
+  summarization.
+- Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
+  agent skills.
+- Actor workspace is the only source of truth for actor-owned active,
+  candidate, retired, rejected, and superseded action skill records.
+- Generated TypeScript action skill bundles must not be auto-imported into the
+  hot loop.
+- `build/generated-skills` is a legacy exploratory output location only. It must
+  not be treated as an actor-owned action skill store.
+- Per-NPC reviewers write actor-scoped review notes and candidate proposals; they
+  never mutate active action skills directly.
+- A global reviewer may summarize cross-actor patterns only. It must not own
+  actor memory, actor action skill lifecycle, or actor-specific repair proposals.
+
+## 6. Done Criteria For The Actor-Workspace Slice
+
+The actor-workspace slice is done when:
+
+1. `data/actors/<actor_id>/` has the intended source-of-truth layout:
+   `memory/`, `evidence/`, `reviews/`, `provider-inputs/`,
+   `action-skills/active`, `action-skills/candidates`,
+   `action-skills/retired`, and `action-skills/rejected`;
+2. current seed ownership records are materialized into actor workspace action
+   skill records without creating a competing schema;
+3. active seed action skills can be read from actor workspace;
+4. runtime provider proposals are blocked when their primitive is not backed by
+   the actor's active action skill records;
+5. candidate action skill recipes can be validated before trial;
+6. generated or candidate action skill proposals are stored under the actor
+   workspace lifecycle, not `build/generated-skills`;
+7. reviewer jobs and outputs can be written per actor without touching active
+   runtime state;
+8. provider-backed runs persist the exact provider input packet per actor turn;
+9. failed gameplay attempts leave actor-scoped evidence suitable for review,
+   including target, pre/post position, tool attempt, verifier reason, and
+   inventory/block/container delta when relevant;
+10. provider failures after an actor turn observes the world are recorded as
+    failed `provider_error` transcript steps and `provider_failed` events, with
+    the provider input snapshot ref attached when snapshots are enabled;
+11. fake progress such as "started swinging," "pathing started," or provider
+   confidence cannot satisfy a verifier without runtime evidence;
+12. deterministic mode still performs zero network calls;
+13. docs and index routes point to the split spec documents.
+
+## 7. Done Criteria For The Social Feedback Slice
+
+The social feedback slice is done when:
+
+1. reviewer `relationship_event_proposals` can be applied by an explicit
+   runtime-owned command/module, never by the reviewer itself;
+2. the applier rejects unknown actor workspaces, path-like actor ids, unknown
+   event kinds, missing evidence refs, self-targets, and evidence refs that are
+   not inside the relevant actor workspace;
+3. applied relationship events update
+   `data/actors/<from_actor_id>/relationships/<to_actor_id>.json`;
+4. applied events are idempotent by event id and a durable application marker,
+   so repeated reviewer runs do not duplicate social state after the compact
+   relationship event window rolls forward;
+5. actor provider context exposes relationship-derived pressure as categorical
+   goal/decision context, not as arbitrary `0..1` personality floats;
+6. runtime action selection may use relationship pressure to choose between
+   already-allowed bounded actions, but it cannot bypass active action-skill
+   gates or role contracts;
+7. provider input snapshots include actor profile, goal stack, active action
+   skills, relationship state, recent evidence, recent reviews, and memory;
+8. live gameplay/provider smoke setup can be run without printing secrets and
+   leaves a server endpoint the user can join; `MC_PORT` manual overrides are
+   validated before bypassing the managed server;
+9. deterministic test paths still perform zero network calls;
+10. docs and the static architecture page explain the completed social feedback
+    loop accurately.
+
+## 8. Read Next
+
+For implementation, read in this order:
+
+1. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+2. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+3. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+4. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+5. `docs/docs/Architecture/Implementation-Workstreams.md`
+6. `docs/docs/Architecture/Bounded-Action-Skill-Creation.md`
+7. `docs/docs/Architecture/LLM-Context-And-Actor-Workspace.md`
+8. `docs/docs/Agent-Search-Index.md`
+9. `docs/docs/Terminology.md`

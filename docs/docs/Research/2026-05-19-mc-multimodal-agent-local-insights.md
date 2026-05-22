@@ -18,8 +18,8 @@ The LLM interaction is constrained to specific JSON shapes (`tool_call`, `tool_c
 The runtime hashes tool names and arguments. If the same arguments yield the same result repeatedly, it escalates from a warning to a critical failure, aborting the loop.
 - **For `/probe`:** Implement a lightweight memory Map tracking the last 8 `{ tool, argsHash, resultStatus }` entries per actor. If repeated failures hit a threshold, inject a prompt warning; abort on critical thresholds.
 
-### Skill Recording (Traces, Not Code)
-Skills are saved as ordered atomic traces (`{ tool, arguments }`) with preconditions and success criteria, rather than raw JavaScript blobs.
+### Action Skill Recording (Traces, Not Code)
+Action skills are saved as ordered atomic traces (`{ tool, arguments }`) with preconditions and success criteria, rather than raw JavaScript blobs.
 - **For `/probe`:** Adopt this trace-based recording. Successful dialogue or movement sequences should be saved as JSON traces (`build/generated-skills/*.json`). Ignore replay functionality for now.
 
 ### Memory & Transcript Separation
@@ -36,6 +36,6 @@ Goals are defined with explicit `successCriteria` and `blockers`. State updates 
 2. **Rich Action Feedback:** Append post-action observations to movement and social tool results.
 3. **Anti-Repeat Loop:** Track action hashes and inject prompt warnings upon repeated failures.
 4. **Memory Layering:** Separate `working` notes from `episodic` events in the prompt context.
-5. **Trace-Based Skills:** Record successful sequences as JSON step traces, not code.
+5. **Trace-Based Action Skills:** Record successful sequences as JSON step traces, not code.
 6. **Minimal Goals:** Define scenarios via simple `successCriteria` and `blockers`, avoiding deep planners.
 7. **Defer Complexity:** Ignore vision models, subagents, and crafting trees for the initial headless proof.

@@ -12,6 +12,12 @@ function assertActorId(actorId: string) {
   }
 }
 
+/**
+ * Normalizes the active actor roster for probe runs.
+ *
+ * The bounds keep early runtime evidence readable: enough actors for mutual
+ * behavior, but not enough to hide single-bot competence failures in crowd noise.
+ */
 export function normalizeActorIds(actorIds?: readonly string[]) {
   const resolved = (actorIds && actorIds.length > 0 ? [...actorIds] : [...DEFAULT_ACTOR_IDS.slice(0, 2)])
     .map((actorId) => actorId.trim());
@@ -32,6 +38,8 @@ export function normalizeActorIds(actorIds?: readonly string[]) {
 }
 
 export function defaultActorRoles(actorIds: readonly string[]) {
+  // Role assignment is deterministic so action skill ownership and transcript
+  // review do not depend on provider output or object key ordering.
   return Object.fromEntries(
     normalizeActorIds(actorIds).map((actorId, index) => [
       actorId,

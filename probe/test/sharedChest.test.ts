@@ -71,7 +71,11 @@ test("inspectChest records observed contents into the shared storage ledger", as
 
   assert.deepEqual(result, {
     status: "inspected",
+    actorId: "npc_a",
+    roleId: "quartermaster",
     chestId: "shared-chest-1",
+    currentTask: "inspect shared storage",
+    ledgerSeq: 1,
     items: [
       { name: "oak_log", count: 5 },
       { name: "stick", count: 2 }
@@ -108,7 +112,11 @@ test("depositToSharedChest moves allowed items and records one ledger contributi
 
   assert.deepEqual(result, {
     status: "deposited",
+    actorId: "npc_a",
+    roleId: "gatherer",
     chestId: "shared-chest-1",
+    currentTask: "deposit logs",
+    ledgerSeq: 1,
     itemName: "oak_log",
     movedCount: 5
   });
@@ -143,6 +151,48 @@ test("depositToSharedChest blocks keep-items violations without mutating ledger 
   assert.equal(ledger.entries().length, 0);
 });
 
+test("depositToSharedChest blocks zero-move adapters without writing contribution evidence", async () => {
+  const ledger = createSharedStorageLedger();
+  const bulletin = createTeamBulletin();
+  const inventory = createInventoryStore({ oak_log: 4 });
+  const chest = {
+    chestId: "shared-chest-1",
+    async open() {
+      return {
+        items() {
+          return [];
+        },
+        deposit() {
+          return 0;
+        },
+        withdraw() {
+          return 0;
+        },
+        close() {}
+      };
+    }
+  };
+
+  const result = await depositToSharedChest({
+    actorId: "npc_a",
+    roleId: "gatherer",
+    chest,
+    inventory: {
+      items: inventory.items
+    },
+    ledger,
+    bulletin,
+    itemName: "oak_log",
+    count: 2,
+    currentTask: "deposit logs"
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.movedCount, 0);
+  assert.deepEqual(ledger.entries(), []);
+  assert.deepEqual(bulletin.snapshot(), []);
+});
+
 test("withdrawFromSharedChest lets a crafter take needed inputs and updates bulletin state", async () => {
   const ledger = createSharedStorageLedger();
   const bulletin = createTeamBulletin();
@@ -168,7 +218,11 @@ test("withdrawFromSharedChest lets a crafter take needed inputs and updates bull
 
   assert.deepEqual(result, {
     status: "withdrew",
+    actorId: "npc_b",
+    roleId: "crafter",
     chestId: "shared-chest-1",
+    currentTask: "craft planks and sticks",
+    ledgerSeq: 1,
     itemName: "oak_log",
     movedCount: 4,
     reason: "craft planks"

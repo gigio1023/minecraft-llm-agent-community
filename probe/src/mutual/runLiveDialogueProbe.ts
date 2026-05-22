@@ -1,11 +1,19 @@
 import { loadMutualProbeConfig } from "../config.js";
+import { defaultActorRoles } from "../runtime/actorRoster.js";
+import {
+  initializeActorWorkspaces,
+  listActiveActorActionSkillRecords
+} from "../runtime/actorWorkspace.js";
 import { createBots, closeBots } from "../runtime/createBots.js";
 import { createMemory } from "../runtime/memory.js";
+import { createProbeSession } from "../runtime/session/probeSession.js";
 import { finalizeRunProbe, type ProbeRunResult } from "../runProbe.js";
 import { startDockerServer, type ServerHandle } from "../server/dockerServer.js";
+import { assignSeedActionSkillOwnership } from "../skills/ownership.js";
 import { moveTo } from "../tools/moveTo.js";
 import { remember } from "../tools/remember.js";
 import { wait } from "../tools/wait.js";
+import { buildActorProviderContext } from "../provider/actorProviderContext.js";
 import {
   buildDialogueContext,
   buildDialoguePersonas,
@@ -21,11 +29,14 @@ import { createMutualTranscript } from "./transcript.js";
 import { executeMutualTool, allowedMutualTools } from "./tools/index.js";
 import type { ToolResult } from "./types.js";
 import { toToolResult } from "./tools/wrapper.js";
+import { writeProviderInputSnapshot } from "../provider/providerInputStore.js";
 
 
 
 const liveAllowedTools = allowedMutualTools.filter((tool) => tool !== "drop_item");
 
+// Live provider context must be JSON-safe because it is sent to the Responses
+// API and may also appear in trace metadata.
 function toDialogueJsonValue(value: unknown): import("./dialogueContext.js").DialogueJsonValue {
   if (
     value === null ||
@@ -84,6 +95,8 @@ function readTicksArg(args: Record<string, unknown>, fallbackTicks: number) {
 }
 
 function createRecentTranscript(runtimeState: ReturnType<typeof createMutualRuntimeState>) {
+  // Recent utterances give the provider short social continuity without handing
+  // it the whole transcript or mutable runtime state.
   return runtimeState.recentUtterances().map<DialogueTranscriptEntry>((entry) => ({
     actorId: entry.actorId,
     actorName: getDialoguePersona(entry.actorId).name,
@@ -120,9 +133,35 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     });
     const activeBots = bots;
     const actorIds = Object.keys(bots);
+    const actorRoles = defaultActorRoles(actorIds);
+    const seedActionSkillOwnership = assignSeedActionSkillOwnership(actorIds, actorRoles);
+    const session = createProbeSession({
+      bots: activeBots,
+      actorIds,
+      actorRoles,
+      seedActionSkillOwnership
+    });
+    if (config.actorWorkspace.initializeOnStart) {
+      await initializeActorWorkspaces({
+        rootDir: config.actorWorkspace.rootDir,
+        actors: session.actors,
+        seedActionSkillOwnership: session.seed_skill_ownership
+      });
+    }
+    const activeActionSkillsByActor = new Map(
+      await Promise.all(
+        actorIds.map(async (actorId) => [
+          actorId,
+          await listActiveActorActionSkillRecords(config.actorWorkspace.rootDir, actorId)
+        ] as const)
+      )
+    );
     const personas = buildDialoguePersonas(actorIds);
     const pair = actorIds.slice(0, 2) as MutualActorId[];
     const [actorA, actorB] = pair;
+    const providerTurnCounters = new Map<MutualActorId, number>(
+      pair.map((actorId) => [actorId, 0])
+    );
 
     if (!actorA || !actorB) {
       throw new Error("live mutual dialogue probe requires at least two NPCs");
@@ -146,7 +185,42 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
       bots: actorIds.map((actorId) => activeBots[actorId].username)
     });
 
+    // Delay before the first provider call lets both Mineflayer clients settle
+    // so early dialogue failures are not just login/spawn timing artifacts.
     await delay(config.liveDialogue.delayStartMs);
+
+    async function writeLiveProviderSnapshot(
+      actorId: MutualActorId,
+      input: import("./dialogueContext.js").DialogueJsonObject
+    ) {
+      const nextTurn = (providerTurnCounters.get(actorId) ?? 0) + 1;
+      providerTurnCounters.set(actorId, nextTurn);
+      const turnId = `turn-${String(nextTurn).padStart(4, "0")}`;
+
+      await writeProviderInputSnapshot(config.actorWorkspace.rootDir, {
+        schema: "provider-input-snapshot/v1",
+        snapshot_id: turnId,
+        actor_id: actorId,
+        turn_id: turnId,
+        provider_id: config.liveDialogue.providerId,
+        model: config.liveDialogue.model,
+        created_at: new Date().toISOString(),
+        input: input as import("../provider/inputSnapshot.js").JsonValue,
+        allowed_tools: [...liveAllowedTools],
+        active_action_skills: activeActionSkillsByActor
+          .get(actorId)
+          ?.map((record) => record.skill_id)
+      });
+    }
+
+    async function buildLiveActorProviderContext(actorId: MutualActorId) {
+      return await buildActorProviderContext({
+        actorWorkspaceRootDir: config.actorWorkspace.rootDir,
+        actorId,
+        activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
+        memory: memories[actorId].list()
+      }) as import("./dialogueContext.js").DialogueJsonObject;
+    }
 
     const final = await runMutualLoop({
       actors: {
@@ -156,36 +230,38 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
       providers: {
         [actorA]: {
           async next({ observation, lastResult }) {
-            return provider.next(
-              buildDialogueContext({
-                actorId: actorA,
-                allowedTools: [...liveAllowedTools],
-                persona: personas[actorA] ?? getDialoguePersona(actorA, 0),
-                observation: {
-                  ...observation,
-                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
-                },
-                memory: memories[actorA].list(),
-                recentTranscript: createRecentTranscript(runtimeState)
-              })
-            );
+            const input = buildDialogueContext({
+              actorId: actorA,
+              allowedTools: [...liveAllowedTools],
+              persona: personas[actorA] ?? getDialoguePersona(actorA, 0),
+              observation: {
+                ...observation,
+                ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
+              },
+              memory: memories[actorA].list(),
+              recentTranscript: createRecentTranscript(runtimeState),
+              actorProviderContext: await buildLiveActorProviderContext(actorA)
+            });
+            await writeLiveProviderSnapshot(actorA, input);
+            return provider.next(input);
           }
         },
         [actorB]: {
           async next({ observation, lastResult }) {
-            return provider.next(
-              buildDialogueContext({
-                actorId: actorB,
-                allowedTools: [...liveAllowedTools],
-                persona: personas[actorB] ?? getDialoguePersona(actorB, 1),
-                observation: {
-                  ...observation,
-                  ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
-                },
-                memory: memories[actorB].list(),
-                recentTranscript: createRecentTranscript(runtimeState)
-              })
-            );
+            const input = buildDialogueContext({
+              actorId: actorB,
+              allowedTools: [...liveAllowedTools],
+              persona: personas[actorB] ?? getDialoguePersona(actorB, 1),
+              observation: {
+                ...observation,
+                ...(lastResult ? { lastActionResult: toDialogueToolResult(lastResult) } : {})
+              },
+              memory: memories[actorB].list(),
+              recentTranscript: createRecentTranscript(runtimeState),
+              actorProviderContext: await buildLiveActorProviderContext(actorB)
+            });
+            await writeLiveProviderSnapshot(actorB, input);
+            return provider.next(input);
           }
         }
       },
@@ -214,6 +290,8 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
 
           runtimeState.recordObservation(actorId, observation);
 
+          // Social context is derived after the raw observation so provider
+          // input can include mailbox/bulletin state without mutating it.
           const socialContext = runtimeState.socialContext?.(actorId);
 
           return {
@@ -236,6 +314,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
             runtimeState,
             observation,
             transcript,
+            activeActionSkills: activeActionSkillsByActor.get(actorId) ?? [],
             handlers: {
               async observe_world() {
                 return {

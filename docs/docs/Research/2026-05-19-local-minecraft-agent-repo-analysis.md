@@ -30,15 +30,15 @@ The deeper issues are:
 - No curriculum layer chooses concrete, verifiable next tasks such as obtain
   logs, craft planks, craft a crafting table, make a wooden pickaxe, mine
   cobblestone, craft a furnace, or cook food.
-- No seed gameplay skill layer provides reliable Minecraft operations for
+- No seed gameplay action skill layer provides reliable Minecraft operations for
   gather, craft, smelt, equip, inspect chest, collect drops, and bounded
   exploration.
-- The existing seed skills are social/visibility primitives, not survival
+- The existing seed action skills are social/visibility primitives, not survival
   primitives.
 - The prompt asks for survival/social behavior before the runtime can verify
   survival progress.
 - The main runner is still too large. It mixes CLI, Docker, bot lifecycle,
-  provider calls, generated skill writing/importing, safety wrapping, memory,
+  provider calls, generated action skill writing/importing, safety wrapping, memory,
   observations, tracing, budget, and actor loops.
 - Multi-agent behavior has no task pressure. Personas cannot produce meaningful
   cooperation or competition unless agents need scarce resources, roles, shared
@@ -68,10 +68,10 @@ trusted primitives, current state, and execution feedback.
 
 ## Other Repo Findings
 
-`mc-multimodal-agent` separates the loop into tools, memory, goals, skills, and
+`mc-multimodal-agent` separates the loop into tools, memory, goals, action skills, and
 transcript stores. Its strongest lesson is post-action feedback: many action
 tool results are enriched with status, navigation, and fresh visual observation
-before the next model turn. It also records skills as scoped ordered tool steps
+before the next model turn. It also records action skills as scoped ordered tool steps
 with preconditions and success criteria, not just generated code blobs.
 
 `yearn_for_mines` makes the loop explicit as
@@ -82,8 +82,8 @@ inventory, points of interest, and recent events.
 
 `mineflayer-chatgpt` is useful for multi-bot control. It uses an event-driven
 brain instead of constant polling, a shared team bulletin, role-specific allowed
-actions/skills, recent failure blocking, a critic step after actions, and safety
-overrides for water/buried states. It includes builtin gameplay skills such as
+actions/action skills, recent failure blocking, a critic step after actions, and safety
+overrides for water/buried states. It includes builtin gameplay action skills such as
 build house/farm/bridge, craft gear, light area, strip mine, smelt ores,
 fishing, and stash setup.
 
@@ -91,7 +91,7 @@ fishing, and stash setup.
 parts are interruption/timeouts, concise action output summaries, inventory-aware
 crafting, smelting with furnace/fuel checks, world query helpers, auto-eat, and
 memory/history chunking. It is larger than this repo should become, but its
-skill/world helper split is worth copying in simplified TypeScript form.
+action-skill/world helper split is worth copying in simplified TypeScript form.
 
 ## Improvement Points
 
@@ -99,17 +99,17 @@ skill/world helper split is worth copying in simplified TypeScript form.
    The model should receive one concrete next task at a time, with a short reason
    and a machine-checkable success condition.
 
-2. Replace social seed skills with early-game survival seed skills.
+2. Replace social seed action skills with early-game survival seed action skills.
    Start with logs, planks/sticks, crafting table, wooden pickaxe, cobblestone,
    stone pickaxe, furnace, coal, raw iron smelting, chest inspection, dropped
    item collection, and safe bounded exploration.
 
 3. Keep generated TypeScript as an advanced layer, not the base layer.
-   Generated skills should compose trusted `ctx.gameplay.*` helpers. They should
+   Generated action skills should compose trusted `ctx.gameplay.*` helpers. They should
    not directly call raw Mineflayer APIs for common operations.
 
 4. Make each action result include post-action state.
-   Every gather/craft/smelt/move/explore/skill execution should return compact
+   Every gather/craft/smelt/move/explore/action-skill execution should return compact
    post-state: inventory diff, position diff, nearby resource changes, success
    criteria status, and any error cause.
 
@@ -124,7 +124,7 @@ skill/world helper split is worth copying in simplified TypeScript form.
 
 7. Split the current runner before adding more behavior.
    The present `skillVillageCli.ts` should become a thin entrypoint. Gameplay,
-   generated skills, observation, actor loops, provider calls, tracing, and
+   generated action skills, observation, actor loops, provider calls, tracing, and
    server lifecycle should live in separate directories.
 
 ## Proposed Directory Hierarchy
@@ -182,6 +182,6 @@ Do not continue by polishing persona prompts. Build this instead:
 2. Introduce `gameplay/curriculum` that selects one early-game task from current
    inventory/world state.
 3. Introduce `gameplay/verification` for task success checks.
-4. Port 8-12 Voyager-style seed skills in TypeScript using only the primitives.
+4. Port 8-12 Voyager-style seed action skills in TypeScript using only the primitives.
 5. Refactor `skillVillageCli.ts` into a thin CLI plus small modules before
    running another long NPC simulation.

@@ -9,10 +9,12 @@ export type RoleContract = {
   priorityList: string[];
 };
 
+// Role contracts are runtime permissions, not persona flavor. They gate which
+// primitives and shared-storage actions an actor can execute.
 const roleContracts: Record<RoleId, RoleContract> = {
   gatherer: {
     roleId: "gatherer",
-    allowedTools: ["observe", "collect_logs", "inspect_chest", "deposit_shared", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "collect_logs", "mine_block", "inspect_chest", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_log",
       "birch_log",
@@ -30,7 +32,8 @@ const roleContracts: Record<RoleId, RoleContract> = {
       "dark_oak_planks",
       "mangrove_planks",
       "cherry_planks",
-      "crafting_table"
+      "crafting_table",
+      "cobblestone"
     ],
     withdrawAllowedItemNames: [],
     keepItems: {
@@ -40,7 +43,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   crafter: {
     roleId: "crafter",
-    allowedTools: ["observe", "craft_item", "inspect_chest", "withdraw_shared", "deposit_shared", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "craft_item", "craft_with_table", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_planks",
       "birch_planks",
@@ -51,6 +54,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
       "mangrove_planks",
       "cherry_planks",
       "stick",
+      "wooden_pickaxe",
       "crafting_table"
     ],
     withdrawAllowedItemNames: [
@@ -79,7 +83,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   quartermaster: {
     roleId: "quartermaster",
-    allowedTools: ["observe", "inspect_chest", "deposit_shared", "withdraw_shared", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "inspect_chest", "deposit_shared", "withdraw_shared", "say", "wait", "remember"],
     depositAllowedItemNames: ["*"],
     withdrawAllowedItemNames: ["*"],
     keepItems: {
@@ -93,6 +97,7 @@ function allowsItem(allowedItemNames: readonly string[], itemName: string) {
   return allowedItemNames.includes("*") || allowedItemNames.includes(itemName);
 }
 
+/** Returns the immutable contract used for role-based primitive gating. */
 export function getRoleContract(roleId: RoleId): RoleContract {
   return roleContracts[roleId];
 }

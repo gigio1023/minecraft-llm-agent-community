@@ -23,9 +23,13 @@ export function createAgentThreadState(input: {
 
   return {
     beginTurn() {
+      // Thread turn is local to the actor. Multi-actor orchestration can advance
+      // actors independently without losing each actor's transcript order.
       turn += 1;
     },
     recordObservation(observation: Record<string, unknown>) {
+      // Store snapshots at the runtime boundary so later prompt formatting or
+      // tool-result enrichment cannot rewrite the evidence for this turn.
       lastObservation = structuredClone(observation);
     },
     recordResult(result: Record<string, unknown>) {
@@ -39,6 +43,8 @@ export function createAgentThreadState(input: {
       };
     },
     setActiveAction(action: string | null) {
+      // activeAction is a resumability/debug field, not proof of progress; the
+      // verifier still decides whether an action changed Minecraft state.
       activeAction = action;
     },
     updateWorkingMemory(patch: Record<string, unknown>) {
@@ -57,6 +63,8 @@ export function createAgentThreadState(input: {
       inboundMail.push(structuredClone(item));
     },
     snapshot() {
+      // Expose only cloned state. Checkpoint builders can compact this snapshot
+      // without taking ownership of the live thread object.
       return {
         threadId: input.threadId,
         agentId: input.agentId,

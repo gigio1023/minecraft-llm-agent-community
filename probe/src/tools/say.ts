@@ -7,9 +7,9 @@ type ChatActor = {
 };
 
 export type SayResult =
-  | { status: "busy"; reason: string }
-  | { status: "unavailable"; reason: string }
-  | { status: "delivered" };
+  | { status: "busy"; actorId: string; targetId: string; reason: string }
+  | { status: "unavailable"; actorId: string; targetId: string; reason: string }
+  | { status: "delivered"; actorId: string; targetId: string; text: string };
 
 type SayArgs = {
   actor: ChatActor;
@@ -18,6 +18,12 @@ type SayArgs = {
   text: string;
 };
 
+/**
+ * Sends directed chat only after runtime dialogue availability allows it.
+ *
+ * The busy/unavailable result is returned as evidence so the loop can wait or
+ * stop instead of pretending a social action happened.
+ */
 export async function say({
   actor,
   target,
@@ -27,10 +33,19 @@ export async function say({
   const talkResult = dialogueState.requestTalk(actor.username, target.username);
 
   if (talkResult.status !== "available") {
-    return talkResult;
+    return {
+      ...talkResult,
+      actorId: actor.username,
+      targetId: target.username
+    };
   }
 
   actor.chat(text);
 
-  return { status: "delivered" };
+  return {
+    status: "delivered",
+    actorId: actor.username,
+    targetId: target.username,
+    text
+  };
 }

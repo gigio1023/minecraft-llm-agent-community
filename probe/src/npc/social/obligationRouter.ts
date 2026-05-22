@@ -2,14 +2,6 @@ import type { PressureKind, PressureRecord } from "../../runtime/pressureIntent.
 import type { BulletinEntry } from "./teamBulletin.js";
 import type { MailItem } from "../../runtime/mailbox/turnPhasedMailbox.js";
 
-// ---------------------------------------------------------------------------
-// Obligation Router
-// ---------------------------------------------------------------------------
-// Converts bulletin entries and mailbox items into social pressure records.
-// This makes social coordination emerge from material pressure, not from
-// prompt engineering (SPEC §5C).
-// ---------------------------------------------------------------------------
-
 type ObligationRouterInput = {
   actorId: string;
   roleId: string;
@@ -28,6 +20,13 @@ function nextObligationPressureId() {
   return `obligation-pressure-${obligationPressureCounter}`;
 }
 
+/**
+ * Converts public social artifacts into runtime pressure records.
+ *
+ * The router deliberately reads bulletin, mailbox, and shared-storage facts
+ * instead of persona text, so coordination pressure stays tied to material
+ * evidence that can be reviewed from transcripts.
+ */
 export function routeObligationPressures({
   actorId,
   roleId,
@@ -38,7 +37,6 @@ export function routeObligationPressures({
 }: ObligationRouterInput): PressureRecord[] {
   const pressures: PressureRecord[] = [];
 
-  // Blocked teammate detection
   for (const entry of bulletinEntries) {
     if (entry.currentBlocker && entry.actorId !== actorId) {
       const isRelevantToMe = isRoleRelevantToBlocker(roleId, entry.currentBlocker);
@@ -64,7 +62,6 @@ export function routeObligationPressures({
       }
     }
 
-    // Resource needs from teammates
     if (entry.resourceNeeds && entry.resourceNeeds.length > 0 && entry.actorId !== actorId) {
       pressures.push({
         id: nextObligationPressureId(),
@@ -86,7 +83,8 @@ export function routeObligationPressures({
     }
   }
 
-  // Pending mail pressures
+  // Mail becomes conversation pressure only when it is addressed to this actor;
+  // warning mail is handled as hostile pressure elsewhere.
   const unacknowledgedMail = pendingMail.filter(
     (mail) => mail.to === actorId && mail.kind !== "warning"
   );
@@ -110,7 +108,6 @@ export function routeObligationPressures({
     });
   }
 
-  // Shared chest shortage detection
   if (sharedChestItems) {
     const totalItems = sharedChestItems.reduce(
       (sum, item) => sum + item.count,
@@ -138,10 +135,6 @@ export function routeObligationPressures({
 
   return pressures;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function isRoleRelevantToBlocker(roleId: string, blocker: string): boolean {
   const blockerLower = blocker.toLowerCase();

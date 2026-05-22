@@ -1,5 +1,6 @@
 import type { ToolResult } from "../mutual/types.js";
 import type { DeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
+import type { JsonValue } from "./inputSnapshot.js";
 
 type Proposal = {
   tool: string;
@@ -17,6 +18,12 @@ type NextInput = {
   };
   lastResult: ToolResult | null;
   currentTask?: DeterministicTask | null;
+  goalStack?: JsonValue;
+  activeActionSkillContext?: {
+    activeSkillIds: string[];
+    allowedPrimitives: string[];
+  };
+  actorProviderContext?: JsonValue;
 };
 
 function readVisibleTargetId(input: NextInput) {
@@ -40,8 +47,29 @@ const PLANK_ITEM_NAMES = [
   "cherry_planks"
 ] as const;
 
+const SHARED_DEPOSIT_ITEM_PREFERENCE = [
+  "crafting_table",
+  "oak_log",
+  "birch_log",
+  "spruce_log",
+  "jungle_log",
+  "acacia_log",
+  "dark_oak_log",
+  "mangrove_log",
+  "cherry_log",
+  ...PLANK_ITEM_NAMES
+] as const;
+
 function hasNoToolResult(input: NextInput) {
   return input.lastResult === null;
+}
+
+function readPreferredDepositItem(input: NextInput) {
+  const inventory = input.observation?.inventory ?? [];
+
+  return SHARED_DEPOSIT_ITEM_PREFERENCE.find((itemName) =>
+    inventory.some((item) => item.name === itemName && item.count > 0)
+  ) ?? "crafting_table";
 }
 
 export function createDeterministicProvider() {
@@ -58,6 +86,8 @@ export function createDeterministicProvider() {
       }
 
       if (input.currentTask?.id === "collect_4_logs") {
+        // Deterministic mode is deliberately boring: repeat the owned primitive
+        // until runtime evidence either verifies progress or records a blocker.
         if (lastResult.tool === "collect_logs" && lastResult.status === "blocked") {
           return {
             tool: "remember",
@@ -76,6 +106,8 @@ export function createDeterministicProvider() {
           };
         }
 
+        // Inventory observation drives the next craft step; the provider does
+        // not assume that a previous craft result changed state.
         if (countItems(input.observation, PLANK_ITEM_NAMES) < 4) {
           return {
             tool: "craft_item",
@@ -115,7 +147,7 @@ export function createDeterministicProvider() {
           tool: "deposit_shared",
           args: {
             chestId: input.currentTask.success.chestId,
-            itemName: "crafting_table",
+            itemName: readPreferredDepositItem(input),
             count: 1
           }
         };
@@ -145,6 +177,13 @@ export function createDeterministicProvider() {
         };
       }
 
+      if (lastResult.tool === "collect_logs") {
+        return {
+          tool: "remember",
+          args: { note: "collect_4_logs completed with runtime inventory evidence" }
+        };
+      }
+
       if (lastResult.tool === "craft_item") {
         return {
           tool: "remember",
@@ -155,6 +194,8 @@ export function createDeterministicProvider() {
       if (lastResult.tool === "observe") {
         const targetId = readVisibleTargetId(input);
 
+        // No visible actor is a real terminal observation for this social probe,
+        // not a reason to wander and invent social progress.
         if (!targetId) {
           return {
             tool: "remember",

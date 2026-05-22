@@ -2,34 +2,72 @@ import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
-import HomepageFeatures from '@site/src/components/HomepageFeatures';
-
 import Heading from '@theme/Heading';
 import styles from './index.module.css';
 
-function HomepageHeader() {
-  const {siteConfig} = useDocusaurusContext();
+const links = [
+  {
+    title: 'Overview',
+    text: 'What this probe is trying to prove.',
+    to: '/docs/intro',
+  },
+  {
+    title: 'Run the probe',
+    text: 'Start the local Minecraft server and Mineflayer actor.',
+    to: '/docs/Setup/Headless-Server',
+  },
+  {
+    title: 'Runtime loop',
+    text: 'How turns become verified artifacts.',
+    to: '/docs/Architecture/Runtime-Loop-And-Verification',
+  },
+];
+
+function HomePage() {
   return (
-    <header className={clsx('hero', styles.heroBanner)}>
-      <div className="container">
-        <Heading as="h1" className={styles.hero__title}>
-          {siteConfig.title}
-        </Heading>
-        <p className={styles.hero__subtitle}>{siteConfig.tagline}</p>
-        <div className={styles.buttons}>
-          <Link
-            className="button button--primary button--lg"
-            to="/docs/Architecture/SPEC">
-            Read the Specs
-          </Link>
-          <Link
-            className="button button--secondary button--lg"
-            to="/blog">
-            Read the Blog
-          </Link>
+    <>
+      <section className={styles.hero}>
+        <div className={styles.imageLayer} aria-hidden="true" />
+        <div className={styles.gridLayer} aria-hidden="true" />
+        <div className={clsx('container', styles.heroInner)}>
+          <p className={styles.eyebrow}>Mineflayer · TypeScript · LLM agents</p>
+          <Heading as="h1" className={styles.title}>
+            <span className={styles.desktopTitle}>minecraft-llm-agent-community</span>
+            <span className={styles.mobileTitle}>
+              Minecraft LLM
+              <br />
+              agents.
+            </span>
+          </Heading>
+          <p className={styles.lead}>
+            A headless Minecraft probe for bounded agent actions, truthful
+            transcripts, and evidence you can inspect after the run.
+          </p>
+          <div className={styles.actions}>
+            <Link className={styles.primaryAction} to="/docs/intro">
+              Read overview
+            </Link>
+            <Link className={styles.secondaryAction} to="/docs/Setup/Headless-Server">
+              Run locally
+            </Link>
+          </div>
         </div>
-      </div>
-    </header>
+        <div className={styles.scrollHint} aria-hidden="true">
+          Current build
+        </div>
+      </section>
+
+      <section className={styles.linkSection}>
+        <div className={clsx('container', styles.linkGrid)}>
+          {links.map((item) => (
+            <Link className={styles.linkCard} to={item.to} key={item.title}>
+              <span>{item.title}</span>
+              <p>{item.text}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -37,12 +75,9 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`Welcome to ${siteConfig.title}`}
-      description="Documentation and updates for the minecraft-llm-agent-community headless probe migration.">
-      <HomepageHeader />
-      <main>
-        <HomepageFeatures />
-      </main>
+      title={siteConfig.title}
+      description="A bounded Minecraft LLM-agent probe built on Mineflayer, transcripts, and runtime-owned verification.">
+      <HomePage />
     </Layout>
   );
 }

@@ -1,3 +1,4 @@
+/** Returns a short, transcript-safe summary of generated action skill output. */
 export function summarizeResult(result: unknown) {
   if (result === undefined) {
     return "undefined";

@@ -11,6 +11,14 @@ const sidebars = {
       items: [
         'Architecture/SPEC',
         'Architecture/Minimal-Probe',
+        'Architecture/Runtime-Loop-And-Verification',
+        'Architecture/Transcript-And-Runtime-Artifacts',
+        'Architecture/Actor-Workspace-And-Action-Skill-Memory',
+        'Architecture/Async-Reviewer-Sidecars',
+        'Architecture/Implementation-Workstreams',
+        'Architecture/Bounded-Action-Skill-Creation',
+        'Architecture/LLM-Context-And-Actor-Workspace',
+        'Architecture/Social-Actor-Profiles-And-Relationships',
       ],
     },
     {

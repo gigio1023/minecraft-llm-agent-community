@@ -1,32 +1,37 @@
 import type { ToolResult } from "../types.js";
+import {
+  runAction,
+  type ActionTimeoutPolicy
+} from "../../runtime/actions/actionRunner.js";
 
 type WrapperOptions = {
   tool: string;
+  timeoutMs?: number;
+  timeoutPolicy?: ActionTimeoutPolicy;
   postObserve?: () => Promise<unknown> | unknown;
 };
 
 export async function withActionWrapper(
-  actionFn: () => Promise<unknown> | unknown,
+  actionFn: (signal: AbortSignal) => Promise<unknown> | unknown,
   options: WrapperOptions
 ): Promise<ToolResult> {
-  const startTime = Date.now();
-  
-  const timeoutMs = 5000;
-  
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      reject(new Error(`Tool execution timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-
   let actionResult: unknown;
   let ok = false;
   let status = "unknown";
   let message: string | undefined;
 
-  try {
-    actionResult = await Promise.race([actionFn(), timeoutPromise]);
-    
+  const runnerResult = await runAction({
+    tool: options.tool,
+    action: actionFn,
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+    ...(options.timeoutPolicy ? { timeoutPolicy: options.timeoutPolicy } : {})
+  });
+
+  actionResult = runnerResult.value ?? {};
+
+  // Tool implementations can return rich domain statuses such as `busy` or
+  // `blocked`; the wrapper normalizes them without erasing action-specific data.
+  if (runnerResult.status === "completed") {
     if (typeof actionResult === "object" && actionResult !== null) {
       if ("status" in actionResult) {
         status = String(actionResult.status);
@@ -43,15 +48,13 @@ export async function withActionWrapper(
       ok = true;
       status = "done";
     }
-  } catch (error) {
+  } else {
     ok = false;
-    status = "failed";
-    message = error instanceof Error ? error.message : String(error);
+    status = runnerResult.status;
+    message = runnerResult.message;
     actionResult = {};
   }
 
-  const durationMs = Date.now() - startTime;
-  
   let observation: unknown;
   
   const requiresPostObserve = [
@@ -62,7 +65,8 @@ export async function withActionWrapper(
     try {
       observation = await options.postObserve();
     } catch (error) {
-      // Ignore postObserve errors or log them?
+      // Post-observation improves evidence, but it must not convert a completed
+      // action into a failure when the underlying primitive already returned.
     }
   }
 
@@ -73,11 +77,16 @@ export async function withActionWrapper(
     status,
     ...(message ? { message } : {}),
     ...(observation !== undefined ? { observation } : {}),
-    durationMs,
+    durationMs: runnerResult.durationMs,
+    timeoutMs: runnerResult.timeoutMs,
+    timedOut: runnerResult.timedOut,
+    cancelled: runnerResult.cancelled
   };
 }
 
 export function toToolResult(value: unknown, fallbackTool: string): ToolResult {
+  // Live and deterministic paths both feed lastResult back to providers, so the
+  // fallback keeps unknown values transcript-safe instead of passing raw output.
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
     const tool = typeof record.tool === "string" ? record.tool : fallbackTool;

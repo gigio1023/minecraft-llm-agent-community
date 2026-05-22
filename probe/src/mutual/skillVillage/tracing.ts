@@ -16,6 +16,8 @@ function tracingEnabled() {
 }
 
 function ensureLangfuseEnv() {
+  // Local defaults keep trace wiring testable without requiring shared secrets.
+  // Production-like runs should override these via environment variables.
   process.env.LANGFUSE_PUBLIC_KEY ??= localDefaults.publicKey;
   process.env.LANGFUSE_SECRET_KEY ??= localDefaults.secretKey;
   process.env.LANGFUSE_BASE_URL ??= localDefaults.baseUrl;
@@ -43,6 +45,8 @@ export async function traceGeneration<T>(
     return run();
   }
 
+  // Langfuse traces provider behavior only. Minecraft progress still has to be
+  // corroborated by transcript/world artifacts.
   return propagateAttributes(
     {
       sessionId,

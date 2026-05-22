@@ -1,5 +1,7 @@
 export type MutualActorId = string;
 
+// Acceptance categories are evidence buckets for the mutual probe. A category
+// passes only when transcript steps show the relevant causal behavior.
 export type InteractionCategory =
   | "conversationTurnState"
   | "spatialAttentionApproach"
@@ -24,6 +26,8 @@ export type Proposal = {
   why?: string;
 };
 
+// ToolResult is deliberately open-ended because each primitive can attach
+// domain evidence, while the common fields keep wrapper/transcript code stable.
 export type ToolResultStatus = "done" | "blocked" | "invalid" | "unavailable" | "transient" | "failed" | string;
 
 export type ToolResult = {
@@ -36,6 +40,12 @@ export type ToolResult = {
   [key: string]: unknown;
 };
 
+/**
+ * One causal mutual-interaction transcript step.
+ *
+ * Optional fields let deterministic and live probes share the same artifact
+ * shape while still recording only evidence that actually exists for a turn.
+ */
 export type MutualStepRecord = {
   category?: InteractionCategory;
   actor?: string;

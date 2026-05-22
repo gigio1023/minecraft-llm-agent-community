@@ -1,4 +1,5 @@
 import type { Vec3 } from "vec3";
+import { goals } from "mineflayer-pathfinder";
 import type { ItemStack } from "../gameplay/storage/sharedStorageLedger.js";
 
 type InventoryItem = {
@@ -17,6 +18,7 @@ type SharedChestWindow = {
 
 type ChestBlock = {
   name: string;
+  position?: Vec3;
 };
 
 type SharedChestBot = {
@@ -26,6 +28,15 @@ type SharedChestBot = {
     count: number;
   }) => unknown;
   openChest?: (block: any, direction?: number, cursorPos?: Vec3) => Promise<SharedChestWindow>;
+  entity?: {
+    position: {
+      distanceTo(other: { x: number; y: number; z: number }): number;
+    };
+  };
+  pathfinder?: {
+    goto(goal: unknown): Promise<void>;
+    stop?(): void;
+  };
   inventory?: {
     items(): InventoryItem[];
   };
@@ -37,6 +48,8 @@ type SharedChestBot = {
 type CreateMineflayerSharedChestAccessorOptions = {
   chestId?: string;
   maxDistance?: number;
+  openDistance?: number;
+  moveTimeoutMs?: number;
 };
 
 function snapshotItems(items: InventoryItem[]): ItemStack[] {
@@ -47,6 +60,8 @@ function snapshotItems(items: InventoryItem[]): ItemStack[] {
 }
 
 function findSharedChestBlock(bot: SharedChestBot, maxDistance: number) {
+  // The first live storage boundary is intentionally simple: one nearby normal
+  // or trapped chest acts as the shared stash until chest registration exists.
   return bot.findBlock?.({
     matching(block) {
       return block.name === "chest" || block.name === "trapped_chest";
@@ -61,12 +76,66 @@ function readItemType(bot: SharedChestBot, item: InventoryItem) {
     return item.type;
   }
 
+  // Some Mineflayer item stacks from windows omit `type`; registry lookup keeps
+  // storage transfer code version-tolerant without hard-coding numeric ids.
   return bot.registry?.itemsByName?.[item.name]?.id;
+}
+
+async function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          onTimeout();
+          reject(new Error(`shared chest pathfinder timeout after ${timeoutMs}ms`));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+async function moveNearSharedChest(
+  bot: SharedChestBot,
+  block: ChestBlock,
+  openDistance: number,
+  moveTimeoutMs: number
+) {
+  if (!block.position || !bot.entity || !bot.pathfinder) {
+    return;
+  }
+
+  const distance = bot.entity.position.distanceTo(block.position);
+  if (distance <= openDistance) {
+    return;
+  }
+
+  // Opening a chest is an embodied Mineflayer action, not a pure read. Move
+  // into interaction range first so storage action skills are atomic at the
+  // primitive boundary instead of timing out on a distant windowOpen event.
+  await raceWithTimeout(
+    bot.pathfinder.goto(
+      new goals.GoalNear(block.position.x, block.position.y, block.position.z, Math.max(1, Math.floor(openDistance)))
+    ),
+    moveTimeoutMs,
+    () => bot.pathfinder?.stop?.()
+  );
 }
 
 export function createMineflayerSharedChestAccessor(
   bot: SharedChestBot,
-  { chestId = "shared-chest-1", maxDistance = 12 }: CreateMineflayerSharedChestAccessorOptions = {}
+  {
+    chestId = "shared-chest-1",
+    maxDistance = 12,
+    openDistance = 2.5,
+    moveTimeoutMs = 8_000
+  }: CreateMineflayerSharedChestAccessorOptions = {}
 ) {
   return {
     chestId,
@@ -74,12 +143,17 @@ export function createMineflayerSharedChestAccessor(
       const block = findSharedChestBlock(bot, maxDistance);
 
       if (!block || !bot.openChest) {
+        // Observation should stay non-fatal when a chest is absent; mutating
+        // actions below throw because they need an explicit runtime boundary.
         return null;
       }
 
+      await moveNearSharedChest(bot, block as ChestBlock, openDistance, moveTimeoutMs);
       const chest = await bot.openChest(block);
 
       try {
+        // Return a value snapshot, not the live window contents, so transcript
+        // observations cannot change after the chest window is closed.
         return snapshotItems(chest.containerItems());
       } finally {
         chest.close();
@@ -92,6 +166,7 @@ export function createMineflayerSharedChestAccessor(
         throw new Error("shared chest is not available nearby");
       }
 
+      await moveNearSharedChest(bot, block as ChestBlock, openDistance, moveTimeoutMs);
       const chest = await bot.openChest(block);
 
       return {
@@ -103,6 +178,9 @@ export function createMineflayerSharedChestAccessor(
           const itemType = inventoryItem ? readItemType(bot, inventoryItem) : undefined;
 
           if (!inventoryItem || itemType === undefined) {
+            // Deposit is allowed to no-op when the actor lacks the item; policy
+            // checks happen before this adapter and ledger evidence records the
+            // actual moved count.
             return 0;
           }
 
@@ -115,6 +193,8 @@ export function createMineflayerSharedChestAccessor(
           const itemType = chestItem ? readItemType(bot, chestItem) : undefined;
 
           if (!chestItem || itemType === undefined) {
+            // Missing chest contents are not fatal at the adapter layer. The
+            // caller converts zero movement into a blocked storage action.
             return 0;
           }
 

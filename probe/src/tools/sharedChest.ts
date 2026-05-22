@@ -71,6 +71,8 @@ async function usingChest<T>(chest: SharedChestAccessor, run: (container: Shared
   try {
     return await run(container);
   } finally {
+    // Mineflayer chest windows are live container handles. Always close them
+    // after the primitive so later storage actions do not inherit UI state.
     await container.close();
   }
 }
@@ -99,6 +101,8 @@ export async function inspectChest(input: {
   });
 
   input.bulletin.update({
+    // The bulletin is intentionally derived from the ledger sequence so social
+    // state can point back to the same transcript-visible storage event.
     actorId: input.actorId,
     roleId: input.roleId,
     chestId: input.chest.chestId,
@@ -109,7 +113,11 @@ export async function inspectChest(input: {
 
   return {
     status: "inspected",
+    actorId: input.actorId,
+    roleId: input.roleId,
     chestId: input.chest.chestId,
+    currentTask: input.currentTask,
+    ledgerSeq: ledgerEntry.seq,
     items
   };
 }
@@ -138,6 +146,8 @@ export async function depositToSharedChest(input: {
   const beforeInventory = snapshotItems(input.inventory.items());
   const personalCount = countItems(beforeInventory, input.itemName);
   const reserve = readKeepItemCount(input.roleId, input.itemName);
+  // Shared storage pressure must not drain the actor below its role-owned
+  // personal reserve.
   const movableCount = Math.min(input.count, Math.max(0, personalCount - reserve));
 
   if (movableCount <= 0) {
@@ -158,11 +168,25 @@ export async function depositToSharedChest(input: {
       beforeChest,
       afterChest,
       movedCount:
+        // Live Mineflayer adapters return a moved count, while test/storage
+        // doubles may only expose before/after snapshots. Both paths must feed
+        // the ledger with the same semantic "actual moved" value.
         typeof depositResult === "number"
           ? depositResult
           : countItems(afterChest, input.itemName) - countItems(beforeChest, input.itemName)
     };
   });
+
+  if (transfer.movedCount <= 0) {
+    return {
+      status: "blocked",
+      chestId: input.chest.chestId,
+      itemName: input.itemName,
+      movedCount: 0,
+      message: `${input.itemName} was not moved into shared storage`
+    };
+  }
+
   const afterInventory = snapshotItems(input.inventory.items());
   const ledgerEntry = input.ledger.recordDeposit({
     actorId: input.actorId,
@@ -186,7 +210,11 @@ export async function depositToSharedChest(input: {
 
   return {
     status: "deposited",
+    actorId: input.actorId,
+    roleId: input.roleId,
     chestId: input.chest.chestId,
+    currentTask: input.currentTask,
+    ledgerSeq: ledgerEntry.seq,
     itemName: input.itemName,
     movedCount: transfer.movedCount
   };
@@ -221,6 +249,8 @@ export async function withdrawFromSharedChest(input: {
     const requestedCount = Math.min(input.count, availableCount);
 
     if (requestedCount <= 0) {
+      // A no-op withdrawal is blocked before ledger write; otherwise transcript
+      // consumers would see a storage event that did not change shared state.
       return {
         beforeChest,
         afterChest: beforeChest,
@@ -234,6 +264,8 @@ export async function withdrawFromSharedChest(input: {
       beforeChest,
       afterChest,
       movedCount:
+        // As with deposits, prefer adapter-reported movement but preserve a
+        // snapshot-delta fallback for deterministic tests and offline ledgers.
         typeof withdrawResult === "number"
           ? withdrawResult
           : countItems(beforeChest, input.itemName) - countItems(afterChest, input.itemName)
@@ -275,7 +307,11 @@ export async function withdrawFromSharedChest(input: {
 
   return {
     status: "withdrew",
+    actorId: input.actorId,
+    roleId: input.roleId,
     chestId: input.chest.chestId,
+    currentTask: input.currentTask,
+    ledgerSeq: ledgerEntry.seq,
     itemName: input.itemName,
     movedCount: transfer.movedCount,
     reason: input.reason

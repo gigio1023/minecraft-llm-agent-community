@@ -35,6 +35,7 @@ const PLANK_ITEM_NAMES = [
 export type DeterministicCurriculumState = {
   visibleActors: VisibleActor[];
   inventory?: InventoryItem[];
+  nearbyBlocks?: Array<{ name: string; distance: number }>;
   sharedChest?: {
     chestId: string;
     items: InventoryItem[];
@@ -92,6 +93,24 @@ type CraftCraftingTableTask = {
   success: InventoryGoal;
 };
 
+type CraftWoodenPickaxeTask = {
+  id: "craft_wooden_pickaxe";
+  reason: string;
+  blockers: string[];
+  preferredActorRoles: string[];
+  primitiveIds: RuntimePrimitiveId[];
+  success: InventoryGoal;
+};
+
+type MineCobblestoneTask = {
+  id: "mine_cobblestone";
+  reason: string;
+  blockers: string[];
+  preferredActorRoles: string[];
+  primitiveIds: RuntimePrimitiveId[];
+  success: InventoryGoal;
+};
+
 type DepositSharedMaterialsTask = {
   id: "deposit_shared_materials";
   reason: string;
@@ -111,6 +130,8 @@ export type DeterministicTask =
   | CollectLogsTask
   | CraftPlanksAndSticksTask
   | CraftCraftingTableTask
+  | CraftWoodenPickaxeTask
+  | MineCobblestoneTask
   | DepositSharedMaterialsTask;
 
 const APPROACH_DISTANCE = 1.5;
@@ -131,17 +152,25 @@ export function selectDeterministicTask(
 ): DeterministicTask | null {
   const completedTaskIds = new Set(state.completedTaskIds ?? []);
 
+  // Inventory observations anchor boring competence; social approach is only a
+  // fallback when the runtime cannot currently prove an early-game material task.
   if (state.inventory) {
     const logCount = countItems(state.inventory, LOG_ITEM_NAMES);
     const plankCount = countItems(state.inventory, PLANK_ITEM_NAMES);
     const stickCount = countItems(state.inventory, ["stick"]);
     const craftingTableCount = countItems(state.inventory, ["crafting_table"]);
+    const woodenPickaxeCount = countItems(state.inventory, ["wooden_pickaxe"]);
+    const cobblestoneCount = countItems(state.inventory, ["cobblestone"]);
+    const nearbyCraftingTableCount =
+      state.nearbyBlocks?.filter((block) => block.name === "crafting_table").length ?? 0;
     const sharedChestResourceCount = countItems(state.sharedChest?.items, [
       ...LOG_ITEM_NAMES,
       ...PLANK_ITEM_NAMES,
       "crafting_table"
     ]);
 
+    // Shared storage visibility comes before local crafting so later actors can
+    // reason from a public artifact instead of another actor's private inventory.
     if (
       state.sharedChest &&
       (logCount > 0 || plankCount > 0 || craftingTableCount > 0) &&
@@ -162,7 +191,49 @@ export function selectDeterministicTask(
       };
     }
 
+    if (cobblestoneCount >= 1 || completedTaskIds.has("mine_cobblestone")) {
+      return null;
+    }
+
+    if (woodenPickaxeCount >= 1) {
+      return {
+        id: "mine_cobblestone",
+        reason: "Need cobblestone from a real mined stone block before stone-tool progression.",
+        blockers: [],
+        preferredActorRoles: ["gatherer"],
+        primitiveIds: ["observe", "mine_block", "wait"],
+        success: {
+          kind: "inventory_at_least",
+          itemNames: ["cobblestone"],
+          targetCount: 1
+        }
+      };
+    }
+
+    if (
+      (craftingTableCount >= 1 || completedTaskIds.has("craft_crafting_table") || nearbyCraftingTableCount > 0) &&
+      nearbyCraftingTableCount > 0 &&
+      plankCount >= 3 &&
+      stickCount >= 2
+    ) {
+      return {
+        id: "craft_wooden_pickaxe",
+        reason: "Need a first table-crafted tool before mining stone.",
+        blockers: [],
+        preferredActorRoles: ["crafter"],
+        primitiveIds: ["observe", "craft_with_table", "wait"],
+        success: {
+          kind: "inventory_at_least",
+          itemNames: ["wooden_pickaxe"],
+          targetCount: 1
+        }
+      };
+    }
+
     if (craftingTableCount >= 1 || completedTaskIds.has("craft_crafting_table")) {
+      // The actor has a crafting table item, but placing/finding a table block
+      // remains a separate primitive boundary. Do not claim tool progression
+      // until the runtime can observe a nearby table block.
       return null;
     }
 
@@ -199,6 +270,9 @@ export function selectDeterministicTask(
     }
 
     if (completedTaskIds.has("craft_planks_and_sticks")) {
+      // Completed ids are a fallback for cases where inventory observation is
+      // temporarily narrow after reconnect or pickup lag. They should advance
+      // the chain, but verification still owns the pass/fail decision.
       return {
         id: "craft_crafting_table",
         reason: "Need a crafting table to unlock the next progression layer.",
@@ -271,6 +345,9 @@ export function selectDeterministicTask(
     return null;
   }
 
+  // Social movement remains a fallback task. It keeps the loop doing observable
+  // work when inventory evidence is missing, but it is not the primary proof of
+  // Minecraft competence.
   return {
     id: "approach_visible_target",
     reason: `Need to close distance to ${nearestActor.id} before the next interaction.`,

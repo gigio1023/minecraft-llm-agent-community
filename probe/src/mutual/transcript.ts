@@ -12,6 +12,12 @@ function snapshot<T>(value: T): T {
   return structuredClone(value);
 }
 
+/**
+ * Persists the mutual probe transcript as a single reviewable JSON artifact.
+ *
+ * Steps are cloned at record time so later runtime-state mutation cannot rewrite
+ * the causal chain that the acceptance categories are based on.
+ */
 export function createMutualTranscript({
   evidenceDir,
   probeId,
@@ -32,6 +38,8 @@ export function createMutualTranscript({
       const outputPath = path.join(evidenceDir, `${probeId}-${Date.now()}.json`);
       const categories = maybeFinal ? snapshot(categoriesOrFinal as MutualCategories) : undefined;
       const final = maybeFinal ? maybeFinal : (categoriesOrFinal as TranscriptFinal);
+      // The writer supports both older "final only" probes and newer
+      // category-plus-final probes so historical artifacts remain comparable.
       const payload = {
         probe: probeId,
         ...(transcriptBots ? { bots: transcriptBots } : {}),

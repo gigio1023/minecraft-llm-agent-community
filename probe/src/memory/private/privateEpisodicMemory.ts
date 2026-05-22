@@ -1,3 +1,9 @@
+/**
+ * Maintains a bounded private memory tail for one actor.
+ *
+ * This is intentionally append-only and shallow: richer summarization belongs in
+ * checkpoint/memory extraction paths, not in the hot gameplay loop.
+ */
 export function createPrivateEpisodicMemory(limit = 8) {
   const events: string[] = [];
 

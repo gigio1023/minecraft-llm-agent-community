@@ -8,7 +8,7 @@ Goal: Extract usable concepts for our small headless Minecraft NPC tool-loop (`/
 Voyager's strength is its observation pipeline and failure feedback loop. However, its core execution model—where the LLM generates raw JavaScript and runs it via `eval()`—is completely unacceptable for our repo's safety and design principles. We must own the execution via strict tool schemas and runtime validation.
 
 - **What we keep:** Compressing Minecraft state into practical text observations, feeding failure reasons back as the next LLM input, and simple sequential curriculums.
-- **What we discard:** LLM-generated JavaScript, `eval()` runtimes, and the Chroma-based generated skill database.
+- **What we discard:** LLM-generated JavaScript, `eval()` runtimes, and the Chroma-based generated action skill database.
 
 ## Prompts & Curriculum
 

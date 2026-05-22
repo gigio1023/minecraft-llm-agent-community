@@ -19,6 +19,7 @@ import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 import { converse } from "../src/mutual/tools/converse.js";
 import { dropItem } from "../src/mutual/tools/dropItem.js";
 import {
+  createMutualTools,
   executeMutualTool,
   validateMutualProposal
 } from "../src/mutual/tools/index.js";
@@ -27,7 +28,12 @@ import { replyTo } from "../src/mutual/tools/replyTo.js";
 import type { MutualJsonValue, MutualStepRecord, Proposal, ToolResult } from "../src/mutual/types.js";
 import { runMutualLoop } from "../src/mutual/mutualLoop.js";
 import { toToolResult } from "../src/mutual/tools/wrapper.js";
-import { finalizeRunProbe } from "../src/runProbe.js";
+import {
+  buildManagedProbeBaselineRconCommands,
+  buildManagedSpawnRconPlan,
+  finalizeRunProbe
+} from "../src/runProbe.js";
+import { readManualMinecraftPort } from "../src/server/manualMinecraftPort.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -37,6 +43,10 @@ import { observe } from "../src/tools/observe.js";
 import { remember } from "../src/tools/remember.js";
 import { say } from "../src/tools/say.js";
 import { wait } from "../src/tools/wait.js";
+import {
+  runtimeControlActionSkill,
+  testActionSkillRecord
+} from "./helpers/actionSkillRecords.js";
 
 function createPosition(x: number, y = 0, z = 0) {
   return {
@@ -180,6 +190,7 @@ function createPathfindingBot(username: string, x: number) {
       throw new Error("moveTo should not fall back to manual controls in this test");
     },
     pathfinder: {
+      stop: undefined as undefined | (() => void),
       async goto() {
         goals.push("goal-near");
         position.x = 1.5;
@@ -248,6 +259,31 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
   assert.throws(() => validateProposal({ tool: "drop_database", args: {} }), /Unsupported tool/);
 });
 
+test("managed probe spawn plan clears bot inventories after teleport", () => {
+  const plan = buildManagedSpawnRconPlan(["npc_a", "npc_b"], { x: 13.183, y: 73, z: -17.877 });
+
+  assert.deepEqual(plan.worldSpawn, ["setworldspawn", "13", "73", "-18"]);
+  assert.deepEqual(plan.actors.map((actor) => actor.teleport), [
+    ["tp", "npc_a", "13.183", "73", "-17.877"],
+    ["tp", "npc_b", "15.183", "73", "-17.877"]
+  ]);
+  assert.deepEqual(plan.actors.map((actor) => actor.clearInventory), [
+    ["clear", "npc_a"],
+    ["clear", "npc_b"]
+  ]);
+});
+
+test("managed probe baseline prepares logs and shared chest near spawn", () => {
+  assert.deepEqual(buildManagedProbeBaselineRconCommands({ x: 13.183, y: 73, z: -17.877 }), [
+    ["setblock", "14", "73", "-22", "air"],
+    ["setblock", "14", "73", "-22", "chest"],
+    ["setblock", "16", "73", "-21", "oak_log"],
+    ["setblock", "17", "73", "-21", "oak_log"],
+    ["setblock", "18", "73", "-21", "oak_log"],
+    ["setblock", "19", "73", "-21", "oak_log"]
+  ]);
+});
+
 test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
   const allowedTools = ["converse", "wait"];
   const persona: { name: string; role: string; style: string; objective: string } = {
@@ -297,7 +333,7 @@ test("buildDialogueContext snapshots persona, observation, transcript, memory, a
       name: "Mara",
       role: "quartermaster",
       style: "brief but careful",
-      objective: "coordinate the marker handoff"
+      objective: "inspect and rebalance shared storage"
     },
     observation: {
       visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
@@ -523,6 +559,135 @@ test("createOpenAICodexProvider retries malformed JSON once before returning a p
   assert.equal(proposal.tool, "converse");
 });
 
+test("createOpenAICodexGameplayProvider sends actor workspace context and parses runtime tools", async () => {
+  const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const { createOpenAICodexGameplayProvider } = await import(
+    "../src/provider/openaiCodexGameplayProvider.js"
+  );
+  const provider = createOpenAICodexGameplayProvider({
+    accessToken: "test-token",
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url: String(url), init });
+
+      return new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            tool: "collect_logs",
+            args: { targetCount: 4 }
+          })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+  });
+
+  const proposal = await provider.next({
+    observation: { inventory: [{ name: "oak_log", count: 0 }] },
+    lastResult: null,
+    currentTask: { id: "collect_4_logs" },
+    activeActionSkillContext: {
+      activeSkillIds: ["collectLogs"],
+      allowedPrimitives: ["observe", "collect_logs", "wait"]
+    },
+    actorProviderContext: {
+      schema: "actor-provider-context/v1",
+      recent_evidence: [{ category: "fake_progress_rejection" }]
+    }
+  });
+
+  assert.deepEqual({
+    tool: proposal.tool,
+    args: proposal.args
+  }, {
+    tool: "collect_logs",
+    args: { targetCount: 4 }
+  });
+  assert.equal(proposal.providerTrace?.raw_output_text, "{\"tool\":\"collect_logs\",\"args\":{\"targetCount\":4}}");
+  assert.deepEqual(proposal.providerTrace?.proposal, {
+    tool: "collect_logs",
+    args: { targetCount: 4 }
+  });
+  const requestBody = JSON.parse(String(fetchCalls[0]?.init?.body));
+  assert.match(requestBody.input, /actor-provider-context\/v1/);
+  assert.match(requestBody.input, /fake_progress_rejection/);
+});
+
+test("createOpenAICodexReviewer parses bounded findings and proposal hints", async () => {
+  const { createOpenAICodexReviewer } = await import("../src/reviewer/openaiCodexReviewer.js");
+  const reviewer = createOpenAICodexReviewer({
+    accessToken: "test-token",
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            findings: [
+              {
+                severity: "p1",
+                title: "No inventory delta",
+                body: "The actor claimed progress without log inventory evidence."
+              }
+            ],
+            proposal: {
+              task_intent: "repair log collection",
+              required_primitives: ["observe", "collect_logs"],
+              known_failure_modes: ["fake_progress"]
+            },
+            relationship_event_proposals: [
+              {
+                kind: "fake_progress_rejected",
+                target_actor_id: "npc_a",
+                summary: "Jun claimed log progress without inventory evidence.",
+                evidence_refs: ["actors/npc_b/evidence/fake-progress-turn-0001-collect_logs.json"]
+              }
+            ]
+          })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      )
+  });
+
+  const result = await reviewer.review({
+    job: {
+      schema: "actor-review-job/v1",
+      job_id: "job-1",
+      actor_id: "npc_b",
+      reason: "fake_progress_rejection",
+      created_at: "2026-05-20T00:00:00.000Z",
+      input_refs: [],
+      active_action_skill_snapshot: []
+    },
+    actor_context: {
+      schema: "actor-provider-context/v1"
+    }
+  });
+
+  assert.equal(result.findings[0]?.severity, "p1");
+  assert.equal(result.proposal?.task_intent, "repair log collection");
+  assert.deepEqual(result.proposal?.required_primitives, ["observe", "collect_logs"]);
+  assert.deepEqual(result.relationship_event_proposals, [
+    {
+      kind: "fake_progress_rejected",
+      target_actor_id: "npc_a",
+      summary: "Jun claimed log progress without inventory evidence.",
+      evidence_refs: ["actors/npc_b/evidence/fake-progress-turn-0001-collect_logs.json"]
+    }
+  ]);
+});
+
 test("createOpenAICodexProvider stops after exhausting malformed JSON retries", async () => {
   let fetchCount = 0;
   const { createOpenAICodexProvider } = await import("../src/mutual/openaiCodexProvider.js");
@@ -662,6 +827,41 @@ test("deterministic provider follows the planned runtime contract sequence", () 
      provider.next({ observation, lastResult: { tool: "say", ok: true, status: "available" } }),
     { tool: "remember", args: { note: "npc_b responded after one busy turn" } }
   );
+
+  assert.deepEqual(
+    provider.next({
+      observation: { ...observation, inventory: [{ name: "oak_log", count: 4 }] },
+      lastResult: { tool: "collect_logs", ok: true, status: "collected" }
+    }),
+    {
+      tool: "remember",
+      args: { note: "collect_4_logs completed with runtime inventory evidence" }
+    }
+  );
+
+  assert.deepEqual(
+    provider.next({
+      observation: { ...observation, inventory: [{ name: "oak_log", count: 4 }] },
+      currentTask: {
+        id: "deposit_shared_materials",
+        reason: "Need to make gathered materials available through shared storage.",
+        blockers: [],
+        preferredActorRoles: ["gatherer"],
+        primitiveIds: ["observe", "inspect_chest", "deposit_shared", "wait"],
+        success: {
+          kind: "shared_chest_has_at_least",
+          chestId: "shared-chest-1",
+          itemNames: ["oak_log"],
+          targetCount: 1
+        }
+      },
+      lastResult: { tool: "collect_logs", ok: true, status: "collected" }
+    }),
+    {
+      tool: "deposit_shared",
+      args: { chestId: "shared-chest-1", itemName: "oak_log", count: 1 }
+    }
+  );
 });
 
 test("mutual providers keep actor-specific deterministic order", () => {
@@ -727,6 +927,37 @@ test("mutual proposal validation rejects unsupported tools", () => {
     () => validateMutualProposal({ tool: "drop_database", args: {} }),
     /Unsupported mutual tool/
   );
+});
+
+test("deterministic mutual tools block scenario actions outside active action skills", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const tools = createMutualTools({
+    runtimeState,
+    memories: { npc_a: createMemory(4) },
+    activeActionSkillsByActor: {
+      npc_a: [runtimeControlActionSkill("npc_a")]
+    }
+  });
+
+  const step = await tools.execute({
+    actorId: "npc_a",
+    actor: createFakeBot("npc_a", 0) as any,
+    targetId: "npc_b",
+    target: createFakeBot("npc_b", 2) as any,
+    proposal: {
+      tool: "say",
+      args: { text: "Need logs?" }
+    },
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+    }
+  });
+
+  assert.equal(step.actorAction.result, "blocked");
+  assert.equal((step.worldStateChange as { status: string }).status, "blocked");
 });
 
 test("mutual observe and reply tools expose heard chat and busy reply behavior", async () => {
@@ -823,6 +1054,7 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
 
   assert.deepEqual(await observe({ actor, target, dialogueState, memory }), {
     status: "ok",
+    observerId: "npc_a",
     visibleActors: [{ id: "npc_b", distance: 2, busy: true }],
     memory: ["saw npc_b near spawn"]
   });
@@ -834,6 +1066,8 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
       distance: 0.75,
       beforeDistance: 2,
       afterDistance: 0.75,
+      distanceDelta: 1.25,
+      reason: "move_to arrived within 1.5 blocks of npc_b.",
       arrived: true
     }
   );
@@ -844,15 +1078,20 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
 
   assert.deepEqual(await say({ actor, target, dialogueState, text: "hi npc_b" }), {
     status: "busy",
+    actorId: "npc_a",
+    targetId: "npc_b",
     reason: "npc_b is busy"
   });
   assert.deepEqual(actor.chatLog, []);
   assert.deepEqual(target.chatLog, []);
 
-  assert.deepEqual(await wait({ ticks: 0 }), { status: "waited", ticks: 0 });
+  assert.deepEqual(await wait({ ticks: 0 }), { status: "waited", ticks: 0, durationMs: 0 });
 
   assert.deepEqual(await say({ actor, target, dialogueState, text: "hi npc_b" }), {
-    status: "delivered"
+    status: "delivered",
+    actorId: "npc_a",
+    targetId: "npc_b",
+    text: "hi npc_b"
   });
   assert.deepEqual(actor.chatLog, ["hi npc_b"]);
   assert.deepEqual(target.chatLog, []);
@@ -862,6 +1101,43 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
     note: "npc_b answered"
   });
   assert.deepEqual(memory.list(), ["saw npc_b near spawn", "npc_b answered"]);
+});
+
+test("observe keeps important station blocks even when many closer blocks exist", async () => {
+  const actor = createFakeBot("npc_a", 0) as ReturnType<typeof createFakeBot> & {
+    findBlocks(input: {
+      matching: (block: { name: string }) => boolean;
+      maxDistance: number;
+      count: number;
+    }): Array<{ x: number; y: number; z: number }>;
+    blockAt(position: { x: number; y: number; z: number }): { name: string };
+  };
+  const target = createFakeBot("npc_b", 2);
+  const memory = createMemory(4);
+  const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 1 });
+  const blocks = [
+    ...Array.from({ length: 24 }, (_, index) => ({
+      name: "short_grass",
+      position: { x: index % 6, y: 0, z: Math.floor(index / 6) }
+    })),
+    { name: "crafting_table", position: { x: 5, y: 0, z: 5 } }
+  ];
+
+  actor.findBlocks = ({ matching }) =>
+    blocks.filter((block) => matching({ name: block.name })).map((block) => block.position);
+  actor.blockAt = (position) =>
+    blocks.find((block) =>
+      block.position.x === position.x &&
+      block.position.y === position.y &&
+      block.position.z === position.z
+    ) ?? { name: "air" };
+
+  const observation = await observe({ actor: actor as any, target, dialogueState, memory });
+
+  assert.ok(
+    observation.nearbyBlocks?.some((block) => block.name === "crafting_table"),
+    "crafting table must survive observe sampling because it gates table-bound crafting"
+  );
 });
 
 test("converse sends directed speech, supports self-talk, and records heard messages", async () => {
@@ -957,6 +1233,44 @@ test("executeMutualTool records converse dispatcher steps with args and provider
       }
     }
   ]);
+});
+
+test("executeMutualTool blocks live mutual tools not backed by active action skills", async () => {
+  const runtimeState = createMutualRuntimeState({
+    busyRepliesBeforeAvailable: 0,
+    markerItemName: "paper"
+  });
+  const actor = createFakeBot("npc_a", 0);
+  const transcriptSteps: MutualStepRecord[] = [];
+
+  const result = await executeMutualTool({
+    proposal: {
+      tool: "converse",
+      args: {
+        target: "npc_b",
+        utterance: "Jun, check the marker."
+      }
+    },
+    actor,
+    runtimeState,
+    observation: {
+      visibleActors: [{ id: "npc_b", distance: 2, busy: false }]
+    },
+    activeActionSkills: [runtimeControlActionSkill("npc_a")],
+    transcript: {
+      recordStep(step) {
+        transcriptSteps.push(step);
+      }
+    }
+  });
+
+  assert.equal(result.tool, "converse");
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "blocked");
+  assert.match(result.message as string, /not backed by active action skills/);
+  assert.deepEqual(actor.chatLog, []);
+  assert.equal(transcriptSteps[0]?.actorAction.tool, "converse");
+  assert.equal((transcriptSteps[0]?.result as { status: string }).status, "blocked");
 });
 
 test("executeMutualTool returns a failed ToolResult when a handler throws", async () => {
@@ -1178,8 +1492,31 @@ test("moveTo prefers pathfinder and returns before and after distance details", 
     distance: 1.5,
     beforeDistance: 3,
     afterDistance: 1.5,
-    arrived: true
+    distanceDelta: 1.5,
+    arrived: true,
+    reason: "move_to arrived within 1.5 blocks of npc_b."
   });
+  assert.deepEqual(actor.goals, ["goal-near"]);
+});
+
+test("moveTo stops pathfinder and blocks when goto times out", async () => {
+  const actor = createPathfindingBot("npc_a", 0);
+  const target = createPathfindingBot("npc_b", 3);
+  let stopped = false;
+
+  actor.pathfinder.goto = async () => {
+    actor.goals.push("goal-near");
+    return new Promise<void>(() => {});
+  };
+  actor.pathfinder.stop = () => {
+    stopped = true;
+  };
+
+  const result = await moveTo({ actor, target, targetId: "npc_b", timeoutMs: 5 });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(stopped, true);
+  assert.match(result.reason, /pathfinder timeout/);
   assert.deepEqual(actor.goals, ["goal-near"]);
 });
 
@@ -1242,6 +1579,11 @@ test("agent loop records six steps and succeeds when remember changes the next a
       target: { username: "npc_b" }
     },
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("approachAndRequestItem", ["observe", "move_to", "say", "wait"])
+    ],
+    stepDelayMs: 0,
     transcript: {
       recordStep(step) {
         transcriptSteps.push(step);
@@ -1252,6 +1594,7 @@ test("agent loop records six steps and succeeds when remember changes the next a
       async observe() {
         return {
           status: "ok",
+          observerId: "npc_b",
           visibleActors: [{ id: "npc_b", distance: 1.5, busy: true }],
           memory: []
         };
@@ -1342,4 +1685,13 @@ test("finalizeRunProbe keeps failure behavior unchanged when main execution fail
       return true;
     }
   );
+});
+
+test("manual Minecraft port override is validated before bypassing managed server", () => {
+  assert.equal(readManualMinecraftPort(undefined), undefined);
+  assert.equal(readManualMinecraftPort(""), undefined);
+  assert.equal(readManualMinecraftPort("32771"), 32771);
+  assert.throws(() => readManualMinecraftPort("not-a-port"), /MC_PORT must be an integer/);
+  assert.throws(() => readManualMinecraftPort("0"), /MC_PORT must be an integer/);
+  assert.throws(() => readManualMinecraftPort("65536"), /MC_PORT must be an integer/);
 });

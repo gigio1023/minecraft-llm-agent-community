@@ -18,6 +18,12 @@ type ReplyToArgs = {
   text: string;
 };
 
+/**
+ * Sends a reply and records it for the source actor's next observation.
+ *
+ * Busy/unavailable status is preserved as tool result evidence, but the chat is
+ * still emitted so the live run remains human-visible.
+ */
 export async function replyTo({
   actor,
   source,

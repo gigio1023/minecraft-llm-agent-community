@@ -1,5 +1,12 @@
 import type { CanonicalTranscriptPart } from "../canonical/transcriptParts.js";
 
+/**
+ * Projects canonical parts into a compact ordering trace for humans.
+ *
+ * This intentionally drops payload data; reviewers should use it to spot
+ * missing observations/results or actor ordering issues, then inspect the full
+ * canonical artifact for details.
+ */
 export function projectDebugTimeline(parts: CanonicalTranscriptPart[]) {
   return parts.map((part) => {
     switch (part.kind) {

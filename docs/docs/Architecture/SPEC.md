@@ -4,48 +4,73 @@ sidebar_position: 1
 
 # Architecture Specification
 
-**minecraft-llm-agent-community** is designed to simulate an emergent NPC society. This document outlines the technical pillars required to move beyond simple chatbots and create agents with real **Gameplay Competence** and **Social Pressure**.
+This page is the public architecture overview for the active rebuild.
 
-## 1. Design Philosophy
+The canonical rebuild spec lives in the repo root at:
 
-A believable society cannot be built with "Persona Prompts" alone. It requires:
-- **Expert Play**: Agents must handle Minecraft's mechanics like skilled players.
-- **Material Scarcity**: Cooperation and conflict should emerge from the need for finite resources (wood, coal, iron).
-- **Social Framework**: Roles, shared storage, and social obligations provide the "glue" for long-term interactions.
+- `SPEC.md`
 
-## 2. Core Subsystems
+Use that file as the source of truth for:
 
-### A. The Bounded Runtime
-To ensure stability, the runtime (built on **Mineflayer**) owns the "Reality" of the world. It validates every action, handles timeouts, and records every state change.
-- **Single Active Action**: Only one physical action (like mining or moving) can be active at a time per agent to prevent race conditions.
-- **Post-Action Refresh**: After every action, the runtime provides a fresh observation of the agent's inventory and surroundings.
+- current product direction;
+- current rebuild scope;
+- non-negotiable runtime rules;
+- immediate implementation priority;
+- split architecture doc routing.
 
-### B. Pressure & Intent Loop
-Instead of open-ended planning, our agents operate on a **Pressure-Intent** model:
-1. **Pressures**: The environment generates internal "pressures" (e.g., *Hunger*, *Shared Stash Shortage*, *Hostile Nearby*).
-2. **Intents**: The LLM compiles these pressures into a high-level **Intent** (e.g., "Collect wood for the shared chest").
-3. **Execution**: The intent is carried out using a strictly validated registry of **Tools** (e.g., `collectLogs`, `craftItem`).
+## Current Architecture Summary
 
-### C. Social Simulation
-- **Role Contracts**: NPCs have specific roles (Gatherer, Crafter, Scout, Guard) with corresponding permissions and priorities.
-- **Shared Storage**: The settlement uses shared chests, creating a mutual dependency between NPCs.
-- **Hostile Entities**: A single, bounded hostile NPC act as a source of "dramatic pressure," forcing the cooperative NPCs to react to danger.
+The active architecture is defined by boundaries more than feature count:
 
-## 3. Memory & Transcripts
+- **Runtime-owned truth**: model proposals are gated, executed, verified, and
+  recorded by runtime code.
+- **Actor-local ownership**: each NPC owns its action skills, memory, evidence,
+  reviews, provider inputs, and relationships under actor workspace.
+- **Replayable evidence**: provider packets, turn evidence, verifier deltas, and
+  review refs make failures inspectable.
+- **Bounded social pressure**: profiles, goals, obligations, and relationships
+  shape intent without granting tools or bypassing action-skill gates.
+- **Async repair**: reviewers diagnose from immutable artifacts after the turn;
+  runtime guards own mutation and promotion.
 
-Long-running simulations require a sophisticated memory architecture:
-- **Part-Based Transcripts**: Every turn is recorded as a structured record (Observation + Intent + Tool Call + Result).
-- **Compaction**: As the session grows, the runtime "compacts" old history into a summary while keeping a "raw tail" of recent events to stay within the LLM's context window.
-- **Memory Layers**:
-    - **Episodic**: Recent experiences and successes/failures.
-    - **Procedural**: Knowledge of how to perform specific workflows (e.g., smelting iron).
-    - **Semantic**: Shared knowledge (e.g., "Where is the main storage?").
+## Important Constraints
 
-## 4. Key References
+- do not reintroduce raw gameplay `eval` loops;
+- do not optimize for persona richness before competence exists;
+- do not optimize for long-run autonomy before short-run boring tasks are reliable;
+- do not put critic, reflection, or action-skill generation in the gameplay hot
+  path;
+- do not let quick probes become permanent monoliths.
+- do not treat `build/generated-skills` as an actor-owned action skill source of
+  truth.
 
-Our design draws lessons from several pioneering Minecraft AI projects:
-- **Voyager**: Adopted structured curriculum and primitive validation.
-- **mc-multimodal-agent**: Adopted post-action refreshes and layered memory.
-- **mineflayer-chatgpt**: Adopted event-driven multi-bot brains and role restrictions.
-- **mindcraft-ce**: Adopted single-action gating and busy-aware conversation.
-- **Opencode/Codex**: Adopted advanced transcript compaction and replay architectures.
+## Current Slice Boundary
+
+The actor-workspace and social-feedback slices are now implemented enough to be
+the active public architecture. The next useful work is not to add a larger
+society. It is to validate the runtime against more real Minecraft task
+failures, harden provider/reviewer prompts from actual evidence, and migrate any
+still-useful legacy generated-code experiments into bounded recipes.
+
+Deep reconnect refactoring is deferred unless it is required to keep hot-path
+evidence honest. Reconnect remains a runtime responsibility, but it is not the
+driver of the next slice.
+
+## Read Next
+
+1. `../../../../SPEC.md`
+2. `Runtime-Loop-And-Verification.md`
+3. `Transcript-And-Runtime-Artifacts.md`
+4. `Actor-Workspace-And-Action-Skill-Memory.md`
+5. `Async-Reviewer-Sidecars.md`
+6. `Implementation-Workstreams.md`
+7. `Bounded-Action-Skill-Creation.md`
+8. `LLM-Context-And-Actor-Workspace.md`
+9. `Social-Actor-Profiles-And-Relationships.md`
+10. `../Setup/Headless-Server.md`
+11. `../Setup/Provider-Setup.md`
+
+## Historical Note
+
+Older architecture and plan docs in this repository may still be useful as
+research context, but they should not override the current root `SPEC.md`.

@@ -139,11 +139,11 @@ These primitives validate names, check range, explain missing ingredients,
 1. A deterministic gameplay curriculum module with one concrete next task.
 2. TypeScript gameplay primitives equivalent to `mineBlock`, `craftItem`,
    `smeltItem`, `exploreUntil`, `useChest`.
-3. A small curated early-game seed skill set built from those primitives.
+3. A small curated early-game seed action skill set built from those primitives.
 4. Shared chest/storage memory and semantic event recording.
 5. Runtime-first task verification.
 
-### Best seed skill set to port in spirit
+### Best seed action skill set to port in spirit
 
 1. `collectLogs`
 2. `craftPlanksAndSticks`
@@ -163,7 +163,7 @@ These primitives validate names, check range, explain missing ingredients,
 - raw LLM-generated JavaScript eval as the core action layer;
 - `voyager.py`-style monolithic runner;
 - broad QA/vector-db curriculum machinery before the basics work;
-- blind bulk import of learned skills from `skill_library/`.
+- blind bulk import of learned action skills from `skill_library/`.
 
 ## Repo-Specific Recommendation
 

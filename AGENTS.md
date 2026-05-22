@@ -2,23 +2,63 @@
 
 ## Current Direction
 
-This repository is now a reference and migration staging area for a new
-Minecraft agent-loop probe. Do not revive the old Voyager-style project as the
-active architecture.
+This repository is a rebuild staging area for a headless Minecraft agent-loop
+runtime.
 
-The next build should be zero-based and tiny:
+Do not revive the old Voyager-style architecture as the active path.
 
-- headless local Minecraft Java server;
-- multiple mineflayer bots as NPCs;
-- no manual Minecraft client requirement;
-- no Fabric/Forge mod setup for the first proof;
-- no raw LLM-generated JavaScript `eval` loop;
-- allow small generated TypeScript skill bundles when they are written to disk,
-  transcript-visible, statically screened for blocked APIs, and executed with a
-  short runtime timeout;
-- a bounded tool loop where the LLM chooses the next valid tool call and
-  utterance, while the runtime validates movement, chat availability, state,
-  inventory, records, budget, and termination.
+The current implementation goal is not a full village simulator.
+It is a small, bounded, observable runtime that can later grow into a social
+simulation seed.
+
+Immediate target:
+
+- one bot that can perform boring gameplay tasks end-to-end;
+- transcript and runtime artifacts that explain success, failure, stall, and reconnect;
+- reconnect/session lifecycle that stays truthful when explicitly in scope;
+- architecture support for per-agent action skill ownership and later bounded
+  action skill evolution.
+
+North star:
+
+- a social simulation seed with role pressure, action skill ownership, memory,
+  and later human-in-the-loop social play.
+
+Not current delivery targets:
+
+- persona richness as a content goal;
+- long-run autonomy as a product goal;
+- large multi-bot society behavior before single-bot competence is trustworthy.
+
+## Canonical Docs
+
+Read these first:
+
+1. `SPEC.md`
+2. `docs/docs/Agent-Search-Index.md`
+3. `docs/docs/Terminology.md`
+4. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+5. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+6. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+7. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+8. `docs/docs/Architecture/Implementation-Workstreams.md`
+9. `docs/docs/Architecture/Action-Skill-Verification.md`
+10. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+11. `docs/docs/Architecture/Minimal-Probe.md`
+12. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+13. `docs/docs/Setup/Headless-Server.md`
+14. `docs/docs/Setup/Provider-Setup.md`
+
+Treat `SPEC.md` as the canonical rebuild spec.
+
+## Terminology
+
+- `agent skill`: Codex/Claude-style capability under `.agents/skills/*/SKILL.md`,
+  built or maintained with `skill-builder`.
+- `action skill`: Minecraft/Mineflayer-based bundled behavior the runtime can
+  validate, execute, verify, and record. Conversation-like actions are action
+  skills when they run through the game runtime.
+- Do not use bare `skill` in active guidance when the meaning could be confused.
 
 ## Search Index
 
@@ -35,81 +75,123 @@ Important search tokens:
 - `OPENAI_CODEX_PROVIDER`
 - `GAME_RUNTIME_CODEX_AUTH`
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
-
-## Required Reading Order
-
-1. `docs/docs/Agent-Search-Index.md`
-2. `docs/docs/Migration/agent-loop-migration.md`
-3. `docs/docs/Migration/headless-mineflayer-setup.md`
-4. `docs/docs/Migration/openai-codex-provider.md`
-5. `docs/reports/2026-05-19-local-minecraft-agent-repo-analysis.md`
-6. `docs/reports/2026-05-19-skill-village-failure-report.md`
-7. `docs/reports/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
-8. `docs/docs/Migration/minimal-probe-goal.md`
-9. `docs/docs/Migration/handoff-gpt54-copilot.md`
+- `SOCIAL_SIMULATION_SEED`
+- `SPEED_BOUNDED_SOCIAL_SIMULATION`
+- `LIVE_TRANSCRIPT_FIRST`
+- `CHECKPOINT_READY_RUNTIME`
+- `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
+- `ACTION_SKILL_VERIFICATION`
+- `CURRENT_HANDOFF_NEXT_WORK`
+- `GENERATED_ACTION_SKILL_LEGACY_STORE`
+- `PER_NPC_ASYNC_REVIEWER`
+- `IMPLEMENTATION_WORKSTREAMS`
+- `ACTION_SKILL`
+- `AGENT_SKILL`
 
 ## Design Rules
 
-- Use Minecraft as an experiment accelerator, not as a premature replacement
-  for minecraft-llm-agent-community.
-- The first proof is not a village simulator. It is a tiny NPC tool-loop probe.
-- Keep implementation aggressively simple. Prefer small, named modules over
-  large files. If a TypeScript file approaches a few hundred lines, split it by
-  responsibility before adding more behavior.
-- Keep functions small and single-purpose. Avoid “runner” files that contain
-  config, provider calls, memory, skill execution, Docker control, and CLI
-  orchestration all together.
+- Use Minecraft as an experiment accelerator.
+- The first meaningful proof is not a big society. It is boring competence plus
+  strong observability.
+- Keep implementation aggressively simple. Prefer small, named modules over large files.
+- If a TypeScript file becomes large, split it by responsibility before adding more behavior.
+- Keep functions small and single-purpose.
+- Avoid runner files that mix config, provider calls, reconnect, transcript,
+  persistence, and gameplay execution in one place.
 - Use clear directory boundaries:
-  - `gameplay/` for Minecraft progression, curriculum, primitives, seed skills,
-    and success verification;
-  - `server/` for Docker/server lifecycle;
-  - `runtime/` for bot creation and loop orchestration;
-  - `memory/` for per-agent and public event memory;
-  - `skills/` for seed/generated skill execution;
-  - `provider/` for live model requests and tracing;
-  - CLI files should only parse config and call one high-level runner.
-- Do not let quick probes become permanent monoliths. Temporary scripts are
-  acceptable for one live check, but committed code must be simplified and
-  factored into small files immediately after the behavior is proven.
-- Do not add new docs under `docs/superpowers`. That hierarchy is deprecated.
-  Use `docs/reports`, `docs/specs`, or `docs/plans`.
-- Do not expect social simulation from persona text alone. Add Minecraft task
-  pressure first: resource gathering, crafting, tool upgrades, storage,
-  exploration, scarcity, and shared/private inventory.
-- Mineflayer provides the game client API. For embodied experiments, prefer
-  generated TypeScript skill bundles over raw eval: each skill should export one
-  bounded `run(ctx)` function and use only the runtime-provided context helpers.
-- Prefer Docker or mineflayer's `minecraft-wrap` pattern over manual server
-  setup.
-- Human visual inspection is optional. Prefer transcript, structured event log,
-  and optional prismarine-viewer/screenshot evidence.
-- Keep tests small and Detroit-style. Do not add broad mocks to create false
-  confidence.
-- Never use absolute local paths (e.g. `/Users/...`) in committed code or
-  documentation. Always use repo-relative paths instead. This applies to `.md`,
-  code, config, and any other committed file.
+  - `gameplay/` for progression, curriculum, primitives, seed action skills,
+    verification;
+  - `runtime/` for loop, actions, session, and orchestration;
+  - `memory/` and `runtime/state/` for agent and runtime state;
+  - `skills/` for seed/generated action skill ownership and execution;
+  - `provider/` for model calls and tracing;
+  - `transcript/` for transcript and artifact persistence.
+- Do not let quick probes become permanent monoliths.
+- Do not expect social simulation from persona text alone.
+- Add Minecraft task pressure first: resource gathering, crafting, storage,
+  movement, scarcity, and shared/private inventory.
+- Mineflayer provides the game client API.
+- Prefer bounded TypeScript helpers and bounded action skill bundles over raw
+  eval.
+- Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
+  artifacts, structured logs, and optional viewer evidence.
+- Failures should be explainable from artifacts without immediate reproduction.
+- Progress must be real. Do not confuse partial motion, initial animation, or
+  optimistic status text with success.
+- Treat interruption-sensitive Minecraft actions as atomic action skill
+  boundaries. For example, block breaking must keep Mineflayer digging until
+  `bot.dig(...)` resolves or fails; do not stop to check progress mid-dig,
+  because that resets block-breaking progress.
+- Actor workspace is the source of truth for actor-owned action skill state.
+- Treat `build/generated-skills` as legacy exploratory output, not as active or
+  candidate actor-owned action skill memory.
+- Keep tests small and Detroit-style. Use them to protect real owned behavior,
+  not to simulate a fake feeling of coverage.
+- Live transcript is the primary evidence of runtime value.
+
+## TypeScript Commenting Rules
+
+These rules are based on the Google TypeScript Style Guide, TypeScript JSDoc
+reference, TSDoc, TypeDoc, DefinitelyTyped, and VS Code/TypeScript ecosystem
+practice.
+
+- Prefer readable names, narrow functions, and explicit types before adding a
+  comment. A comment should not restate what TypeScript already proves.
+- Use `/** ... */` documentation comments for exported APIs, cross-module
+  contracts, and code a caller needs to understand. Use `//` comments for local
+  implementation notes.
+- Comments should explain why a runtime boundary exists, what invariant is being
+  protected, what failure mode is being rejected, or what Minecraft/Mineflayer
+  behavior is non-obvious.
+- For gameplay code, prioritize comments around verification, timeout,
+  cancellation, reconnect/session freshness, fake-progress rejection, actor
+  workspace initialization, action skill ownership, and transcript semantics.
+- Do not add decorative section banners, obvious parameter descriptions, or
+  comments that merely narrate the next line of code.
+- Keep comments short enough to review. If a comment needs a long explanation,
+  prefer extracting a named helper or adding a design doc section.
+- Keep comments current when behavior changes. A stale comment is worse than no
+  comment because this repo relies on artifacts and code to diagnose real runs.
+- When documenting generated or candidate action skills, state the primitive
+  boundary and evidence required for promotion. Do not imply autonomous runtime
+  trust before verification exists.
+- During comment passes, explicitly inspect every TypeScript file with zero
+  comments. Either add a high-signal contract/invariant comment or leave it
+  uncommented only when the file is a trivial CLI/re-export/declarative constant.
+- Configuration comments should explain non-obvious defaults, auth boundaries,
+  artifact locations, and destructive-vs-non-destructive behavior. Do not label
+  obvious scalar defaults.
+
+Reference anchors:
+
+- Google TypeScript Style Guide: `https://google.github.io/styleguide/tsguide.html`
+- TypeScript JSDoc Reference:
+  `https://www.typescriptlang.org/docs/handbook/jsdoc-supported-types.html`
+- TSDoc approach: `https://tsdoc.org/pages/intro/approach/`
+- TypeDoc TSDoc support:
+  `https://typedoc.org/documents/Doc_Comments.TSDoc_Support.html`
+- DefinitelyTyped contribution guidance:
+  `https://definitelytyped.org/guides/contributing.html`
+- VS Code TypeScript/JSDoc hover behavior issue:
+  `https://github.com/microsoft/vscode/issues/215550`
 
 ## Testing Rules
 
 - Keep tests aggressively small, direct, and Detroit-style.
-- Test real owned behavior with real state transitions whenever possible.
-- Prefer pure modules and narrow seams so tests do not need heavy mocking.
-- Do not add mock-heavy tests that pass without proving real behavior.
-- Do not mock large internal subsystems just to make green tests easy.
-- If a test needs many mocks or a deep fake object graph, simplify the code
-  under test first.
-- Prefer small hand-written fakes only at true external boundaries.
-- Do not add broad Mineflayer, provider, Docker, or filesystem mock layers for
-  ordinary unit tests.
-- Avoid tests that only assert implementation details, call counts, or internal
-  wiring.
-- Avoid snapshot-style tests that create large unreadable fixtures with weak
-  signal.
-- Each test should protect one important behavior, invariant, or regression.
-- If a test would still pass after the real logic was broken, delete or rewrite
-  it.
-- For new features, first ask what the smallest meaningful test is. Write that,
-  not a mock-driven test suite.
+- Prefer tests that prove one important owned behavior or regression.
+- Use tests to reject fake success and hidden dependencies.
+- Do not add broad mocks or snapshot-heavy suites.
+- If a test would still pass after the real logic was broken, rewrite or delete it.
+- Do not add elaborate tests for persona richness or long-run autonomy yet.
+
+## Documentation Rules
+
+- Keep `SPEC.md`, `README.md`, `docs/docs/intro.md`, and
+  `docs/docs/Agent-Search-Index.md` aligned.
+- If a plan becomes historical rather than active, mark it clearly as archived or
+  deprecated instead of leaving it ambiguous.
+- Prefer one canonical definition doc over several drifting ones.
+- Never use absolute local paths in committed docs.
 
 ## Auth Rule
 

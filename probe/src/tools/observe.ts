@@ -29,6 +29,7 @@ type PositionedActor = {
 
 export type ObserveResult = {
   status: "ok";
+  observerId: string;
   visibleActors: Array<{
     id: string;
     distance: number;
@@ -74,18 +75,34 @@ function scanNearbyBlocks(actor: PositionedActor) {
     return undefined;
   }
 
-  return actor
+  // Nearby blocks are coarse evidence for verification and debugging, not a
+  // full world model. Keep the scan small so observe remains cheap in each loop.
+  const blockSnapshots = actor
     .findBlocks({
       matching: (block) => block.name !== "air" && block.name !== "void_air",
       maxDistance: 16,
-      count: 24
+      count: 48
     })
     .map((position) => ({
       name: actor.blockAt?.(position)?.name ?? "unknown",
       distance: roundDistance(actor.entity.position.distanceTo(position))
     }))
-    .sort((left, right) => left.distance - right.distance)
-    .slice(0, 12);
+    .sort((left, right) => left.distance - right.distance);
+  const importantBlocks = new Set(["crafting_table", "chest"]);
+  const selected = new Map<string, { name: string; distance: number }>();
+
+  for (const block of blockSnapshots.filter((entry) => importantBlocks.has(entry.name))) {
+    selected.set(`${block.name}:${block.distance}`, block);
+  }
+
+  for (const block of blockSnapshots) {
+    if (selected.size >= 12) {
+      break;
+    }
+    selected.set(`${block.name}:${block.distance}`, block);
+  }
+
+  return [...selected.values()].sort((left, right) => left.distance - right.distance);
 }
 
 export async function observe({
@@ -97,10 +114,18 @@ export async function observe({
 }: ObserveArgs): Promise<ObserveResult> {
   const inventory = inspectInventory(actor);
   const nearbyBlocks = scanNearbyBlocks(actor);
-  const sharedChestItems = sharedChest ? await sharedChest.inspect() : null;
+  const sharedChestItems = sharedChest
+    ? await Promise.resolve(sharedChest.inspect()).catch(() => null)
+    : null;
 
+  // Observe is the transcript-facing state boundary. Optional capabilities stay
+  // optional so the same primitive can run against Mineflayer bots and narrow
+  // test doubles without fabricating evidence. Chest inspection is especially
+  // non-fatal because stale world fixtures should not turn observation into a
+  // storage action.
   return {
     status: "ok",
+    observerId: actor.username,
     visibleActors:
       target.username === actor.username
         ? []

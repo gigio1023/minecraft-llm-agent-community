@@ -25,6 +25,8 @@ function hasDroppedItemEntity(
   entities: Record<string, { metadata?: unknown[] }> | undefined,
   itemId: number
 ) {
+  // Dropped item visibility is checked from entity metadata because Mineflayer's
+  // toss promise can resolve before the item is observable to another actor.
   return Object.values(entities ?? {}).some((entity) =>
     entity.metadata?.some(
       (entry) =>
@@ -43,6 +45,8 @@ async function waitForDroppedItemEntity(
 ) {
   const deadline = Date.now() + timeoutMs;
 
+  // Keep the wait short: marker handoff evidence should appear quickly or the
+  // transcript should record a real failure instead of hiding behind sleeps.
   while (Date.now() < deadline) {
     if (hasDroppedItemEntity(entities, itemId)) {
       return;
@@ -73,6 +77,8 @@ export async function dropItem({
   ) => typeof PrismarineItem;
   const item = new (ItemCtor(actor.version))(itemData.id, count);
 
+  // Creative slot seeding is a probe shortcut, not a survival mechanic. It lets
+  // the mutual scenario test material observation without inventory setup.
   await actor.creative.setInventorySlot(36, item);
   await actor.toss(itemData.id, null, count);
   await waitForDroppedItemEntity(actor.entities, itemData.id);

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { actors, names } from "./actors.js";
 import { summarizeResult } from "./result.js";
-import type { ActorId, MemoryEntry, PublicEvent, SkillProposal } from "./types.js";
+import type { ActionSkillProposal, ActorId, MemoryEntry, PublicEvent } from "./types.js";
 
 export const memories: Record<ActorId, MemoryEntry[]> = {
   npc_a: [],
@@ -13,6 +13,12 @@ export const memories: Record<ActorId, MemoryEntry[]> = {
 
 export const publicEvents: PublicEvent[] = [];
 
+/**
+ * Loads bounded per-actor memory from disk for the exploratory skill-village run.
+ *
+ * Missing or malformed files reset that actor's memory instead of blocking the
+ * run; transcript artifacts remain the stronger source of truth.
+ */
 export async function loadAgentMemories(memoryDir: string) {
   await mkdir(memoryDir, { recursive: true });
   await Promise.all(
@@ -56,10 +62,12 @@ export async function rememberPublicUtterance(memoryDir: string, speakerId: Acto
 export async function rememberPublicToolResult(
   memoryDir: string,
   actorId: ActorId,
-  proposal: SkillProposal,
+  proposal: ActionSkillProposal,
   result: unknown
 ) {
   const skillResult = summarizeResult(result);
+  // Public events are a shared social surface. They summarize action skill
+  // results for other actors without exposing raw execution internals.
   publicEvents.push({
     actorId,
     actorName: names[actorId],

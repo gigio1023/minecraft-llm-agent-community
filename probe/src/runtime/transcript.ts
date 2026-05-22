@@ -20,6 +20,7 @@ type TranscriptStep = {
   tool: string;
   result: JsonValue;
   args?: Record<string, JsonValue>;
+  providerOutputRef?: string;
 };
 
 type TranscriptFinal = Record<string, JsonValue> & {
@@ -31,6 +32,7 @@ type CreateTranscriptOptions = {
   evidenceDir: string;
   probeId: string;
   bots: string[];
+  metadata?: Record<string, JsonValue>;
 };
 
 function snapshot<T>(value: T): T {
@@ -40,17 +42,23 @@ function snapshot<T>(value: T): T {
 export function createTranscript({
   evidenceDir,
   probeId,
-  bots
+  bots,
+  metadata = {}
 }: CreateTranscriptOptions) {
   const transcriptBots = snapshot(bots);
+  const transcriptMetadata = snapshot(metadata);
   const steps: TranscriptStep[] = [];
   const canonical = createCanonicalTranscript();
 
   return {
     recordStep(step: TranscriptStep) {
+      // Preserve the raw probe step for quick inspection while also projecting
+      // it into canonical parts that can survive compaction and filtering.
       steps.push(snapshot(step));
 
-       canonical.append({
+      // Canonical transcript keeps every observe -> tool_call -> tool_result
+      // triple so failures and stalls remain inspectable after compaction.
+      canonical.append({
         kind: "observation",
         threadId: `thread:${step.actor}`,
         turn: steps.length,
@@ -78,9 +86,12 @@ export function createTranscript({
       await fs.mkdir(evidenceDir, { recursive: true });
 
       const outputPath = path.join(evidenceDir, `${probeId}-${Date.now()}.json`);
+      // The non-canonical payload is intentionally redundant with canonical
+      // parts; it is optimized for humans reading one run artifact quickly.
       const payload = {
         probe: probeId,
         bots: transcriptBots,
+        metadata: transcriptMetadata,
         steps,
         debugTimeline: projectDebugTimeline(canonical.list()),
         final: snapshot(final)
@@ -88,6 +99,9 @@ export function createTranscript({
 
       await fs.writeFile(outputPath, JSON.stringify(payload, null, 2));
 
+      // Checkpoint lives in the canonical artifact, while the JSON probe payload
+      // above stays a raw step log plus projected debug timeline. The current
+      // checkpoint is minimal until richer thread snapshots are wired in.
       canonical.append({
         kind: "checkpoint",
         threadId: `thread:${transcriptBots[0] ?? "npc_a"}`,

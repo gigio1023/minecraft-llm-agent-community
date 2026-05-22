@@ -12,7 +12,7 @@ Mineflayer-style observation, action feedback, memory, and multi-agent context.
 - `mc-multimodal-agent` uses an OpenClaw-style turn loop: build prompt from
   memory, run a model/tool loop, store transcript events, record tool outcomes,
   and compact durable memory. Its important setting is automatic post-action
-  observation: movement, digging, placing, crafting, and skill execution append
+  observation: movement, digging, placing, crafting, and action skill execution append
   fresh status/navigation/visual context after the tool runs.
 - `yearn_for_mines` exposes Minecraft through MCP and names the loop directly:
   `perceive -> plan -> execute -> verify -> remember`. Observation is split into
@@ -38,13 +38,13 @@ Mineflayer-style observation, action feedback, memory, and multi-agent context.
 
 ## Implications For This Probe
 
-- Do not rely on generated Mineflayer skills to return useful data. Most actions
+- Do not rely on generated Mineflayer action skills to return useful data. Most actions
   are side effects (`lookAt`, movement, chat, dig), so `undefined` is expected.
 - The runtime should automatically capture `preObservation`, helper call events,
-  `postObservation`, and a compact `diff` after each skill execution.
+  `postObservation`, and a compact `diff` after each action skill execution.
 - LLM history should look like a normal chat, but its user messages should carry
   current NPC perspective plus post-action feedback from the prior step.
-- System prompt should include a compact "Mineflayer affordance skill" so the
+- System prompt should include compact "Mineflayer affordance" text so the
   model knows what it can observe and do without bloating every user message.
 - The assistant history should avoid reinforcing long generated code when
   possible. Keep the model's prior decision visible, but add runtime feedback as

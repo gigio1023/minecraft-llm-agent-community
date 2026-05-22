@@ -6,6 +6,12 @@ export type CanonicalJsonValue =
   | CanonicalJsonValue[]
   | { [key: string]: CanonicalJsonValue };
 
+/**
+ * Canonical transcript events are the replay/evidence source.
+ *
+ * Derived debug timelines and compact artifacts may project these parts, but
+ * should not replace them as the source of runtime truth.
+ */
 export type CanonicalTranscriptPart =
   | {
       kind: "observation";
@@ -72,6 +78,13 @@ function snapshot<T>(value: T): T {
   return structuredClone(value);
 }
 
+/**
+ * Append-only canonical transcript buffer.
+ *
+ * All reads and writes clone data because transcript parts are runtime
+ * evidence, not mutable prompt context. A projector can derive timelines,
+ * checkpoints, or compact views without changing the original event stream.
+ */
 export function createCanonicalTranscript() {
   const parts: CanonicalTranscriptPart[] = [];
 

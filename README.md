@@ -2,116 +2,152 @@
 
 <img src="assets/cover-image.png" alt="Cover Image" width="60%">
 
-A headless, multi-agent Minecraft probe designed to study LLM-driven NPC interactions under resource scarcity and social contracts.
+Headless Minecraft agent-loop runtime research.
+
+This repository is not currently trying to ship a full NPC society.
+It is rebuilding a small, bounded, observable runtime that can later grow into a
+social simulation seed.
 
 [Documentation & Web Portal](https://naem1023.github.io/minecraft-llm-agent-community/)
 
----
+## Current Direction
 
-## Overview
+Short-term product:
 
-**minecraft-llm-agent-community** runs multiple lightweight Mineflayer bots on a local vanilla Minecraft server using Docker. Unlike systems that generate raw JavaScript code to execute directly, this runtime uses a strictly bounded tool loop. The LLM acts as the decision-making "Brain" that selects from a validated registry of tools (e.g., `mineBlock`, `say`, `craftItem`), while the TypeScript runtime owns the physical "Body," validating actions and tracking execution outcomes. 
+- a tiny headless Minecraft runtime;
+- one bot that can make real end-to-end progress on boring gameplay tasks;
+- strong observability through transcript and runtime artifacts;
+- truthful reconnect/session lifecycle evidence when reconnect is in scope;
+- architecture space for per-agent action skill ownership and later action skill
+  evolution.
 
-Every run records structured JSON transcripts, allowing developers to analyze and evaluate multi-agent cooperation, role responsibilities, and resource distribution.
+Long-term north star:
 
-Of course, having Yann LeCun's proposed "world model" would make this task much easier, but LLMs are not naturally good at understanding the physical world. We wanted to see how far we could push social simulation by overcoming this constraint.
+- a social simulation seed in Minecraft;
+- bots with role pressure, memory, action skill ownership, and eventually richer
+  social interaction with each other and a human player.
 
----
+Not current goals:
 
-## Comparative Analysis (References & Inspirations)
+- persona richness as a content deliverable;
+- long-run autonomy as a product deliverable;
+- pretending partial animation is the same thing as competence.
 
-This project is a staging area that consolidates, simplifies, or adapts concepts from several pioneering open-source projects in the LLM agent, multi-agent, and Minecraft AI research spaces.
+## What Success Looks Like
 
-Below is a comparison of how this project relates to **22 famous repositories**:
+The first meaningful success is not a big multi-agent story.
 
-| Repository | Focus Area | Relationship to This Project |
-|------------|------------|-----------------------------|
-| [Voyager](https://github.com/MineDojo/Voyager) | Minecraft AI Agent | We adopt their early-game survival progression but replace their open-ended JavaScript `eval` loop with static tool-bound TypeScript execution. |
-| [MineDojo](https://github.com/MineDojo/MineDojo) | Minecraft Framework | We share the goal of training embodied agents but focus on simple vanilla servers rather than complex Fabric/Forge mod setups. |
-| [Generative Agents](https://github.com/joonspk-research/generative_agents) | Multi-Agent Society | We simulate NPC societies but drive cooperation through material scarcity and shared storage rather than text-only personas. |
-| [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Generalist LLM Agent | We limit execution to a strict tool-registry rather than allowing open-ended shell execution to ensure deterministic behavior. |
-| [BabyAGI](https://github.com/yoheinakajima/babyagi) | LLM Task Planner | We replace autonomous agent-guided planning with a machine-verifiable gameplay curriculum. |
-| [MetaGPT](https://github.com/geekan/MetaGPT) | Multi-Agent Framework | We adapt their structured role-contracts and clean API boundaries to define NPC responsibilities. |
-| [ChatDev](https://github.com/OpenBMB/ChatDev) | Collaborative Agents | We apply similar role-based collaboration protocols to Mineflayer bots working in a shared space. |
-| [LangChain](https://github.com/langchain-ai/langchain) | LLM Orchestration | We write clean, lightweight TS modules instead of importing heavy frameworks to minimize execution overhead. |
-| [LlamaIndex](https://github.com/run-llama/llama_index) | RAG & Context | We use a custom episodic-and-semantic memory wrapper instead of external vector databases for bot observations. |
-| [Mineflayer](https://github.com/PrismarineJS/mineflayer) | Minecraft Bot API | The core library powering our bot connections, movement, and physical world interactions. |
-| [Prismarine Viewer](https://github.com/PrismarineJS/prismarine-viewer) | Real-time Web Viewer | Used as an optional tool for manual visual verification of bot movement and builds. |
-| [GITM](https://github.com/bytedance/GITM) | Text-Based Minecraft AI | We build on their text-based planning success while centering the system on multi-agent cooperative loops. |
-| [DEPS](https://github.com/wangbingyt/DEPS) | Task-Planning Errors | We adopt their error-aware feedback and action criticism to prevent bots from repeating failing actions. |
-| [Cradle](https://github.com/baai-agents/Cradle) | Screen-Control Agent | We interact programmatically through Mineflayer APIs rather than simulating keyboard and mouse clicks. |
-| [Steve-1](https://github.com/shibhansh/steve-1) | Visual-Motor Control | We focus on symbolic LLM task planning rather than end-to-end neural network visual controls. |
-| [Camel](https://github.com/camel-ai/camel) | Role-Playing Cooperative | We implement role-based dialogues inside Minecraft to coordinate resource gathering. |
-| [MineAgent](https://github.com/polixir/MineAgent) | Multi-Agent Coordination | We use task pressure (scarcity, shared chest stashes) to trigger cooperation instead of plain conversation. |
-| [Mindcraft-CE](https://github.com/wearedevx/Mindcraft-CE) | Minecraft LLM Client | We adapt their busy-aware dialogue system and single-action lock gates to prevent bot race conditions. |
-| [Mineflayer-ChatGPT](https://github.com/PrismarineJS/mineflayer-chatgpt) | ChatGPT Bot Client | We incorporate their event-driven brain designs, team bulletins, and safety overrides for environmental hazards. |
-| [Microsoft JARVIS](https://github.com/microsoft/JARVIS) | LLM Tool Controller | We use the LLM to choose from verified tools, while the runtime validates the outputs. |
-| [Project Malmo](https://github.com/microsoft/malmo) | Historical Minecraft AI | We replace historical modded setups with lightweight Docker containers running vanilla server instances. |
-| [OpenCode/Codex](https://github.com/OpenCode-AI) | Code & Compaction | We adapt their history-compaction techniques to fit long-running bot logs into the LLM context window. |
+It is this:
 
----
+- a bot actually completes boring tasks like collecting logs;
+- failures are explainable from transcript, checkpoint-like artifacts, and traces;
+- the runtime is small enough to refactor without guesswork;
+- later social simulation work can build on top without starting over again.
 
-## Technical Architecture
+## Core Principles
 
-Our system replaces the legacy Voyager eval-loop with a robust, tool-bound architecture:
+- no raw JavaScript `eval` gameplay loop;
+- deterministic-first runtime development;
+- runtime-owned validation, timeout, verification, and artifacts;
+- actor workspace is the source of truth for actor-owned action skill state;
+- tests stay small and Detroit-style;
+- live transcript is the primary behavior evidence;
+- social simulation should emerge from Minecraft task pressure, not persona text alone.
 
-- **Headless Server**: Vanilla Minecraft running inside a Docker container. No graphical client is required.
-- **Mineflayer Bots**: Multiple NPCs join the server concurrently as TypeScript clients.
-- **Bounded Tool Loop**: The LLM chooses actions from a strictly validated tool registry. Each tool has a short runtime timeout and a static API screen.
-- **Pressure-Driven Behavior**: Bots prioritize gathering, crafting, and building based on resource needs and obligations, not just persona templates.
-- **Structured Transcripts**: Run evidence is logged as deterministic JSON.
+## Canonical Documents
 
----
+Read these first:
+
+1. `SPEC.md`
+2. `AGENTS.md`
+3. `docs/docs/Agent-Search-Index.md`
+4. `docs/docs/Terminology.md`
+5. `docs/docs/Architecture/Minimal-Probe.md`
+
+Historical plans and research still exist in `docs/docs/Plans/` and
+`docs/docs/Research/`, but not every older plan is still an active implementation
+instruction.
 
 ## Quick Start
 
-### 1. Requirements
-- Docker and Docker Compose
+### Requirements
+
+- Docker / Docker Compose
 - Bun 1.3+
-- Node.js 22+ (to build Docusaurus documentation)
+- Node.js 22+ for docs builds
 
-### 2. Start the Headless Server
-```bash
-# Start the server container
-docker compose -f probe/compose.yaml up -d
-```
+### Install probe dependencies
 
-### 3. Install Dependencies
 ```bash
 cd probe && bun install
 ```
 
-### 4. Configure Provider Authentication
-This project uses the OpenAI Codex provider with `gpt-5.4-mini` by default. Define your credentials in a local JSON file at:
+### Start the headless server
+
+```bash
+bun run --cwd probe server:ready
 ```
+
+The command prints `minecraft_direct_connect=127.0.0.1:25565` for a local
+Minecraft Java client. It starts the Docker server if needed or reports the
+existing managed endpoint. Stop it with `bun run --cwd probe server:stop`.
+
+### Provider auth
+
+Provider-backed paths use an ignored local auth store such as:
+
+```text
 build/provider-auth/openai-codex-auth.json
 ```
-*Note: This path is gitignored. The runtime reads and refreshes tokens internally. Do not commit or print raw API tokens.*
 
-### 5. Run the Probe Simulation
+Deterministic mode should remain usable without live provider access.
+
+### Run the probe
+
 ```bash
-PROBE_BOTS="npc1,npc2,npc3" bun run src/cli.ts
+bun run --cwd probe src/cli.ts
 ```
-Structured transcripts are saved to `data/evidence/` after completion.
 
----
+Useful runtime options:
 
-## Project Structure
+```bash
+bun run --cwd probe src/cli.ts --npcs 3 --observe-ms 60000
+bun run --cwd probe src/cli.ts --provider openai-codex --npcs 3 --observe-ms 120000
+bun run --cwd probe src/cli.ts --npcs 3 --dashboard-port 4174
+bun run --cwd probe src/cli.ts --npcs 3 --no-dashboard
+```
+
+The CLI starts the dashboard by default at `http://127.0.0.1:4173` while the
+probe runs. The dashboard is a read-only local artifact server: it reads actor
+workspace files, provider inputs/outputs, evidence, memory, relationships, and
+action skills. If the dashboard port is already in use, the probe continues and
+the existing dashboard can be reused.
+
+Run artifacts should be inspectable after execution.
+
+Primary evidence should come from:
+
+- transcript output;
+- checkpoint-like runtime artifacts;
+- Langfuse traces when provider-backed paths are used.
+
+## Repository Structure
 
 | Directory | Purpose |
 |-----------|---------|
-| `probe/` | Core runtime: agent loops, skills, memory, and Docker server configurations. |
-| `docs/` | Project documentation, search index, research, and Docusaurus blog site. |
-| `data/evidence/` | JSON transcripts saved from active simulation runs. |
+| `probe/` | Runtime code, bot orchestration, tools, server setup, transcript handling. |
+| `docs/` | Search index, architecture docs, setup guides, research, and plans. |
+| `build/provider-auth/` | Ignored local provider auth storage. |
 
----
+## Documentation Status
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details on commit conventions, validation steps, and styling rules.
-
----
+- `SPEC.md` is the canonical rebuild spec.
+- `AGENTS.md` is the canonical repo guidance for agents.
+- `docs/docs/Architecture/Minimal-Probe.md` describes the active current-phase goal.
+- Older plan docs are useful as historical context, but some are now archived and
+  should not be treated as the current build plan.
 
 ## License
 
-This project is a reference staging area. Do not revive the legacy Voyager architecture as the active implementation path.
+This repository is a reference and migration staging area.
+Do not revive the old Voyager-style architecture as the active implementation path.

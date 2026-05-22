@@ -1,4 +1,4 @@
-# Minecraft Gameplay And Voyager Seed Skills Research
+# Minecraft Gameplay And Voyager Seed Action Skills Research
 
 Date: 2026-05-19
 
@@ -71,9 +71,9 @@ The key primitives are:
 - `placeItem`, `killMob`, `useChest`, and related helpers make high-level
   Minecraft actions reusable.
 
-## Voyager Seed Skill Categories
+## Voyager Seed Action Skill Categories
 
-Observed skill library categories from `MineDojo/Voyager`:
+Observed action skill library categories from `MineDojo/Voyager`:
 
 - Resource collection: `mineWoodLog`, `mineThreeMoreOakLogs`,
   `obtainOneMoreAcaciaLog`, `obtainBirchLogs`, `collectBamboo`,
@@ -93,7 +93,7 @@ Observed skill library categories from `MineDojo/Voyager`:
 - Exploration/interaction: `exploreCave`, `exploreCaveAndGatherResources`,
   `openChestAndCheckContents`, `fishInNearbyWaterSafely`, `plantOakSapling`
 
-## Seed Skill Set To Port First
+## Seed Action Skill Set To Port First
 
 For this probe, port a small TypeScript subset before more social simulation:
 

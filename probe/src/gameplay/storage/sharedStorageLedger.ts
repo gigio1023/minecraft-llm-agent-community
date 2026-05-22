@@ -19,6 +19,8 @@ export type SharedStorageLedgerEntry = {
 };
 
 function snapshotItems(items: readonly ItemStack[]) {
+  // Normalize item order at the ledger boundary so storage evidence is stable
+  // across Mineflayer container iteration and deterministic test doubles.
   return [...items]
     .map((item) => ({ name: item.name, count: item.count }))
     .sort((left, right) => left.name.localeCompare(right.name));
@@ -35,6 +37,9 @@ export function createSharedStorageLedger() {
   }
 
   function syncChest(chestId: string, items: readonly ItemStack[]) {
+    // latestChest is a cache of the most recent public storage observation, not
+    // an inferred inventory model. Only explicit inspect/deposit/withdraw
+    // evidence should move it forward.
     chestSnapshots.set(chestId, snapshotItems(items));
   }
 
@@ -43,6 +48,8 @@ export function createSharedStorageLedger() {
       return snapshotItems(chestSnapshots.get(chestId) ?? []);
     },
     entries() {
+      // Transcript consumers get stable, cloned snapshots; callers cannot mutate
+      // ledger history or depend on Mineflayer inventory iteration order.
       return entries.map((entry) => ({
         ...entry,
         ...(entry.snapshot ? { snapshot: snapshotItems(entry.snapshot) } : {}),
@@ -79,6 +86,9 @@ export function createSharedStorageLedger() {
       beforeInventory: readonly ItemStack[];
       afterInventory: readonly ItemStack[];
     }) {
+      // Deposit entries preserve both chest and actor inventory snapshots. That
+      // lets transcript review distinguish public contribution from private
+      // depletion or role-reserve mistakes.
       const entry: SharedStorageLedgerEntry = {
         seq: nextSeq(),
         kind: "deposit",
@@ -107,6 +117,8 @@ export function createSharedStorageLedger() {
       beforeInventory: readonly ItemStack[];
       afterInventory: readonly ItemStack[];
     }) {
+      // Withdrawal reason is part of the storage evidence contract: taking a
+      // shared item should be explainable as task pressure, not a silent drain.
       const entry: SharedStorageLedgerEntry = {
         seq: nextSeq(),
         kind: "withdraw",

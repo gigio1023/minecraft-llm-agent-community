@@ -4,6 +4,10 @@ import test from "node:test";
 import { createDeterministicProvider } from "../src/provider/deterministicProvider.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { validateProposal } from "../src/tools/index.js";
+import {
+  runtimeControlActionSkill,
+  testActionSkillRecord
+} from "./helpers/actionSkillRecords.js";
 
 function createPosition(x: number, y = 0, z = 0) {
   return {
@@ -35,6 +39,16 @@ test("agent loop deposits crafted resource into shared chest and stops after pub
   const final = await runAgentLoop({
     bots: { actor, target },
     provider,
+    activeActionSkills: [
+      runtimeControlActionSkill(),
+      testActionSkillRecord("depositSharedItems", [
+        "observe",
+        "inspect_chest",
+        "deposit_shared",
+        "wait"
+      ])
+    ],
+    stepDelayMs: 0,
     initialCompletedTaskIds: [
       "collect_4_logs",
       "craft_planks_and_sticks",
@@ -50,6 +64,7 @@ test("agent loop deposits crafted resource into shared chest and stops after pub
       async observe() {
         return {
           status: "ok" as const,
+          observerId: "npc_b",
           visibleActors: [{ id: "npc_b", distance: 2, busy: false }],
           inventory: craftingTableDeposited
             ? []

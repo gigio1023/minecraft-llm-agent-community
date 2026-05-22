@@ -2,11 +2,12 @@ import type { IntentKind } from "../../runtime/pressureIntent.js";
 import type { RoleId } from "../../npc/roles/contracts.js";
 import type { RuntimePrimitiveId } from "../primitives/registry.js";
 
-// ---------------------------------------------------------------------------
-// Seed Skill Definition
-// ---------------------------------------------------------------------------
+// Seed action skills describe owned Minecraft behaviors above runtime
+// primitives. Planned entries must name their missing primitive boundary instead
+// of implying that prompt text alone can make the behavior trustworthy.
 
-export type SeedSkillId =
+export type SeedActionSkillId =
+  | "runtimeObserveAndRemember"
   // Core progression (12)
   | "collectLogs"
   | "craftPlanksAndSticks"
@@ -20,6 +21,15 @@ export type SeedSkillId =
   | "inspectSharedChest"
   | "depositSharedItems"
   | "collectDroppedItems"
+  // Survival / utility roadmap (8)
+  | "exploreForMaterials"
+  | "placeCraftingTable"
+  | "equipBestTool"
+  | "placeTorchLightArea"
+  | "eatFoodWhenHungry"
+  | "sleepAtNight"
+  | "fleeDanger"
+  | "setupSharedStash"
   // Social (4)
   | "approachAndRequestItem"
   | "announceResourceDiscovery"
@@ -31,95 +41,138 @@ export type SeedSkillId =
   | "stealFromChestIfExposed"
   | "attackThenRetreat";
 
-export type SeedSkill = {
-  id: SeedSkillId;
+export type SeedActionSkill = {
+  id: SeedActionSkillId;
   summary: string;
+  runtimeStatus: "implemented" | "planned";
+  implementationNotes: string;
   intentKinds: IntentKind[];
   validRoles: RoleId[];
   preconditions: string[];
   primitiveIds: RuntimePrimitiveId[];
+  missingPrimitives?: string[];
 };
 
-// ---------------------------------------------------------------------------
-// Core Progression Skills
-// ---------------------------------------------------------------------------
+const runtimeControlActionSkills: SeedActionSkill[] = [
+  {
+    id: "runtimeObserveAndRemember",
+    summary: "Observe current state, wait safely, and write runtime memory notes",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Baseline control bundle. It keeps sensing, explicit wait, and terminal/status memory notes inside actor workspace ownership.",
+    intentKinds: ["wait_or_defer", "inspect_settlement_state"],
+    validRoles: ["gatherer", "crafter", "quartermaster"],
+    preconditions: [],
+    primitiveIds: ["observe", "wait", "remember"]
+  }
+];
 
-const coreSkills: SeedSkill[] = [
+// Core progression is the current proof path: gather wood, craft the first
+// station, and make shared storage evidence visible before expanding the loop.
+
+const coreActionSkills: SeedActionSkill[] = [
   {
     id: "collectLogs",
     summary: "Mine nearby trees to gather logs",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses Mineflayer block search, pathfinder movement, dig, dropped-item pickup, and inventory-increase evidence.",
     intentKinds: ["bootstrap_progress", "resupply_shared_storage", "recover_basic_tools"],
-    validRoles: ["gatherer", "quartermaster"],
+    validRoles: ["gatherer"],
     preconditions: [],
     primitiveIds: ["observe", "collect_logs", "wait"]
   },
   {
     id: "craftPlanksAndSticks",
     summary: "Craft planks and sticks from logs",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses inventory crafting recipes that do not require a crafting table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
-    validRoles: ["crafter", "quartermaster"],
+    validRoles: ["crafter"],
     preconditions: ["inventory has logs"],
     primitiveIds: ["observe", "craft_item", "wait"]
   },
   {
     id: "craftCraftingTable",
     summary: "Craft a crafting table from planks",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses inventory crafting; crafting table itself does not require an existing table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
-    validRoles: ["crafter", "quartermaster"],
+    validRoles: ["crafter"],
     preconditions: ["inventory has planks"],
     primitiveIds: ["observe", "craft_item", "wait"]
   },
   {
     id: "craftWoodenPickaxe",
     summary: "Craft a wooden pickaxe from planks and sticks",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses a nearby observed crafting table block and verifies wooden_pickaxe inventory increase.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter"],
     preconditions: ["inventory has planks", "inventory has sticks", "crafting_table nearby"],
-    primitiveIds: ["observe", "craft_item", "wait"]
+    primitiveIds: ["observe", "craft_with_table", "wait"]
   },
   {
     id: "mineCobblestone",
     summary: "Mine stone blocks to gather cobblestone",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses the bounded mine_block primitive for nearby stone and verifies cobblestone inventory increase.",
     intentKinds: ["bootstrap_progress"],
     validRoles: ["gatherer"],
     preconditions: ["inventory has wooden_pickaxe or stone_pickaxe"],
-    primitiveIds: ["observe", "collect_logs", "wait"]
+    primitiveIds: ["observe", "mine_block", "wait"]
   },
   {
     id: "craftStonePickaxe",
     summary: "Upgrade to a stone pickaxe from cobblestone and sticks",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires crafting-table support and cobblestone acquisition first.",
     intentKinds: ["bootstrap_progress"],
     validRoles: ["crafter"],
     preconditions: ["inventory has cobblestone", "inventory has sticks", "crafting_table nearby"],
-    primitiveIds: ["observe", "craft_item", "wait"]
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["use_crafting_table"]
   },
   {
     id: "craftFurnace",
     summary: "Craft a furnace from cobblestone",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires cobblestone acquisition and crafting-table support.",
     intentKinds: ["bootstrap_progress"],
     validRoles: ["crafter"],
     preconditions: ["inventory has cobblestone >= 8", "crafting_table nearby"],
-    primitiveIds: ["observe", "craft_item", "wait"]
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["mine_block", "use_crafting_table"]
   },
   {
     id: "mineCoal",
     summary: "Mine coal ore to gather coal",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires a mine_block primitive, ore targeting, and pickaxe/tool gating.",
     intentKinds: ["bootstrap_progress", "resupply_shared_storage"],
     validRoles: ["gatherer"],
     preconditions: ["inventory has pickaxe"],
-    primitiveIds: ["observe", "collect_logs", "wait"]
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["mine_block"]
   },
   {
     id: "smeltRawIron",
     summary: "Smelt raw iron in a furnace using coal",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires furnace interaction, fuel/input/output handling, and smelting verification.",
     intentKinds: ["bootstrap_progress"],
     validRoles: ["crafter"],
     preconditions: ["inventory has raw_iron", "inventory has coal", "furnace nearby"],
-    primitiveIds: ["observe", "craft_item", "wait"]
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["use_furnace"]
   },
   {
     id: "inspectSharedChest",
     summary: "Inspect the shared chest to check what is available",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses the shared chest accessor and ledger-backed storage observation.",
     intentKinds: ["inspect_settlement_state", "resupply_shared_storage"],
     validRoles: ["gatherer", "crafter", "quartermaster"],
     preconditions: ["shared chest nearby"],
@@ -128,6 +181,8 @@ const coreSkills: SeedSkill[] = [
   {
     id: "depositSharedItems",
     summary: "Deposit surplus items into the shared chest",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses shared storage ledger rules and role-specific deposit permissions.",
     intentKinds: ["resupply_shared_storage", "fulfill_obligation", "bootstrap_progress"],
     validRoles: ["gatherer", "quartermaster"],
     preconditions: ["shared chest nearby", "inventory has depositable items"],
@@ -136,21 +191,127 @@ const coreSkills: SeedSkill[] = [
   {
     id: "collectDroppedItems",
     summary: "Pick up dropped items from the ground",
+    runtimeStatus: "planned",
+    implementationNotes: "move_to alone is not enough; this needs dropped-item targeting and pickup verification.",
     intentKinds: ["claim_nearby_opportunity", "recover_basic_tools"],
     validRoles: ["gatherer", "crafter", "quartermaster"],
     preconditions: ["dropped items visible"],
-    primitiveIds: ["observe", "move_to", "wait"]
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["collect_dropped_item"]
   }
 ];
 
-// ---------------------------------------------------------------------------
-// Social Skills
-// ---------------------------------------------------------------------------
+// Roadmap skills stay listed so future growth has a contract, but they remain
+// inactive until their primitive boundary and verification evidence exist.
 
-const socialSkills: SeedSkill[] = [
+const survivalUtilityActionSkills: SeedActionSkill[] = [
+  {
+    id: "exploreForMaterials",
+    summary: "Explore a bounded area until needed materials or landmarks are found",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References Voyager exploreUntil and yearn_for_mines reposition/status loops. Needs bounded exploration, observation diffs, and abortable pathing before it can be active.",
+    intentKinds: ["claim_nearby_opportunity", "bootstrap_progress"],
+    validRoles: ["gatherer"],
+    preconditions: ["current area lacks the needed block or item"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["explore_until", "world_diff"]
+  },
+  {
+    id: "placeCraftingTable",
+    summary: "Place or approach a crafting table so table recipes become available",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References Voyager placeItem and mindcraft-ce craftRecipe table handling. Current runtime can craft a table item but cannot place, find, or bind a table to craft_item.",
+    intentKinds: ["bootstrap_progress", "recover_basic_tools"],
+    validRoles: ["crafter", "quartermaster"],
+    preconditions: ["inventory has crafting_table or enough planks to craft one"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["place_block", "use_crafting_table"]
+  },
+  {
+    id: "equipBestTool",
+    summary: "Equip the best available tool for the next block or combat task",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References mindcraft-ce equip and mineflayer-chatgpt craft_gear. Needs inventory tool ranking and verification that the held item changed.",
+    intentKinds: ["bootstrap_progress", "recover_basic_tools", "avoid_or_retreat"],
+    validRoles: ["gatherer", "crafter"],
+    preconditions: ["inventory has a usable tool"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["equip_item", "held_item_observation"]
+  },
+  {
+    id: "placeTorchLightArea",
+    summary: "Place torches around the work area to make night or mining safer",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References mineflayer-chatgpt light_area and Voyager torch workflows. Needs block placement, light-level observation, and torch inventory verification.",
+    intentKinds: ["bootstrap_progress", "avoid_or_retreat", "claim_nearby_opportunity"],
+    validRoles: ["gatherer", "quartermaster"],
+    preconditions: ["inventory has torches", "area is dark or route is unsafe"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["place_block", "light_level_observation"]
+  },
+  {
+    id: "eatFoodWhenHungry",
+    summary: "Eat available food when hunger blocks safe work",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References Voyager hunger-aware eating, mindcraft-ce consume, and yearn_for_mines interact:eat. Needs vitals observation and consume verification.",
+    intentKinds: ["avoid_or_retreat", "recover_basic_tools"],
+    validRoles: ["gatherer", "crafter", "quartermaster"],
+    preconditions: ["food below safe threshold", "inventory has edible item"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["consume_item", "vitals_observation"]
+  },
+  {
+    id: "sleepAtNight",
+    summary: "Sleep in a nearby bed when night prevents safe work",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References mineflayer-chatgpt sleep and mindcraft-ce goToBed. Needs time-of-day observation, bed targeting, and sleep/wake verification.",
+    intentKinds: ["avoid_or_retreat", "wait_or_defer"],
+    validRoles: ["gatherer", "crafter", "quartermaster"],
+    preconditions: ["nighttime", "bed nearby or bed in inventory/placeable"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["use_bed", "time_observation"]
+  },
+  {
+    id: "fleeDanger",
+    summary: "Move away from nearby hostile mobs or unsafe terrain",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References mindcraft-ce avoidEnemies and yearn_for_mines combat/flee separation. Needs hostile observation, bounded flee target selection, and distance verification.",
+    intentKinds: ["avoid_or_retreat"],
+    validRoles: ["gatherer", "crafter", "quartermaster"],
+    preconditions: ["hostile mob or hazard within danger range"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["observe_hostiles", "flee_from_entity"]
+  },
+  {
+    id: "setupSharedStash",
+    summary: "Create a simple shared stash by placing and registering a chest",
+    runtimeStatus: "planned",
+    implementationNotes:
+      "References mineflayer-chatgpt setup_stash and mindcraft-ce chest helpers. Current storage ledger can model a chest, but runtime cannot place/open a real chest as setup.",
+    intentKinds: ["resupply_shared_storage", "inspect_settlement_state", "bootstrap_progress"],
+    validRoles: ["quartermaster", "crafter"],
+    preconditions: ["inventory has chest or enough planks", "flat safe placement nearby"],
+    primitiveIds: ["observe", "wait"],
+    missingPrimitives: ["place_block", "open_container", "register_shared_chest"]
+  }
+];
+
+// Social skills are action skills only when they pass through runtime
+// primitives such as movement, chat, memory, and storage ledger updates.
+
+const socialActionSkills: SeedActionSkill[] = [
   {
     id: "approachAndRequestItem",
     summary: "Walk to a teammate and ask for a specific item",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses move_to and say; success still depends on distance and dialogue-state verification.",
     intentKinds: ["request_or_handoff", "unblock_teammate"],
     validRoles: ["crafter", "quartermaster"],
     preconditions: ["target actor visible", "target actor not busy"],
@@ -159,6 +320,8 @@ const socialSkills: SeedSkill[] = [
   {
     id: "announceResourceDiscovery",
     summary: "Tell teammates about a new resource location",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses say plus remember; resource-location grounding is still minimal.",
     intentKinds: ["claim_nearby_opportunity", "inspect_settlement_state"],
     validRoles: ["gatherer", "crafter", "quartermaster"],
     preconditions: ["resource found"],
@@ -167,6 +330,8 @@ const socialSkills: SeedSkill[] = [
   {
     id: "handoffItemAtChest",
     summary: "Deposit an item at the shared chest for a requesting teammate",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses shared chest deposit and say; item transfer is ledger-backed.",
     intentKinds: ["fulfill_obligation", "unblock_teammate"],
     validRoles: ["gatherer", "quartermaster"],
     preconditions: ["shared chest nearby", "obligation pending"],
@@ -175,6 +340,8 @@ const socialSkills: SeedSkill[] = [
   {
     id: "waitForBusyCrafter",
     summary: "Wait nearby while a crafter finishes their current task",
+    runtimeStatus: "implemented",
+    implementationNotes: "Uses wait and say around runtime-owned busy state.",
     intentKinds: ["wait_or_defer", "request_or_handoff"],
     validRoles: ["gatherer", "quartermaster"],
     preconditions: ["target actor busy"],
@@ -182,14 +349,15 @@ const socialSkills: SeedSkill[] = [
   }
 ];
 
-// ---------------------------------------------------------------------------
-// Hostile Skills (bounded)
-// ---------------------------------------------------------------------------
+// Hostile pressure is intentionally bounded and mostly planned; it needs
+// explicit engagement budgets and evidence before it can affect live runs.
 
-const hostileSkills: SeedSkill[] = [
+const hostileActionSkills: SeedActionSkill[] = [
   {
     id: "patrolArea",
     summary: "Walk a short patrol route around the home area",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires area anchors, bounded route targets, and patrol verification.",
     intentKinds: ["avoid_or_retreat", "claim_nearby_opportunity"],
     validRoles: [],
     preconditions: [],
@@ -198,6 +366,8 @@ const hostileSkills: SeedSkill[] = [
   {
     id: "threatenApproach",
     summary: "Move toward a cooperative NPC to apply social pressure",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires hostile role runtime, engagement budget, and social-pressure verification.",
     intentKinds: ["avoid_or_retreat"],
     validRoles: [],
     preconditions: ["target visible", "engagement timeout not exceeded"],
@@ -206,6 +376,8 @@ const hostileSkills: SeedSkill[] = [
   {
     id: "stealFromChestIfExposed",
     summary: "Take items from an unguarded shared chest",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires hostile role runtime, guard checks, theft cooldown, and withdrawal rules.",
     intentKinds: ["claim_nearby_opportunity"],
     validRoles: [],
     preconditions: ["shared chest unguarded", "theft cooldown expired"],
@@ -214,6 +386,8 @@ const hostileSkills: SeedSkill[] = [
   {
     id: "attackThenRetreat",
     summary: "Brief attack on a target followed by immediate retreat",
+    runtimeStatus: "planned",
+    implementationNotes: "Requires combat primitive, health checks, target safety, and retreat verification.",
     intentKinds: ["avoid_or_retreat"],
     validRoles: [],
     preconditions: ["target in range", "engagement timeout not exceeded", "health above retreat threshold"],
@@ -221,38 +395,56 @@ const hostileSkills: SeedSkill[] = [
   }
 ];
 
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
+// Registry lookup is the stable ownership map used by planners and tests. Keep
+// ids here synchronized with runtime primitive support rather than duplicating
+// behavior in callers.
 
-const allSkills: SeedSkill[] = [...coreSkills, ...socialSkills, ...hostileSkills];
+const allActionSkills: SeedActionSkill[] = [
+  ...runtimeControlActionSkills,
+  ...coreActionSkills,
+  ...survivalUtilityActionSkills,
+  ...socialActionSkills,
+  ...hostileActionSkills
+];
 
-const skillById = new Map<SeedSkillId, SeedSkill>(
-  allSkills.map((skill) => [skill.id, skill])
+const actionSkillById = new Map<SeedActionSkillId, SeedActionSkill>(
+  allActionSkills.map((actionSkill) => [actionSkill.id, actionSkill])
 );
 
-export function getSeedSkill(id: SeedSkillId): SeedSkill {
-  const skill = skillById.get(id);
+export function getSeedActionSkill(id: SeedActionSkillId): SeedActionSkill {
+  const actionSkill = actionSkillById.get(id);
 
-  if (!skill) {
-    throw new Error(`Unknown seed skill: ${id}`);
+  if (!actionSkill) {
+    throw new Error(`Unknown seed action skill: ${id}`);
   }
 
-  return skill;
+  return actionSkill;
 }
 
-export function listSeedSkills(): SeedSkill[] {
-  return [...allSkills];
+export function listSeedActionSkills(): SeedActionSkill[] {
+  return [...allActionSkills];
 }
 
-export function listCoreSkillIds(): SeedSkillId[] {
-  return coreSkills.map((skill) => skill.id);
+export function listImplementedSeedActionSkills(): SeedActionSkill[] {
+  return allActionSkills.filter((actionSkill) => actionSkill.runtimeStatus === "implemented");
 }
 
-export function listSocialSkillIds(): SeedSkillId[] {
-  return socialSkills.map((skill) => skill.id);
+export function listPlannedSeedActionSkills(): SeedActionSkill[] {
+  return allActionSkills.filter((actionSkill) => actionSkill.runtimeStatus === "planned");
 }
 
-export function listHostileSkillIds(): SeedSkillId[] {
-  return hostileSkills.map((skill) => skill.id);
+export function listCoreActionSkillIds(): SeedActionSkillId[] {
+  return coreActionSkills.map((actionSkill) => actionSkill.id);
+}
+
+export function listSocialActionSkillIds(): SeedActionSkillId[] {
+  return socialActionSkills.map((actionSkill) => actionSkill.id);
+}
+
+export function listSurvivalUtilityActionSkillIds(): SeedActionSkillId[] {
+  return survivalUtilityActionSkills.map((actionSkill) => actionSkill.id);
+}
+
+export function listHostileActionSkillIds(): SeedActionSkillId[] {
+  return hostileActionSkills.map((actionSkill) => actionSkill.id);
 }

@@ -106,6 +106,8 @@ export function createMutualRuntimeState({
       return;
     }
 
+    // Bulletin entries are public actor state, so they expose current work and
+    // contributions without leaking an actor's private episodic memory.
     teamBulletin.update({
       actorId,
       roleId: roleByActor[actorId],
@@ -120,6 +122,8 @@ export function createMutualRuntimeState({
       return;
     }
 
+    // Hostile pressure only appears after material/social context exists. This
+    // keeps Phase 1 from manufacturing drama before the world has shared facts.
     if (!markerDropped && sharedSettlement.snapshot().knownSharedChests.length === 0) {
       hostileAlerts.delete(actorId);
       hostileEngagementTicks[actorId] = 0;
@@ -191,6 +195,8 @@ export function createMutualRuntimeState({
       }
     };
 
+    // Mail is both immediate social context and thread evidence; recording both
+    // sides makes later artifact review distinguish sent vs observed obligations.
     mailbox.enqueue(mail);
     const thread = threads[entry.actorId as MutualActorId];
     thread.recordOutboundMail(mail);
@@ -214,6 +220,8 @@ export function createMutualRuntimeState({
     const typedActorId = actorId as MutualActorId;
     const roleId = roleOf(actorId);
 
+    // Providers receive a compact state bundle, not direct mutable stores. That
+    // keeps role pressure visible while preserving runtime ownership of memory.
     return {
       role: roleId ? getRoleContract(roleId) : null,
       mailbox: mailbox.visible(actorId),
@@ -234,6 +242,8 @@ export function createMutualRuntimeState({
       mailbox.beginTurn(actorId);
       threads[actorId].beginTurn();
 
+      // Visibility is turn-phased: mail becomes context at turn start, not at an
+      // arbitrary point during another actor's tool execution.
       for (const item of mailbox.visible(actorId)) {
         threads[actorId].recordInboundMail(item);
       }
@@ -315,6 +325,8 @@ export function createMutualRuntimeState({
 
       if (socialContextEnabled && normalizedActorIds.includes(entry.actorId)) {
         const actorId = entry.actorId as MutualActorId;
+        // Conversation is recorded as an active action because social progress
+        // should be inspectable like movement or storage actions.
         threads[actorId].setActiveAction("converse");
         threads[actorId].updateWorkingMemory({
           nextIntendedAction: entry.targetId ? `await response from ${entry.targetId}` : null
@@ -364,6 +376,8 @@ export function createMutualRuntimeState({
 
       threads[actorId].setActiveAction(result.tool);
       threads[actorId].recordResult(result as Record<string, unknown>);
+      // Failed tool results become explicit promises/blockers so the next turn
+      // can explain retries instead of looping silently.
       threads[actorId].updateWorkingMemory({
         currentPromise: result.ok ? null : `${result.tool}:${result.status}`
       });
