@@ -160,8 +160,10 @@ Per-action-skill probes add a second gate after transcript write:
 - matrix reports also include `evidenceGaps`, which repeats the required
   contract and postcondition evidence for every unproven action skill and the
   same fresh-evidence command.
-- matrix reports also include `nextActions`, derived from `evidenceGaps`, for
-  dashboard and reviewer-sidecar consumption.
+- matrix reports also include `nextActions` for dashboard and reviewer-sidecar
+  consumption. In `--audit-existing-evidence` mode, a historical pass still
+  creates a `refresh_historical_evidence` next action because historical proof
+  is not a fresh current-run proof after code changes.
 - live and audited result rows carry structured terminal/postcondition fields
   when available: `terminalStatus`, `terminalWhy`, `postconditionStatus`,
   `postconditionFailure`, and `failureKind`. Reviewers should use these fields

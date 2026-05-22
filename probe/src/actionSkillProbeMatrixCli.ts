@@ -148,6 +148,7 @@ export type ProbeMatrixReport = {
 export type ProbeMatrixNextAction = {
   kind:
     | "run_fresh_live_probe"
+    | "refresh_historical_evidence"
     | "fix_failed_probe"
     | "restore_environment";
   skillId?: SeedActionSkillId;
@@ -390,7 +391,8 @@ export function countProbeMatrixEvidenceScopes(
 }
 
 export function buildProbeMatrixNextActions(
-  gaps: readonly ProbeMatrixEvidenceGap[]
+  gaps: readonly ProbeMatrixEvidenceGap[],
+  skillStatuses: readonly ProbeMatrixSkillStatus[] = []
 ): ProbeMatrixNextAction[] {
   const environmentBlocked = gaps.filter((gap) => gap.status === "environment_blocked");
   const actionable = gaps.filter((gap) => gap.status !== "environment_blocked");
@@ -430,6 +432,22 @@ export function buildProbeMatrixNextActions(
       command: gap.freshEvidenceCommand,
       skillId: gap.skillId,
       requiredEvidence: gap.requiredEvidence
+    });
+  }
+
+  for (const status of skillStatuses) {
+    if (status.status !== "passed" || status.evidenceScope !== "historical_transcript") {
+      continue;
+    }
+
+    actions.push({
+      kind: "refresh_historical_evidence",
+      priority: "P0",
+      reason: "historical transcript passed, but current implementation still needs fresh live proof",
+      evidenceScope: status.evidenceScope,
+      command: status.freshEvidenceCommand,
+      skillId: status.skillId,
+      requiredEvidence: status.requiredEvidence
     });
   }
 
@@ -822,7 +840,7 @@ export function buildProbeMatrixReport(input: {
     }),
     skillStatuses,
     evidenceGaps,
-    nextActions: buildProbeMatrixNextActions(evidenceGaps),
+    nextActions: buildProbeMatrixNextActions(evidenceGaps, skillStatuses),
     summary
   };
 }

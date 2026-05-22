@@ -295,7 +295,10 @@ dashboards and reviewer sidecars can show what to do next without inferring it:
 restore Docker/server environment, run the listed fresh probe command, or fix a
 failed probe before re-running it. When the environment is blocked,
 `nextActions` points at the Docker preflight check; per-skill fresh probe
-commands remain on `skillStatuses` and `evidenceGaps`.
+commands remain on `skillStatuses` and `evidenceGaps`. In
+`--audit-existing-evidence` mode, a historical pass also creates a
+`refresh_historical_evidence` next action because historical proof is not a
+fresh current-run proof after code changes.
 
 The per-action-skill postcondition is output-specific. Craft probes must prove
 the expected inventory outputs, not merely any passed verifier. Ordered social

@@ -472,6 +472,44 @@ test("action skill probe matrix next action unsets MC_PORT for managed fixture b
   assert.equal(action.command, "unset MC_PORT && docker info --format '{{.ServerVersion}}'");
 });
 
+test("action skill probe matrix next actions refresh historical transcript passes", () => {
+  const [testCase] = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs"],
+    maxActions: 8
+  });
+  const report = buildProbeMatrixReport({
+    mode: "evidence_audit",
+    actorId: "npc_b",
+    maxActions: 8,
+    cases: [testCase],
+    results: [
+      {
+        status: "passed",
+        skillId: "collectLogs",
+        actorId: "npc_b",
+        contract: {
+          skillId: "collectLogs",
+          primitiveIds: ["observe", "collect_logs", "wait"],
+          evidence: ["inventory delta"],
+          protectedBy: ["test/collectLogs.test.ts"]
+        },
+        allowedPrimitives: ["observe", "collect_logs", "wait"],
+        finalWhy: "historical collectLogs pass",
+        transcriptPath: "data/evidence/action_skill_probe_collectLogs.json",
+        terminalStatus: "success",
+        postconditionStatus: "passed"
+      }
+    ]
+  });
+
+  assert.equal(report.skillStatuses[0].status, "passed");
+  assert.equal(report.skillStatuses[0].evidenceScope, "historical_transcript");
+  assert.deepEqual(report.nextActions.map((action) => action.kind), ["refresh_historical_evidence"]);
+  assert.equal(report.nextActions[0].skillId, "collectLogs");
+  assert.match(report.nextActions[0].command ?? "", /--skill collectLogs/);
+});
+
 test("action skill probe matrix skill statuses provide one row per case", () => {
   const cases = buildProbeMatrixCases({
     actorId: "npc_b",

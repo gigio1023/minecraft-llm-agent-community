@@ -428,7 +428,9 @@ proof, or failed-probe repair with the exact command to run when available.
 Environment restoration is de-duplicated into one actionable command;
 fixture-backed `MC_PORT` blockers explicitly unset `MC_PORT` before checking the
 managed Docker server. Per-skill fresh probe commands remain on `skillStatuses`
-and `evidenceGaps`.
+and `evidenceGaps`. Historical audit passes also produce
+`refresh_historical_evidence` next actions so dashboards do not treat old proof
+as fresh current-run proof after code changes.
 Live and audited rows also preserve structured
 terminal/postcondition diagnosis fields when available:
 `terminalStatus`, `terminalWhy`, `postconditionStatus`,
