@@ -413,7 +413,13 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
       }
 
       if (skillId === "runtimeObserveAndRemember") {
-        return { tool: "remember", args: { note: "runtimeObserveAndRemember probe observed and persisted memory" } };
+        if (input.lastResult.tool === "observe") {
+          return { tool: "wait", args: { ticks: 20 } };
+        }
+        if (input.lastResult.tool === "wait") {
+          return { tool: "remember", args: { note: "runtimeObserveAndRemember probe observed, waited, and persisted memory" } };
+        }
+        throw new Error(`runtimeObserveAndRemember probe received unexpected last tool: ${input.lastResult.tool}`);
       }
 
       if (skillId === "inspectSharedChest") {
@@ -667,10 +673,11 @@ function isFollowUpText(text: string) {
 export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, ActionSkillPostconditionSpec>> = {
   runtimeObserveAndRemember: {
     skillId: "runtimeObserveAndRemember",
-    evidenceSummary: ["observation snapshot was captured before memory note was persisted"],
+    evidenceSummary: ["observation snapshot was captured", "bounded wait completed before memory note was persisted"],
     minimumPassingTranscript: {
       steps: [
         { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "wait", result: { status: "waited", ticks: 20 } },
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     },
@@ -686,8 +693,17 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         return "runtimeObserveAndRemember did not capture an observation snapshot";
       }
 
+      const waitIndex = steps.findIndex((step, index) => {
+        const result = asRecord(step.result);
+        return index > observeIndex && step.tool === "wait" && result.status === "waited";
+      });
+
+      if (waitIndex < 0) {
+        return "runtimeObserveAndRemember did not complete a bounded wait after observing";
+      }
+
       return steps
-        .slice(observeIndex + 1)
+        .slice(waitIndex + 1)
         .some((step) => {
           const result = asRecord(step.result);
           return step.tool === "remember" &&
@@ -696,7 +712,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
             result.note.trim().length > 0;
         })
         ? null
-        : "runtimeObserveAndRemember did not persist a non-empty memory note after observing";
+        : "runtimeObserveAndRemember did not persist a non-empty memory note after waiting";
     }
   },
   collectLogs: {

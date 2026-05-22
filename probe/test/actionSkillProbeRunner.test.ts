@@ -501,6 +501,31 @@ test("action skill probe postcondition rejects remember without observation snap
   );
 });
 
+test("action skill probe postcondition requires wait before runtime control memory", async () => {
+  const skippedWait = await writeTranscriptPayload({
+      steps: [
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "remember", result: { status: "remembered", note: "observed" } }
+      ]
+    });
+  const rememberedBeforeWait = await writeTranscriptPayload({
+      steps: [
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "remember", result: { status: "remembered", note: "observed" } },
+        { tool: "wait", result: { status: "waited", ticks: 20 } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("runtimeObserveAndRemember", skippedWait) ?? "",
+    /bounded wait/
+  );
+  assert.match(
+    await validateProbePostcondition("runtimeObserveAndRemember", rememberedBeforeWait) ?? "",
+    /memory note after waiting/
+  );
+});
+
 test("action skill probe postcondition enforces ordered social evidence", async () => {
   const prematureRequest = await writeTranscriptPayload({
       steps: [

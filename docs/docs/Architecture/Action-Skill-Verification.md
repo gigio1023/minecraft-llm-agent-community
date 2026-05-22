@@ -193,9 +193,10 @@ when the terminal note is failed, so reviewers can distinguish terminal control
 failure from missing Minecraft evidence.
 The matrix report preserves that distinction in structured fields on `results`,
 `skillStatuses`, and `evidenceGaps`.
-`runtimeObserveAndRemember` also requires a real observe result with an
-observation snapshot before the memory write, so a naked terminal memory note
-cannot prove runtime control flow.
+`runtimeObserveAndRemember` also requires a real observe result, a completed
+bounded wait after that observation, and only then a memory write. A naked
+terminal memory note, or observe-to-remember without wait evidence, cannot prove
+runtime control flow.
 
 Planned action skills may remain in the registry without verification contracts.
 They must not become active until their primitive boundaries and evidence rules

@@ -416,7 +416,8 @@ Remaining harness work:
 Current postcondition rules:
 
 - `runtimeObserveAndRemember` requires an observe result with an observation
-  snapshot before a non-empty memory note;
+  snapshot, a completed bounded wait after that observation, and then a
+  non-empty memory note;
 - `collectLogs` requires passed runtime verifier progress with supported
   log-family inventory at the target count;
 - `craftPlanksAndSticks` requires passed runtime verifier progress with both
