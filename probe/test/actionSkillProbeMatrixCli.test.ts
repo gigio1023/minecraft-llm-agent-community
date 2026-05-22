@@ -113,6 +113,28 @@ test("action skill probe matrix preflight rejects non-Minecraft manual port list
   }
 });
 
+test("action skill probe matrix preflight blocks manual servers for fixture-backed probes", async () => {
+  const previous = process.env.MC_PORT;
+  process.env.MC_PORT = "32771";
+  try {
+    const cases = buildProbeMatrixCases({
+      actorId: "npc_b",
+      skillIds: ["collectLogs"],
+      maxActions: 8
+    });
+    const result = await checkProbeMatrixEnvironment(cases);
+    assert.equal(result.status, "environment_blocked");
+    assert.match(result.reason, /managed RCON fixtures/);
+    assert.match(result.reason, /collectLogs/);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.MC_PORT;
+    } else {
+      process.env.MC_PORT = previous;
+    }
+  }
+});
+
 test("action skill probe matrix preflight blocks disconnected manual Minecraft port overrides", async () => {
   const previous = process.env.MC_PORT;
   const server = createServer();

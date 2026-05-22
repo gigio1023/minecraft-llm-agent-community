@@ -9,6 +9,7 @@ import { loadProbeConfig } from "./config.js";
 import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 import {
   actionSkillPostconditionSpecs,
+  actionSkillProbeRequiresManagedFixture,
   getActionSkillProbePreconditionMode,
   hasDeterministicActionSkillProbeDriver,
   runLiveActionSkillProbe,
@@ -693,9 +694,23 @@ export function buildProbeMatrixCases(input: {
   });
 }
 
-export async function checkProbeMatrixEnvironment(): Promise<ProbeMatrixPreflight> {
+export async function checkProbeMatrixEnvironment(
+  cases: readonly ProbeMatrixCase[] = []
+): Promise<ProbeMatrixPreflight> {
   const manualMinecraftPort = readManualMinecraftPort();
   if (manualMinecraftPort !== undefined) {
+    const fixtureRequired = cases.filter((testCase) =>
+      actionSkillProbeRequiresManagedFixture(testCase.skillId)
+    );
+    if (fixtureRequired.length > 0) {
+      return {
+        status: "environment_blocked",
+        reason:
+          `MC_PORT manual server cannot prepare managed RCON fixtures for: ` +
+          fixtureRequired.map((testCase) => testCase.skillId).join(", ")
+      };
+    }
+
     const config = loadProbeConfig();
     const manualServer = await checkManualMinecraftServer({
       port: manualMinecraftPort,
@@ -967,7 +982,7 @@ async function main() {
       return;
     }
 
-    const preflight = await checkProbeMatrixEnvironment();
+    const preflight = await checkProbeMatrixEnvironment(cases);
     if (preflight.status !== "ready") {
       console.log("matrix_preflight status=environment_blocked");
       console.log(preflight.reason);

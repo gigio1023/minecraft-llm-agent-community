@@ -5,6 +5,7 @@ import {
   buildSkillProbeActionSkillRecords,
   loadSkillProbeContract,
   runLiveActionSkillProbe,
+  actionSkillProbeRequiresManagedFixture,
   type ActionSkillProbeConfig,
 } from "./runtime/actionSkillProbeRunner.js";
 import { loadProbeConfig } from "./config.js";
@@ -188,6 +189,16 @@ async function main() {
         return;
       }
     } else {
+      if (actionSkillProbeRequiresManagedFixture(skillId)) {
+        console.log(`─── Environment Blocked ───`);
+        console.log(`  status: environment_blocked`);
+        console.log(`  command: unset MC_PORT`);
+        console.log(`  reason: ${skillId} requires managed RCON fixture setup`);
+        console.log(`───────────────────────────\n`);
+        process.exitCode = 1;
+        return;
+      }
+
       const manualServer = await checkManualMinecraftServer({
         port: manualMinecraftPort,
         version: loadProbeConfig().server.version

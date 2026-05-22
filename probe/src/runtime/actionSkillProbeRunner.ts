@@ -143,6 +143,15 @@ export function getActionSkillProbePreconditionMode(skillId: SeedActionSkillId) 
   return actionSkillProbePreconditionModeBySkill[skillId];
 }
 
+export function actionSkillProbeRequiresManagedFixture(skillId: SeedActionSkillId) {
+  const preconditionMode = getActionSkillProbePreconditionMode(skillId);
+  if (!preconditionMode) {
+    throw new Error(`Missing action skill probe precondition mode for implemented skill: ${skillId}`);
+  }
+
+  return preconditionMode !== "none";
+}
+
 function asObserveActor(bot: import("mineflayer").Bot): ObserveActor {
   return bot as unknown as ObserveActor;
 }
@@ -318,6 +327,13 @@ async function setupProbePreconditions(input: {
   }
 
   if (!runRcon) {
+    if (preconditionMode !== "none") {
+      throw new Error(
+        `Action skill ${skillId} requires managed RCON fixture setup (${preconditionMode}); ` +
+        "unset MC_PORT or run against the managed probe server."
+      );
+    }
+
     return;
   }
 

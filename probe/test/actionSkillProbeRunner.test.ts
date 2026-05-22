@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   actionSkillProbeProviderMetadata,
+  actionSkillProbeRequiresManagedFixture,
   actionSkillPostconditionSpecs,
   buildSkillProbeActionSkillRecords,
   classifyActionSkillProbeOutcome,
@@ -206,6 +207,13 @@ test("actionSkillProbeRunner requires deterministic live probe coverage for ever
       `${skill.id} must declare a live probe precondition mode`
     );
   }
+});
+
+test("actionSkillProbeRunner identifies action skills that require managed RCON fixtures", () => {
+  assert.equal(actionSkillProbeRequiresManagedFixture("runtimeObserveAndRemember"), false);
+  assert.equal(actionSkillProbeRequiresManagedFixture("collectLogs"), true);
+  assert.equal(actionSkillProbeRequiresManagedFixture("craftPlanksAndSticks"), true);
+  assert.equal(actionSkillProbeRequiresManagedFixture("inspectSharedChest"), true);
 });
 
 test("actionSkillProbeRunner uses deterministic provider metadata for live probes", () => {

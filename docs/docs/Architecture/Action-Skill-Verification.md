@@ -120,6 +120,9 @@ Per-action-skill probes add a second gate after transcript write:
   `remember` note. The action-skill probe harness always uses this deterministic
   provider path; gameplay provider environment settings must not pull these
   contract probes into OpenAI auth or LLM proposal behavior.
+- manual `MC_PORT` probes are allowed only for action skills whose precondition
+  mode is `none`; fixture-backed probes require the managed server because RCON
+  fixture setup is part of their evidence contract.
 - matrix `cases[]` rows include `readinessItems`, so reviewers can audit
   registry status, selected role, primitive ownership, verification contract,
   postcondition spec, deterministic driver, and fixture/precondition mode before

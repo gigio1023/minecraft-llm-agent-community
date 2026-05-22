@@ -190,6 +190,9 @@ The single-skill harness runs Docker preflight before actor workspace
 initialization, dashboard startup, or Minecraft startup unless `MC_PORT` points
 at an already-running manual Minecraft server that passes a Minecraft protocol
 ping.
+Manual `MC_PORT` probes are allowed only for action skills whose precondition
+mode is `none`; fixture-backed probes require the managed server because their
+RCON setup is part of the evidence contract.
 When Docker is unavailable and no live manual server override exists, it reports
 `environment_blocked` with the Docker preflight command and exits without
 mutating actor workspace state.
