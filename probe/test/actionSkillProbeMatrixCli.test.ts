@@ -8,6 +8,7 @@ import {
   auditExistingActionSkillEvidence,
   buildFreshEvidenceCommand,
   buildProbeMatrixEvidenceGaps,
+  buildProbeMatrixNextActions,
   buildProbeMatrixReport,
   buildProbeMatrixCases,
   buildProbeMatrixSkillStatuses,
@@ -125,6 +126,11 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
   assert.equal(report.evidenceGaps[0].evidenceScope, "missing");
+  assert.equal(report.nextActions.length, 1);
+  assert.equal(report.nextActions[0].kind, "run_fresh_live_probe");
+  assert.equal(report.nextActions[0].priority, "P0");
+  assert.equal(report.nextActions[0].skillId, "collectLogs");
+  assert.match(report.nextActions[0].command ?? "", /--skill collectLogs/);
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
   assert.equal(report.cases[0].skillId, "collectLogs");
   assert.equal(report.cases[0].probePreconditionMode, "placed_logs");
@@ -183,6 +189,9 @@ test("action skill probe matrix report counts environment preflight blockers as 
   assert.equal(report.evidenceGaps.length, 1);
   assert.equal(report.evidenceGaps[0].status, "environment_blocked");
   assert.equal(report.evidenceGaps[0].evidenceScope, "environment_blocked");
+  assert.equal(report.nextActions.length, 1);
+  assert.equal(report.nextActions[0].kind, "restore_environment");
+  assert.match(report.nextActions[0].command ?? "", /--skill craftPlanksAndSticks/);
   assert.match(report.evidenceGaps[0].reason, /docker unavailable/);
   assert.equal(report.summary.completed, 0);
   assert.equal(report.summary.planned, 1);
@@ -297,6 +306,53 @@ test("action skill probe matrix builds concrete fresh evidence commands", () => 
     buildFreshEvidenceCommand(testCase),
     "bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard"
   );
+});
+
+test("action skill probe matrix next actions classify missing, failed, and environment-blocked gaps", () => {
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs", "craftCraftingTable"],
+    maxActions: 8
+  });
+  const missingGap = buildProbeMatrixEvidenceGaps({ cases }).find((gap) => gap.skillId === "collectLogs");
+  assert.ok(missingGap);
+  const blockedGap = buildProbeMatrixEvidenceGaps({
+    cases: [cases[0]],
+    preflight: { status: "environment_blocked", reason: "docker unavailable" }
+  })[0];
+  const failedGap = buildProbeMatrixEvidenceGaps({
+    cases: [cases[1]],
+    results: [
+      {
+        status: "failed",
+        skillId: "craftCraftingTable",
+        actorId: "npc_b",
+        contract: {
+          skillId: "craftCraftingTable",
+          primitiveIds: ["observe", "craft_item", "wait"],
+          evidence: ["crafting table inventory"],
+          protectedBy: ["test/craftItem.test.ts"]
+        },
+        allowedPrimitives: ["observe", "craft_item", "wait"],
+        finalWhy: "missing crafting table inventory",
+        postconditionStatus: "failed",
+        postconditionFailure: "missing crafting table inventory",
+        failureKind: "postcondition_failed"
+      }
+    ]
+  })[0];
+
+  const actions = buildProbeMatrixNextActions([missingGap, blockedGap, failedGap]);
+
+  assert.deepEqual(actions.map((action) => action.kind), [
+    "run_fresh_live_probe",
+    "restore_environment",
+    "fix_failed_probe"
+  ]);
+  assert.ok(actions.every((action) => action.priority === "P0"));
+  assert.ok(actions.every((action) => action.command?.includes("--init-actor-workspace baseline")));
+  assert.equal(actions[2].skillId, "craftCraftingTable");
+  assert.match(actions[2].reason, /missing crafting table inventory/);
 });
 
 test("action skill probe matrix skill statuses provide one row per case", () => {

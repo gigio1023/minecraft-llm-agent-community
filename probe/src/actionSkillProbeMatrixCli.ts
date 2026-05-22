@@ -126,6 +126,7 @@ export type ProbeMatrixReport = {
   verdict: ProbeMatrixVerdict;
   skillStatuses: ProbeMatrixSkillStatus[];
   evidenceGaps: ProbeMatrixEvidenceGap[];
+  nextActions: ProbeMatrixNextAction[];
   summary: {
     passed: number;
     failed: number;
@@ -134,6 +135,22 @@ export type ProbeMatrixReport = {
     planned: number;
     statusCounts: ProbeMatrixStatusCounts;
     evidenceScopeCounts: ProbeMatrixEvidenceScopeCounts;
+  };
+};
+
+export type ProbeMatrixNextAction = {
+  kind:
+    | "run_fresh_live_probe"
+    | "fix_failed_probe"
+    | "restore_environment";
+  skillId?: SeedActionSkillId;
+  priority: "P0";
+  reason: string;
+  command?: string;
+  evidenceScope: ProbeMatrixEvidenceScope;
+  requiredEvidence?: {
+    contract: string[];
+    postcondition: string[];
   };
 };
 
@@ -364,6 +381,46 @@ export function countProbeMatrixEvidenceScopes(
     missing: skillStatuses.filter((entry) => entry.evidenceScope === "missing").length,
     environmentBlocked: skillStatuses.filter((entry) => entry.evidenceScope === "environment_blocked").length
   };
+}
+
+export function buildProbeMatrixNextActions(
+  gaps: readonly ProbeMatrixEvidenceGap[]
+): ProbeMatrixNextAction[] {
+  return gaps.map((gap) => {
+    if (gap.status === "environment_blocked") {
+      return {
+        kind: "restore_environment",
+        priority: "P0",
+        reason: gap.reason,
+        evidenceScope: gap.evidenceScope,
+        command: gap.freshEvidenceCommand,
+        skillId: gap.skillId,
+        requiredEvidence: gap.requiredEvidence
+      };
+    }
+
+    if (gap.status === "pending_live_evidence") {
+      return {
+        kind: "run_fresh_live_probe",
+        priority: "P0",
+        reason: gap.reason,
+        evidenceScope: gap.evidenceScope,
+        command: gap.freshEvidenceCommand,
+        skillId: gap.skillId,
+        requiredEvidence: gap.requiredEvidence
+      };
+    }
+
+    return {
+      kind: "fix_failed_probe",
+      priority: "P0",
+      reason: gap.reason,
+      evidenceScope: gap.evidenceScope,
+      command: gap.freshEvidenceCommand,
+      skillId: gap.skillId,
+      requiredEvidence: gap.requiredEvidence
+    };
+  });
 }
 
 type ExistingEvidencePayload = {
@@ -760,6 +817,12 @@ export function buildProbeMatrixReport(input: {
     statusCounts: countProbeMatrixSkillStatuses(skillStatuses),
     evidenceScopeCounts: countProbeMatrixEvidenceScopes(skillStatuses)
   };
+  const evidenceGaps = buildProbeMatrixEvidenceGaps({
+    mode: input.mode,
+    cases: input.cases,
+    preflight: input.preflight,
+    results
+  });
 
   return {
     schema: "action-skill-probe-matrix-report/v1",
@@ -775,12 +838,8 @@ export function buildProbeMatrixReport(input: {
       preflight: input.preflight
     }),
     skillStatuses,
-    evidenceGaps: buildProbeMatrixEvidenceGaps({
-      mode: input.mode,
-      cases: input.cases,
-      preflight: input.preflight,
-      results
-    }),
+    evidenceGaps,
+    nextActions: buildProbeMatrixNextActions(evidenceGaps),
     summary
   };
 }
@@ -858,6 +917,22 @@ function printFreshEvidenceCommands(gaps: readonly ProbeMatrixEvidenceGap[]) {
   }
 }
 
+function printNextActions(actions: readonly ProbeMatrixNextAction[]) {
+  if (actions.length === 0) {
+    console.log("matrix_next_actions count=0");
+    return;
+  }
+
+  console.log(`matrix_next_actions count=${actions.length}`);
+  for (const action of actions) {
+    const skill = action.skillId ? `${action.skillId}: ` : "";
+    console.log(`  ${action.priority} ${action.kind} ${skill}${action.reason.split("\n")[0]}`);
+    if (action.command) {
+      console.log(`    ${action.command}`);
+    }
+  }
+}
+
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -886,6 +961,7 @@ async function main() {
       printEvidenceScopeCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       printFreshEvidenceCommands(report.evidenceGaps);
+      printNextActions(report.nextActions);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
       }
@@ -913,6 +989,7 @@ async function main() {
       printEvidenceScopeCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       printFreshEvidenceCommands(report.evidenceGaps);
+      printNextActions(report.nextActions);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
       }
@@ -939,6 +1016,7 @@ async function main() {
       printEvidenceScopeCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       printFreshEvidenceCommands(report.evidenceGaps);
+      printNextActions(report.nextActions);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
       }
@@ -990,6 +1068,7 @@ async function main() {
     printEvidenceScopeCountsSummary(report);
     printEvidenceGapSummary(report.evidenceGaps);
     printFreshEvidenceCommands(report.evidenceGaps);
+    printNextActions(report.nextActions);
 
     if (options.reportPath) {
       await writeMatrixReport(options.reportPath, report);

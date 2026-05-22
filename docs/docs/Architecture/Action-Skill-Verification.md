@@ -110,9 +110,14 @@ Per-action-skill probes add a second gate after transcript write:
 - matrix CLI output prints `matrix_fresh_commands` for the first few unproven
   action skills, so fresh live probes can be launched without opening the JSON
   report.
+- matrix CLI output prints `matrix_next_actions`, so a reviewer can see whether
+  the next step is restoring the environment, running fresh live proof, or
+  repairing a failed probe.
 - matrix reports also include `evidenceGaps`, which repeats the required
   contract and postcondition evidence for every unproven action skill and the
   same fresh-evidence command.
+- matrix reports also include `nextActions`, derived from `evidenceGaps`, for
+  dashboard and reviewer-sidecar consumption.
 - live and audited result rows carry structured terminal/postcondition fields
   when available: `terminalStatus`, `terminalWhy`, `postconditionStatus`,
   `postconditionFailure`, and `failureKind`. Reviewers should use these fields

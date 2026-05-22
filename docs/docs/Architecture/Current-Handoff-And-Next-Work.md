@@ -399,7 +399,10 @@ reviewers can distinguish historical transcript proof from fresh live proof.
 `historicalTranscript`, `missing`, and `environmentBlocked`.
 `evidenceGaps` lists every unproven action skill with its blocker status,
 reason, required contract and postcondition evidence, and the same
-fresh-evidence command. Live and audited rows also preserve structured
+fresh-evidence command. `nextActions` derives P0 reviewer/dashboard actions
+from those gaps, classifying each row as environment restoration, fresh live
+proof, or failed-probe repair with the exact command to run when available.
+Live and audited rows also preserve structured
 terminal/postcondition diagnosis fields when available:
 `terminalStatus`, `terminalWhy`, `postconditionStatus`,
 `postconditionFailure`, and `failureKind`. Use these fields for dashboards or

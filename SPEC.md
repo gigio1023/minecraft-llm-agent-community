@@ -224,6 +224,9 @@ It prints `matrix_scope_counts`, which separates fresh current-run evidence from
 historical transcript evidence, missing evidence, and environment blockers.
 When unproven action skills remain, it prints `matrix_fresh_commands` with the
 first few single-skill probe commands needed to collect fresh live evidence.
+It also prints `matrix_next_actions`, a reviewer-friendly list of P0 follow-up
+actions that classifies each gap as environment restoration, fresh live proof,
+or failed-probe repair.
 It also runs a Docker preflight before actor workspace initialization or
 Minecraft startup. When Docker is unavailable, it reports
 `matrix_preflight status=environment_blocked` and exits without mutating the
@@ -271,6 +274,10 @@ structured `terminalStatus`, `terminalWhy`, `postconditionStatus`,
 `postconditionFailure`, and `failureKind` fields when available. Reviewers and
 dashboards should read those fields instead of parsing the human `reason`
 string.
+The report also includes `nextActions`, derived from `evidenceGaps`, so
+dashboards and reviewer sidecars can show what to do next without inferring it:
+restore Docker/server environment, run the listed fresh probe command, or fix a
+failed probe before re-running it.
 
 The per-action-skill postcondition is output-specific. Craft probes must prove
 the expected inventory outputs, not merely any passed verifier. Ordered social
