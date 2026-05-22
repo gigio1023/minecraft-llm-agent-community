@@ -16,7 +16,7 @@ import { startDashboardServer, type DashboardServer } from "./dashboard/dashboar
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
 import { probePort } from "./server/serverLifecycle.js";
 import { checkDockerPreflight, dockerPreflightCommand } from "./server/dockerPreflight.js";
-import { readManualMinecraftPort } from "./server/manualMinecraftPort.js";
+import { checkManualMinecraftServer, readManualMinecraftPort } from "./server/manualMinecraftPort.js";
 
 type SkillProbeCliOptions = {
   actor?: string;
@@ -188,12 +188,15 @@ async function main() {
         return;
       }
     } else {
-      const manualPortStatus = await probePort(manualMinecraftPort);
-      if (!manualPortStatus.inUse) {
+      const manualServer = await checkManualMinecraftServer({
+        port: manualMinecraftPort,
+        version: loadProbeConfig().server.version
+      });
+      if (manualServer.status === "environment_blocked") {
         console.log(`─── Environment Blocked ───`);
         console.log(`  status: environment_blocked`);
         console.log(`  command: MC_PORT=${manualMinecraftPort}`);
-        console.log(`  reason: manual Minecraft server is not accepting connections`);
+        console.log(`  reason: ${manualServer.reason}`);
         console.log(`───────────────────────────\n`);
         process.exitCode = 1;
         return;

@@ -144,8 +144,8 @@ Per-action-skill probes add a second gate after transcript write:
   report.
 - the single-skill probe command runs Docker preflight before actor workspace
   initialization, dashboard startup, or Minecraft startup unless `MC_PORT`
-  points at an already-running manual Minecraft server that is accepting
-  connections. An unavailable runtime is reported as `environment_blocked`
+  points at an already-running manual Minecraft server that passes a Minecraft
+  protocol ping. An unavailable runtime is reported as `environment_blocked`
   instead of mutating local actor state and then failing as if the action skill
   had run.
 - matrix CLI output prints `matrix_next_actions`, so a reviewer can see whether

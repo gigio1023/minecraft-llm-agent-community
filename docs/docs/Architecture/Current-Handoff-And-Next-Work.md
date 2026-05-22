@@ -319,8 +319,8 @@ bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init
 
 The single-skill command runs Docker preflight before actor workspace
 initialization, dashboard startup, or Minecraft startup unless `MC_PORT` points
-at an already-running manual Minecraft server that is accepting connections. If
-Docker/OrbStack is unavailable and no live manual server override exists, it reports
+at an already-running manual Minecraft server that passes a Minecraft protocol
+ping. If Docker/OrbStack is unavailable and no live manual server override exists, it reports
 `environment_blocked` with the Docker preflight command and exits without
 mutating actor workspace state.
 
@@ -362,7 +362,7 @@ are stable.
 
 The matrix command runs a Docker preflight before actor workspace initialization
 or Minecraft startup unless `MC_PORT` points at an already-running manual
-Minecraft server that is accepting connections. If Docker/OrbStack is
+Minecraft server that passes a Minecraft protocol ping. If Docker/OrbStack is
 unavailable and no live manual server override exists, it reports an environment
 blocker instead of mutating actor workspace state or turning the first action
 skill into a misleading runtime failure.

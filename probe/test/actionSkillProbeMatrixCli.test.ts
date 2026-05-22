@@ -87,7 +87,7 @@ test("action skill probe matrix preflight separates docker environment blockers"
   assert.match(blocked.reason, /failed to connect to the docker API/);
 });
 
-test("action skill probe matrix preflight accepts manual Minecraft port overrides", async () => {
+test("action skill probe matrix preflight rejects non-Minecraft manual port listeners", async () => {
   const previous = process.env.MC_PORT;
   const server = createServer();
   await new Promise<void>((resolve) => {
@@ -97,7 +97,10 @@ test("action skill probe matrix preflight accepts manual Minecraft port override
   assert.ok(address && typeof address === "object");
   process.env.MC_PORT = String(address.port);
   try {
-    assert.deepEqual(await checkProbeMatrixEnvironment(), { status: "ready" });
+    const result = await checkProbeMatrixEnvironment();
+    assert.equal(result.status, "environment_blocked");
+    assert.match(result.reason, new RegExp(`MC_PORT=${address.port}`));
+    assert.match(result.reason, /not a ready Minecraft server/);
   } finally {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());

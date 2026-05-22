@@ -23,8 +23,7 @@ import {
   dockerPreflightCommand,
   type DockerPreflight
 } from "./server/dockerPreflight.js";
-import { readManualMinecraftPort } from "./server/manualMinecraftPort.js";
-import { probePort } from "./server/serverLifecycle.js";
+import { checkManualMinecraftServer, readManualMinecraftPort } from "./server/manualMinecraftPort.js";
 export { normalizeDockerPreflightResult } from "./server/dockerPreflight.js";
 
 type MatrixCliOptions = {
@@ -697,12 +696,13 @@ export function buildProbeMatrixCases(input: {
 export async function checkProbeMatrixEnvironment(): Promise<ProbeMatrixPreflight> {
   const manualMinecraftPort = readManualMinecraftPort();
   if (manualMinecraftPort !== undefined) {
-    const manualPortStatus = await probePort(manualMinecraftPort);
-    if (!manualPortStatus.inUse) {
-      return {
-        status: "environment_blocked",
-        reason: `MC_PORT=${manualMinecraftPort} is not accepting connections`
-      };
+    const config = loadProbeConfig();
+    const manualServer = await checkManualMinecraftServer({
+      port: manualMinecraftPort,
+      version: config.server.version
+    });
+    if (manualServer.status === "environment_blocked") {
+      return manualServer;
     }
 
     return { status: "ready" };
