@@ -193,6 +193,13 @@ cd probe
 bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline
 ```
 
+Current matrix checklist command:
+
+```bash
+cd probe
+bun run probe:skills -- --dry-run
+```
+
 Use the matrix command after single-skill probes are stable. It enumerates
 implemented seed action skills from the registry, rejects planned action skills,
 runs each case through the same live harness, and reports
@@ -201,6 +208,12 @@ It also runs a Docker preflight before actor workspace initialization or
 Minecraft startup. When Docker is unavailable, it reports
 `matrix_preflight status=environment_blocked` and exits without mutating the
 probe world.
+
+Use `--dry-run` when the Minecraft runtime is unavailable or before a live
+matrix run. It prints the implemented action skill checklist, including role,
+primitive ownership, preconditions, verification contract evidence, and
+postcondition evidence, without Docker, actor workspace initialization, or world
+mutation.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero

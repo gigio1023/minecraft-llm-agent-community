@@ -18,6 +18,9 @@ test("action skill probe matrix builds one case for every implemented seed actio
   assert.ok(cases.every((entry) => entry.actorId === "npc_b"));
   assert.ok(cases.every((entry) => entry.maxActions === 8));
   assert.ok(cases.every((entry) => entry.roleId.length > 0));
+  assert.ok(cases.every((entry) => entry.primitiveIds.length > 0));
+  assert.ok(cases.every((entry) => entry.contractEvidence.length > 0));
+  assert.ok(cases.every((entry) => entry.postconditionEvidence.length > 0));
 });
 
 test("action skill probe matrix can narrow to selected implemented skills", () => {
@@ -29,6 +32,7 @@ test("action skill probe matrix can narrow to selected implemented skills", () =
 
   assert.deepEqual(cases.map((entry) => entry.skillId), ["collectLogs", "craftCraftingTable"]);
   assert.deepEqual(cases.map((entry) => entry.roleId), ["gatherer", "crafter"]);
+  assert.deepEqual(cases.map((entry) => entry.preconditions), [[], ["inventory has planks"]]);
 });
 
 test("action skill probe matrix rejects planned or unknown skill ids", () => {

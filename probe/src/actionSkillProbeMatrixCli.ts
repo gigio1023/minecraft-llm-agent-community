@@ -1,11 +1,13 @@
 import type { SeedActionSkillId } from "./gameplay/seedSkills/registry.js";
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
+import { getActionSkillVerificationContract } from "./gameplay/seedSkills/verificationContracts.js";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import type { RoleId } from "./npc/roles/contracts.js";
 import { loadProbeConfig } from "./config.js";
 import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 import {
+  actionSkillPostconditionSpecs,
   runLiveActionSkillProbe,
   validateSkillProbeConfig,
   type ActionSkillProbeConfig,
@@ -19,10 +21,15 @@ type MatrixCliOptions = {
   maxActions?: number;
   initActorWorkspace?: boolean;
   continueOnFailure?: boolean;
+  dryRun?: boolean;
 };
 
 type ProbeMatrixCase = ActionSkillProbeConfig & {
   summary: string;
+  preconditions: string[];
+  primitiveIds: string[];
+  contractEvidence: string[];
+  postconditionEvidence: string[];
 };
 
 export type ProbeMatrixPreflight =
@@ -64,6 +71,9 @@ function parseArgs(argv: readonly string[]): MatrixCliOptions {
       case "--continue-on-failure":
         options.continueOnFailure = true;
         break;
+      case "--dry-run":
+        options.dryRun = true;
+        break;
       case "--help":
         printUsage();
         process.exit(0);
@@ -88,6 +98,7 @@ function printUsage() {
     "  --max-actions <n>         Max actions per skill probe (default: 8)",
     "  --init-actor-workspace baseline   Initialize actor workspace before each run",
     "  --continue-on-failure     Continue after failed/error probes",
+    "  --dry-run                 Print action skill verification checklist without Docker",
     "  --help                    Show this help"
   ].join("\n"));
 }
@@ -134,10 +145,19 @@ export function buildProbeMatrixCases(input: {
       maxActions: input.maxActions
     } satisfies ActionSkillProbeConfig;
     validateSkillProbeConfig(probeConfig);
+    const postconditionSpec = actionSkillPostconditionSpecs[skill.id];
+    if (!postconditionSpec) {
+      throw new Error(`Missing postcondition spec for implemented action skill: ${skill.id}`);
+    }
+    const contract = getActionSkillVerificationContract(skill.id);
 
     return {
       ...probeConfig,
-      summary: skill.summary
+      summary: skill.summary,
+      preconditions: [...skill.preconditions],
+      primitiveIds: [...skill.primitiveIds],
+      contractEvidence: [...contract.evidence],
+      postconditionEvidence: [...postconditionSpec.evidenceSummary]
     };
   });
 }
@@ -248,6 +268,20 @@ function printResult(result: ActionSkillProbeResult) {
   }
 }
 
+function printDryRun(cases: ProbeMatrixCase[]) {
+  console.log("Action skill verification checklist:");
+  for (const [index, testCase] of cases.entries()) {
+    console.log(`─── [${index + 1}/${cases.length}] ${testCase.skillId} ───`);
+    console.log(`  role:          ${testCase.roleId}`);
+    console.log(`  max-actions:   ${testCase.maxActions}`);
+    console.log(`  summary:       ${testCase.summary}`);
+    console.log(`  primitives:    ${testCase.primitiveIds.join(", ")}`);
+    console.log(`  preconditions: ${testCase.preconditions.length > 0 ? testCase.preconditions.join("; ") : "(none)"}`);
+    console.log(`  contract:      ${testCase.contractEvidence.join("; ")}`);
+    console.log(`  postcondition: ${testCase.postconditionEvidence.join("; ")}`);
+  }
+}
+
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -262,6 +296,12 @@ async function main() {
     console.log(`Action skill probe matrix: ${cases.length} case(s)`);
     console.log(`actor: ${actorId}`);
     console.log();
+
+    if (options.dryRun) {
+      printDryRun(cases);
+      console.log(`matrix_dry_run total=${cases.length}`);
+      return;
+    }
 
     const preflight = await checkProbeMatrixEnvironment();
     if (preflight.status !== "ready") {

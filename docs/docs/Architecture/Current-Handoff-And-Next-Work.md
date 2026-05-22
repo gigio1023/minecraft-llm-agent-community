@@ -316,6 +316,13 @@ cd probe
 bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline
 ```
 
+Checklist command:
+
+```bash
+cd probe
+bun run probe:skills -- --dry-run
+```
+
 This command enumerates implemented seed action skills from the registry and
 runs them one-by-one through the same live probe harness. It exists to make the
 full action skill verification checklist reproducible after individual probes
@@ -325,6 +332,15 @@ The matrix command runs a Docker preflight before actor workspace initialization
 or Minecraft startup. If Docker/OrbStack is unavailable, it reports an
 environment blocker instead of turning the first action skill into a misleading
 runtime failure.
+
+The dry-run checklist does not touch Docker, actor workspace, or the Minecraft
+world. It prints each implemented action skill with:
+
+- selected role;
+- primitive ownership;
+- declared preconditions;
+- verification contract evidence;
+- postcondition evidence.
 
 Remaining harness work:
 
