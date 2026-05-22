@@ -198,6 +198,8 @@ Implemented surfaces:
 - `collect_logs` requires log inventory increase, not just block removal;
 - `move_to` bounds `pathfinder.goto(...)` with timeout and `pathfinder.stop()`;
 - `craft_item` resolves real registry/recipe data and awaits `bot.craft(...)`;
+- `craft_item` returns blocked, not crafted, when available inventory evidence
+  shows no target item increase after `bot.craft(...)`;
 - shared chest deposit rejects zero-item transfers before ledger writes;
 - implemented seed action skills must declare primitive ownership, evidence,
   and test coverage.

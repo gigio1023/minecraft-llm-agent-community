@@ -28,6 +28,13 @@ type CraftResult = {
   beforeCount?: number;
   afterCount?: number;
   inventoryDelta?: number;
+} | {
+  status: "blocked";
+  itemName: string;
+  reason: string;
+  beforeCount?: number;
+  afterCount?: number;
+  inventoryDelta?: number;
 };
 
 function resolveCraftTarget(bot: CraftingBot, itemName: string) {
@@ -77,15 +84,27 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
   const beforeCount = countInventoryItem(bot, resolvedItemName);
   await bot.craft(recipe, 1, null);
   const afterCount = countInventoryItem(bot, resolvedItemName);
+  const inventoryDelta =
+    beforeCount !== undefined && afterCount !== undefined
+      ? afterCount - beforeCount
+      : undefined;
+
+  if (inventoryDelta !== undefined && inventoryDelta <= 0) {
+    return {
+      status: "blocked",
+      itemName: resolvedItemName,
+      reason: `craft_item completed but ${resolvedItemName} inventory did not increase`,
+      beforeCount,
+      afterCount,
+      inventoryDelta
+    };
+  }
 
   return {
     status: "crafted",
     itemName: resolvedItemName,
     beforeCount,
     afterCount,
-    inventoryDelta:
-      beforeCount !== undefined && afterCount !== undefined
-        ? afterCount - beforeCount
-        : undefined
+    inventoryDelta
   };
 }

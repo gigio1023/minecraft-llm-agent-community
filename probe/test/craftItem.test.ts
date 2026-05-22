@@ -69,6 +69,22 @@ test("craftItem awaits Mineflayer craft completion before returning inventory ev
   assert.equal(result.inventoryDelta, 4);
 });
 
+test("craftItem blocks optimistic craft completion without inventory increase", async () => {
+  const bot = createCraftBot({ initialCounts: { stick: 0 }, craftedCount: 0 });
+
+  const result = await craftItem({ bot, itemName: "stick" });
+
+  assert.deepEqual(result, {
+    status: "blocked",
+    itemName: "stick",
+    reason: "craft_item completed but stick inventory did not increase",
+    beforeCount: 0,
+    afterCount: 0,
+    inventoryDelta: 0
+  });
+  assert.deepEqual(bot.craftCalls, [{ recipe: "stick", count: 1, table: null }]);
+});
+
 test("craftItem rejects unknown item names before calling Mineflayer craft", async () => {
   const bot = createCraftBot();
 

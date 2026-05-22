@@ -67,7 +67,9 @@ Required evidence:
 - item name resolves to a registry item id;
 - `recipesFor(...)` returns an available recipe;
 - `bot.craft(recipe, count, craftingTable)` is awaited;
-- crafted item inventory count is reported when available.
+- crafted item inventory count is reported when available;
+- when inventory counts are available, the primitive must not return
+  `crafted` unless the target item count increased.
 
 Inventory-only crafting is intentionally separate from table-bound crafting.
 Table-bound recipes need their own primitive that can find/place/use a crafting

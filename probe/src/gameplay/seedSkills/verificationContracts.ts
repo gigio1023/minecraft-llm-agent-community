@@ -43,7 +43,8 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     evidence: [
       "craft target resolves to a concrete Mineflayer item id",
       "recipesFor returns an available inventory recipe",
-      "bot.craft is awaited before crafted inventory evidence is reported"
+      "bot.craft is awaited before crafted inventory evidence is reported",
+      "crafted result is blocked when available inventory counts do not increase"
     ],
     protectedBy: ["test/craftItem.test.ts", "test/agentLoop.phase1.test.ts"]
   },
@@ -53,7 +54,8 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     evidence: [
       "crafting_table exists in registry",
       "inventory recipe is available without an existing crafting table",
-      "bot.craft is awaited before success is returned"
+      "bot.craft is awaited before success is returned",
+      "crafted result is blocked when available inventory counts do not increase"
     ],
     protectedBy: ["test/craftItem.test.ts", "test/agentLoop.phase1.test.ts"]
   },
