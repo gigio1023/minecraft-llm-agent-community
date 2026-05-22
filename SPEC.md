@@ -218,6 +218,8 @@ Use the matrix command after single-skill probes are stable. It enumerates
 implemented seed action skills from the registry, rejects planned action skills,
 runs each case through the same live harness, and reports
 `matrix_summary verdict=<verdict> passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
+It also prints `matrix_status_counts`, which mirrors
+`summary.statusCounts` for quick terminal inspection.
 It also runs a Docker preflight before actor workspace initialization or
 Minecraft startup. When Docker is unavailable, it reports
 `matrix_preflight status=environment_blocked` and exits without mutating the

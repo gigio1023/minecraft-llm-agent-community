@@ -661,6 +661,20 @@ function printEvidenceGapSummary(gaps: readonly ProbeMatrixEvidenceGap[]) {
   }
 }
 
+function printStatusCountsSummary(report: ProbeMatrixReport) {
+  const counts = report.summary.statusCounts;
+  console.log(
+    [
+      "matrix_status_counts",
+      `passed=${counts.passed}`,
+      `failed=${counts.failed}`,
+      `error=${counts.error}`,
+      `pending_live_evidence=${counts.pendingLiveEvidence}`,
+      `environment_blocked=${counts.environmentBlocked}`
+    ].join(" ")
+  );
+}
+
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -685,6 +699,7 @@ async function main() {
         cases
       });
       console.log(`matrix_dry_run total=${cases.length}`);
+      printStatusCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
@@ -709,6 +724,7 @@ async function main() {
         printResult(result);
       }
       console.log(`matrix_summary verdict=${report.verdict} passed=${report.summary.passed} failed=${report.summary.failed} error=${report.summary.error} total=${report.summary.completed}/${report.summary.planned}`);
+      printStatusCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
@@ -732,6 +748,7 @@ async function main() {
         results: []
       });
       console.log(`matrix_summary verdict=${report.verdict} passed=0 failed=0 error=1 total=0/${cases.length}`);
+      printStatusCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
@@ -780,6 +797,7 @@ async function main() {
       preflight,
       results
     });
+    printStatusCountsSummary(report);
     printEvidenceGapSummary(report.evidenceGaps);
 
     if (options.reportPath) {
