@@ -431,6 +431,10 @@ managed Docker server. Per-skill fresh probe commands remain on `skillStatuses`
 and `evidenceGaps`. Historical audit passes also produce
 `refresh_historical_evidence` next actions so dashboards do not treat old proof
 as fresh current-run proof after code changes.
+The top-level report verdict follows the same rule: historical transcript
+passes alone cannot make an evidence audit `passed`. A complete historical
+audit without fresh current-run proof remains `incomplete` and points reviewers
+at `refresh_historical_evidence` actions.
 Live and audited rows also preserve structured
 terminal/postcondition diagnosis fields when available:
 `terminalStatus`, `terminalWhy`, `postconditionStatus`,

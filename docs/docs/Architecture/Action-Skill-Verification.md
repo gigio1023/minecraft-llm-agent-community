@@ -164,6 +164,9 @@ Per-action-skill probes add a second gate after transcript write:
   consumption. In `--audit-existing-evidence` mode, a historical pass still
   creates a `refresh_historical_evidence` next action because historical proof
   is not a fresh current-run proof after code changes.
+- evidence audit reports do not become top-level `passed` from historical
+  transcript rows alone. Even an all-historical-pass audit remains `incomplete`
+  until fresh `current_run` proof exists for every selected action skill.
 - live and audited result rows carry structured terminal/postcondition fields
   when available: `terminalStatus`, `terminalWhy`, `postconditionStatus`,
   `postconditionFailure`, and `failureKind`. Reviewers should use these fields

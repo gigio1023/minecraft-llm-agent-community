@@ -288,6 +288,24 @@ test("action skill probe matrix classifies reusable report verdicts", () => {
 
   assert.equal(
     classifyProbeMatrixReport({
+      mode: "evidence_audit",
+      planned: 2,
+      completed: 2,
+      passed: 2,
+      failed: 0,
+      error: 0,
+      evidenceScopeCounts: {
+        currentRun: 0,
+        historicalTranscript: 2,
+        missing: 0,
+        environmentBlocked: 0
+      }
+    }),
+    "incomplete"
+  );
+
+  assert.equal(
+    classifyProbeMatrixReport({
       planned: 2,
       completed: 1,
       passed: 1,
@@ -505,6 +523,7 @@ test("action skill probe matrix next actions refresh historical transcript passe
 
   assert.equal(report.skillStatuses[0].status, "passed");
   assert.equal(report.skillStatuses[0].evidenceScope, "historical_transcript");
+  assert.equal(report.verdict, "incomplete");
   assert.deepEqual(report.nextActions.map((action) => action.kind), ["refresh_historical_evidence"]);
   assert.equal(report.nextActions[0].skillId, "collectLogs");
   assert.match(report.nextActions[0].command ?? "", /--skill collectLogs/);

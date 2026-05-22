@@ -215,11 +215,13 @@ function buildProbeMatrixReadinessItems(input: {
 export type ProbeMatrixPreflight = DockerPreflight;
 
 export function classifyProbeMatrixReport(input: {
+  mode?: ProbeMatrixReport["mode"];
   planned: number;
   completed: number;
   passed: number;
   failed: number;
   error: number;
+  evidenceScopeCounts?: ProbeMatrixEvidenceScopeCounts;
   preflight?: ProbeMatrixPreflight;
 }): ProbeMatrixVerdict {
   if (input.preflight?.status === "environment_blocked" && input.completed === 0) {
@@ -228,6 +230,13 @@ export function classifyProbeMatrixReport(input: {
 
   if (input.failed > 0 || input.error > 0) {
     return "failed";
+  }
+
+  if (
+    input.mode === "evidence_audit" &&
+    input.evidenceScopeCounts?.currentRun !== input.planned
+  ) {
+    return "incomplete";
   }
 
   if (input.planned > 0 && input.completed === input.planned && input.passed === input.planned) {
@@ -835,6 +844,7 @@ export function buildProbeMatrixReport(input: {
     ...(input.preflight ? { preflight: input.preflight } : {}),
     ...(input.results ? { results } : {}),
     verdict: classifyProbeMatrixReport({
+      mode: input.mode,
       ...summary,
       preflight: input.preflight
     }),

@@ -299,6 +299,10 @@ commands remain on `skillStatuses` and `evidenceGaps`. In
 `--audit-existing-evidence` mode, a historical pass also creates a
 `refresh_historical_evidence` next action because historical proof is not a
 fresh current-run proof after code changes.
+An evidence audit report must not return top-level `verdict: "passed"` from
+historical transcript rows alone. Even if every selected action skill has a
+historical pass, the report remains `incomplete` until the current run produces
+fresh `current_run` proof for every selected action skill.
 
 The per-action-skill postcondition is output-specific. Craft probes must prove
 the expected inventory outputs, not merely any passed verifier. Ordered social
