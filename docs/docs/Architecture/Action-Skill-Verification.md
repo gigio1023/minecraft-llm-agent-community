@@ -173,6 +173,9 @@ transcripts when required primitives appear out of order.
 Inventory postconditions are tied to the expected primitive. For example,
 `collectLogs` only accepts passed inventory evidence on `collect_logs`, and
 crafting action skills only accept passed inventory evidence on `craft_item`.
+The live probe evaluates postconditions whenever a transcript is written, even
+when the terminal note is failed, so reviewers can distinguish terminal control
+failure from missing Minecraft evidence.
 `runtimeObserveAndRemember` also requires a real observe result with an
 observation snapshot before the memory write, so a naked terminal memory note
 cannot prove runtime control flow.

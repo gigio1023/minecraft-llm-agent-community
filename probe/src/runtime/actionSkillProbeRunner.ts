@@ -61,6 +61,11 @@ export type ActionSkillProbeResult = {
   errorMessage?: string;
 };
 
+export type ActionSkillProbeFinal = {
+  status: string;
+  why: string;
+};
+
 type ServerEndpoint = {
   host: string;
   port: number;
@@ -891,6 +896,37 @@ export async function validateProbePostcondition(skillId: SeedActionSkillId, tra
   return spec.validate(steps);
 }
 
+export function classifyActionSkillProbeOutcome(input: {
+  final: ActionSkillProbeFinal;
+  postconditionFailure: string | null;
+}): Pick<ActionSkillProbeResult, "status" | "finalWhy"> {
+  if (input.final.status === "success" && !input.postconditionFailure) {
+    return {
+      status: "passed",
+      finalWhy: input.final.why
+    };
+  }
+
+  if (input.final.status === "success") {
+    return {
+      status: "failed",
+      finalWhy: input.postconditionFailure ?? input.final.why
+    };
+  }
+
+  if (!input.postconditionFailure) {
+    return {
+      status: "failed",
+      finalWhy: `terminal status ${input.final.status} even though postcondition passed: ${input.final.why}`
+    };
+  }
+
+  return {
+    status: "failed",
+    finalWhy: `${input.final.why}; postcondition: ${input.postconditionFailure}`
+  };
+}
+
 /**
  * Builds a minimal set of active action skill records that restricts the
  * runtime gate to only the primitives required by the target skill.
@@ -1261,18 +1297,20 @@ export async function runLiveActionSkillProbe(
       }
     });
 
-    const postconditionFailure = final.status === "success"
-      ? await validateProbePostcondition(input.skillId, transcriptPath)
-      : null;
+    const postconditionFailure = await validateProbePostcondition(input.skillId, transcriptPath);
+    const outcome = classifyActionSkillProbeOutcome({
+      final,
+      postconditionFailure
+    });
 
     return {
-      status: final.status === "success" && !postconditionFailure ? "passed" : "failed",
+      status: outcome.status,
       skillId: input.skillId,
       actorId: input.actorId,
       contract,
       allowedPrimitives,
       transcriptPath,
-      finalWhy: postconditionFailure ?? final.why
+      finalWhy: outcome.finalWhy
     };
   } catch (error) {
     return {

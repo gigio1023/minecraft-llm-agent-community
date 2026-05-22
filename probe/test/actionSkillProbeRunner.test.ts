@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   actionSkillPostconditionSpecs,
   buildSkillProbeActionSkillRecords,
+  classifyActionSkillProbeOutcome,
   loadSkillProbeContract,
   validateSkillProbeConfig,
   validateProbePostcondition,
@@ -179,6 +180,52 @@ test("actionSkillProbeRunner throws for maxActions less than 1", () => {
         maxActions: 0
       }),
     /--max-actions must be at least 1/
+  );
+});
+
+test("actionSkillProbeRunner classifies final status and postcondition evidence separately", () => {
+  assert.deepEqual(
+    classifyActionSkillProbeOutcome({
+      final: { status: "success", why: "terminal memory reached" },
+      postconditionFailure: null
+    }),
+    {
+      status: "passed",
+      finalWhy: "terminal memory reached"
+    }
+  );
+
+  assert.deepEqual(
+    classifyActionSkillProbeOutcome({
+      final: { status: "success", why: "terminal memory reached" },
+      postconditionFailure: "missing inventory evidence"
+    }),
+    {
+      status: "failed",
+      finalWhy: "missing inventory evidence"
+    }
+  );
+
+  assert.deepEqual(
+    classifyActionSkillProbeOutcome({
+      final: { status: "failed", why: "blocked repeatedly" },
+      postconditionFailure: null
+    }),
+    {
+      status: "failed",
+      finalWhy: "terminal status failed even though postcondition passed: blocked repeatedly"
+    }
+  );
+
+  assert.deepEqual(
+    classifyActionSkillProbeOutcome({
+      final: { status: "failed", why: "blocked repeatedly" },
+      postconditionFailure: "missing inventory evidence"
+    }),
+    {
+      status: "failed",
+      finalWhy: "blocked repeatedly; postcondition: missing inventory evidence"
+    }
   );
 });
 

@@ -271,7 +271,9 @@ attached to the expected primitive rather than an unrelated successful step.
 Social probes must prove the delivered chat text matches the action skill
 intent; generic delivered chat or untargeted chat is not sufficient evidence.
 Runtime control probes must prove an observe snapshot happened before a terminal
-memory note.
+memory note. When a live probe writes a transcript, terminal status and
+postcondition evidence are classified separately so reviewers can see whether
+the failure was terminal-control flow, missing Minecraft evidence, or both.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero

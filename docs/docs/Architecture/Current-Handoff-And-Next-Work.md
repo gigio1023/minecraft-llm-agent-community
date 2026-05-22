@@ -426,6 +426,9 @@ Checked-in protection:
 
 - `probe/test/actionSkillProbeRunner.test.ts` rejects empty transcripts for
   every currently implemented action skill;
+- the same runner now classifies terminal status separately from postcondition
+  evidence, so a failed terminal note with valid Minecraft evidence is reported
+  differently from missing evidence;
 - the same test file includes a minimum accepted evidence payload for every
   implemented action skill through the runtime-owned
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill
