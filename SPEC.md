@@ -190,12 +190,34 @@ This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero
 when runtime evidence does not satisfy the contract.
 
+Current harness capabilities:
+
+- deterministic fixture setup through RCON for `collectLogs`,
+  `craftPlanksAndSticks`, `craftCraftingTable`, `inspectSharedChest`,
+  `depositSharedItems`, `handoffItemAtChest`, and social probes;
+- one action-skill-specific deterministic driver for each implemented seed
+  action skill when `PROBE_GAMEPLAY_PROVIDER` is `deterministic`;
+- transcript postcondition checks after the run, so a terminal `remember` note
+  cannot make the probe pass unless the action skill produced required state
+  evidence;
+- craft probes require a passed runtime verifier, not only a non-throwing
+  `bot.craft(...)`;
+- shared-storage probes require positive item movement into the shared chest.
+
 Current live `collectLogs` proof:
 
 - command: `bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard`;
 - artifact: `data/evidence/action_skill_probe_collectLogs-1779385755355.json`;
 - result: inventory increased from `0` to `4` logs and verifier passed
   `collect_4_logs reached 4/4 relevant inventory items`.
+
+Current live verification blocker:
+
+- On 2026-05-22, the craft live probe could not start because the local
+  Docker/OrbStack daemon was unavailable:
+  `dial unix /Users/naem1023/.orbstack/run/docker.sock: connect: no such file or directory`.
+- This is external runtime availability, not action skill evidence. Re-run the
+  probe matrix after Docker/OrbStack is running.
 
 ## 5. Non-Negotiable Rules
 

@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   buildSkillProbeActionSkillRecords,
   loadSkillProbeContract,
   validateSkillProbeConfig,
+  validateProbePostcondition,
   type ActionSkillProbeConfig
 } from "../src/runtime/actionSkillProbeRunner.js";
 
@@ -165,4 +169,53 @@ test("actionSkillProbeRunner throws for maxActions less than 1", () => {
       }),
     /--max-actions must be at least 1/
   );
+});
+
+test("action skill probe postcondition rejects craft completion without passed verification", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "action-skill-probe-"));
+  const transcriptPath = path.join(dir, "transcript.json");
+  await writeFile(
+    transcriptPath,
+    JSON.stringify({
+      steps: [
+        {
+          tool: "craft_item",
+          result: { status: "crafted", itemName: "crafting_table" },
+          verification: { status: "progressing" }
+        },
+        {
+          tool: "remember",
+          result: { status: "remembered", note: "looks done" }
+        }
+      ]
+    })
+  );
+
+  const failure = await validateProbePostcondition("craftCraftingTable", transcriptPath);
+
+  assert.match(failure ?? "", /never produced a passed runtime verification/);
+});
+
+test("action skill probe postcondition accepts shared storage movement evidence", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "action-skill-probe-"));
+  const transcriptPath = path.join(dir, "transcript.json");
+  await writeFile(
+    transcriptPath,
+    JSON.stringify({
+      steps: [
+        {
+          tool: "deposit_shared",
+          result: { status: "deposited", movedCount: 1, itemName: "crafting_table" }
+        },
+        {
+          tool: "remember",
+          result: { status: "remembered", note: "done" }
+        }
+      ]
+    })
+  );
+
+  const failure = await validateProbePostcondition("depositSharedItems", transcriptPath);
+
+  assert.equal(failure, null);
 });

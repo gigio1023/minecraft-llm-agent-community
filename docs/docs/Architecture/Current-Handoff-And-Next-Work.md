@@ -288,9 +288,14 @@ Implemented behavior:
 - select action skill id;
 - initialize actor workspace to baseline when requested;
 - start or reuse the managed server;
+- prepare skill-specific fixtures and inventory preconditions through RCON when
+  the managed server is available;
+- drive deterministic probes with an action-skill-specific provider instead of
+  relying on the broader curriculum provider to pick the right primitive;
 - run exactly one action skill scenario through the existing runtime loop;
 - persist pre/post observations, tool attempts, verification result, provider
   context if used, and transcript output;
+- re-read the transcript and apply a postcondition check before reporting pass;
 - exit with non-zero status when runtime evidence does not satisfy the action
   skill verification contract.
 
@@ -308,9 +313,41 @@ Remaining harness work:
 
 - stream explicit probe events into the dashboard instead of relying only on
   artifact polling;
-- add optional precondition setup for craft-focused probes, such as giving a
-  crafter logs before probing `craftPlanksAndSticks`;
+- run the new craft/storage/social probe matrix after Docker/OrbStack is
+  available locally;
 - add a small live matrix runner only after the single-skill command is stable.
+
+Current postcondition rules:
+
+- `collectLogs`, `craftPlanksAndSticks`, and `craftCraftingTable` require at
+  least one passed runtime verifier in the transcript;
+- `inspectSharedChest` requires an `inspect_chest` result with a real item
+  snapshot;
+- `depositSharedItems` requires `deposit_shared` with `movedCount > 0`;
+- `handoffItemAtChest` requires a positive deposit and delivered chat;
+- `approachAndRequestItem` requires arrival distance evidence and delivered
+  chat;
+- `announceResourceDiscovery` requires delivered chat;
+- `waitForBusyCrafter` requires busy response, bounded wait, and delivered
+  follow-up.
+
+Latest local limitation:
+
+On 2026-05-22, the craft live probe was attempted with:
+
+```bash
+cd probe
+bun run probe:skill -- --actor npc_b --skill craftPlanksAndSticks --max-actions 8 --init-actor-workspace baseline --no-dashboard
+```
+
+It failed before Minecraft startup because Docker/OrbStack was unavailable:
+
+```text
+dial unix /Users/naem1023/.orbstack/run/docker.sock: connect: no such file or directory
+```
+
+Do not treat this as action skill failure evidence. Re-run the matrix once the
+daemon is available.
 
 ### P0: Live `collect_logs` Validation
 

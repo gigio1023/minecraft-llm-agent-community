@@ -1,5 +1,6 @@
 import type { SeedActionSkillId } from "../gameplay/seedSkills/registry.js";
 import { getSeedActionSkill } from "../gameplay/seedSkills/registry.js";
+import { promises as fs } from "node:fs";
 import {
   getActionSkillVerificationContract,
   type ActionSkillVerificationContract
@@ -10,7 +11,6 @@ import { validateProposal } from "../tools/index.js";
 import type { RoleId } from "../npc/roles/contracts.js";
 import type { ProbeConfig } from "../config.js";
 import { loadProbeConfig } from "../config.js";
-import { createDeterministicProvider } from "../provider/deterministicProvider.js";
 import { createOpenAICodexGameplayProvider } from "../provider/openaiCodexGameplayProvider.js";
 import { loadOpenAICodexAuth } from "../mutual/openaiCodexAuth.js";
 import { createBots, closeBots, type ProbeBots } from "./createBots.js";
@@ -68,11 +68,18 @@ type ServerEndpoint = {
 };
 
 type ObserveActor = Parameters<typeof observe>[0]["actor"];
+type RconContext = ReturnType<typeof buildLiveSmokeServerContext>;
+type RconRunner = (args: string[]) => Promise<void>;
 
 const probeCompletedTaskHints: Partial<Record<SeedActionSkillId, string[]>> = {
   craftPlanksAndSticks: ["collect_4_logs"],
   craftCraftingTable: ["collect_4_logs", "craft_planks_and_sticks"]
 };
+
+const probeFixtureOffsets = {
+  collectLogBase: [3, 0, -3],
+  sharedChest: [1, 0, -4]
+} as const;
 
 function asObserveActor(bot: import("mineflayer").Bot): ObserveActor {
   return bot as unknown as ObserveActor;
@@ -139,7 +146,7 @@ function buildProbeConfig(input: ActionSkillProbeConfig, baseConfig = loadProbeC
 
 async function ensureProbeServer(config: ProbeConfig): Promise<{
   server: ServerEndpoint;
-  rconContext?: ReturnType<typeof buildLiveSmokeServerContext>;
+  rconContext?: RconContext;
 }> {
   if (process.env.MC_PORT && process.env.MC_PORT.trim().length > 0) {
     const port = Number(process.env.MC_PORT);
@@ -171,20 +178,12 @@ async function ensureProbeServer(config: ProbeConfig): Promise<{
   };
 }
 
-async function teleportProbeBotsToSpawn(
-  bots: ProbeBots,
-  spawnConfig: { x: number; y: number; z: number },
-  skillId: SeedActionSkillId,
-  rcon?: ReturnType<typeof buildLiveSmokeServerContext>
-) {
-  if (!rcon) {
-    return;
-  }
-
+async function createRconRunner(rcon: RconContext): Promise<RconRunner> {
   const { execFile } = await import("node:child_process");
   const util = await import("node:util");
   const execFileAsync = util.promisify(execFile);
-  const runRcon = async (args: string[]) => {
+
+  return async (args: string[]) => {
     await execFileAsync(
       "docker",
       ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
@@ -194,6 +193,16 @@ async function teleportProbeBotsToSpawn(
       }
     );
   };
+}
+
+async function teleportProbeBotsToSpawn(
+  bots: ProbeBots,
+  spawnConfig: { x: number; y: number; z: number },
+  runRcon?: RconRunner
+) {
+  if (!runRcon) {
+    return;
+  }
 
   const offsets = [
     [0, 0, 0],
@@ -223,23 +232,281 @@ async function teleportProbeBotsToSpawn(
   await Promise.allSettled(
     actorIds.map((actorId) => runRcon(["clear", bots[actorId].username]))
   );
+}
+
+function fixturePosition(
+  spawnConfig: { x: number; y: number; z: number },
+  offset: readonly [number, number, number]
+) {
+  return {
+    x: Math.floor(spawnConfig.x) + offset[0],
+    y: Math.floor(spawnConfig.y) + offset[1],
+    z: Math.floor(spawnConfig.z) + offset[2]
+  };
+}
+
+async function setupProbePreconditions(input: {
+  bots: ProbeBots;
+  actorId: string;
+  skillId: SeedActionSkillId;
+  spawnConfig: { x: number; y: number; z: number };
+  runRcon?: RconRunner;
+}) {
+  const { bots, actorId, skillId, spawnConfig, runRcon } = input;
+  if (!runRcon) {
+    return;
+  }
+
+  const actor = bots[actorId];
+  if (!actor) {
+    return;
+  }
+
+  const give = (itemName: string, count: number) =>
+    runRcon(["give", actor.username, `minecraft:${itemName}`, String(count)]);
+  const clearChestFixture = () => {
+    const chest = fixturePosition(spawnConfig, probeFixtureOffsets.sharedChest);
+    return runRcon(["setblock", String(chest.x), String(chest.y), String(chest.z), "air"]);
+  };
+  const placeChestFixture = async (itemsNbt?: string) => {
+    const chest = fixturePosition(spawnConfig, probeFixtureOffsets.sharedChest);
+    await runRcon(["setblock", String(chest.x), String(chest.y), String(chest.z), "chest"]);
+    if (itemsNbt) {
+      await runRcon([
+        "data",
+        "merge",
+        "block",
+        String(chest.x),
+        String(chest.y),
+        String(chest.z),
+        itemsNbt
+      ]);
+    }
+  };
+
+  await clearChestFixture();
 
   if (skillId === "collectLogs") {
-    const baseX = Math.floor(spawnConfig.x) + 3;
-    const y = Math.floor(spawnConfig.y);
-    const z = Math.floor(spawnConfig.z) - 3;
+    const base = fixturePosition(spawnConfig, probeFixtureOffsets.collectLogBase);
 
     // The collectLogs live probe owns a tiny repeatable tree fixture. Relying
     // on natural spawn trees makes repeated probes deplete the world and turns
     // later failures into setup noise instead of action-skill evidence.
     await Promise.allSettled(
       Array.from({ length: 4 }, (_, index) =>
-        runRcon(["setblock", String(baseX + index), String(y), String(z), "oak_log"])
+        runRcon(["setblock", String(base.x + index), String(base.y), String(base.z), "oak_log"])
       )
     );
   }
 
+  if (skillId === "craftPlanksAndSticks") {
+    await give("oak_log", 4);
+  }
+
+  if (skillId === "craftCraftingTable") {
+    await Promise.allSettled([give("oak_planks", 4), give("stick", 2)]);
+  }
+
+  if (skillId === "inspectSharedChest") {
+    await Promise.allSettled([give("crafting_table", 1)]);
+    await placeChestFixture('{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}');
+  }
+
+  if (skillId === "depositSharedItems" || skillId === "handoffItemAtChest") {
+    await give("crafting_table", skillId === "handoffItemAtChest" ? 2 : 1);
+    await placeChestFixture();
+  }
+
+  if (
+    skillId === "approachAndRequestItem" ||
+    skillId === "announceResourceDiscovery" ||
+    skillId === "waitForBusyCrafter"
+  ) {
+    // A local crafting table in inventory suppresses the bootstrap curriculum,
+    // letting social probes validate their own primitives instead of being
+    // redirected to wood gathering.
+    await give("crafting_table", 1);
+  }
+
   await new Promise((resolve) => setTimeout(resolve, skillId === "collectLogs" ? 3000 : 1500));
+}
+
+function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorId: string) {
+  let turn = 0;
+  return {
+    next(input: {
+      observation?: { inventory?: Array<{ name: string; count: number }> };
+      lastResult: { tool: string; status: string; verification?: { status?: string } } | null;
+    }) {
+      turn += 1;
+
+      if (!input.lastResult) {
+        return { tool: "observe", args: {} };
+      }
+
+      if (input.lastResult.tool === "remember") {
+        return { tool: "remember", args: { note: `${skillId} probe already reached terminal memory` } };
+      }
+
+      if (skillId === "runtimeObserveAndRemember") {
+        return { tool: "remember", args: { note: "runtimeObserveAndRemember probe observed and persisted memory" } };
+      }
+
+      if (skillId === "inspectSharedChest") {
+        if (input.lastResult.tool === "inspect_chest" && input.lastResult.status === "inspected") {
+          return { tool: "remember", args: { note: "inspectSharedChest inspected live shared storage" } };
+        }
+        return { tool: "inspect_chest", args: {} };
+      }
+
+      if (skillId === "depositSharedItems") {
+        if (input.lastResult.tool === "deposit_shared" && input.lastResult.status === "deposited") {
+          return { tool: "remember", args: { note: `${skillId} moved item into shared storage` } };
+        }
+        return { tool: "deposit_shared", args: { itemName: "crafting_table", count: 1 } };
+      }
+
+      if (skillId === "handoffItemAtChest") {
+        if (input.lastResult.tool === "deposit_shared" && input.lastResult.status === "deposited") {
+          return { tool: "say", args: { target: targetActorId, text: "I left a crafting table in the shared chest." } };
+        }
+        if (input.lastResult.tool === "say" && input.lastResult.status === "delivered") {
+          return { tool: "remember", args: { note: "handoffItemAtChest deposited and announced the handoff" } };
+        }
+        return { tool: "deposit_shared", args: { itemName: "crafting_table", count: 1 } };
+      }
+
+      if (skillId === "approachAndRequestItem") {
+        if (input.lastResult.tool === "move_to" && input.lastResult.status === "arrived") {
+          return { tool: "say", args: { target: targetActorId, text: "can you spare one starter item?" } };
+        }
+        if (input.lastResult.tool === "say" && input.lastResult.status === "delivered") {
+          return { tool: "remember", args: { note: "approachAndRequestItem arrived and delivered request" } };
+        }
+        return { tool: "move_to", args: { target: targetActorId } };
+      }
+
+      if (skillId === "announceResourceDiscovery") {
+        if (input.lastResult.tool === "say" && input.lastResult.status === "delivered") {
+          return { tool: "remember", args: { note: "announceResourceDiscovery delivered resource announcement" } };
+        }
+        return { tool: "say", args: { target: targetActorId, text: "I found oak logs near spawn." } };
+      }
+
+      if (skillId === "waitForBusyCrafter") {
+        if (input.lastResult.tool === "say" && input.lastResult.status === "busy") {
+          return { tool: "wait", args: { ticks: 20 } };
+        }
+        if (input.lastResult.tool === "wait") {
+          return { tool: "say", args: { target: targetActorId, text: "checking again when you are ready" } };
+        }
+        if (input.lastResult.tool === "say" && input.lastResult.status === "delivered") {
+          return { tool: "remember", args: { note: "waitForBusyCrafter waited through busy state and delivered follow-up" } };
+        }
+        return { tool: "say", args: { target: targetActorId, text: "are you free to talk?" } };
+      }
+
+      if (input.lastResult.verification?.status === "passed") {
+        return { tool: "remember", args: { note: `${skillId} completed with runtime verification evidence` } };
+      }
+
+      if (skillId === "craftPlanksAndSticks") {
+        const planks = input.observation?.inventory
+          ?.filter((item) => item.name.endsWith("_planks"))
+          .reduce((sum, item) => sum + item.count, 0) ?? 0;
+        return planks < 4
+          ? { tool: "craft_item", args: { itemName: "planks" } }
+          : { tool: "craft_item", args: { itemName: "stick" } };
+      }
+
+      if (skillId === "craftCraftingTable") {
+        return { tool: "craft_item", args: { itemName: "crafting_table" } };
+      }
+
+      if (skillId === "collectLogs") {
+        return { tool: "collect_logs", args: { targetCount: 4 } };
+      }
+
+      return { tool: "remember", args: { note: `${skillId} probe stopped after ${turn} turns` } };
+    }
+  };
+}
+
+type TranscriptPayload = {
+  steps?: Array<{
+    tool?: string;
+    result?: Record<string, unknown>;
+    verification?: { status?: string; reason?: string; progress?: Record<string, unknown> };
+  }>;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+}
+
+function numberField(record: Record<string, unknown>, name: string) {
+  return typeof record[name] === "number" ? record[name] : undefined;
+}
+
+export async function validateProbePostcondition(skillId: SeedActionSkillId, transcriptPath: string) {
+  const payload = JSON.parse(await fs.readFile(transcriptPath, "utf8")) as TranscriptPayload;
+  const steps = payload.steps ?? [];
+  const results = steps.map((step) => ({ tool: step.tool, result: asRecord(step.result), verification: step.verification }));
+  const hasPassedVerification = results.some((step) => step.verification?.status === "passed");
+  const toolResult = (tool: string, predicate: (result: Record<string, unknown>) => boolean) =>
+    results.some((step) => step.tool === tool && predicate(step.result));
+
+  switch (skillId) {
+    case "collectLogs":
+    case "craftPlanksAndSticks":
+    case "craftCraftingTable":
+      if (!hasPassedVerification) {
+        return `${skillId} never produced a passed runtime verification in transcript`;
+      }
+      return null;
+    case "inspectSharedChest":
+      return toolResult("inspect_chest", (result) => result.status === "inspected" && Array.isArray(result.items))
+        ? null
+        : "inspectSharedChest did not inspect a live shared chest";
+    case "depositSharedItems":
+      return toolResult("deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)
+        ? null
+        : `${skillId} did not move any item into shared storage`;
+    case "handoffItemAtChest":
+      if (!toolResult("deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)) {
+        return "handoffItemAtChest did not move any item into shared storage";
+      }
+      return toolResult("say", (result) => result.status === "delivered")
+        ? null
+        : "handoffItemAtChest did not announce the shared chest handoff";
+    case "approachAndRequestItem":
+      if (!toolResult("move_to", (result) => result.status === "arrived" && result.arrived === true)) {
+        return "approachAndRequestItem did not reach interaction range";
+      }
+      return toolResult("say", (result) => result.status === "delivered")
+        ? null
+        : "approachAndRequestItem did not deliver a request after arriving";
+    case "announceResourceDiscovery":
+      return toolResult("say", (result) => result.status === "delivered")
+        ? null
+        : "announceResourceDiscovery did not deliver chat";
+    case "waitForBusyCrafter":
+      if (!toolResult("say", (result) => result.status === "busy")) {
+        return "waitForBusyCrafter did not observe a busy response";
+      }
+      if (!toolResult("wait", (result) => result.status === "waited")) {
+        return "waitForBusyCrafter did not wait after busy response";
+      }
+      return toolResult("say", (result) => result.status === "delivered")
+        ? null
+        : "waitForBusyCrafter did not deliver a follow-up after waiting";
+    case "runtimeObserveAndRemember":
+      return toolResult("remember", (result) => result.status === "remembered")
+        ? null
+        : "runtimeObserveAndRemember did not persist memory";
+    default:
+      return null;
+  }
 }
 
 /**
@@ -390,7 +657,17 @@ export async function runLiveActionSkillProbe(
       host: server.host,
       port: server.port
     });
-    await teleportProbeBotsToSpawn(bots, config.spawn, input.skillId, serverContext.rconContext);
+    const runRcon = serverContext.rconContext
+      ? await createRconRunner(serverContext.rconContext)
+      : undefined;
+    await teleportProbeBotsToSpawn(bots, config.spawn, runRcon);
+    await setupProbePreconditions({
+      bots,
+      actorId: input.actorId,
+      skillId: input.skillId,
+      spawnConfig: config.spawn,
+      runRcon
+    });
 
     const actor = bots[input.actorId];
     const target = bots[Object.keys(bots).find((actorId) => actorId !== input.actorId) ?? input.actorId];
@@ -410,7 +687,7 @@ export async function runLiveActionSkillProbe(
             reasoning: config.gameplayProvider.reasoning,
             maxRetries: config.gameplayProvider.maxRetries
           })
-        : createDeterministicProvider();
+        : createActionSkillProbeProvider(input.skillId, target.username);
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
     const sharedSettlementState = createSharedSettlementState();
@@ -602,14 +879,18 @@ export async function runLiveActionSkillProbe(
       }
     });
 
+    const postconditionFailure = final.status === "success"
+      ? await validateProbePostcondition(input.skillId, transcriptPath)
+      : null;
+
     return {
-      status: final.status === "success" ? "passed" : "failed",
+      status: final.status === "success" && !postconditionFailure ? "passed" : "failed",
       skillId: input.skillId,
       actorId: input.actorId,
       contract,
       allowedPrimitives,
       transcriptPath,
-      finalWhy: final.why
+      finalWhy: postconditionFailure ?? final.why
     };
   } catch (error) {
     return {

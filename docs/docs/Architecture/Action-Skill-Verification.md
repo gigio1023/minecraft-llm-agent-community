@@ -73,6 +73,15 @@ Inventory-only crafting is intentionally separate from table-bound crafting.
 Table-bound recipes need their own primitive that can find/place/use a crafting
 table and verify that boundary.
 
+Per-action-skill probes add a second gate after transcript write:
+
+- `craftPlanksAndSticks` and `craftCraftingTable` pass only when the runtime
+  verifier reaches `passed`;
+- a non-throwing `bot.craft(...)`, a `crafted` result, or a terminal memory note
+  is not enough;
+- probe fixtures may give the actor starting logs, planks, or sticks, but the
+  final claim must still come from post-action inventory observation.
+
 ### Shared Storage
 
 Shared chest actions must close container windows after use and must not write
@@ -84,6 +93,25 @@ Required evidence:
 - before/after chest snapshot;
 - before/after inventory snapshot when available;
 - positive moved count for deposit/withdraw ledger events.
+
+Per-action-skill probes currently use a tiny RCON-placed chest fixture. The
+probe passes only when the transcript shows actual chest inspection or positive
+item movement. This keeps shared-storage action skills from passing on role
+permission alone.
+
+### Social Runtime Actions
+
+Social action skills are still runtime action skills. They do not pass because
+text was proposed by the provider.
+
+Required evidence:
+
+- `approachAndRequestItem`: measured arrival within interaction range and
+  delivered chat;
+- `announceResourceDiscovery`: delivered chat;
+- `handoffItemAtChest`: positive shared-chest deposit and delivered handoff
+  chat;
+- `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up.
 
 ## Current Coverage
 
