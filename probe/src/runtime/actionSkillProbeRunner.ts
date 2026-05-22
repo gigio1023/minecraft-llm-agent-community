@@ -432,12 +432,21 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
   };
 }
 
-type TranscriptPayload = {
+export type ProbeTranscriptPayload = {
   steps?: Array<{
     tool?: string;
     result?: Record<string, unknown>;
     verification?: { status?: string; reason?: string; progress?: Record<string, unknown> };
   }>;
+};
+
+type ProbeTranscriptStep = NonNullable<ProbeTranscriptPayload["steps"]>[number];
+
+export type ActionSkillPostconditionSpec = {
+  skillId: SeedActionSkillId;
+  evidenceSummary: string[];
+  minimumPassingTranscript: ProbeTranscriptPayload;
+  validate(steps: ProbeTranscriptStep[]): string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -448,65 +457,173 @@ function numberField(record: Record<string, unknown>, name: string) {
   return typeof record[name] === "number" ? record[name] : undefined;
 }
 
-export async function validateProbePostcondition(skillId: SeedActionSkillId, transcriptPath: string) {
-  const payload = JSON.parse(await fs.readFile(transcriptPath, "utf8")) as TranscriptPayload;
-  const steps = payload.steps ?? [];
-  const results = steps.map((step) => ({ tool: step.tool, result: asRecord(step.result), verification: step.verification }));
-  const hasPassedVerification = results.some((step) => step.verification?.status === "passed");
-  const toolResult = (tool: string, predicate: (result: Record<string, unknown>) => boolean) =>
-    results.some((step) => step.tool === tool && predicate(step.result));
+function hasPassedVerification(steps: ProbeTranscriptStep[]) {
+  return steps.some((step) => step.verification?.status === "passed");
+}
 
-  switch (skillId) {
-    case "collectLogs":
-    case "craftPlanksAndSticks":
-    case "craftCraftingTable":
-      if (!hasPassedVerification) {
-        return `${skillId} never produced a passed runtime verification in transcript`;
-      }
-      return null;
-    case "inspectSharedChest":
-      return toolResult("inspect_chest", (result) => result.status === "inspected" && Array.isArray(result.items))
-        ? null
-        : "inspectSharedChest did not inspect a live shared chest";
-    case "depositSharedItems":
-      return toolResult("deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)
-        ? null
-        : `${skillId} did not move any item into shared storage`;
-    case "handoffItemAtChest":
-      if (!toolResult("deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)) {
-        return "handoffItemAtChest did not move any item into shared storage";
-      }
-      return toolResult("say", (result) => result.status === "delivered")
-        ? null
-        : "handoffItemAtChest did not announce the shared chest handoff";
-    case "approachAndRequestItem":
-      if (!toolResult("move_to", (result) => result.status === "arrived" && result.arrived === true)) {
-        return "approachAndRequestItem did not reach interaction range";
-      }
-      return toolResult("say", (result) => result.status === "delivered")
-        ? null
-        : "approachAndRequestItem did not deliver a request after arriving";
-    case "announceResourceDiscovery":
-      return toolResult("say", (result) => result.status === "delivered")
-        ? null
-        : "announceResourceDiscovery did not deliver chat";
-    case "waitForBusyCrafter":
-      if (!toolResult("say", (result) => result.status === "busy")) {
-        return "waitForBusyCrafter did not observe a busy response";
-      }
-      if (!toolResult("wait", (result) => result.status === "waited")) {
-        return "waitForBusyCrafter did not wait after busy response";
-      }
-      return toolResult("say", (result) => result.status === "delivered")
-        ? null
-        : "waitForBusyCrafter did not deliver a follow-up after waiting";
-    case "runtimeObserveAndRemember":
-      return toolResult("remember", (result) => result.status === "remembered")
+function hasToolResult(
+  steps: ProbeTranscriptStep[],
+  tool: string,
+  predicate: (result: Record<string, unknown>) => boolean
+) {
+  return steps.some((step) => step.tool === tool && predicate(asRecord(step.result)));
+}
+
+export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, ActionSkillPostconditionSpec>> = {
+  runtimeObserveAndRemember: {
+    skillId: "runtimeObserveAndRemember",
+    evidenceSummary: ["memory note was persisted through remember"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "remember", result: { status: "remembered", note: "observed" } }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "remember", (result) => result.status === "remembered")
         ? null
         : "runtimeObserveAndRemember did not persist memory";
-    default:
-      return null;
+    }
+  },
+  collectLogs: {
+    skillId: "collectLogs",
+    evidenceSummary: ["runtime verifier passed after log inventory increase"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "collect_logs", result: { status: "collected" }, verification: { status: "passed" } }]
+    },
+    validate(steps) {
+      return hasPassedVerification(steps)
+        ? null
+        : "collectLogs never produced a passed runtime verification in transcript";
+    }
+  },
+  craftPlanksAndSticks: {
+    skillId: "craftPlanksAndSticks",
+    evidenceSummary: ["runtime verifier passed after plank and stick inventory outputs"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
+    },
+    validate(steps) {
+      return hasPassedVerification(steps)
+        ? null
+        : "craftPlanksAndSticks never produced a passed runtime verification in transcript";
+    }
+  },
+  craftCraftingTable: {
+    skillId: "craftCraftingTable",
+    evidenceSummary: ["runtime verifier passed after crafting table inventory output"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
+    },
+    validate(steps) {
+      return hasPassedVerification(steps)
+        ? null
+        : "craftCraftingTable never produced a passed runtime verification in transcript";
+    }
+  },
+  inspectSharedChest: {
+    skillId: "inspectSharedChest",
+    evidenceSummary: ["shared chest inspection returned an item snapshot"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "inspect_chest", result: { status: "inspected", items: [{ name: "oak_log", count: 2 }] } }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "inspect_chest", (result) => result.status === "inspected" && Array.isArray(result.items))
+        ? null
+        : "inspectSharedChest did not inspect a live shared chest";
+    }
+  },
+  depositSharedItems: {
+    skillId: "depositSharedItems",
+    evidenceSummary: ["deposit_shared moved a positive item count"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)
+        ? null
+        : "depositSharedItems did not move any item into shared storage";
+    }
+  },
+  approachAndRequestItem: {
+    skillId: "approachAndRequestItem",
+    evidenceSummary: ["move_to arrived within range", "say delivered the request"],
+    minimumPassingTranscript: {
+      steps: [
+        { tool: "move_to", result: { status: "arrived", arrived: true } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    },
+    validate(steps) {
+      if (!hasToolResult(steps, "move_to", (result) => result.status === "arrived" && result.arrived === true)) {
+        return "approachAndRequestItem did not reach interaction range";
+      }
+      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+        ? null
+        : "approachAndRequestItem did not deliver a request after arriving";
+    }
+  },
+  announceResourceDiscovery: {
+    skillId: "announceResourceDiscovery",
+    evidenceSummary: ["say delivered the resource announcement"],
+    minimumPassingTranscript: {
+      steps: [{ tool: "say", result: { status: "delivered" } }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+        ? null
+        : "announceResourceDiscovery did not deliver chat";
+    }
+  },
+  handoffItemAtChest: {
+    skillId: "handoffItemAtChest",
+    evidenceSummary: ["deposit_shared moved a positive item count", "say delivered the handoff"],
+    minimumPassingTranscript: {
+      steps: [
+        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    },
+    validate(steps) {
+      if (!hasToolResult(steps, "deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)) {
+        return "handoffItemAtChest did not move any item into shared storage";
+      }
+      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+        ? null
+        : "handoffItemAtChest did not announce the shared chest handoff";
+    }
+  },
+  waitForBusyCrafter: {
+    skillId: "waitForBusyCrafter",
+    evidenceSummary: ["say observed busy", "wait completed", "say delivered follow-up"],
+    minimumPassingTranscript: {
+      steps: [
+        { tool: "say", result: { status: "busy" } },
+        { tool: "wait", result: { status: "waited" } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    },
+    validate(steps) {
+      if (!hasToolResult(steps, "say", (result) => result.status === "busy")) {
+        return "waitForBusyCrafter did not observe a busy response";
+      }
+      if (!hasToolResult(steps, "wait", (result) => result.status === "waited")) {
+        return "waitForBusyCrafter did not wait after busy response";
+      }
+      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+        ? null
+        : "waitForBusyCrafter did not deliver a follow-up after waiting";
+    }
   }
+};
+
+export async function validateProbePostcondition(skillId: SeedActionSkillId, transcriptPath: string) {
+  const payload = JSON.parse(await fs.readFile(transcriptPath, "utf8")) as ProbeTranscriptPayload;
+  const steps = payload.steps ?? [];
+
+  const spec = actionSkillPostconditionSpecs[skillId];
+  if (!spec) {
+    return `Missing action skill probe postcondition spec: ${skillId}`;
+  }
+
+  return spec.validate(steps);
 }
 
 /**

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  actionSkillPostconditionSpecs,
   buildSkillProbeActionSkillRecords,
   loadSkillProbeContract,
   validateSkillProbeConfig,
@@ -11,8 +12,7 @@ import {
   type ActionSkillProbeConfig
 } from "../src/runtime/actionSkillProbeRunner.js";
 import {
-  listImplementedSeedActionSkills,
-  type SeedActionSkillId
+  listImplementedSeedActionSkills
 } from "../src/gameplay/seedSkills/registry.js";
 
 async function writeTranscriptPayload(payload: unknown) {
@@ -225,76 +225,19 @@ test("action skill probe postcondition rejects empty transcripts for every imple
   const transcriptPath = await writeTranscriptPayload({ steps: [] });
 
   for (const skill of listImplementedSeedActionSkills()) {
+    assert.ok(actionSkillPostconditionSpecs[skill.id], `${skill.id} must declare a postcondition spec`);
     const failure = await validateProbePostcondition(skill.id, transcriptPath);
     assert.notEqual(failure, null, `${skill.id} must require explicit postcondition evidence`);
   }
 });
 
-test("action skill probe postcondition accepts minimum evidence for every implemented action skill", async () => {
-  const positivePayloads: Record<SeedActionSkillId, unknown> = {
-    runtimeObserveAndRemember: {
-      steps: [{ tool: "remember", result: { status: "remembered", note: "observed" } }]
-    },
-    collectLogs: {
-      steps: [{ tool: "collect_logs", result: { status: "collected" }, verification: { status: "passed" } }]
-    },
-    craftPlanksAndSticks: {
-      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
-    },
-    craftCraftingTable: {
-      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
-    },
-    inspectSharedChest: {
-      steps: [{ tool: "inspect_chest", result: { status: "inspected", items: [{ name: "oak_log", count: 2 }] } }]
-    },
-    depositSharedItems: {
-      steps: [{ tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }]
-    },
-    approachAndRequestItem: {
-      steps: [
-        { tool: "move_to", result: { status: "arrived", arrived: true } },
-        { tool: "say", result: { status: "delivered" } }
-      ]
-    },
-    announceResourceDiscovery: {
-      steps: [{ tool: "say", result: { status: "delivered" } }]
-    },
-    handoffItemAtChest: {
-      steps: [
-        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } },
-        { tool: "say", result: { status: "delivered" } }
-      ]
-    },
-    waitForBusyCrafter: {
-      steps: [
-        { tool: "say", result: { status: "busy" } },
-        { tool: "wait", result: { status: "waited" } },
-        { tool: "say", result: { status: "delivered" } }
-      ]
-    },
-    craftWoodenPickaxe: { steps: [] },
-    mineCobblestone: { steps: [] },
-    craftStonePickaxe: { steps: [] },
-    craftFurnace: { steps: [] },
-    mineCoal: { steps: [] },
-    smeltRawIron: { steps: [] },
-    collectDroppedItems: { steps: [] },
-    exploreForMaterials: { steps: [] },
-    placeCraftingTable: { steps: [] },
-    equipBestTool: { steps: [] },
-    placeTorchLightArea: { steps: [] },
-    eatFoodWhenHungry: { steps: [] },
-    sleepAtNight: { steps: [] },
-    fleeDanger: { steps: [] },
-    setupSharedStash: { steps: [] },
-    patrolArea: { steps: [] },
-    threatenApproach: { steps: [] },
-    stealFromChestIfExposed: { steps: [] },
-    attackThenRetreat: { steps: [] }
-  };
-
+test("action skill probe postcondition accepts spec-declared minimum evidence for every implemented action skill", async () => {
   for (const skill of listImplementedSeedActionSkills()) {
-    const transcriptPath = await writeTranscriptPayload(positivePayloads[skill.id]);
+    const spec = actionSkillPostconditionSpecs[skill.id];
+    assert.ok(spec, `${skill.id} must declare a postcondition spec`);
+    assert.ok(spec.evidenceSummary.length > 0, `${skill.id} must summarize required evidence`);
+
+    const transcriptPath = await writeTranscriptPayload(spec.minimumPassingTranscript);
     const failure = await validateProbePostcondition(skill.id, transcriptPath);
     assert.equal(failure, null, `${skill.id} should accept its minimum evidence payload`);
   }
