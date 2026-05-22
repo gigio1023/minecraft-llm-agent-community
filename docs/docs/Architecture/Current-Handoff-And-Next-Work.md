@@ -174,7 +174,9 @@ Implemented surfaces:
 - CLI options for NPC count, bot ids, max actions, observation window, actor
   workspace initialization, and dashboard port;
 - Bun/Elysia dashboard server that starts with the CLI by default;
-- dashboard assets and Minecraft-style item icons.
+- dashboard assets and Minecraft-style item icons;
+- best-effort runtime event streaming from `runAgentLoop` into the dashboard via
+  `/api/runtime-events`, with SSE plus polling fallback.
 
 Important files:
 
@@ -612,13 +614,15 @@ Implemented behavior:
 - dashboard startup checks whether the fixed port is already accepting
   connections and treats an existing dashboard as reusable;
 - dashboard startup remains best-effort and does not fail gameplay or action
-  skill probes.
+  skill probes;
+- dashboard event ingestion tolerates missing or partial artifacts because
+  runtime events are fire-and-forget and state refresh still falls back to
+  artifact polling.
 
 Remaining work:
 
 - fixed ports only, with explicit reuse-or-fail behavior;
-- clear stale process detection;
-- dashboard event ingestion should tolerate missing or partial artifacts.
+- clear stale process detection.
 
 ### P1: Crafting Table Boundary
 
@@ -711,7 +715,8 @@ Check:
 
 1. Run live `collectLogs` probe until it passes repeatably.
 2. Feed failures into actor evidence and reviewer queue.
-3. Improve dashboard event stream around that probe.
+3. Use dashboard runtime events to inspect each live probe turn while keeping
+   the dashboard as an observer, not a control plane.
 4. Add precondition setup for craft probes.
 5. Add crafting-table primitive.
 6. Add generic `mine_block`.

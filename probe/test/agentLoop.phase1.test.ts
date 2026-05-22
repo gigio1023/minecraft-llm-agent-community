@@ -40,6 +40,7 @@ test("agent loop repeats move_to until the current approach task is verified", a
   const actor = createBot("npc_a", 0);
   const target = createBot("npc_b", 4);
   const transcriptSteps: Array<Record<string, unknown>> = [];
+  const events: Array<Record<string, unknown>> = [];
   let moveToCalls = 0;
   const rootDir = path.resolve(
     here,
@@ -59,6 +60,9 @@ test("agent loop repeats move_to until the current approach task is verified", a
         actorWorkspaceRootDir: rootDir
       },
       stepDelayMs: 0,
+      onEvent(event) {
+        events.push(event);
+      },
       transcript: {
         recordStep(step) {
           transcriptSteps.push(step as Record<string, unknown>);
@@ -127,6 +131,12 @@ test("agent loop repeats move_to until the current approach task is verified", a
       transcriptSteps.map((step) => step.tool),
       ["observe", "move_to", "move_to", "say", "remember"]
     );
+    assert.deepEqual(
+      events.map((event) => event.type).filter((type) => type === "tool_completed"),
+      ["tool_completed", "tool_completed", "tool_completed", "tool_completed", "tool_completed"]
+    );
+    assert.equal(events.at(-1)?.type, "loop_completed");
+    assert.equal(events.at(-1)?.status, "success");
     assert.equal((transcriptSteps[1]?.verification as { status: string }).status, "progressing");
     assert.equal((transcriptSteps[2]?.verification as { status: string }).status, "passed");
 

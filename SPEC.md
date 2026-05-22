@@ -196,6 +196,11 @@ RCON setup is part of the evidence contract.
 When Docker is unavailable and no live manual server override exists, it reports
 `environment_blocked` with the Docker preflight command and exits without
 mutating actor workspace state.
+When the dashboard is enabled, the harness sends best-effort `agent-loop-event`
+runtime events to `/api/runtime-events` for turn observation, provider proposal,
+tool completion, and loop completion. These events are fire-and-forget:
+dashboard failure must not reject, delay, or relabel NPC action execution, and
+the dashboard still falls back to artifact polling.
 
 Current matrix command:
 

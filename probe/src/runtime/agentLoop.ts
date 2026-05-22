@@ -43,6 +43,18 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+export type AgentLoopEvent = {
+  schema: "agent-loop-event/v1";
+  type: "turn_observed" | "provider_proposed" | "tool_completed" | "loop_completed";
+  at: string;
+  actorId: string;
+  turnId?: string;
+  tool?: AllowedTool;
+  status?: string;
+  taskId?: string;
+  data?: JsonValue;
+};
+
 type RuntimeActor = {
   username: string;
 };
@@ -126,6 +138,7 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
       model: string;
     };
   };
+  onEvent?: (event: AgentLoopEvent) => void | Promise<void>;
 };
 
 const DEFAULT_MAX_ACTIONS = 10;
@@ -189,6 +202,23 @@ function shouldVerifyTaskProgress(
   );
 }
 
+function emitAgentLoopEvent(
+  onEvent: AgentLoopArgs<RuntimeActor>["onEvent"],
+  event: Omit<AgentLoopEvent, "schema" | "at">
+) {
+  if (!onEvent) {
+    return;
+  }
+
+  void Promise.resolve(
+    onEvent({
+      schema: "agent-loop-event/v1",
+      at: new Date().toISOString(),
+      ...event
+    })
+  ).catch(() => undefined);
+}
+
 async function executeTool<TActor extends RuntimeActor>(
   tools: AgentLoopTools<TActor>,
   validated: ValidatedProposal,
@@ -235,7 +265,8 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   activeActionSkills,
   stepDelayMs = 1000,
   maxActions = DEFAULT_MAX_ACTIONS,
-  artifacts
+  artifacts,
+  onEvent
 }: AgentLoopArgs<TActor>) {
   const actor = bots.actor;
   const target = bots.target;
@@ -292,6 +323,18 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     previousIntent = pressureContext.currentIntent;
 
     const turnId = `turn-${String(step + 1).padStart(4, "0")}`;
+    emitAgentLoopEvent(onEvent, {
+      type: "turn_observed",
+      actorId: actor.username,
+      turnId,
+      taskId: currentTask?.id,
+      status: observation.status,
+      data: {
+        visible_actor_count: observation.visibleActors.length,
+        inventory_count: observation.inventory?.length ?? 0
+      }
+    });
+
     const providerInput = {
       observation,
       lastResult,
@@ -325,6 +368,17 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       proposal
     });
     const validated = tools.validateProposal(proposal);
+    emitAgentLoopEvent(onEvent, {
+      type: "provider_proposed",
+      actorId: actor.username,
+      turnId,
+      tool: validated.tool,
+      taskId: currentTask?.id,
+      data: {
+        args: toJsonRecord(validated.args)
+      }
+    });
+
     const preActionPosition = readActorPosition(actor);
     const execution = await executePhaseOneTool({
       tools,
@@ -340,6 +394,19 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     const postActionPosition = readActorPosition(actor);
     const result = execution.result;
     const verification = execution.verification ?? readVerification(result);
+    emitAgentLoopEvent(onEvent, {
+      type: "tool_completed",
+      actorId: actor.username,
+      turnId,
+      tool: validated.tool,
+      status: String(result.status ?? ""),
+      taskId: currentTask?.id,
+      data: {
+        ok: result.ok === true,
+        verification_status: verification?.status ?? null,
+        verification_reason: verification?.reason ?? null
+      }
+    });
 
     const evidenceRefs = await recordTurnAndAttemptEvidenceIfRequested({
       artifacts,
@@ -417,14 +484,32 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
         typeof result.note === "string"
           ? result.note
           : "runtime-owned curriculum reached a terminal note";
+      const status = classifyTerminalNote(note);
+      emitAgentLoopEvent(onEvent, {
+        type: "loop_completed",
+        actorId: actor.username,
+        turnId,
+        tool: validated.tool,
+        status,
+        taskId: currentTask?.id,
+        data: { why: note }
+      });
 
       return {
-        status: classifyTerminalNote(note),
+        status,
         why: note
       };
     }
   }
 
+  emitAgentLoopEvent(onEvent, {
+    type: "loop_completed",
+    actorId: actor.username,
+    status: "error",
+    data: {
+      why: `Agent loop exhausted ${maxActions}-action budget without remember`
+    }
+  });
   throw new Error(`Agent loop exhausted ${maxActions}-action budget without remember`);
 }
 

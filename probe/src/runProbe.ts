@@ -4,7 +4,7 @@ import { createOpenAICodexGameplayProvider } from "./provider/openaiCodexGamepla
 import { closeBots, createBots } from "./runtime/createBots.js";
 import { createDialogueState } from "./runtime/dialogueState.js";
 import { createMemory } from "./runtime/memory.js";
-import { runAgentLoop } from "./runtime/agentLoop.js";
+import { runAgentLoop, type AgentLoopEvent } from "./runtime/agentLoop.js";
 import { createTranscript } from "./runtime/transcript.js";
 import { loadOpenAICodexAuth } from "./mutual/openaiCodexAuth.js";
 import { validateProposal } from "./tools/index.js";
@@ -51,6 +51,10 @@ type FinalizeRunProbeOptions = {
   result?: { transcriptPath: string } | null;
   caughtError?: unknown;
   cleanupErrors?: unknown[];
+};
+
+type RunProbeOptions = {
+  onEvent?: (event: AgentLoopEvent) => void;
 };
 
 type ObserveActor = Parameters<typeof observe>[0]["actor"];
@@ -245,7 +249,7 @@ async function teleportBotsToRequestedSpawn(
   await new Promise((resolve) => setTimeout(resolve, 2000));
 }
 
-export async function runProbe(): Promise<ProbeRunResult> {
+export async function runProbe(options: RunProbeOptions = {}): Promise<ProbeRunResult> {
   const config = loadProbeConfig();
   const maxActions = readProbeMaxActions();
   const gameplayAuth =
@@ -380,6 +384,7 @@ export async function runProbe(): Promise<ProbeRunResult> {
           }
         },
         transcript,
+        onEvent: options.onEvent,
         tools: {
           validateProposal,
           observe: ({ actor, target }) =>

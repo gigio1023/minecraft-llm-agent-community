@@ -2,6 +2,7 @@ import { watch, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Elysia } from "elysia";
+import type { DashboardRuntimeEvent } from "./runtimeEvents.js";
 
 type JsonRecord = Record<string, unknown>;
 type JsonEntry = {
@@ -23,6 +24,8 @@ const evidenceRoot = path.join(repoRoot, "data/evidence");
 const dashboardAssetRoot = path.join(repoRoot, "probe/src/dashboard/assets");
 const refreshDebounceMs = 120;
 const heartbeatMs = 15_000;
+const maxRuntimeEvents = 80;
+const recentRuntimeEvents: DashboardRuntimeEvent[] = [];
 
 function parsePort(argv: readonly string[]) {
   const portIndex = argv.indexOf("--port");
@@ -312,6 +315,7 @@ async function buildState() {
       final_status: latest?.json?.final && isRecord(latest.json.final) ? latest.json.final.status ?? null : null,
       final_why: latest?.json?.final && isRecord(latest.json.final) ? latest.json.final.why ?? null : null
     },
+    runtime_events: recentRuntimeEvents,
     actors,
     latest_transcript: latest
   };
@@ -369,6 +373,16 @@ class DashboardBroadcaster {
     for (const watcher of this.watchers) {
       watcher.close();
     }
+  }
+
+  ingestRuntimeEvent(event: DashboardRuntimeEvent) {
+    recentRuntimeEvents.push(event);
+    recentRuntimeEvents.splice(0, Math.max(0, recentRuntimeEvents.length - maxRuntimeEvents));
+    const payload = `event: runtime_event\ndata: ${JSON.stringify(event)}\n\n`;
+    for (const client of this.clients.values()) {
+      void this.write(client.writer, payload);
+    }
+    this.scheduleRefresh();
   }
 
   private scheduleRefresh() {
@@ -469,6 +483,9 @@ function html() {
     .relation { display:grid; grid-template-columns:74px 1fr; gap:6px; align-items:center; margin:5px 0; }
     .timeline { display:grid; gap:6px; }
     .event { border-left:2px solid var(--accent); padding:6px 8px; background:var(--panel2); border-radius:0 5px 5px 0; }
+    .runtime-events { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:6px; }
+    .runtime-event { background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:5px; padding:7px; min-height:64px; }
+    .runtime-event strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .skill-name { display:flex; gap:8px; align-items:center; }
     .skill-loadout { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:6px; }
     .skill-slot { background:var(--panel3); border:1px solid var(--line); border-radius:5px; padding:7px; }
@@ -492,6 +509,7 @@ function html() {
   </header>
   <main>
     <section class="summary" id="summary"></section>
+    <section class="panel" id="runtime-events"></section>
     <section class="actors" id="actors"></section>
   </main>
   <script>
@@ -563,6 +581,14 @@ function html() {
       if (!memory?.length) return '<div class="sub">memory artifact 없음</div>';
       return '<div class="timeline">' + memory.map((item) => '<div class="event"><strong>' + esc(item.file) + '</strong><div class="sub">' + esc(item.summary) + '</div></div>').join('') + '</div>';
     }
+    function runtimeEventList(events) {
+      const rows = (events ?? []).slice(-12).reverse();
+      if (!rows.length) return '<h3>Runtime Events</h3><div class="sub">agent loop 이벤트 대기 중</div>';
+      return '<h3>Runtime Events</h3><div class="runtime-events">' + rows.map((event) => {
+        const detail = [event.turnId, event.tool, event.status].filter(Boolean).join(' / ');
+        return '<div class="runtime-event"><strong>' + esc(event.actorId) + ' · ' + esc(event.type) + '</strong><div class="sub">' + esc(detail || event.at) + '</div><div class="primitive-row">' + (event.tool ? chip(event.tool) : '') + (event.taskId ? '<span class="chip">' + esc(event.taskId) + '</span>' : '') + '</div></div>';
+      }).join('') + '</div>';
+    }
     function renderActor(actor) {
       const s = actor.summary ?? {};
       const latestInput = latest(actor.provider_inputs);
@@ -602,6 +628,7 @@ function html() {
         metric('Latest transcript', state.summary.latest_transcript_file ?? 'none'),
         metric('Final', state.summary.final_status ?? 'none')
       ].join('');
+      document.getElementById('runtime-events').innerHTML = runtimeEventList(state.runtime_events);
       document.getElementById('actors').innerHTML = state.actors.map(renderActor).join('');
     }
     async function pollRefresh() {
@@ -620,6 +647,7 @@ function html() {
       }
       const source = new EventSource('/api/events');
       source.addEventListener('state', (event) => render(JSON.parse(event.data)));
+      source.addEventListener('runtime_event', () => void pollRefresh());
       source.addEventListener('dashboard_error', (event) => {
         const data = JSON.parse(event.data);
         document.getElementById('updated').innerHTML = '<span class="stale">dashboard error: ' + esc(data.message) + '</span>';
@@ -683,6 +711,19 @@ export function startDashboardServer(port = defaultPort) {
 
   const app = new Elysia()
     .get("/api/state", async () => sendJson(await buildState()))
+    .post("/api/runtime-events", async ({ body }) => {
+      const event = body as DashboardRuntimeEvent;
+      if (
+        event?.schema !== "agent-loop-event/v1" ||
+        typeof event.actorId !== "string" ||
+        typeof event.type !== "string"
+      ) {
+        return new Response("Invalid runtime event", { status: 400 });
+      }
+
+      broadcaster.ingestRuntimeEvent(event);
+      return sendJson({ ok: true });
+    })
     .get("/api/events", ({ request }) => {
       const stream = new TransformStream<Uint8Array>();
       broadcaster.addClient(stream.writable.getWriter(), request.signal);

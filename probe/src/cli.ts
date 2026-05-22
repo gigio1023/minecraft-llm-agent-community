@@ -1,5 +1,6 @@
 import { runProbe } from "./runProbe.js";
 import { startDashboardServer, type DashboardServer } from "./dashboard/dashboardServer.js";
+import { createDashboardRuntimeEventSink } from "./dashboard/runtimeEvents.js";
 import { probePort } from "./server/serverLifecycle.js";
 
 type CliOptions = {
@@ -176,8 +177,11 @@ async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     applyOptionsToEnv(options);
+    const dashboardPort = options.dashboardPort ?? 4173;
     dashboardServer = await startCliDashboard(options);
-    const { transcriptPath, cleanupError } = await runProbe();
+    const { transcriptPath, cleanupError } = await runProbe({
+      onEvent: options.dashboard === false ? undefined : createDashboardRuntimeEventSink(dashboardPort)
+    });
 
     if (cleanupError) {
       console.warn(formatError(cleanupError));

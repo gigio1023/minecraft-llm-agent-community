@@ -14,6 +14,7 @@ import {
 } from "./runtime/actorWorkspace.js";
 import { assignSeedActionSkillOwnership } from "./skills/ownership.js";
 import { startDashboardServer, type DashboardServer } from "./dashboard/dashboardServer.js";
+import { createDashboardRuntimeEventSink } from "./dashboard/runtimeEvents.js";
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
 import { probePort } from "./server/serverLifecycle.js";
 import { checkDockerPreflight, dockerPreflightCommand } from "./server/dockerPreflight.js";
@@ -230,13 +231,13 @@ async function main() {
     }
 
     // Start dashboard if not disabled
+    const dashboardPort = cliOptions.dashboardPort ?? 3099;
     if (cliOptions.dashboard !== false) {
-      const port = cliOptions.dashboardPort ?? 3099;
       try {
-        if ((await probePort(port)).inUse) {
-          console.warn(`dashboard already running: http://127.0.0.1:${port}`);
+        if ((await probePort(dashboardPort)).inUse) {
+          console.warn(`dashboard already running: http://127.0.0.1:${dashboardPort}`);
         } else {
-          dashboardServer = startDashboardServer(port);
+          dashboardServer = startDashboardServer(dashboardPort);
           console.log(`dashboard: ${dashboardServer.url}`);
         }
       } catch (error) {
@@ -260,7 +261,12 @@ async function main() {
       console.log(`  live probe: ${contract.liveProbe}`);
     }
 
-    const result = await runLiveActionSkillProbe(probeConfig);
+    const result = await runLiveActionSkillProbe({
+      ...probeConfig,
+      onEvent: cliOptions.dashboard === false
+        ? undefined
+        : createDashboardRuntimeEventSink(dashboardPort)
+    });
 
     console.log(`\n─── Probe Result ───`);
     console.log(`  status: ${result.status}`);

@@ -15,7 +15,7 @@ import { createBots, closeBots, type ProbeBots } from "./createBots.js";
 import { createDialogueState } from "./dialogueState.js";
 import { createMemory } from "./memory.js";
 import { createTranscript } from "./transcript.js";
-import { runAgentLoop } from "./agentLoop.js";
+import { runAgentLoop, type AgentLoopEvent } from "./agentLoop.js";
 import { withActionWrapper } from "../mutual/tools/wrapper.js";
 import { moveTo } from "../tools/moveTo.js";
 import { observe } from "../tools/observe.js";
@@ -45,6 +45,7 @@ export type ActionSkillProbeConfig = {
   skillId: SeedActionSkillId;
   roleId: RoleId;
   maxActions: number;
+  onEvent?: (event: AgentLoopEvent) => void;
 };
 
 export type ActionSkillProbeResult = {
@@ -1316,6 +1317,7 @@ export async function runLiveActionSkillProbe(
         }
       },
       transcript,
+      onEvent: input.onEvent,
       tools: {
         validateProposal,
         observe: ({ actor, target }) =>
