@@ -300,6 +300,9 @@ Implemented behavior:
   the managed server is available;
 - drive deterministic probes with an action-skill-specific provider instead of
   relying on the broader curriculum provider to pick the right primitive;
+- keep this action-skill probe provider deterministic regardless of
+  `PROBE_GAMEPLAY_PROVIDER`, so live contract checks do not require OpenAI auth
+  and do not confuse LLM proposal behavior with primitive correctness;
 - run exactly one action skill scenario through the existing runtime loop;
 - persist pre/post observations, tool attempts, verification result, provider
   context if used, and transcript output;

@@ -11,8 +11,6 @@ import { validateProposal } from "../tools/index.js";
 import type { RoleId } from "../npc/roles/contracts.js";
 import type { ProbeConfig } from "../config.js";
 import { loadProbeConfig } from "../config.js";
-import { createOpenAICodexGameplayProvider } from "../provider/openaiCodexGameplayProvider.js";
-import { loadOpenAICodexAuth } from "../mutual/openaiCodexAuth.js";
 import { createBots, closeBots, type ProbeBots } from "./createBots.js";
 import { createDialogueState } from "./dialogueState.js";
 import { createMemory } from "./memory.js";
@@ -105,6 +103,11 @@ const deterministicProbeDriverSkillIds = [
 ] as const satisfies readonly SeedActionSkillId[];
 
 const deterministicProbeDriverSkillIdSet = new Set<SeedActionSkillId>(deterministicProbeDriverSkillIds);
+
+export const actionSkillProbeProviderMetadata = {
+  provider_id: "deterministic-action-skill-probe",
+  model: "deterministic-action-skill-probe-driver"
+} as const;
 
 export type ActionSkillProbePreconditionMode =
   | "none"
@@ -1219,10 +1222,6 @@ export async function runLiveActionSkillProbe(
   const { contract, allowedPrimitives } = loadSkillProbeContract(input.skillId);
   const activeActionSkills = buildSkillProbeActionSkillRecords(input);
   const config = buildProbeConfig(input);
-  const gameplayAuth =
-    config.gameplayProvider.providerId === "openai-codex"
-      ? await loadOpenAICodexAuth(config.liveDialogue.authStorePath)
-      : null;
   let server: ServerEndpoint | null = null;
   let bots: ProbeBots | null = null;
 
@@ -1257,15 +1256,7 @@ export async function runLiveActionSkillProbe(
     const dialogueState = createDialogueState({
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable
     });
-    const provider =
-      config.gameplayProvider.providerId === "openai-codex"
-        ? createOpenAICodexGameplayProvider({
-            accessToken: gameplayAuth?.accessToken ?? "",
-            model: config.gameplayProvider.model,
-            reasoning: config.gameplayProvider.reasoning,
-            maxRetries: config.gameplayProvider.maxRetries
-          })
-        : createActionSkillProbeProvider(input.skillId, target.username);
+    const provider = createActionSkillProbeProvider(input.skillId, target.username);
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
     const sharedSettlementState = createSharedSettlementState();
@@ -1303,12 +1294,12 @@ export async function runLiveActionSkillProbe(
       artifacts: {
         actorWorkspaceRootDir: config.actorWorkspace.rootDir,
         providerInputSnapshots: {
-          provider_id: config.gameplayProvider.providerId,
-          model: config.gameplayProvider.model
+          provider_id: actionSkillProbeProviderMetadata.provider_id,
+          model: actionSkillProbeProviderMetadata.model
         },
         providerOutputSnapshots: {
-          provider_id: config.gameplayProvider.providerId,
-          model: config.gameplayProvider.model
+          provider_id: actionSkillProbeProviderMetadata.provider_id,
+          model: actionSkillProbeProviderMetadata.model
         }
       },
       transcript,

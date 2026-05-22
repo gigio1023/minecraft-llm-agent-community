@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  actionSkillProbeProviderMetadata,
   actionSkillPostconditionSpecs,
   buildSkillProbeActionSkillRecords,
   classifyActionSkillProbeOutcome,
@@ -205,6 +206,13 @@ test("actionSkillProbeRunner requires deterministic live probe coverage for ever
       `${skill.id} must declare a live probe precondition mode`
     );
   }
+});
+
+test("actionSkillProbeRunner uses deterministic provider metadata for live probes", () => {
+  assert.deepEqual(actionSkillProbeProviderMetadata, {
+    provider_id: "deterministic-action-skill-probe",
+    model: "deterministic-action-skill-probe-driver"
+  });
 });
 
 test("actionSkillProbeRunner classifies final status and postcondition evidence separately", () => {

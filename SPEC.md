@@ -316,7 +316,8 @@ Current harness capabilities:
   `craftPlanksAndSticks`, `craftCraftingTable`, `inspectSharedChest`,
   `depositSharedItems`, `handoffItemAtChest`, and social probes;
 - one action-skill-specific deterministic driver for each implemented seed
-  action skill when `PROBE_GAMEPLAY_PROVIDER` is `deterministic`;
+  action skill; the action-skill probe harness does not switch to OpenAI auth or
+  an LLM provider based on `PROBE_GAMEPLAY_PROVIDER`;
 - transcript postcondition checks after the run, so a terminal `remember` note
   cannot make the probe pass unless the action skill produced required state
   evidence;

@@ -117,7 +117,9 @@ Per-action-skill probes add a second gate after transcript write:
 - every implemented action skill must declare an explicit deterministic live
   probe driver and probe fixture/precondition mode. Missing driver coverage is
   a validation failure, not permission to terminate through a generic
-  `remember` note.
+  `remember` note. The action-skill probe harness always uses this deterministic
+  provider path; gameplay provider environment settings must not pull these
+  contract probes into OpenAI auth or LLM proposal behavior.
 - matrix `cases[]` rows include `readinessItems`, so reviewers can audit
   registry status, selected role, primitive ownership, verification contract,
   postcondition spec, deterministic driver, and fixture/precondition mode before
