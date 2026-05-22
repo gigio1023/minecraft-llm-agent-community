@@ -484,12 +484,13 @@ function arrayField(record: Record<string, unknown>, name: string): unknown[] {
   return Array.isArray(record[name]) ? record[name] : [];
 }
 
-function hasPassedVerificationProgress(
+function hasPassedToolVerificationProgress(
   steps: ProbeTranscriptStep[],
+  tool: string,
   predicate: (progress: Record<string, unknown>) => boolean
 ) {
   return steps.some((step) => {
-    if (step.verification?.status !== "passed") {
+    if (step.tool !== tool || step.verification?.status !== "passed") {
       return false;
     }
 
@@ -653,7 +654,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }]
     },
     validate(steps) {
-      return hasPassedVerificationProgress(steps, (progress) =>
+      return hasPassedToolVerificationProgress(steps, "collect_logs", (progress) =>
         progressHasTargetInventory({
           progress,
           itemNames: logItemNames,
@@ -683,7 +684,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }]
     },
     validate(steps) {
-      return hasPassedVerificationProgress(steps, (progress) =>
+      return hasPassedToolVerificationProgress(steps, "craft_item", (progress) =>
         progressHasCraftOutputs(progress, [
           { itemNames: plankItemNames, minimumAfterCount: 4 },
           { itemNames: ["stick"], minimumAfterCount: 2 }
@@ -712,7 +713,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }]
     },
     validate(steps) {
-      return hasPassedVerificationProgress(steps, (progress) =>
+      return hasPassedToolVerificationProgress(steps, "craft_item", (progress) =>
         progressHasTargetInventory({
           progress,
           itemNames: ["crafting_table"],

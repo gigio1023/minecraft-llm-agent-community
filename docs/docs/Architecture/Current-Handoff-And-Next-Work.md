@@ -407,6 +407,8 @@ Current postcondition rules:
   supported plank-family and stick output counts;
 - `craftCraftingTable` requires passed runtime verifier progress with crafting
   table inventory output;
+- inventory verifier progress must be attached to the expected primitive
+  (`collect_logs` or `craft_item`), not an unrelated successful step;
 - `inspectSharedChest` requires an `inspect_chest` result with a non-empty
   positive item snapshot and chest id;
 - `depositSharedItems` requires `deposit_shared` with `itemName` and

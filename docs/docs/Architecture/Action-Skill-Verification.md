@@ -170,6 +170,9 @@ burying them in tests.
 The same postcondition rules reject weak passed verifications when the progress
 payload does not contain the expected inventory output, and reject social
 transcripts when required primitives appear out of order.
+Inventory postconditions are tied to the expected primitive. For example,
+`collectLogs` only accepts passed inventory evidence on `collect_logs`, and
+crafting action skills only accept passed inventory evidence on `craft_item`.
 `runtimeObserveAndRemember` also requires a real observe result with an
 observation snapshot before the memory write, so a naked terminal memory note
 cannot prove runtime control flow.

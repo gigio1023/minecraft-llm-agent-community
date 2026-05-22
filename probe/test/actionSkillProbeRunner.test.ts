@@ -288,6 +288,52 @@ test("action skill probe postcondition accepts non-oak log and plank families", 
   assert.equal(await validateProbePostcondition("craftPlanksAndSticks", sprucePlankTranscript), null);
 });
 
+test("action skill probe postcondition rejects inventory evidence on the wrong tool", async () => {
+  const collectEvidenceOnWait = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "wait",
+          result: { status: "waited" },
+          verification: {
+            status: "passed",
+            progress: {
+              itemNames: ["oak_log"],
+              beforeCount: 0,
+              afterCount: 4,
+              targetCount: 4
+            }
+          }
+        }
+      ]
+    });
+  const craftEvidenceOnRemember = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "remember",
+          result: { status: "remembered", note: "crafted" },
+          verification: {
+            status: "passed",
+            progress: {
+              itemNames: ["crafting_table"],
+              beforeCount: 0,
+              afterCount: 1,
+              targetCount: 1
+            }
+          }
+        }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("collectLogs", collectEvidenceOnWait) ?? "",
+    /log inventory target evidence/
+  );
+  assert.match(
+    await validateProbePostcondition("craftCraftingTable", craftEvidenceOnRemember) ?? "",
+    /crafting table inventory evidence/
+  );
+});
+
 test("action skill probe postcondition accepts shared storage movement evidence", async () => {
   const transcriptPath = await writeTranscriptPayload({
       steps: [
