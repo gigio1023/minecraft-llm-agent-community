@@ -133,11 +133,11 @@ text was proposed by the provider.
 
 Required evidence:
 
-- `approachAndRequestItem`: measured arrival within interaction range and
-  delivered chat;
+- `approachAndRequestItem`: measured arrival within interaction range, including
+  before/after distance fields, and delivered chat;
 - `announceResourceDiscovery`: delivered chat;
-- `handoffItemAtChest`: positive shared-chest deposit and delivered handoff
-  chat;
+- `handoffItemAtChest`: named positive shared-chest deposit and delivered
+  handoff chat;
 - `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up.
 
 For ordered social action skills, evidence order matters. A delivered request

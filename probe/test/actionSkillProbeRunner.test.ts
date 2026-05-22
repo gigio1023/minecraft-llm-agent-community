@@ -267,17 +267,58 @@ test("action skill probe postcondition accepts shared storage movement evidence"
   assert.equal(failure, null);
 });
 
+test("action skill probe postcondition rejects weak shared storage evidence", async () => {
+  const emptyInspect = await writeTranscriptPayload({
+      steps: [
+        { tool: "inspect_chest", result: { status: "inspected", items: [] } }
+      ]
+    });
+  const unnamedDeposit = await writeTranscriptPayload({
+      steps: [
+        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }
+      ]
+    });
+  const unnamedHandoff = await writeTranscriptPayload({
+      steps: [
+        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("inspectSharedChest", emptyInspect) ?? "",
+    /item evidence/
+  );
+  assert.match(
+    await validateProbePostcondition("depositSharedItems", unnamedDeposit) ?? "",
+    /named item/
+  );
+  assert.match(
+    await validateProbePostcondition("handoffItemAtChest", unnamedHandoff) ?? "",
+    /named item/
+  );
+});
+
 test("action skill probe postcondition enforces ordered social evidence", async () => {
   const prematureRequest = await writeTranscriptPayload({
       steps: [
         { tool: "say", result: { status: "delivered" } },
-        { tool: "move_to", result: { status: "arrived", arrived: true } }
+        {
+          tool: "move_to",
+          result: {
+            status: "arrived",
+            arrived: true,
+            beforeDistance: 3,
+            afterDistance: 1,
+            distanceDelta: 2
+          }
+        }
       ]
     });
   const prematureHandoff = await writeTranscriptPayload({
       steps: [
         { tool: "say", result: { status: "delivered" } },
-        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }
+        { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } }
       ]
     });
   const prematureBusyFollowUp = await writeTranscriptPayload({
@@ -299,6 +340,20 @@ test("action skill probe postcondition enforces ordered social evidence", async 
   assert.match(
     await validateProbePostcondition("waitForBusyCrafter", prematureBusyFollowUp) ?? "",
     /wait after busy response/
+  );
+});
+
+test("action skill probe postcondition requires measured arrival evidence before social request", async () => {
+  const unmeasuredArrival = await writeTranscriptPayload({
+      steps: [
+        { tool: "move_to", result: { status: "arrived", arrived: true } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("approachAndRequestItem", unmeasuredArrival) ?? "",
+    /measured distance evidence/
   );
 });
 

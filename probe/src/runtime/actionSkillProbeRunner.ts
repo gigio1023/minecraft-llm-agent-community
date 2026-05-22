@@ -505,6 +505,18 @@ function progressHasCraftOutputs(
   );
 }
 
+function itemSnapshotHasPositiveCount(items: unknown[]) {
+  return items
+    .map(asRecord)
+    .some((item) => typeof item.name === "string" && (numberField(item, "count") ?? 0) > 0);
+}
+
+function hasPositiveTransfer(result: Record<string, unknown>) {
+  return result.status === "deposited" &&
+    typeof result.itemName === "string" &&
+    (numberField(result, "movedCount") ?? 0) > 0;
+}
+
 function hasToolResult(
   steps: ProbeTranscriptStep[],
   tool: string,
@@ -642,26 +654,28 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   inspectSharedChest: {
     skillId: "inspectSharedChest",
-    evidenceSummary: ["shared chest inspection returned an item snapshot"],
+    evidenceSummary: ["shared chest inspection returned a non-empty positive item snapshot"],
     minimumPassingTranscript: {
       steps: [{ tool: "inspect_chest", result: { status: "inspected", items: [{ name: "oak_log", count: 2 }] } }]
     },
     validate(steps) {
-      return hasToolResult(steps, "inspect_chest", (result) => result.status === "inspected" && Array.isArray(result.items))
+      return hasToolResult(steps, "inspect_chest", (result) =>
+        result.status === "inspected" && itemSnapshotHasPositiveCount(arrayField(result, "items"))
+      )
         ? null
-        : "inspectSharedChest did not inspect a live shared chest";
+        : "inspectSharedChest did not inspect a live shared chest with item evidence";
     }
   },
   depositSharedItems: {
     skillId: "depositSharedItems",
-    evidenceSummary: ["deposit_shared moved a positive item count"],
+    evidenceSummary: ["deposit_shared moved a named item with a positive count"],
     minimumPassingTranscript: {
-      steps: [{ tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }]
+      steps: [{ tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } }]
     },
     validate(steps) {
-      return hasToolResult(steps, "deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)
+      return hasToolResult(steps, "deposit_shared", hasPositiveTransfer)
         ? null
-        : "depositSharedItems did not move any item into shared storage";
+        : "depositSharedItems did not move a named item into shared storage";
     }
   },
   approachAndRequestItem: {
@@ -669,7 +683,16 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     evidenceSummary: ["move_to arrived within range", "say delivered the request"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "move_to", result: { status: "arrived", arrived: true } },
+        {
+          tool: "move_to",
+          result: {
+            status: "arrived",
+            arrived: true,
+            beforeDistance: 3,
+            afterDistance: 1,
+            distanceDelta: 2
+          }
+        },
         { tool: "say", result: { status: "delivered" } }
       ]
     },
@@ -677,11 +700,14 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       const arrived = steps.findIndex(
         (step) => step.tool === "move_to" &&
           asRecord(step.result).status === "arrived" &&
-          asRecord(step.result).arrived === true
+          asRecord(step.result).arrived === true &&
+          (numberField(asRecord(step.result), "afterDistance") ?? Number.POSITIVE_INFINITY) <= 1.5 &&
+          typeof numberField(asRecord(step.result), "beforeDistance") === "number" &&
+          typeof numberField(asRecord(step.result), "distanceDelta") === "number"
       );
 
       if (arrived < 0) {
-        return "approachAndRequestItem did not reach interaction range";
+        return "approachAndRequestItem did not reach interaction range with measured distance evidence";
       }
       return steps
         .slice(arrived + 1)
@@ -707,19 +733,18 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     evidenceSummary: ["deposit_shared moved a positive item count", "say delivered the handoff"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } },
+        { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } },
         { tool: "say", result: { status: "delivered" } }
       ]
     },
     validate(steps) {
       const depositIndex = steps.findIndex(
         (step) => step.tool === "deposit_shared" &&
-          asRecord(step.result).status === "deposited" &&
-          (numberField(asRecord(step.result), "movedCount") ?? 0) > 0
+          hasPositiveTransfer(asRecord(step.result))
       );
 
       if (depositIndex < 0) {
-        return "handoffItemAtChest did not move any item into shared storage";
+        return "handoffItemAtChest did not move a named item into shared storage";
       }
       return steps
         .slice(depositIndex + 1)

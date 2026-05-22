@@ -405,13 +405,14 @@ Current postcondition rules:
   plank and stick output counts;
 - `craftCraftingTable` requires passed runtime verifier progress with crafting
   table inventory output;
-- `inspectSharedChest` requires an `inspect_chest` result with a real item
-  snapshot;
-- `depositSharedItems` requires `deposit_shared` with `movedCount > 0`;
-- `handoffItemAtChest` requires a positive deposit before delivered handoff
-  chat;
-- `approachAndRequestItem` requires arrival distance evidence before delivered
-  chat;
+- `inspectSharedChest` requires an `inspect_chest` result with a non-empty
+  positive item snapshot;
+- `depositSharedItems` requires `deposit_shared` with `itemName` and
+  `movedCount > 0`;
+- `handoffItemAtChest` requires a named positive deposit before delivered
+  handoff chat;
+- `approachAndRequestItem` requires measured arrival distance evidence before
+  delivered chat;
 - `announceResourceDiscovery` requires delivered chat;
 - `waitForBusyCrafter` requires busy response before bounded wait before
   delivered follow-up.
