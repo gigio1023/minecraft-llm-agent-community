@@ -35,6 +35,7 @@ const PLANK_ITEM_NAMES = [
 export type DeterministicCurriculumState = {
   visibleActors: VisibleActor[];
   inventory?: InventoryItem[];
+  nearbyBlocks?: Array<{ name: string; distance: number }>;
   sharedChest?: {
     chestId: string;
     items: InventoryItem[];
@@ -92,6 +93,15 @@ type CraftCraftingTableTask = {
   success: InventoryGoal;
 };
 
+type CraftWoodenPickaxeTask = {
+  id: "craft_wooden_pickaxe";
+  reason: string;
+  blockers: string[];
+  preferredActorRoles: string[];
+  primitiveIds: RuntimePrimitiveId[];
+  success: InventoryGoal;
+};
+
 type DepositSharedMaterialsTask = {
   id: "deposit_shared_materials";
   reason: string;
@@ -111,6 +121,7 @@ export type DeterministicTask =
   | CollectLogsTask
   | CraftPlanksAndSticksTask
   | CraftCraftingTableTask
+  | CraftWoodenPickaxeTask
   | DepositSharedMaterialsTask;
 
 const APPROACH_DISTANCE = 1.5;
@@ -138,6 +149,9 @@ export function selectDeterministicTask(
     const plankCount = countItems(state.inventory, PLANK_ITEM_NAMES);
     const stickCount = countItems(state.inventory, ["stick"]);
     const craftingTableCount = countItems(state.inventory, ["crafting_table"]);
+    const woodenPickaxeCount = countItems(state.inventory, ["wooden_pickaxe"]);
+    const nearbyCraftingTableCount =
+      state.nearbyBlocks?.filter((block) => block.name === "crafting_table").length ?? 0;
     const sharedChestResourceCount = countItems(state.sharedChest?.items, [
       ...LOG_ITEM_NAMES,
       ...PLANK_ITEM_NAMES,
@@ -166,10 +180,34 @@ export function selectDeterministicTask(
       };
     }
 
+    if (woodenPickaxeCount >= 1 || completedTaskIds.has("craft_wooden_pickaxe")) {
+      return null;
+    }
+
+    if (
+      (craftingTableCount >= 1 || completedTaskIds.has("craft_crafting_table") || nearbyCraftingTableCount > 0) &&
+      nearbyCraftingTableCount > 0 &&
+      plankCount >= 3 &&
+      stickCount >= 2
+    ) {
+      return {
+        id: "craft_wooden_pickaxe",
+        reason: "Need a first table-crafted tool before mining stone.",
+        blockers: [],
+        preferredActorRoles: ["crafter"],
+        primitiveIds: ["observe", "craft_with_table", "wait"],
+        success: {
+          kind: "inventory_at_least",
+          itemNames: ["wooden_pickaxe"],
+          targetCount: 1
+        }
+      };
+    }
+
     if (craftingTableCount >= 1 || completedTaskIds.has("craft_crafting_table")) {
-      // Stop the current deterministic chain at the first tool-station proof.
-      // Later stages need table placement/use and richer tool verification
-      // before they become honest runtime targets.
+      // The actor has a crafting table item, but placing/finding a table block
+      // remains a separate primitive boundary. Do not claim tool progression
+      // until the runtime can observe a nearby table block.
       return null;
     }
 

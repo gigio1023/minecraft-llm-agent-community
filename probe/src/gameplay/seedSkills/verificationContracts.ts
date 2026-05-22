@@ -62,6 +62,18 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     protectedBy: ["test/craftItem.test.ts", "test/agentLoop.phase1.test.ts"]
   },
   {
+    skillId: "craftWoodenPickaxe",
+    primitiveIds: ["observe", "craft_with_table", "wait"],
+    evidence: [
+      "nearby crafting_table block is selected from live block search",
+      "table-bound recipe resolves with the crafting table block argument",
+      "bot.craft is awaited before success is returned",
+      "wooden_pickaxe inventory count increases after craft"
+    ],
+    protectedBy: ["test/craftWithTable.test.ts", "test/actionSkillProbeRunner.test.ts"],
+    liveProbe: "bun run probe:skill -- --actor npc_c --skill craftWoodenPickaxe --max-actions 8 --init-actor-workspace baseline --no-dashboard"
+  },
+  {
     skillId: "inspectSharedChest",
     primitiveIds: ["observe", "inspect_chest", "wait"],
     evidence: [

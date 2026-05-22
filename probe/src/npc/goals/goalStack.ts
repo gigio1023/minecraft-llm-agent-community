@@ -59,6 +59,7 @@ function taskToGoalKind(task: DeterministicTask): GoalKind {
       return "gather_resource";
     case "craft_planks_and_sticks":
     case "craft_crafting_table":
+    case "craft_wooden_pickaxe":
       return "craft_item";
     case "deposit_shared_materials":
       return "deposit_shared";
@@ -75,6 +76,8 @@ function taskTargetItem(task: DeterministicTask) {
       return "planks_and_sticks";
     case "craft_crafting_table":
       return "crafting_table";
+    case "craft_wooden_pickaxe":
+      return "wooden_pickaxe";
     case "deposit_shared_materials":
       return "shared_materials";
     case "approach_visible_target":

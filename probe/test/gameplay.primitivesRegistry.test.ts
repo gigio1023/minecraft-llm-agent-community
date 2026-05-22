@@ -9,6 +9,7 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
     "move_to",
     "collect_logs",
     "craft_item",
+    "craft_with_table",
     "inspect_chest",
     "deposit_shared",
     "withdraw_shared",

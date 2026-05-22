@@ -42,7 +42,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   crafter: {
     roleId: "crafter",
-    allowedTools: ["observe", "move_to", "craft_item", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "craft_item", "craft_with_table", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_planks",
       "birch_planks",
@@ -53,6 +53,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
       "mangrove_planks",
       "cherry_planks",
       "stick",
+      "wooden_pickaxe",
       "crafting_table"
     ],
     withdrawAllowedItemNames: [

@@ -521,13 +521,13 @@ action-skill matrix passed:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-strict-collectlogs.json
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-table-crafting.json
 ```
 
 ```text
-matrix_summary verdict=passed passed=10 failed=0 error=0 total=10/10
-matrix_status_counts passed=10 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=10 historical_transcript=0 missing=0 environment_blocked=0
+matrix_summary verdict=passed passed=11 failed=0 error=0 total=11/11
+matrix_status_counts passed=11 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=11 historical_transcript=0 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -537,6 +537,7 @@ Fresh current-run transcripts were produced for:
 - `collectLogs`;
 - `craftPlanksAndSticks`;
 - `craftCraftingTable`;
+- `craftWoodenPickaxe`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;
@@ -597,9 +598,9 @@ bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-e
 Current result:
 
 ```text
-matrix_summary verdict=incomplete passed=10 failed=0 error=0 total=10/10
-matrix_status_counts passed=10 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=0 historical_transcript=10 missing=0 environment_blocked=0
+matrix_summary verdict=incomplete passed=11 failed=0 error=0 total=11/11
+matrix_status_counts passed=11 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=0 historical_transcript=11 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -693,21 +694,28 @@ Remaining work:
 - stale process remediation remains manual: identify the process occupying the
   fixed port and stop it before re-running with dashboard events.
 
-### P1: Crafting Table Boundary
+### Implemented: Table-Bound Crafting Boundary
 
-Current `craft_item` is inventory-only. Wooden pickaxe and later progression
-need a separate table-bound boundary.
+`craft_item` remains inventory-only. Wooden pickaxe progression now uses the
+separate `craft_with_table` primitive and `craftWoodenPickaxe` seed action
+skill.
 
-Implement a primitive such as `use_crafting_table` or
-`craft_with_crafting_table`.
+Implemented behavior:
 
-Required evidence:
+- `craft_with_table` finds a nearby `crafting_table` block instead of silently
+  treating inventory-only crafting as enough;
+- the recipe is resolved against the table block;
+- `bot.craft(recipe, 1, table)` is awaited;
+- primitive evidence records `tablePosition`, `beforeCount`, `afterCount`, and
+  positive `inventoryDelta`;
+- runtime postconditions require passed `wooden_pickaxe` inventory evidence;
+- the action-skill matrix includes `craftWoodenPickaxe` as current-run proof.
 
-- table item exists or table block is nearby;
-- if placing is required, block placement succeeds and is observed;
-- recipe is resolved against the table;
-- `bot.craft(recipe, count, table)` is awaited;
-- inventory output increases.
+Remaining placement boundary:
+
+- placing a crafting table from inventory is still a separate future action
+  skill. Do not overload `craft_with_table` with placement until placement has
+  its own evidence contract.
 
 Do not overload inventory-only `craft_item` with table discovery and placement.
 

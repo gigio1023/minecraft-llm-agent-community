@@ -407,13 +407,18 @@ export async function collectLogs({
         beforeLogCount !== undefined && afterLogCount !== undefined
           ? afterLogCount - beforeLogCount
           : undefined;
+      const targetNotMetAfterProgress =
+        inventoryDelta !== undefined &&
+        inventoryDelta > 0 &&
+        targetLogCount !== undefined &&
+        (afterLogCount ?? 0) < targetLogCount;
       const dugWithoutPickup =
         attemptedBlocks.some((attemptedBlock) => attemptedBlock.outcome === "dug") &&
         inventoryDelta !== undefined &&
         inventoryDelta <= 0;
 
       return {
-        status: "blocked",
+        status: targetNotMetAfterProgress ? "progressing" : "blocked",
         block: lastBlock?.name,
         target: lastBlock?.position,
         attemptedBlocks,
@@ -421,9 +426,11 @@ export async function collectLogs({
         afterLogCount,
         inventoryDelta,
         blockRemoved: lastBlockRemoved,
-        reason: dugWithoutPickup
-          ? "collect_logs dug a log, but log inventory did not increase."
-          : "collect_logs found no reachable low log block within 12 blocks."
+        reason: targetNotMetAfterProgress
+          ? `collect_logs increased log inventory by ${inventoryDelta}, but exhausted reachable candidates before target ${targetLogCount}.`
+          : dugWithoutPickup
+            ? "collect_logs dug a log, but log inventory did not increase."
+            : "collect_logs found no reachable low log block within 12 blocks."
       };
     }
 
@@ -480,6 +487,7 @@ export async function collectLogs({
         position: block.position,
         outcome: "dug"
       });
+      exhaustedCandidates.add(candidateKey);
     } catch (error) {
       if (signal?.aborted) {
         throw error;
@@ -525,17 +533,8 @@ export async function collectLogs({
         beforeLogCount !== undefined ? afterLogCount - beforeLogCount : undefined;
 
       if (totalInventoryDelta !== undefined && totalInventoryDelta > 0) {
-        return {
-          status: "progressing",
-          block: block.name,
-          target: block.position,
-          attemptedBlocks,
-          beforeLogCount,
-          afterLogCount,
-          inventoryDelta: totalInventoryDelta,
-          blockRemoved: lastBlockRemoved,
-          reason: `collect_logs increased log inventory by ${totalInventoryDelta}, but a later pickup did not increase inventory.`
-        };
+        exhaustedCandidates.add(candidateKey);
+        continue;
       }
 
       // A single pickup miss is not enough to end the whole action skill when

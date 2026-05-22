@@ -98,7 +98,11 @@ export function verifyTask(
     };
   }
 
-  if (task.id === "collect_4_logs" || task.id === "craft_crafting_table") {
+  if (
+    task.id === "collect_4_logs" ||
+    task.id === "craft_crafting_table" ||
+    task.id === "craft_wooden_pickaxe"
+  ) {
     const beforeCount = countItems(input.before, task.success.itemNames);
     const afterCount = countItems(input.after, task.success.itemNames);
     const beforeNearbyBlockCount =

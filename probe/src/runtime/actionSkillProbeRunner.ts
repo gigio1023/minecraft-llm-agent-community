@@ -24,6 +24,7 @@ import { say } from "../tools/say.js";
 import { wait } from "../tools/wait.js";
 import { collectLogs } from "../tools/collectLogs.js";
 import { craftItem } from "../tools/craftItem.js";
+import { craftWithTable } from "../tools/craftWithTable.js";
 import { getRoleContract } from "../npc/roles/contracts.js";
 import { createSharedStorageLedger } from "../gameplay/storage/sharedStorageLedger.js";
 import { createTeamBulletin } from "../npc/social/teamBulletin.js";
@@ -88,7 +89,8 @@ const probeCompletedTaskHints: Partial<Record<SeedActionSkillId, string[]>> = {
 
 const probeFixtureOffsets = {
   collectLogBase: [3, 0, -3],
-  sharedChest: [1, 0, -4]
+  sharedChest: [1, 0, -4],
+  craftingTable: [2, 0, -2]
 } as const;
 
 const deterministicProbeDriverSkillIds = [
@@ -96,6 +98,7 @@ const deterministicProbeDriverSkillIds = [
   "collectLogs",
   "craftPlanksAndSticks",
   "craftCraftingTable",
+  "craftWoodenPickaxe",
   "inspectSharedChest",
   "depositSharedItems",
   "approachAndRequestItem",
@@ -116,6 +119,7 @@ export type ActionSkillProbePreconditionMode =
   | "placed_logs"
   | "inventory_logs"
   | "inventory_planks_and_sticks"
+  | "table_craft_inputs"
   | "inspectable_shared_chest"
   | "depositable_shared_chest"
   | "social_bootstrap_inventory";
@@ -125,6 +129,7 @@ const actionSkillProbePreconditionModes = {
   collectLogs: "placed_logs",
   craftPlanksAndSticks: "inventory_logs",
   craftCraftingTable: "inventory_planks_and_sticks",
+  craftWoodenPickaxe: "table_craft_inputs",
   inspectSharedChest: "inspectable_shared_chest",
   depositSharedItems: "depositable_shared_chest",
   approachAndRequestItem: "social_bootstrap_inventory",
@@ -328,8 +333,10 @@ export function buildProbePreconditionRconCommands(input: {
   }
 
   const chest = fixturePosition(input.spawnConfig, probeFixtureOffsets.sharedChest);
+  const table = fixturePosition(input.spawnConfig, probeFixtureOffsets.craftingTable);
   const commands: string[][] = [
-    ["setblock", String(chest.x), String(chest.y), String(chest.z), "air"]
+    ["setblock", String(chest.x), String(chest.y), String(chest.z), "air"],
+    ["setblock", String(table.x), String(table.y), String(table.z), "air"]
   ];
   const give = (itemName: string, count: number) => {
     commands.push(["give", input.actorUsername, `minecraft:${itemName}`, String(count)]);
@@ -362,6 +369,12 @@ export function buildProbePreconditionRconCommands(input: {
 
   if (preconditionMode === "inventory_planks_and_sticks") {
     give("oak_planks", 4);
+    give("stick", 2);
+  }
+
+  if (preconditionMode === "table_craft_inputs") {
+    commands.push(["setblock", String(table.x), String(table.y), String(table.z), "crafting_table"]);
+    give("oak_planks", 3);
     give("stick", 2);
   }
 
@@ -533,6 +546,14 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
 
       if (skillId === "craftCraftingTable") {
         return { tool: "craft_item", args: { itemName: "crafting_table" } };
+      }
+
+      if (skillId === "craftWoodenPickaxe") {
+        if (input.lastResult.tool === "craft_with_table" && input.lastResult.status === "crafted") {
+          return { tool: "remember", args: { note: "craftWoodenPickaxe completed table-bound craft attempt" } };
+        }
+
+        return { tool: "craft_with_table", args: { itemName: "wooden_pickaxe" } };
       }
 
       if (skillId === "collectLogs") {
@@ -922,6 +943,67 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       )
         ? null
         : "craftCraftingTable never produced passed crafting table inventory evidence in transcript";
+    }
+  },
+  craftWoodenPickaxe: {
+    skillId: "craftWoodenPickaxe",
+    evidenceSummary: [
+      "craft_with_table result reports a nearby crafting table block",
+      "craft_with_table result reports positive wooden_pickaxe inventory delta",
+      "runtime verifier passed after wooden_pickaxe inventory output"
+    ],
+    minimumPassingTranscript: {
+      steps: [{
+        tool: "craft_with_table",
+        result: {
+          status: "crafted",
+          itemName: "wooden_pickaxe",
+          tablePosition: { x: 1, y: 64, z: 1 },
+          inventoryDelta: 1,
+          afterCount: 1
+        },
+        verification: {
+          status: "passed",
+          progress: {
+            itemNames: ["wooden_pickaxe"],
+            beforeCount: 0,
+            afterCount: 1,
+            targetCount: 1
+          }
+        }
+      }]
+    },
+    validate(steps) {
+      const craftedStep = steps.find((step) => {
+        if (step.tool !== "craft_with_table") {
+          return false;
+        }
+
+        const result = asRecord(step.result);
+        const tablePosition = asRecord(result.tablePosition);
+
+        return result.status === "crafted" &&
+          result.itemName === "wooden_pickaxe" &&
+          (numberField(result, "inventoryDelta") ?? 0) > 0 &&
+          (numberField(result, "afterCount") ?? 0) >= 1 &&
+          typeof tablePosition.x === "number" &&
+          typeof tablePosition.y === "number" &&
+          typeof tablePosition.z === "number";
+      });
+
+      if (!craftedStep) {
+        return "craftWoodenPickaxe did not record table-bound craft result evidence with positive wooden_pickaxe inventory delta";
+      }
+
+      return hasPassedToolVerificationProgress(steps, "craft_with_table", (progress) =>
+        progressHasTargetInventory({
+          progress,
+          itemNames: ["wooden_pickaxe"],
+          minimumAfterCount: 1
+        })
+      )
+        ? null
+        : "craftWoodenPickaxe never produced passed wooden_pickaxe inventory evidence in transcript";
     }
   },
   inspectSharedChest: {
@@ -1407,6 +1489,11 @@ export async function runLiveActionSkillProbe(
           withActionWrapper(
             () => craftItem({ bot: actor, itemName: readStringArg(args, "itemName") }),
             { tool: "craft_item" }
+          ),
+        craft_with_table: ({ actor, args }) =>
+          withActionWrapper(
+            () => craftWithTable({ bot: actor, itemName: readStringArg(args, "itemName") }),
+            { tool: "craft_with_table" }
           ),
         inspect_chest: () =>
           withActionWrapper(

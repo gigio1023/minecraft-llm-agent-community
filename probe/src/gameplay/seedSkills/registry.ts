@@ -105,13 +105,13 @@ const coreActionSkills: SeedActionSkill[] = [
   {
     id: "craftWoodenPickaxe",
     summary: "Craft a wooden pickaxe from planks and sticks",
-    runtimeStatus: "planned",
-    implementationNotes: "Requires finding/placing/using a crafting table. Current craft_item passes no table.",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses a nearby observed crafting table block and verifies wooden_pickaxe inventory increase.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter"],
     preconditions: ["inventory has planks", "inventory has sticks", "crafting_table nearby"],
-    primitiveIds: ["observe", "wait"],
-    missingPrimitives: ["use_crafting_table"]
+    primitiveIds: ["observe", "craft_with_table", "wait"]
   },
   {
     id: "mineCobblestone",

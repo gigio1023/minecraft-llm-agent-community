@@ -348,6 +348,9 @@ Current harness capabilities:
 - deterministic fixture setup through RCON for `collectLogs`,
   `craftPlanksAndSticks`, `craftCraftingTable`, `inspectSharedChest`,
   `depositSharedItems`, `handoffItemAtChest`, and social probes;
+- table-bound crafting fixture setup for `craftWoodenPickaxe`, including a
+  nearby `crafting_table` block and bounded `craft_with_table` primitive
+  evidence;
 - one action-skill-specific deterministic driver for each implemented seed
   action skill; the action-skill probe harness does not switch to OpenAI auth or
   an LLM provider based on `PROBE_GAMEPLAY_PROVIDER`;
@@ -362,16 +365,17 @@ Current harness capabilities:
 Current live action-skill matrix proof:
 
 - command:
-  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-strict-collectlogs.json`;
+  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-table-crafting.json`;
 - result:
-  `matrix_summary verdict=passed passed=10 failed=0 error=0 total=10/10`;
+  `matrix_summary verdict=passed passed=11 failed=0 error=0 total=11/11`;
 - evidence scope:
-  `matrix_scope_counts current_run=10 historical_transcript=0 missing=0 environment_blocked=0`;
+  `matrix_scope_counts current_run=11 historical_transcript=0 missing=0 environment_blocked=0`;
 - implemented action skills with fresh live proof:
   `runtimeObserveAndRemember`, `collectLogs`, `craftPlanksAndSticks`,
-  `craftCraftingTable`, `inspectSharedChest`, `depositSharedItems`,
-  `approachAndRequestItem`, `announceResourceDiscovery`, `handoffItemAtChest`,
-  and `waitForBusyCrafter`.
+  `craftCraftingTable`, `craftWoodenPickaxe`, `inspectSharedChest`,
+  `depositSharedItems`, `approachAndRequestItem`,
+  `announceResourceDiscovery`, `handoffItemAtChest`, and
+  `waitForBusyCrafter`.
 
 The corresponding transcript artifacts under `data/evidence/` and the JSON
 matrix report under `tmp/` are intentionally ignored runtime evidence. Preserve

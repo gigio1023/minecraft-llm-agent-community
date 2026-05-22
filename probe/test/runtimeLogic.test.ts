@@ -1103,6 +1103,43 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(memory.list(), ["saw npc_b near spawn", "npc_b answered"]);
 });
 
+test("observe keeps important station blocks even when many closer blocks exist", async () => {
+  const actor = createFakeBot("npc_a", 0) as ReturnType<typeof createFakeBot> & {
+    findBlocks(input: {
+      matching: (block: { name: string }) => boolean;
+      maxDistance: number;
+      count: number;
+    }): Array<{ x: number; y: number; z: number }>;
+    blockAt(position: { x: number; y: number; z: number }): { name: string };
+  };
+  const target = createFakeBot("npc_b", 2);
+  const memory = createMemory(4);
+  const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 1 });
+  const blocks = [
+    ...Array.from({ length: 24 }, (_, index) => ({
+      name: "short_grass",
+      position: { x: index % 6, y: 0, z: Math.floor(index / 6) }
+    })),
+    { name: "crafting_table", position: { x: 5, y: 0, z: 5 } }
+  ];
+
+  actor.findBlocks = ({ matching }) =>
+    blocks.filter((block) => matching({ name: block.name })).map((block) => block.position);
+  actor.blockAt = (position) =>
+    blocks.find((block) =>
+      block.position.x === position.x &&
+      block.position.y === position.y &&
+      block.position.z === position.z
+    ) ?? { name: "air" };
+
+  const observation = await observe({ actor: actor as any, target, dialogueState, memory });
+
+  assert.ok(
+    observation.nearbyBlocks?.some((block) => block.name === "crafting_table"),
+    "crafting table must survive observe sampling because it gates table-bound crafting"
+  );
+});
+
 test("converse sends directed speech, supports self-talk, and records heard messages", async () => {
   const runtimeState = createMutualRuntimeState({
     busyRepliesBeforeAvailable: 0,

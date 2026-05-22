@@ -236,13 +236,13 @@ OrbStack/Docker was restored:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-final.json
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-table-crafting.json
 ```
 
 ```text
-matrix_summary verdict=passed passed=10 failed=0 error=0 total=10/10
-matrix_status_counts passed=10 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=10 historical_transcript=0 missing=0 environment_blocked=0
+matrix_summary verdict=passed passed=11 failed=0 error=0 total=11/11
+matrix_status_counts passed=11 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=11 historical_transcript=0 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -253,6 +253,7 @@ Mineflayer harness and their postcondition checks:
 - `collectLogs`;
 - `craftPlanksAndSticks`;
 - `craftCraftingTable`;
+- `craftWoodenPickaxe`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;
@@ -268,6 +269,14 @@ The contract test requires every implemented seed action skill to declare:
 - owned runtime primitives;
 - required evidence;
 - checked-in tests that protect the behavior.
+
+Table-bound crafting is intentionally separate from inventory-only
+`craft_item`. `craftWoodenPickaxe` must prove that a nearby `crafting_table`
+block was used by `craft_with_table`, that Mineflayer resolved a table recipe,
+that `bot.craft(...)` completed against the table block, and that
+`wooden_pickaxe` inventory increased. A future placement action skill can own
+crafting-table placement; this contract only covers using an already nearby
+station.
 
 The live probe postcondition test also requires every implemented action skill
 to fail on an empty transcript and to define a minimum accepted evidence

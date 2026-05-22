@@ -106,6 +106,7 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   move_to(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   collect_logs(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  craft_with_table?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   inspect_chest(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   deposit_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   withdraw_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -244,6 +245,15 @@ async function executeTool<TActor extends RuntimeActor>(
       return tools.collect_logs({ actor, target, args: validated.args });
     case "craft_item":
       return tools.craft_item({ actor, target, args: validated.args });
+    case "craft_with_table":
+      return tools.craft_with_table
+        ? tools.craft_with_table({ actor, target, args: validated.args })
+        : {
+            tool: "craft_with_table",
+            ok: false,
+            status: "blocked",
+            message: "craft_with_table handler is not installed"
+          };
     case "inspect_chest":
       return tools.inspect_chest({ actor, target, args: validated.args });
     case "deposit_shared":
@@ -297,6 +307,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
         distance: visibleActor.distance
       })),
       ...(observation.inventory ? { inventory: observation.inventory } : {}),
+      ...(observation.nearbyBlocks ? { nearbyBlocks: observation.nearbyBlocks } : {}),
       ...(observation.sharedChest ? { sharedChest: observation.sharedChest } : {}),
       completedTaskIds: [...completedTaskIds]
     });

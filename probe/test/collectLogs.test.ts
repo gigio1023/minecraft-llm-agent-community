@@ -58,7 +58,11 @@ test("collectLogs reports collected only when log inventory increases", async ()
 });
 
 test("collectLogs keeps mining until the requested target count is in inventory", async () => {
-  const block = { name: "oak_log", position: { x: 2, y: 0, z: 0 } };
+  const blocks = [
+    { name: "oak_log", position: { x: 2, y: 0, z: 0 } },
+    { name: "oak_log", position: { x: 3, y: 0, z: 0 } },
+    { name: "oak_log", position: { x: 4, y: 0, z: 0 } }
+  ];
   let logCount = 0;
   let digCount = 0;
 
@@ -74,8 +78,11 @@ test("collectLogs keeps mining until the requested target count is in inventory"
     pathfinder: {
       async goto() {}
     },
-    findBlock() {
-      return block;
+    findBlocks() {
+      return blocks.map((block) => block.position);
+    },
+    blockAt(position: { x: number }) {
+      return blocks.find((block) => block.position.x === position.x) ?? { name: "air" };
     },
     canDigBlock() {
       return true;
@@ -86,9 +93,6 @@ test("collectLogs keeps mining until the requested target count is in inventory"
     },
     nearestEntity() {
       return null;
-    },
-    blockAt() {
-      return { name: "air" };
     },
     async lookAt() {},
     setControlState() {}
@@ -480,5 +484,5 @@ test("collectLogs returns progressing when an early log is acquired before a lat
 
   assert.equal(result.status, "progressing");
   assert.equal(result.inventoryDelta, 1);
-  assert.match(result.reason, /later pickup did not increase inventory/);
+  assert.match(result.reason, /exhausted reachable candidates/);
 });

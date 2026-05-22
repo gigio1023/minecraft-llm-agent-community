@@ -87,8 +87,8 @@ test("actionSkillProbeRunner does not duplicate runtimeObserveAndRemember when p
 test("actionSkillProbeRunner throws for planned unimplemented skills", () => {
   const config: ActionSkillProbeConfig = {
     actorId: "npc_a",
-    skillId: "craftWoodenPickaxe",
-    roleId: "crafter",
+    skillId: "mineCobblestone",
+    roleId: "gatherer",
     maxActions: 1
   };
 
@@ -175,8 +175,8 @@ test("actionSkillProbeRunner throws for a planned skill", () => {
     () =>
       validateSkillProbeConfig({
         actorId: "npc_a",
-        skillId: "craftWoodenPickaxe",
-        roleId: "crafter",
+        skillId: "mineCobblestone",
+        roleId: "gatherer",
         maxActions: 1
       }),
     /planned but not implemented/
@@ -237,6 +237,7 @@ test("actionSkillProbeRunner plans deterministic craft precondition fixtures", (
     }),
     [
       ["setblock", "11", "64", "-9", "air"],
+      ["setblock", "12", "64", "-7", "air"],
       ["give", "npc_b", "minecraft:oak_log", "4"]
     ]
   );
@@ -249,8 +250,24 @@ test("actionSkillProbeRunner plans deterministic craft precondition fixtures", (
     }),
     [
       ["setblock", "11", "64", "-9", "air"],
+      ["setblock", "12", "64", "-7", "air"],
       ["give", "npc_b", "minecraft:oak_planks", "4"],
       ["give", "npc_b", "minecraft:stick", "2"]
+    ]
+  );
+
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_c",
+      skillId: "craftWoodenPickaxe",
+      spawnConfig: { x: 10, y: 64, z: -5 }
+    }),
+    [
+      ["setblock", "11", "64", "-9", "air"],
+      ["setblock", "12", "64", "-7", "air"],
+      ["setblock", "12", "64", "-7", "crafting_table"],
+      ["give", "npc_c", "minecraft:oak_planks", "3"],
+      ["give", "npc_c", "minecraft:stick", "2"]
     ]
   );
 });
@@ -264,6 +281,7 @@ test("actionSkillProbeRunner plans deterministic storage and social fixtures", (
     }),
     [
       ["setblock", "1", "70", "-4", "air"],
+      ["setblock", "2", "70", "-2", "air"],
       ["give", "npc_b", "minecraft:crafting_table", "1"],
       ["setblock", "1", "70", "-4", "chest"],
       [
@@ -286,6 +304,7 @@ test("actionSkillProbeRunner plans deterministic storage and social fixtures", (
     }),
     [
       ["setblock", "1", "70", "-4", "air"],
+      ["setblock", "2", "70", "-2", "air"],
       ["give", "npc_b", "minecraft:crafting_table", "2"],
       ["setblock", "1", "70", "-4", "chest"]
     ]

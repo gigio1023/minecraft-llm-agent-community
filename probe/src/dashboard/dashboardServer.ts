@@ -533,6 +533,7 @@ function html() {
       quartermaster: "chest",
       collect_logs: "oak_log",
       craft_item: "crafting_table",
+      craft_with_table: "crafting_table",
       inspect_chest: "chest",
       deposit_shared: "chest",
       withdraw_shared: "chest"

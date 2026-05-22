@@ -31,6 +31,7 @@ test("intent-to-action-skill compiler returns craft action skills for a crafter 
   const ids = candidates.map((c) => c.id);
   assert.ok(ids.includes("craftPlanksAndSticks"), "crafter can craft planks");
   assert.ok(ids.includes("craftCraftingTable"), "crafter can craft crafting table");
+  assert.ok(ids.includes("craftWoodenPickaxe"), "crafter can craft a table-bound wooden pickaxe");
   assert.ok(!ids.includes("collectLogs"), "crafter should not have collectLogs in bootstrap");
 });
 
