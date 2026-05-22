@@ -663,6 +663,25 @@ function hasDirectedTargetArg(step: ProbeTranscriptStep) {
   return typeof target === "string" && target.trim().length > 0;
 }
 
+function hasDirectedTargetResult(step: ProbeTranscriptStep) {
+  const target = asRecord(step.result).targetId;
+  return typeof target === "string" && target.trim().length > 0;
+}
+
+function textResultMatches(step: ProbeTranscriptStep, predicate: (text: string) => boolean) {
+  const text = asRecord(step.result).text;
+  return typeof text === "string" && predicate(text);
+}
+
+function hasDeliveredSpeechEvidence(step: ProbeTranscriptStep, predicate: (text: string) => boolean) {
+  return step.tool === "say" &&
+    asRecord(step.result).status === "delivered" &&
+    hasDirectedTargetArg(step) &&
+    hasDirectedTargetResult(step) &&
+    textArgMatches(step, predicate) &&
+    textResultMatches(step, predicate);
+}
+
 function isRequestText(text: string) {
   return /request|need|spare|share|give|bring/i.test(text) &&
     /\b(oak\s+log|log|plank|stick|crafting\s+table|chest|food|coal|cobblestone)\b/i.test(text);
@@ -849,7 +868,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   approachAndRequestItem: {
     skillId: "approachAndRequestItem",
-    evidenceSummary: ["move_to arrived within range", "say delivered a request for a specific item"],
+    evidenceSummary: ["move_to arrived within range", "say result confirmed targeted request text for a specific item"],
     minimumPassingTranscript: {
       steps: [
         {
@@ -862,7 +881,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered", actorId: "npc_b", targetId: "npc_target", text: "can you spare one oak log?" } }
       ]
     },
     validate(steps) {
@@ -881,10 +900,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       return steps
         .slice(arrived + 1)
         .some((step) =>
-          step.tool === "say" &&
-          asRecord(step.result).status === "delivered" &&
-          hasDirectedTargetArg(step) &&
-          textArgMatches(step, isRequestText)
+          hasDeliveredSpeechEvidence(step, isRequestText)
         )
         ? null
         : "approachAndRequestItem did not deliver a targeted request for a specific item after arriving";
@@ -892,19 +908,16 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   announceResourceDiscovery: {
     skillId: "announceResourceDiscovery",
-    evidenceSummary: ["say delivered a resource-discovery announcement", "resource note was persisted after announcement"],
+    evidenceSummary: ["say result confirmed targeted resource-discovery text", "resource note was persisted after announcement"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered", actorId: "npc_b", targetId: "npc_target", text: "I found oak logs near spawn." } },
         { tool: "remember", result: { status: "remembered", note: "announceResourceDiscovery delivered resource announcement" } }
       ]
     },
     validate(steps) {
       const announcementIndex = steps.findIndex((step) =>
-          step.tool === "say" &&
-          asRecord(step.result).status === "delivered" &&
-          hasDirectedTargetArg(step) &&
-          textArgMatches(step, isResourceAnnouncementText)
+          hasDeliveredSpeechEvidence(step, isResourceAnnouncementText)
       );
 
       if (announcementIndex < 0) {
@@ -926,11 +939,11 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   handoffItemAtChest: {
     skillId: "handoffItemAtChest",
-    evidenceSummary: ["deposit_shared moved a positive item count with ledger identity", "say delivered a handoff message"],
+    evidenceSummary: ["deposit_shared moved a positive item count with ledger identity", "say result confirmed targeted handoff text"],
     minimumPassingTranscript: {
       steps: [
         { tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
-        { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered", actorId: "npc_b", targetId: "npc_target", text: "I left a crafting table in the shared chest." } }
       ]
     },
     validate(steps) {
@@ -945,10 +958,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       return steps
         .slice(depositIndex + 1)
         .some((step) =>
-          step.tool === "say" &&
-          asRecord(step.result).status === "delivered" &&
-          hasDirectedTargetArg(step) &&
-          textArgMatches(step, isHandoffText)
+          hasDeliveredSpeechEvidence(step, isHandoffText)
         )
         ? null
         : "handoffItemAtChest did not announce the shared chest handoff with handoff text";
@@ -956,17 +966,20 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   waitForBusyCrafter: {
     skillId: "waitForBusyCrafter",
-    evidenceSummary: ["say observed busy", "wait completed", "say delivered a follow-up message"],
+    evidenceSummary: ["say result confirmed targeted busy state", "wait completed", "say result confirmed targeted follow-up text"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "are you free to talk?" }, result: { status: "busy" } },
+        { tool: "say", args: { target: "npc_target", text: "are you free to talk?" }, result: { status: "busy", actorId: "npc_b", targetId: "npc_target", reason: "npc_target is busy" } },
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered", actorId: "npc_b", targetId: "npc_target", text: "checking again when you are ready" } }
       ]
     },
     validate(steps) {
       const busyIndex = steps.findIndex(
-        (step) => step.tool === "say" && asRecord(step.result).status === "busy" && hasDirectedTargetArg(step)
+        (step) => step.tool === "say" &&
+          asRecord(step.result).status === "busy" &&
+          hasDirectedTargetArg(step) &&
+          hasDirectedTargetResult(step)
       );
       if (busyIndex < 0) {
         return "waitForBusyCrafter did not observe a busy response";
@@ -980,10 +993,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       return steps
         .slice(waitIndex + 1)
         .some((step) =>
-          step.tool === "say" &&
-          asRecord(step.result).status === "delivered" &&
-          hasDirectedTargetArg(step) &&
-          textArgMatches(step, isFollowUpText)
+          hasDeliveredSpeechEvidence(step, isFollowUpText)
         )
         ? null
         : "waitForBusyCrafter did not deliver a follow-up message after waiting";

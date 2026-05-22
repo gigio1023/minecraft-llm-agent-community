@@ -25,6 +25,14 @@ async function writeTranscriptPayload(payload: unknown) {
   return transcriptPath;
 }
 
+function deliveredSayResult(text: string) {
+  return { status: "delivered", actorId: "npc_b", targetId: "npc_target", text };
+}
+
+function busySayResult() {
+  return { status: "busy", actorId: "npc_b", targetId: "npc_target", reason: "npc_target is busy" };
+}
+
 test("actionSkillProbeRunner builds active records restricted to the target skill primitives", () => {
   const baseConfig: ActionSkillProbeConfig = {
     actorId: "npc_a",
@@ -547,7 +555,7 @@ test("action skill probe postcondition requires wait before runtime control memo
 test("action skill probe postcondition enforces ordered social evidence", async () => {
   const prematureRequest = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: deliveredSayResult("can you spare one oak log?") },
         {
           tool: "move_to",
           result: {
@@ -562,21 +570,21 @@ test("action skill probe postcondition enforces ordered social evidence", async 
     });
   const prematureHandoff = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: deliveredSayResult("I left a crafting table in the shared chest.") },
         { tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }
       ]
     });
   const prematureBusyFollowUp = await writeTranscriptPayload({
       steps: [
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", args: { target: "npc_target" }, result: { status: "busy" } },
-        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target" }, result: busySayResult() },
+        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: deliveredSayResult("checking again when you are ready") }
       ]
     });
   const prematureResourceMemory = await writeTranscriptPayload({
       steps: [
         { tool: "remember", result: { status: "remembered", note: "found oak logs near spawn" } },
-        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: deliveredSayResult("I found oak logs near spawn.") }
       ]
     });
 
@@ -611,25 +619,25 @@ test("action skill probe postcondition rejects delivered social chat with the wr
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: deliveredSayResult("hello there") }
       ]
     });
   const vagueAnnouncement = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: deliveredSayResult("hello there") }
       ]
     });
   const vagueHandoff = await writeTranscriptPayload({
       steps: [
         { tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
-        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: deliveredSayResult("hello there") }
       ]
     });
   const vagueFollowUp = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target" }, result: { status: "busy" } },
+        { tool: "say", args: { target: "npc_target" }, result: busySayResult() },
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: deliveredSayResult("hello there") }
       ]
     });
 
@@ -664,14 +672,14 @@ test("action skill probe postcondition rejects delivered social chat without a t
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { text: "can you spare one oak log?" }, result: { status: "delivered" } }
+        { tool: "say", args: { text: "can you spare one oak log?" }, result: deliveredSayResult("can you spare one oak log?") }
       ]
     });
   const untargetedBusy = await writeTranscriptPayload({
       steps: [
         { tool: "say", result: { status: "busy" } },
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: deliveredSayResult("checking again when you are ready") }
       ]
     });
 
@@ -682,6 +690,52 @@ test("action skill probe postcondition rejects delivered social chat without a t
   assert.match(
     await validateProbePostcondition("waitForBusyCrafter", untargetedBusy) ?? "",
     /busy response/
+  );
+});
+
+test("action skill probe postcondition requires delivered chat result evidence", async () => {
+  const deliveredOnlyInArgs = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "move_to",
+          result: {
+            status: "arrived",
+            arrived: true,
+            beforeDistance: 3,
+            afterDistance: 1,
+            distanceDelta: 2
+          }
+        },
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } }
+      ]
+    });
+  const deliveredDifferentText = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "move_to",
+          result: {
+            status: "arrived",
+            arrived: true,
+            beforeDistance: 3,
+            afterDistance: 1,
+            distanceDelta: 2
+          }
+        },
+        {
+          tool: "say",
+          args: { target: "npc_target", text: "can you spare one oak log?" },
+          result: { status: "delivered", actorId: "npc_b", targetId: "npc_target", text: "hello there" }
+        }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("approachAndRequestItem", deliveredOnlyInArgs) ?? "",
+    /specific item/
+  );
+  assert.match(
+    await validateProbePostcondition("approachAndRequestItem", deliveredDifferentText) ?? "",
+    /specific item/
   );
 });
 
@@ -698,7 +752,7 @@ test("action skill probe postcondition rejects generic item requests", async () 
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: deliveredSayResult("can you spare one starter item?") }
       ]
     });
 
@@ -711,12 +765,12 @@ test("action skill probe postcondition rejects generic item requests", async () 
 test("action skill probe postcondition requires resource memory after resource announcement", async () => {
   const announcedWithoutMemory = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: deliveredSayResult("I found oak logs near spawn.") }
       ]
     });
   const announcedWithVagueMemory = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: deliveredSayResult("I found oak logs near spawn.") },
         { tool: "remember", result: { status: "remembered", note: "hello there" } }
       ]
     });
@@ -735,7 +789,7 @@ test("action skill probe postcondition requires measured arrival evidence before
   const unmeasuredArrival = await writeTranscriptPayload({
       steps: [
         { tool: "move_to", result: { status: "arrived", arrived: true } },
-        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: deliveredSayResult("can you spare one oak log?") }
       ]
     });
 

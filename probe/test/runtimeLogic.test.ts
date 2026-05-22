@@ -1023,6 +1023,8 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
 
   assert.deepEqual(await say({ actor, target, dialogueState, text: "hi npc_b" }), {
     status: "busy",
+    actorId: "npc_a",
+    targetId: "npc_b",
     reason: "npc_b is busy"
   });
   assert.deepEqual(actor.chatLog, []);
@@ -1031,7 +1033,10 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(await wait({ ticks: 0 }), { status: "waited", ticks: 0 });
 
   assert.deepEqual(await say({ actor, target, dialogueState, text: "hi npc_b" }), {
-    status: "delivered"
+    status: "delivered",
+    actorId: "npc_a",
+    targetId: "npc_b",
+    text: "hi npc_b"
   });
   assert.deepEqual(actor.chatLog, ["hi npc_b"]);
   assert.deepEqual(target.chatLog, []);

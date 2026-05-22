@@ -152,21 +152,24 @@ text was proposed by the provider.
 
 Required evidence:
 
-- `approachAndRequestItem`: measured arrival within interaction range, including
-  before/after distance fields, and delivered chat requesting a specific item;
-- `announceResourceDiscovery`: delivered resource-discovery chat and a
-  resource memory note persisted after that announcement;
+- `approachAndRequestItem`: measured arrival within interaction range,
+  including before/after distance fields, and delivered chat result evidence
+  requesting a specific item;
+- `announceResourceDiscovery`: delivered resource-discovery chat result
+  evidence and a resource memory note persisted after that announcement;
 - `handoffItemAtChest`: actor/ledger-identified named positive shared-chest
-  deposit and delivered handoff chat with matching handoff text;
+  deposit and delivered handoff chat result evidence with matching handoff text;
 - `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up
-  chat.
+  chat result evidence.
 
 For ordered social action skills, evidence order matters. A delivered request
 before arrival, a handoff message before deposit, or a follow-up before waiting
 does not satisfy the postcondition even if each individual primitive appears in
 the transcript. The text intent also matters: generic delivered chat is not
 accepted as a resource discovery, request, handoff, or follow-up. Directed
-social probes must also preserve a non-empty target argument in the transcript.
+social probes must also preserve a non-empty target argument in the transcript
+and target/text fields in the primitive result, so a provider proposal cannot
+be treated as delivered speech without runtime confirmation.
 
 ## Current Coverage
 

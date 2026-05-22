@@ -281,8 +281,10 @@ just an opened container or an unqualified moved count, and must keep the chest
 id in evidence. Wood probes should verify supported log/plank item families
 rather than overfitting to one wood species, and inventory progress must be
 attached to the expected primitive rather than an unrelated successful step.
-Social probes must prove the delivered chat text matches the action skill
-intent; generic delivered chat or untargeted chat is not sufficient evidence.
+Social probes must prove the delivered chat result itself carries target and
+text evidence that matches the action skill intent; generic delivered chat,
+untargeted chat, or intent text that appears only in provider args is not
+sufficient evidence.
 Runtime control probes must prove an observe snapshot happened before a terminal
 memory note. When a live probe writes a transcript, terminal status and
 postcondition evidence are classified separately so reviewers can see whether

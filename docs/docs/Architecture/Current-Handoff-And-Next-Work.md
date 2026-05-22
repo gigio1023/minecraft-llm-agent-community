@@ -431,13 +431,15 @@ Current postcondition rules:
 - `depositSharedItems` requires `deposit_shared` with `itemName` and
   `chestId`, `movedCount > 0`, actor id, and positive ledger sequence;
 - `handoffItemAtChest` requires an actor/ledger-identified named positive
-  deposit before delivered handoff chat with matching handoff text;
+  deposit before delivered handoff chat with matching target/text result
+  evidence;
 - `approachAndRequestItem` requires measured arrival distance evidence before
-  delivered targeted chat requesting a specific item;
+  delivered targeted chat result evidence requesting a specific item;
 - `announceResourceDiscovery` requires delivered targeted resource-discovery
-  chat and a resource memory note persisted after that announcement;
+  chat result evidence and a resource memory note persisted after that
+  announcement;
 - `waitForBusyCrafter` requires busy response before bounded wait before
-  delivered targeted follow-up chat.
+  delivered targeted follow-up chat result evidence.
 
 Checked-in protection:
 
