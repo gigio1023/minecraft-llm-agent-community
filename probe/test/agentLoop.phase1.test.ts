@@ -622,3 +622,121 @@ test("agent loop blocks provider proposals not backed by actor workspace active 
   );
   assert.equal((transcriptSteps[1]?.verification as { status: string }).status, "failed");
 });
+
+test("agent loop records provider failures as actor-visible transcript steps", async () => {
+  const actor = createBot("npc_a", 0);
+  const target = createBot("npc_b", 2);
+  const transcriptSteps: Array<Record<string, unknown>> = [];
+  const events: Array<Record<string, unknown>> = [];
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `agent-loop-provider-failure-${process.pid}-${Date.now()}`
+  );
+
+  try {
+    const final = await runAgentLoop({
+      bots: { actor, target },
+      provider: {
+        async next() {
+          throw new Error("provider offline");
+        }
+      },
+      activeActionSkills: [
+        runtimeControlActionSkill()
+      ],
+      artifacts: {
+        actorWorkspaceRootDir: rootDir,
+        providerInputSnapshots: {
+          provider_id: "test-provider",
+          model: "test-model"
+        }
+      },
+      stepDelayMs: 0,
+      onEvent(event) {
+        events.push(event);
+      },
+      transcript: {
+        recordStep(step) {
+          transcriptSteps.push(step as Record<string, unknown>);
+        }
+      },
+      tools: {
+        validateProposal,
+        async observe() {
+          return {
+            status: "ok" as const,
+            observerId: "npc_b",
+            visibleActors: [
+              {
+                id: "npc_b",
+                distance: 2,
+                busy: false
+              }
+            ],
+            memory: []
+          };
+        },
+        async move_to() {
+          return { tool: "move_to", ok: false, status: "blocked" };
+        },
+        async collect_logs() {
+          return { tool: "collect_logs", ok: false, status: "blocked" };
+        },
+        async craft_item() {
+          return { tool: "craft_item", ok: false, status: "blocked" };
+        },
+        async inspect_chest() {
+          return { tool: "inspect_chest", ok: true, status: "inspected" };
+        },
+        async deposit_shared() {
+          return { tool: "deposit_shared", ok: false, status: "blocked" };
+        },
+        async withdraw_shared() {
+          return { tool: "withdraw_shared", ok: false, status: "blocked" };
+        },
+        async say() {
+          return { tool: "say", ok: false, status: "blocked" };
+        },
+        async wait() {
+          return { tool: "wait", ok: true, status: "waited" };
+        },
+        async remember() {
+          return { tool: "remember", ok: true, status: "remembered", note: "unreachable" };
+        }
+      }
+    });
+
+    assert.deepEqual(final, {
+      status: "failed",
+      why: "provider failed: provider offline"
+    });
+    assert.equal(transcriptSteps.length, 1);
+    assert.equal(transcriptSteps[0]?.tool, "provider_error");
+    assert.equal((transcriptSteps[0]?.result as { ok: boolean }).ok, false);
+    assert.equal((transcriptSteps[0]?.result as { status: string }).status, "failed");
+    assert.equal((transcriptSteps[0]?.result as { message: string }).message, "provider offline");
+    assert.match(
+      (transcriptSteps[0]?.result as { providerInputRef: string }).providerInputRef,
+      /provider-inputs\/turn-0001\.json$/
+    );
+    assert.deepEqual(
+      events.map((event) => event.type),
+      ["turn_observed", "provider_failed", "loop_completed"]
+    );
+    assert.equal(events.at(-1)?.tool, "provider_error");
+    assert.equal(events.at(-1)?.status, "failed");
+
+    const providerInputPath = path.join(
+      rootDir,
+      "npc_a",
+      "provider-inputs",
+      "turn-0001.json"
+    );
+    const providerInput = JSON.parse(await fs.readFile(providerInputPath, "utf8"));
+    assert.equal(providerInput.schema, "provider-input-snapshot/v1");
+    assert.equal(providerInput.actor_id, "npc_a");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});

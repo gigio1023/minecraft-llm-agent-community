@@ -45,11 +45,11 @@ type JsonValue =
 
 export type AgentLoopEvent = {
   schema: "agent-loop-event/v1";
-  type: "turn_observed" | "provider_proposed" | "tool_completed" | "loop_completed";
+  type: "turn_observed" | "provider_proposed" | "provider_failed" | "tool_completed" | "loop_completed";
   at: string;
   actorId: string;
   turnId?: string;
-  tool?: AllowedTool;
+  tool?: AllowedTool | "provider_error";
   status?: string;
   taskId?: string;
   data?: JsonValue;
@@ -71,7 +71,7 @@ type TranscriptRecorder = {
     observation: JsonValue;
     task?: JsonValue;
     pressureContext?: JsonValue;
-    tool: AllowedTool;
+    tool: AllowedTool | "provider_error";
     args?: Record<string, JsonValue>;
     providerOutputRef?: string;
     result: JsonValue;
@@ -200,6 +200,10 @@ function shouldVerifyTaskProgress(
     tool !== "wait" &&
     tool !== "remember"
   );
+}
+
+function formatProviderError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function emitAgentLoopEvent(
@@ -360,7 +364,54 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       providerInput: toJsonValue(providerInput)
     });
 
-    const proposal = await provider.next(providerInput);
+    let proposal: ToolProposal & { providerTrace?: ProviderTrace };
+    try {
+      proposal = await provider.next(providerInput);
+    } catch (error) {
+      const message = formatProviderError(error);
+      const result = {
+        tool: "provider_error",
+        ok: false,
+        status: "failed",
+        message,
+        ...(providerSnapshotPath ? { providerInputRef: providerSnapshotPath } : {})
+      } satisfies ToolResult;
+
+      emitAgentLoopEvent(onEvent, {
+        type: "provider_failed",
+        actorId: actor.username,
+        turnId,
+        status: "failed",
+        taskId: currentTask?.id,
+        data: {
+          message
+        }
+      });
+
+      transcript.recordStep({
+        actor: actor.username,
+        observation: toJsonValue(observation),
+        ...(currentTask ? { task: toJsonValue(currentTask) } : {}),
+        pressureContext: toJsonValue(pressureContext),
+        tool: "provider_error",
+        result: toJsonValue(result)
+      });
+
+      emitAgentLoopEvent(onEvent, {
+        type: "loop_completed",
+        actorId: actor.username,
+        turnId,
+        tool: "provider_error",
+        status: "failed",
+        taskId: currentTask?.id,
+        data: { why: `provider failed: ${message}` }
+      });
+
+      return {
+        status: "failed",
+        why: `provider failed: ${message}`
+      };
+    }
     const providerOutputSnapshotPath = await recordProviderOutputSnapshotIfRequested({
       artifacts,
       actorId: actor.username,

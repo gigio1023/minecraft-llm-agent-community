@@ -438,10 +438,13 @@ The actor-workspace slice is done when:
 9. failed gameplay attempts leave actor-scoped evidence suitable for review,
    including target, pre/post position, tool attempt, verifier reason, and
    inventory/block/container delta when relevant;
-10. fake progress such as "started swinging," "pathing started," or provider
+10. provider failures after an actor turn observes the world are recorded as
+    failed `provider_error` transcript steps and `provider_failed` events, with
+    the provider input snapshot ref attached when snapshots are enabled;
+11. fake progress such as "started swinging," "pathing started," or provider
    confidence cannot satisfy a verifier without runtime evidence;
-11. deterministic mode still performs zero network calls;
-12. docs and index routes point to the split spec documents.
+12. deterministic mode still performs zero network calls;
+13. docs and index routes point to the split spec documents.
 
 ## 7. Done Criteria For The Social Feedback Slice
 

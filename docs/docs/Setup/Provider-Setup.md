@@ -63,6 +63,11 @@ The provider still returns only one bounded runtime primitive. Runtime action
 skill gates and verification decide whether the proposed action can execute or
 counts as progress.
 
+If the live provider throws after an actor turn has already observed the world,
+the runtime records a failed `provider_error` transcript step and emits a
+`provider_failed` dashboard event. When provider input snapshots are enabled,
+that failed step still points at the exact provider-facing input packet.
+
 ## Live Dashboard
 
 The probe CLI starts the local Elysia dashboard server by default while a probe
@@ -83,6 +88,11 @@ Open `http://127.0.0.1:4173`. It refreshes from local files and shows, per NPC:
 
 If `provider-outputs/` is empty, the current run either used deterministic mode
 or failed before the live provider returned an LLM response.
+
+If `build/provider-auth/openai-codex-auth.json` is missing, the CLI fails before
+live gameplay provider turns begin. That is an auth setup blocker, not a
+Minecraft action-skill verdict. Do not paste or print token contents while
+diagnosing it.
 
 Use `--no-dashboard` to disable the server or `--dashboard-port <port>` to move
 it off the default port.

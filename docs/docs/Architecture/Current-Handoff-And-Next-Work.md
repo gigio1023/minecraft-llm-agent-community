@@ -127,6 +127,10 @@ Implemented surfaces:
 - provider input snapshots with credential-shaped key rejection;
 - provider output store added for dashboard/review visibility;
 - opt-in `openai-codex` gameplay provider path.
+- gameplay provider failures after a turn observation are recorded as
+  transcript-visible `provider_error` steps plus `provider_failed` runtime
+  events, with the provider input snapshot still attached when snapshots are
+  enabled.
 
 Important files:
 
@@ -560,6 +564,26 @@ The managed probe start now clears bot inventories and prepares a tiny baseline
 resource surface near spawn: one shared chest and four low `oak_log` blocks.
 That keeps broader product smoke runs from inheriting stale action-skill
 fixture inventory while still giving the gatherer a real boring task to finish.
+
+Latest live provider smoke attempt:
+
+```bash
+cd probe
+bun run src/cli.ts --provider openai-codex --npcs 3 --max-actions 6 --observe-ms 0 --no-dashboard
+```
+
+Current result:
+
+```text
+failed before gameplay provider turns because build/provider-auth/openai-codex-auth.json was missing
+```
+
+This is a setup/auth blocker, not action-skill evidence. Do not treat it as a
+live LLM gameplay verdict. Once the ignored auth store exists, rerun the same
+command and review provider input/output snapshots plus Langfuse traces against
+the runtime transcript. If the provider fails after an actor turn begins,
+`runAgentLoop` now records a failed `provider_error` transcript step and
+`provider_failed` event instead of losing actor-local evidence.
 
 Latest existing-evidence audit:
 
