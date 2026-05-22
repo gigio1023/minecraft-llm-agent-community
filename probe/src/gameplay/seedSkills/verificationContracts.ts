@@ -62,7 +62,8 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     primitiveIds: ["observe", "inspect_chest", "wait"],
     evidence: [
       "shared chest accessor returns item counts",
-      "ledger-backed storage observation is included in runtime state"
+      "ledger-backed storage observation is included in runtime state",
+      "inspect result carries actor id, chest id, and positive ledger sequence"
     ],
     protectedBy: ["test/sharedChest.test.ts", "test/liveSharedChest.test.ts"]
   },
@@ -72,7 +73,8 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     evidence: [
       "role deposit rules allow the item",
       "deposit operation moves a positive item count",
-      "storage ledger records the contribution"
+      "storage ledger records the contribution",
+      "deposit result carries actor id, chest id, and positive ledger sequence"
     ],
     protectedBy: ["test/sharedChest.test.ts", "test/sharedChest.integration.test.ts"]
   },
@@ -82,7 +84,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     evidence: [
       "move_to reports measured before/after distance",
       "pathfinder timeout is bounded and stopped",
-      "say records a delivered or busy dialogue state"
+      "say result records delivered target and text evidence"
     ],
     protectedBy: ["test/runtimeLogic.test.ts", "test/agentLoop.phase1.test.ts"]
   },
@@ -91,6 +93,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     primitiveIds: ["observe", "say", "remember"],
     evidence: [
       "resource announcement is sent through runtime chat",
+      "say result records delivered target and resource-discovery text evidence",
       "resource note is persisted for future provider context"
     ],
     protectedBy: ["test/runtimeLogic.test.ts", "test/transcript.test.ts"]
@@ -100,8 +103,8 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     primitiveIds: ["observe", "inspect_chest", "deposit_shared", "say", "wait"],
     evidence: [
       "deposit operation moves a positive item count into shared storage",
-      "handoff is announced through runtime chat",
-      "ledger links contribution to actor and task"
+      "ledger links contribution to actor and task",
+      "say result records delivered target and handoff text evidence"
     ],
     protectedBy: ["test/sharedChest.test.ts", "test/sharedChest.integration.test.ts"]
   },
@@ -110,8 +113,9 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     primitiveIds: ["observe", "wait", "say"],
     evidence: [
       "busy state is treated as a valid defer signal",
+      "busy say result records actor and target evidence",
       "wait completes as a bounded runtime action",
-      "follow-up chat can observe availability changes"
+      "follow-up say result records delivered target and text evidence"
     ],
     protectedBy: ["test/runtimeLogic.test.ts", "test/mutualSocialRuntime.test.ts"]
   }
