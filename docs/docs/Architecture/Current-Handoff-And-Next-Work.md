@@ -612,17 +612,20 @@ The CLI should own server and dashboard process lifecycle cleanly.
 Implemented behavior:
 
 - dashboard startup checks whether the fixed port is already accepting
-  connections and treats an existing dashboard as reusable;
+  connections and treats an existing process as reusable only after its
+  `/api/state` endpoint returns `minecraft-agent-dashboard-state/v2`;
 - dashboard startup remains best-effort and does not fail gameplay or action
   skill probes;
 - dashboard event ingestion tolerates missing or partial artifacts because
   runtime events are fire-and-forget and state refresh still falls back to
-  artifact polling.
+  artifact polling;
+- dashboard health checks use a short timeout, so a stale listener cannot hang
+  CLI startup indefinitely.
 
 Remaining work:
 
-- fixed ports only, with explicit reuse-or-fail behavior;
-- clear stale process detection.
+- stale process remediation remains manual: identify the process occupying the
+  fixed port and stop it before re-running with dashboard events.
 
 ### P1: Crafting Table Boundary
 

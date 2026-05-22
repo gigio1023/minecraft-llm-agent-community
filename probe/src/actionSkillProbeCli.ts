@@ -14,6 +14,7 @@ import {
 } from "./runtime/actorWorkspace.js";
 import { assignSeedActionSkillOwnership } from "./skills/ownership.js";
 import { startDashboardServer, type DashboardServer } from "./dashboard/dashboardServer.js";
+import { checkDashboardHealth } from "./dashboard/dashboardHealth.js";
 import { createDashboardRuntimeEventSink } from "./dashboard/runtimeEvents.js";
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
 import { probePort } from "./server/serverLifecycle.js";
@@ -136,6 +137,7 @@ function formatError(error: unknown): string {
 
 async function main() {
   let dashboardServer: DashboardServer | null = null;
+  let dashboardEventPort: number | undefined;
 
   try {
     const cliOptions = parseArgs(process.argv.slice(2));
@@ -235,9 +237,16 @@ async function main() {
     if (cliOptions.dashboard !== false) {
       try {
         if ((await probePort(dashboardPort)).inUse) {
-          console.warn(`dashboard already running: http://127.0.0.1:${dashboardPort}`);
+          const health = await checkDashboardHealth(dashboardPort);
+          if (health.status === "ready") {
+            console.warn(`dashboard already running: ${health.url}`);
+            dashboardEventPort = dashboardPort;
+          } else {
+            console.warn(`dashboard port occupied by non-dashboard process: ${health.url} (${health.reason})`);
+          }
         } else {
           dashboardServer = startDashboardServer(dashboardPort);
+          dashboardEventPort = dashboardPort;
           console.log(`dashboard: ${dashboardServer.url}`);
         }
       } catch (error) {
@@ -263,9 +272,9 @@ async function main() {
 
     const result = await runLiveActionSkillProbe({
       ...probeConfig,
-      onEvent: cliOptions.dashboard === false
-        ? undefined
-        : createDashboardRuntimeEventSink(dashboardPort)
+      onEvent: dashboardEventPort
+        ? createDashboardRuntimeEventSink(dashboardEventPort)
+        : undefined
     });
 
     console.log(`\n─── Probe Result ───`);

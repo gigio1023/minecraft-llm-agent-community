@@ -1,5 +1,6 @@
 import { runProbe } from "./runProbe.js";
 import { startDashboardServer, type DashboardServer } from "./dashboard/dashboardServer.js";
+import { checkDashboardHealth } from "./dashboard/dashboardHealth.js";
 import { createDashboardRuntimeEventSink } from "./dashboard/runtimeEvents.js";
 import { probePort } from "./server/serverLifecycle.js";
 
@@ -142,32 +143,41 @@ function formatError(error: unknown): string {
 
 async function startCliDashboard(options: CliOptions) {
   if (options.dashboard === false) {
-    return null;
+    return { server: null, eventPort: undefined };
   }
 
   const port = options.dashboardPort ?? 4173;
 
   try {
     if ((await probePort(port)).inUse) {
-      console.warn(`dashboard already running: http://127.0.0.1:${port}`);
-      return null;
+      const health = await checkDashboardHealth(port);
+      if (health.status === "ready") {
+        console.warn(`dashboard already running: ${health.url}`);
+        return { server: null, eventPort: port };
+      }
+
+      console.warn(`dashboard port occupied by non-dashboard process: ${health.url} (${health.reason})`);
+      return { server: null, eventPort: undefined };
     }
 
     const server = startDashboardServer(port);
     console.log(`dashboard ready: ${server.url}`);
-    return server;
+    return { server, eventPort: port };
   } catch (error) {
     if (
       error instanceof Error &&
       "code" in error &&
       (error as NodeJS.ErrnoException).code === "EADDRINUSE"
     ) {
-      console.warn(`dashboard already running: http://127.0.0.1:${port}`);
-      return null;
+      const health = await checkDashboardHealth(port);
+      if (health.status === "ready") {
+        console.warn(`dashboard already running: ${health.url}`);
+        return { server: null, eventPort: port };
+      }
     }
 
     console.warn(`dashboard unavailable: ${formatError(error)}`);
-    return null;
+    return { server: null, eventPort: undefined };
   }
 }
 
@@ -177,10 +187,10 @@ async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     applyOptionsToEnv(options);
-    const dashboardPort = options.dashboardPort ?? 4173;
-    dashboardServer = await startCliDashboard(options);
+    const dashboard = await startCliDashboard(options);
+    dashboardServer = dashboard.server;
     const { transcriptPath, cleanupError } = await runProbe({
-      onEvent: options.dashboard === false ? undefined : createDashboardRuntimeEventSink(dashboardPort)
+      onEvent: dashboard.eventPort ? createDashboardRuntimeEventSink(dashboard.eventPort) : undefined
     });
 
     if (cleanupError) {

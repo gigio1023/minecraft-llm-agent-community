@@ -201,6 +201,11 @@ runtime events to `/api/runtime-events` for turn observation, provider proposal,
 tool completion, and loop completion. These events are fire-and-forget:
 dashboard failure must not reject, delay, or relabel NPC action execution, and
 the dashboard still falls back to artifact polling.
+If the fixed dashboard port is already occupied, the CLI reuses it only when
+`/api/state` proves it is this repo's dashboard. A random stale listener is
+reported as a dashboard availability issue instead of being mislabeled as an
+active runtime dashboard. The health check is bounded by a short timeout so a
+stale listener cannot hang probe startup.
 
 Current matrix command:
 
