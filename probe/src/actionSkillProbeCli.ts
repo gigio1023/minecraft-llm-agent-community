@@ -15,6 +15,7 @@ import { assignSeedActionSkillOwnership } from "./skills/ownership.js";
 import { startDashboardServer, type DashboardServer } from "./dashboard/dashboardServer.js";
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
 import { probePort } from "./server/serverLifecycle.js";
+import { checkDockerPreflight, dockerPreflightCommand } from "./server/dockerPreflight.js";
 
 type SkillProbeCliOptions = {
   actor?: string;
@@ -172,6 +173,17 @@ async function main() {
     console.log(`  primitives: ${allowedPrimitives.join(", ")}`);
     console.log(`  evidence:   ${contract.evidence.join("; ")}`);
     console.log(`─────────────────────────\n`);
+
+    const preflight = await checkDockerPreflight();
+    if (preflight.status === "environment_blocked") {
+      console.log(`─── Environment Blocked ───`);
+      console.log(`  status: environment_blocked`);
+      console.log(`  command: ${dockerPreflightCommand}`);
+      console.log(`  reason: ${preflight.reason.split("\n")[0]}`);
+      console.log(`───────────────────────────\n`);
+      process.exitCode = 1;
+      return;
+    }
 
     // Initialize actor workspace if requested
     if (cliOptions.initActorWorkspace) {

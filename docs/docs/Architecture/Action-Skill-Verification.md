@@ -140,6 +140,10 @@ Per-action-skill probes add a second gate after transcript write:
 - matrix CLI output prints `matrix_fresh_commands` for the first few unproven
   action skills, so fresh live probes can be launched without opening the JSON
   report.
+- the single-skill probe command runs Docker preflight before actor workspace
+  initialization, dashboard startup, or Minecraft startup, so an unavailable
+  runtime is reported as `environment_blocked` instead of mutating local actor
+  state and then failing as if the action skill had run.
 - matrix CLI output prints `matrix_next_actions`, so a reviewer can see whether
   the next step is restoring the environment, running fresh live proof, or
   repairing a failed probe. Environment restoration is one Docker preflight

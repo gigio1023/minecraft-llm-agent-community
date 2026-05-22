@@ -186,6 +186,11 @@ cd probe
 bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
 ```
 
+The single-skill harness runs the same Docker preflight before actor workspace
+initialization, dashboard startup, or Minecraft startup. When Docker is
+unavailable, it reports `environment_blocked` with the Docker preflight command
+and exits without mutating actor workspace state.
+
 Current matrix command:
 
 ```bash
@@ -232,7 +237,7 @@ command.
 It also runs a Docker preflight before actor workspace initialization or
 Minecraft startup. When Docker is unavailable, it reports
 `matrix_preflight status=environment_blocked` and exits without mutating the
-probe world.
+actor workspace or probe world.
 
 Use `--dry-run` when the Minecraft runtime is unavailable or before a live
 matrix run. It prints the implemented action skill checklist, including role,
