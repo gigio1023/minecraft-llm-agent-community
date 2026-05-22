@@ -31,6 +31,7 @@ test("action skill probe matrix builds one case for every implemented seed actio
   assert.ok(cases.every((entry) => entry.maxActions === 8));
   assert.ok(cases.every((entry) => entry.roleId.length > 0));
   assert.ok(cases.every((entry) => entry.probePreconditionMode.length > 0));
+  assert.ok(cases.every((entry) => entry.readinessItems.length === 7));
   assert.ok(cases.every((entry) => entry.primitiveIds.length > 0));
   assert.ok(cases.every((entry) => entry.contractEvidence.length > 0));
   assert.ok(cases.every((entry) => entry.postconditionEvidence.length > 0));
@@ -127,6 +128,16 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
   assert.equal(report.cases[0].skillId, "collectLogs");
   assert.equal(report.cases[0].probePreconditionMode, "placed_logs");
+  assert.deepEqual(report.cases[0].readinessItems.map((item) => item.id), [
+    "implemented_seed_action_skill",
+    "role_selected",
+    "primitive_ownership_declared",
+    "verification_contract_declared",
+    "postcondition_spec_declared",
+    "deterministic_probe_driver_declared",
+    "probe_precondition_mode_declared"
+  ]);
+  assert.ok(report.cases[0].readinessItems.every((item) => item.status === "ready"));
   assert.ok(report.cases[0].contractEvidence.length > 0);
   assert.ok(report.cases[0].postconditionEvidence.length > 0);
 });

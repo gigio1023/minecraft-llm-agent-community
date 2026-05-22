@@ -249,11 +249,14 @@ Use `--report <path>` to persist the same checklist or live matrix result as a
 JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
 includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or
 `incomplete`, so later reviewers can distinguish live environment blockers from
-real action skill evidence failures. It also includes `skillStatuses`, one row
-per selected action skill, so dashboards and reviewers can render the current
+real action skill evidence failures. Each `cases[]` row includes
+`readinessItems` for the implemented registry entry, role, primitive ownership,
+verification contract, postcondition spec, deterministic probe driver, and
+fixture/precondition mode. The report also includes `skillStatuses`, one row per
+selected action skill, so dashboards and reviewers can render the current
 verification state without deriving it from mixed result and gap arrays. Each
-status row carries a `freshEvidenceCommand`, the exact single-skill probe command
-to run when that row still needs live Minecraft proof. Each status row also
+status row carries a `freshEvidenceCommand`, the exact single-skill probe
+command to run when that row still needs live Minecraft proof. Each status row also
 carries `evidenceScope`: `current_run`, `historical_transcript`, `missing`, or
 `environment_blocked`, so a historical audit pass is not confused with a fresh
 live matrix pass. `summary.statusCounts`

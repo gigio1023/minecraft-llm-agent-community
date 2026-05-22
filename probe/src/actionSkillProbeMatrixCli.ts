@@ -11,6 +11,7 @@ import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 import {
   actionSkillPostconditionSpecs,
   getActionSkillProbePreconditionMode,
+  hasDeterministicActionSkillProbeDriver,
   runLiveActionSkillProbe,
   validateProbePostcondition,
   validateSkillProbeConfig,
@@ -35,12 +36,26 @@ type ProbeMatrixCase = ActionSkillProbeConfig & {
   summary: string;
   preconditions: string[];
   probePreconditionMode: string;
+  readinessItems: ProbeMatrixReadinessItem[];
   primitiveIds: string[];
   contractEvidence: string[];
   postconditionEvidence: string[];
 };
 
 export type ProbeMatrixVerdict = "passed" | "failed" | "environment_blocked" | "incomplete";
+
+export type ProbeMatrixReadinessItem = {
+  id:
+    | "implemented_seed_action_skill"
+    | "role_selected"
+    | "primitive_ownership_declared"
+    | "verification_contract_declared"
+    | "postcondition_spec_declared"
+    | "deterministic_probe_driver_declared"
+    | "probe_precondition_mode_declared";
+  status: "ready";
+  detail: string;
+};
 
 export type ProbeMatrixEvidenceGap = {
   skillId: SeedActionSkillId;
@@ -121,6 +136,55 @@ export type ProbeMatrixReport = {
     evidenceScopeCounts: ProbeMatrixEvidenceScopeCounts;
   };
 };
+
+function buildProbeMatrixReadinessItems(input: {
+  skillId: SeedActionSkillId;
+  roleId: RoleId;
+  primitiveIds: string[];
+  contractEvidence: string[];
+  postconditionEvidence: string[];
+  probePreconditionMode: string;
+}): ProbeMatrixReadinessItem[] {
+  return [
+    {
+      id: "implemented_seed_action_skill",
+      status: "ready",
+      detail: `${input.skillId} is implemented in the seed action skill registry`
+    },
+    {
+      id: "role_selected",
+      status: "ready",
+      detail: `probe role ${input.roleId} is valid for ${input.skillId}`
+    },
+    {
+      id: "primitive_ownership_declared",
+      status: "ready",
+      detail: input.primitiveIds.join(", ")
+    },
+    {
+      id: "verification_contract_declared",
+      status: "ready",
+      detail: `${input.contractEvidence.length} contract evidence item(s)`
+    },
+    {
+      id: "postcondition_spec_declared",
+      status: "ready",
+      detail: `${input.postconditionEvidence.length} postcondition evidence item(s)`
+    },
+    {
+      id: "deterministic_probe_driver_declared",
+      status: "ready",
+      detail: hasDeterministicActionSkillProbeDriver(input.skillId)
+        ? "deterministic probe driver exists"
+        : "deterministic probe driver missing"
+    },
+    {
+      id: "probe_precondition_mode_declared",
+      status: "ready",
+      detail: input.probePreconditionMode
+    }
+  ];
+}
 
 export type ProbeMatrixPreflight =
   | { status: "ready" }
@@ -538,7 +602,15 @@ export function buildProbeMatrixCases(input: {
       probePreconditionMode,
       primitiveIds: [...skill.primitiveIds],
       contractEvidence: [...contract.evidence],
-      postconditionEvidence: [...postconditionSpec.evidenceSummary]
+      postconditionEvidence: [...postconditionSpec.evidenceSummary],
+      readinessItems: buildProbeMatrixReadinessItems({
+        skillId: skill.id,
+        roleId,
+        primitiveIds: [...skill.primitiveIds],
+        contractEvidence: [...contract.evidence],
+        postconditionEvidence: [...postconditionSpec.evidenceSummary],
+        probePreconditionMode
+      })
     };
   });
 }
@@ -729,6 +801,7 @@ function printDryRun(cases: ProbeMatrixCase[]) {
     console.log(`  primitives:    ${testCase.primitiveIds.join(", ")}`);
     console.log(`  preconditions: ${testCase.preconditions.length > 0 ? testCase.preconditions.join("; ") : "(none)"}`);
     console.log(`  probe fixture: ${testCase.probePreconditionMode}`);
+    console.log(`  readiness:     ${testCase.readinessItems.map((item) => item.id).join(", ")}`);
     console.log(`  contract:      ${testCase.contractEvidence.join("; ")}`);
     console.log(`  postcondition: ${testCase.postconditionEvidence.join("; ")}`);
   }

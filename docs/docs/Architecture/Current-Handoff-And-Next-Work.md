@@ -361,6 +361,9 @@ world. It prints each implemented action skill with:
 - primitive ownership;
 - declared preconditions;
 - deterministic probe fixture/precondition mode;
+- readiness items for registry status, role selection, primitive ownership,
+  verification contract, postcondition spec, deterministic probe driver, and
+  fixture/precondition mode;
 - verification contract evidence;
 - postcondition evidence.
 
@@ -383,9 +386,11 @@ top-level `verdict` field: `passed`, `failed`, `environment_blocked`, or
 skill failures and from partial runs that stopped before the whole matrix was
 observed. The same report includes `skillStatuses`, one row per selected action
 skill, so dashboards and reviewer sidecars can render the whole matrix without
-reconstructing it from `results` and `evidenceGaps`. Each status row includes a
-`freshEvidenceCommand`, the exact single-skill probe command to run for fresh
-live Minecraft proof. Each status row also includes `evidenceScope`:
+reconstructing it from `results` and `evidenceGaps`. Each `cases[]` row also
+includes `readinessItems`, the explicit verification-preparation checklist for
+the selected action skill. Each status row includes a `freshEvidenceCommand`,
+the exact single-skill probe command to run for fresh live Minecraft proof. Each
+status row also includes `evidenceScope`:
 `current_run`, `historical_transcript`, `missing`, or `environment_blocked`, so
 reviewers can distinguish historical transcript proof from fresh live proof.
 `summary.statusCounts` aggregates those rows by

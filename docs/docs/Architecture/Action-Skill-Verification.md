@@ -88,6 +88,10 @@ Per-action-skill probes add a second gate after transcript write:
   probe driver and probe fixture/precondition mode. Missing driver coverage is
   a validation failure, not permission to terminate through a generic
   `remember` note.
+- matrix `cases[]` rows include `readinessItems`, so reviewers can audit
+  registry status, selected role, primitive ownership, verification contract,
+  postcondition spec, deterministic driver, and fixture/precondition mode before
+  reading live evidence.
 - matrix reports include a top-level verdict, so `environment_blocked` remains
   separate from runtime verifier failures and incomplete runs.
 - matrix reports include `skillStatuses`, one row per selected action skill,
