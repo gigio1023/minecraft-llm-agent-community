@@ -549,6 +549,11 @@ function textArgMatches(step: ProbeTranscriptStep, predicate: (text: string) => 
   return typeof text === "string" && predicate(text);
 }
 
+function hasDirectedTargetArg(step: ProbeTranscriptStep) {
+  const target = asRecord(step.args).target;
+  return typeof target === "string" && target.trim().length > 0;
+}
+
 function isRequestText(text: string) {
   return /request|need|spare|share|starter|item/i.test(text);
 }
@@ -568,21 +573,36 @@ function isFollowUpText(text: string) {
 export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, ActionSkillPostconditionSpec>> = {
   runtimeObserveAndRemember: {
     skillId: "runtimeObserveAndRemember",
-    evidenceSummary: ["observation step ran before memory note was persisted"],
+    evidenceSummary: ["observation snapshot was captured before memory note was persisted"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "observe", result: { status: "ok" } },
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     },
     validate(steps) {
-      return hasToolResultAfter(steps, {
-        afterTool: "observe",
-        tool: "remember",
-        predicate: (result) => result.status === "remembered"
-      })
+      const observeIndex = steps.findIndex((step) => {
+        const result = asRecord(step.result);
+        return step.tool === "observe" &&
+          result.status === "ok" &&
+          asRecord(result.observation).status === "ok";
+      });
+
+      if (observeIndex < 0) {
+        return "runtimeObserveAndRemember did not capture an observation snapshot";
+      }
+
+      return steps
+        .slice(observeIndex + 1)
+        .some((step) => {
+          const result = asRecord(step.result);
+          return step.tool === "remember" &&
+            result.status === "remembered" &&
+            typeof result.note === "string" &&
+            result.note.trim().length > 0;
+        })
         ? null
-        : "runtimeObserveAndRemember did not observe before persisting memory";
+        : "runtimeObserveAndRemember did not persist a non-empty memory note after observing";
     }
   },
   collectLogs: {
@@ -715,7 +735,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { text: "can you spare one starter item?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
@@ -736,6 +756,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         .some((step) =>
           step.tool === "say" &&
           asRecord(step.result).status === "delivered" &&
+          hasDirectedTargetArg(step) &&
           textArgMatches(step, isRequestText)
         )
         ? null
@@ -746,12 +767,13 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     skillId: "announceResourceDiscovery",
     evidenceSummary: ["say delivered a resource-discovery announcement"],
     minimumPassingTranscript: {
-      steps: [{ tool: "say", args: { text: "I found oak logs near spawn." }, result: { status: "delivered" } }]
+      steps: [{ tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } }]
     },
     validate(steps) {
       return steps.some((step) =>
         step.tool === "say" &&
         asRecord(step.result).status === "delivered" &&
+        hasDirectedTargetArg(step) &&
         textArgMatches(step, isResourceAnnouncementText)
       )
         ? null
@@ -764,7 +786,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     minimumPassingTranscript: {
       steps: [
         { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } },
-        { tool: "say", args: { text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
@@ -781,6 +803,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         .some((step) =>
           step.tool === "say" &&
           asRecord(step.result).status === "delivered" &&
+          hasDirectedTargetArg(step) &&
           textArgMatches(step, isHandoffText)
         )
         ? null
@@ -792,14 +815,14 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     evidenceSummary: ["say observed busy", "wait completed", "say delivered a follow-up message"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "say", args: { text: "are you free to talk?" }, result: { status: "busy" } },
+        { tool: "say", args: { target: "npc_target", text: "are you free to talk?" }, result: { status: "busy" } },
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", args: { text: "checking again when you are ready" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
       const busyIndex = steps.findIndex(
-        (step) => step.tool === "say" && asRecord(step.result).status === "busy"
+        (step) => step.tool === "say" && asRecord(step.result).status === "busy" && hasDirectedTargetArg(step)
       );
       if (busyIndex < 0) {
         return "waitForBusyCrafter did not observe a busy response";
@@ -815,6 +838,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         .some((step) =>
           step.tool === "say" &&
           asRecord(step.result).status === "delivered" &&
+          hasDirectedTargetArg(step) &&
           textArgMatches(step, isFollowUpText)
         )
         ? null

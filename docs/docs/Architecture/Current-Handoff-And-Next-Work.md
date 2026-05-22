@@ -399,6 +399,8 @@ Remaining harness work:
 
 Current postcondition rules:
 
+- `runtimeObserveAndRemember` requires an observe result with an observation
+  snapshot before a non-empty memory note;
 - `collectLogs` requires passed runtime verifier progress with log inventory at
   the target count;
 - `craftPlanksAndSticks` requires passed runtime verifier progress with both
@@ -412,10 +414,11 @@ Current postcondition rules:
 - `handoffItemAtChest` requires a named positive deposit before delivered
   handoff chat with matching handoff text;
 - `approachAndRequestItem` requires measured arrival distance evidence before
-  delivered request-like chat;
-- `announceResourceDiscovery` requires delivered resource-discovery chat;
+  delivered targeted request-like chat;
+- `announceResourceDiscovery` requires delivered targeted resource-discovery
+  chat;
 - `waitForBusyCrafter` requires busy response before bounded wait before
-  delivered follow-up chat.
+  delivered targeted follow-up chat.
 
 Checked-in protection:
 

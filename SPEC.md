@@ -266,7 +266,8 @@ before handoff chat, and busy response before wait before follow-up. Storage
 probes must prove named positive item movement or a non-empty item snapshot, not
 just an opened container or an unqualified moved count. Social probes must prove
 the delivered chat text matches the action skill intent; generic delivered chat
-is not sufficient evidence.
+or untargeted chat is not sufficient evidence. Runtime control probes must prove
+an observe snapshot happened before a terminal memory note.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero

@@ -299,10 +299,24 @@ test("action skill probe postcondition rejects weak shared storage evidence", as
   );
 });
 
+test("action skill probe postcondition rejects remember without observation snapshot", async () => {
+  const weakRuntimeControl = await writeTranscriptPayload({
+      steps: [
+        { tool: "observe", result: { status: "ok" } },
+        { tool: "remember", result: { status: "remembered", note: "observed" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("runtimeObserveAndRemember", weakRuntimeControl) ?? "",
+    /observation snapshot/
+  );
+});
+
 test("action skill probe postcondition enforces ordered social evidence", async () => {
   const prematureRequest = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { text: "can you spare one starter item?" }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } },
         {
           tool: "move_to",
           result: {
@@ -317,15 +331,15 @@ test("action skill probe postcondition enforces ordered social evidence", async 
     });
   const prematureHandoff = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } },
         { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } }
       ]
     });
   const prematureBusyFollowUp = await writeTranscriptPayload({
       steps: [
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", result: { status: "busy" } },
-        { tool: "say", args: { text: "checking again when you are ready" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target" }, result: { status: "busy" } },
+        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
       ]
     });
 
@@ -356,25 +370,25 @@ test("action skill probe postcondition rejects delivered social chat with the wr
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
       ]
     });
   const vagueAnnouncement = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
       ]
     });
   const vagueHandoff = await writeTranscriptPayload({
       steps: [
         { tool: "deposit_shared", result: { status: "deposited", itemName: "crafting_table", movedCount: 1 } },
-        { tool: "say", args: { text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
       ]
     });
   const vagueFollowUp = await writeTranscriptPayload({
       steps: [
-        { tool: "say", result: { status: "busy" } },
+        { tool: "say", args: { target: "npc_target" }, result: { status: "busy" } },
         { tool: "wait", result: { status: "waited" } },
-        { tool: "say", args: { text: "hello there" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
       ]
     });
 
@@ -396,11 +410,45 @@ test("action skill probe postcondition rejects delivered social chat with the wr
   );
 });
 
+test("action skill probe postcondition rejects delivered social chat without a target", async () => {
+  const untargetedRequest = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "move_to",
+          result: {
+            status: "arrived",
+            arrived: true,
+            beforeDistance: 3,
+            afterDistance: 1,
+            distanceDelta: 2
+          }
+        },
+        { tool: "say", args: { text: "can you spare one starter item?" }, result: { status: "delivered" } }
+      ]
+    });
+  const untargetedBusy = await writeTranscriptPayload({
+      steps: [
+        { tool: "say", result: { status: "busy" } },
+        { tool: "wait", result: { status: "waited" } },
+        { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("approachAndRequestItem", untargetedRequest) ?? "",
+    /request-like message/
+  );
+  assert.match(
+    await validateProbePostcondition("waitForBusyCrafter", untargetedBusy) ?? "",
+    /busy response/
+  );
+});
+
 test("action skill probe postcondition requires measured arrival evidence before social request", async () => {
   const unmeasuredArrival = await writeTranscriptPayload({
       steps: [
         { tool: "move_to", result: { status: "arrived", arrived: true } },
-        { tool: "say", args: { text: "can you spare one starter item?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } }
       ]
     });
 

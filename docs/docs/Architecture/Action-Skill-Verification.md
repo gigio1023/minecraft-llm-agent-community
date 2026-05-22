@@ -145,7 +145,8 @@ For ordered social action skills, evidence order matters. A delivered request
 before arrival, a handoff message before deposit, or a follow-up before waiting
 does not satisfy the postcondition even if each individual primitive appears in
 the transcript. The text intent also matters: generic delivered chat is not
-accepted as a resource discovery, request, handoff, or follow-up.
+accepted as a resource discovery, request, handoff, or follow-up. Directed
+social probes must also preserve a non-empty target argument in the transcript.
 
 ## Current Coverage
 
@@ -169,6 +170,9 @@ burying them in tests.
 The same postcondition rules reject weak passed verifications when the progress
 payload does not contain the expected inventory output, and reject social
 transcripts when required primitives appear out of order.
+`runtimeObserveAndRemember` also requires a real observe result with an
+observation snapshot before the memory write, so a naked terminal memory note
+cannot prove runtime control flow.
 
 Planned action skills may remain in the registry without verification contracts.
 They must not become active until their primitive boundaries and evidence rules
