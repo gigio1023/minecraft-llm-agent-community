@@ -366,7 +366,8 @@ world. It prints each implemented action skill with:
 The existing-evidence audit also avoids Docker and Minecraft startup. It scans
 raw `action_skill_probe_*` transcripts under the evidence directory, skips
 canonical projection files, re-applies runtime-owned postcondition specs, and
-reports which action skills already have historical live proof.
+reports the newest raw transcript per action skill. This deliberately prevents
+an older passing transcript from hiding a newer regression.
 
 `--report <path>` writes the same matrix checklist or live result as JSON with
 schema `action-skill-probe-matrix-report/v1`. Use this when handing off action
@@ -436,6 +437,8 @@ Checked-in protection:
 - matrix `results`, `skillStatuses`, and `evidenceGaps` now carry structured
   terminal/postcondition diagnosis fields, so handoff reviewers can tell whether
   a failure came from control flow, evidence, or both;
+- existing-evidence audit uses the newest raw probe transcript per action skill,
+  rather than selecting the best historical pass;
 - the same test file includes a minimum accepted evidence payload for every
   implemented action skill through the runtime-owned
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill

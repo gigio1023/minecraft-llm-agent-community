@@ -540,3 +540,90 @@ test("action skill probe matrix audits existing transcript evidence without Dock
   assert.equal(report.evidenceGaps[0].skillId, "craftCraftingTable");
   assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
 });
+
+test("action skill probe matrix audits the latest transcript instead of hiding regressions behind older passes", async () => {
+  const evidenceDir = await mkdtemp(path.join(tmpdir(), "action-skill-matrix-regression-"));
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs"],
+    maxActions: 8
+  });
+
+  await writeFile(
+    path.join(evidenceDir, "action_skill_probe_collectLogs-100.json"),
+    JSON.stringify({
+      metadata: {
+        action_skill_probe: {
+          actor_id: "npc_b",
+          skill_id: "collectLogs"
+        }
+      },
+      steps: [
+        {
+          tool: "collect_logs",
+          result: { status: "collected" },
+          verification: {
+            status: "passed",
+            progress: {
+              itemNames: ["oak_log"],
+              beforeCount: 0,
+              afterCount: 4,
+              targetCount: 4
+            }
+          }
+        }
+      ],
+      final: {
+        status: "success",
+        why: "older passing attempt"
+      }
+    })
+  );
+  await writeFile(
+    path.join(evidenceDir, "action_skill_probe_collectLogs-200.json"),
+    JSON.stringify({
+      metadata: {
+        action_skill_probe: {
+          actor_id: "npc_b",
+          skill_id: "collectLogs"
+        }
+      },
+      steps: [
+        {
+          tool: "collect_logs",
+          result: {
+            status: "collected",
+            beforeLogCount: 0,
+            afterLogCount: 0
+          }
+        }
+      ],
+      final: {
+        status: "success",
+        why: "newer optimistic attempt"
+      }
+    })
+  );
+
+  const results = await auditExistingActionSkillEvidence({ evidenceDir, cases });
+  const report = buildProbeMatrixReport({
+    mode: "evidence_audit",
+    actorId: "npc_b",
+    maxActions: 8,
+    cases,
+    results,
+    createdAt: "2026-05-22T00:00:00.000Z"
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].status, "failed");
+  assert.equal(results[0].terminalStatus, "success");
+  assert.equal(results[0].postconditionStatus, "failed");
+  assert.equal(results[0].failureKind, "postcondition_failed");
+  assert.match(results[0].transcriptPath ?? "", /action_skill_probe_collectLogs-200\.json/);
+  assert.equal(report.verdict, "failed");
+  assert.equal(report.evidenceGaps.length, 1);
+  assert.equal(report.evidenceGaps[0].skillId, "collectLogs");
+  assert.equal(report.evidenceGaps[0].evidenceScope, "historical_transcript");
+  assert.equal(report.evidenceGaps[0].failureKind, "postcondition_failed");
+});

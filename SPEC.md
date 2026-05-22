@@ -238,7 +238,10 @@ Use `--audit-existing-evidence` when Docker is unavailable but existing
 transcripts should be re-scored. It scans raw `action_skill_probe_*` evidence
 artifacts, skips canonical transcript projections, re-applies each action
 skill's postcondition rule, and reports which skills already have historical
-live proof versus which still need fresh runtime evidence.
+live proof versus which still need fresh runtime evidence. For each action
+skill, the audit reports the newest raw probe transcript instead of
+cherry-picking an older pass, so a recent regression cannot be hidden behind
+stale historical success.
 Use `--report <path>` to persist the same checklist or live matrix result as a
 JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
 includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or

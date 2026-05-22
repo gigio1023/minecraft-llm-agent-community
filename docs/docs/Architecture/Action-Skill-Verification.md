@@ -112,7 +112,9 @@ Per-action-skill probes add a second gate after transcript write:
   failure without parsing prose.
 - `--audit-existing-evidence` can re-score saved raw action skill probe
   transcripts without starting Docker. This is historical proof, not a
-  substitute for a fresh live matrix after code changes.
+  substitute for a fresh live matrix after code changes. It reports the newest
+  raw probe transcript for each action skill, so a later failure is not hidden
+  behind an older passing artifact.
 
 ### Shared Storage
 

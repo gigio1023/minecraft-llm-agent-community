@@ -385,9 +385,12 @@ export async function auditExistingActionSkillEvidence(input: {
     const skillCandidates = candidates
       .filter((candidate) => candidate.skillId === testCase.skillId)
       .sort((left, right) => right.timestamp - left.timestamp);
-    const best = skillCandidates.find((candidate) => candidate.status === "passed") ?? skillCandidates[0];
-    if (best) {
-      const { timestamp: _timestamp, ...result } = best;
+    const latest = skillCandidates[0];
+    if (latest) {
+      // Historical audit must not cherry-pick an older pass over a newer
+      // failure. The report is a review artifact for current behavior, so the
+      // newest raw probe transcript is the only honest historical row.
+      const { timestamp: _timestamp, ...result } = latest;
       results.push(result);
     }
   }
