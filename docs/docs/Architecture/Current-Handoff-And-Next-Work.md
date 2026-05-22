@@ -349,7 +349,8 @@ runtime failure.
 
 Every matrix mode also prints `matrix_status_counts`, a terminal-readable mirror
 of `summary.statusCounts`, so coverage can be checked without opening the JSON
-report.
+report. When gaps remain, it also prints `matrix_fresh_commands` with the first
+few one-skill probe commands to run for fresh live evidence.
 
 The dry-run checklist does not touch Docker, actor workspace, or the Minecraft
 world. It prints each implemented action skill with:

@@ -675,6 +675,18 @@ function printStatusCountsSummary(report: ProbeMatrixReport) {
   );
 }
 
+function printFreshEvidenceCommands(gaps: readonly ProbeMatrixEvidenceGap[]) {
+  if (gaps.length === 0) {
+    console.log("matrix_fresh_commands count=0");
+    return;
+  }
+
+  console.log(`matrix_fresh_commands count=${gaps.length}`);
+  for (const gap of gaps.slice(0, 5)) {
+    console.log(`  ${gap.skillId}: ${gap.freshEvidenceCommand}`);
+  }
+}
+
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -701,6 +713,7 @@ async function main() {
       console.log(`matrix_dry_run total=${cases.length}`);
       printStatusCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
+      printFreshEvidenceCommands(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
       }
@@ -726,6 +739,7 @@ async function main() {
       console.log(`matrix_summary verdict=${report.verdict} passed=${report.summary.passed} failed=${report.summary.failed} error=${report.summary.error} total=${report.summary.completed}/${report.summary.planned}`);
       printStatusCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
+      printFreshEvidenceCommands(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
       }
@@ -750,6 +764,7 @@ async function main() {
       console.log(`matrix_summary verdict=${report.verdict} passed=0 failed=0 error=1 total=0/${cases.length}`);
       printStatusCountsSummary(report);
       printEvidenceGapSummary(report.evidenceGaps);
+      printFreshEvidenceCommands(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
       }
@@ -799,6 +814,7 @@ async function main() {
     });
     printStatusCountsSummary(report);
     printEvidenceGapSummary(report.evidenceGaps);
+    printFreshEvidenceCommands(report.evidenceGaps);
 
     if (options.reportPath) {
       await writeMatrixReport(options.reportPath, report);
