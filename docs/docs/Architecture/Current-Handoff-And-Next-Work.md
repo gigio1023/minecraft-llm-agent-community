@@ -466,7 +466,9 @@ Current postcondition rules:
   completed bounded wait with positive tick/duration evidence after that
   observation; and then a non-empty memory note;
 - `collectLogs` requires passed runtime verifier progress with supported
-  log-family inventory at the target count;
+  log-family inventory at the target count, plus a `collect_logs` result with
+  positive `inventoryDelta`, `afterLogCount` at the target count, and at least
+  one `attemptedBlocks[]` entry whose outcome is `dug`;
 - `craftPlanksAndSticks` requires passed runtime verifier progress with both
   supported plank-family and stick output counts;
 - `craftCraftingTable` requires passed runtime verifier progress with crafting
@@ -519,7 +521,7 @@ action-skill matrix passed:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-final.json
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-strict-collectlogs.json
 ```
 
 ```text
@@ -619,7 +621,7 @@ bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 8 --init-
 Latest confirmed artifact:
 
 ```text
-data/evidence/action_skill_probe_collectLogs-1779430617926.json
+data/evidence/action_skill_probe_collectLogs-1779432570621.json
 ```
 
 Confirmed evidence:
@@ -628,7 +630,14 @@ Confirmed evidence:
 - final reason: `collectLogs completed with runtime verification evidence`;
 - `collect_logs` attempted four `oak_log` blocks in the prepared fixture;
 - inventory increased from `0` to `4`;
+- primitive result reported `inventoryDelta=4`, `afterLogCount=4`, and four
+  `attemptedBlocks[]` entries with `outcome=dug`;
 - verifier reason: `collect_4_logs reached 4/4 relevant inventory items`.
+
+The probe postcondition now rejects a `collectLogs` transcript when the verifier
+passes but the primitive result lacks positive inventory delta or dug-block
+attempt evidence. This keeps action-skill proof tied to the Mineflayer action
+boundary, not only to a later inventory snapshot.
 
 Implementation fixes discovered from the live run:
 

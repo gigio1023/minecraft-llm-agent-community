@@ -281,8 +281,11 @@ The same postcondition rules reject weak passed verifications when the progress
 payload does not contain the expected inventory output, and reject social
 transcripts when required primitives appear out of order.
 Inventory postconditions are tied to the expected primitive. For example,
-`collectLogs` only accepts passed inventory evidence on `collect_logs`, and
-crafting action skills only accept passed inventory evidence on `craft_item`.
+`collectLogs` only accepts passed inventory evidence on `collect_logs`, and it
+also requires the `collect_logs` result itself to report a positive
+`inventoryDelta`, `afterLogCount` at the target count, and at least one
+`attemptedBlocks[]` entry whose outcome is `dug`. Crafting action skills only
+accept passed inventory evidence on `craft_item`.
 The live probe evaluates postconditions whenever a transcript is written, even
 when the terminal note is failed, so reviewers can distinguish terminal control
 failure from missing Minecraft evidence.

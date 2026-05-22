@@ -806,11 +806,20 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   collectLogs: {
     skillId: "collectLogs",
-    evidenceSummary: ["runtime verifier passed after log inventory reached the target count"],
+    evidenceSummary: [
+      "collect_logs result reports a positive inventory delta",
+      "collect_logs result includes at least one dug log attempt",
+      "runtime verifier passed after log inventory reached the target count"
+    ],
     minimumPassingTranscript: {
       steps: [{
         tool: "collect_logs",
-        result: { status: "collected" },
+        result: {
+          status: "collected",
+          inventoryDelta: 4,
+          afterLogCount: 4,
+          attemptedBlocks: [{ block: "oak_log", outcome: "dug" }]
+        },
         verification: {
           status: "passed",
           progress: {
@@ -823,6 +832,28 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }]
     },
     validate(steps) {
+      const collectedStep = steps.find((step) => {
+        if (step.tool !== "collect_logs") {
+          return false;
+        }
+
+        const result = asRecord(step.result);
+        const attemptedBlocks = arrayField(result, "attemptedBlocks").map(asRecord);
+
+        return result.status === "collected" &&
+          (numberField(result, "inventoryDelta") ?? 0) > 0 &&
+          (numberField(result, "afterLogCount") ?? 0) >= 4 &&
+          attemptedBlocks.some((attempt) =>
+            typeof attempt.block === "string" &&
+            logItemNames.includes(attempt.block as (typeof logItemNames)[number]) &&
+            attempt.outcome === "dug"
+          );
+      });
+
+      if (!collectedStep) {
+        return "collectLogs did not record a collected result with positive log inventory delta and dug-block evidence";
+      }
+
       return hasPassedToolVerificationProgress(steps, "collect_logs", (progress) =>
         progressHasTargetInventory({
           progress,

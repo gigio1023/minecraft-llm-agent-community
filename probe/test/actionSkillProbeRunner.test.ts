@@ -433,7 +433,12 @@ test("action skill probe postcondition accepts non-oak log and plank families", 
       steps: [
         {
           tool: "collect_logs",
-          result: { status: "collected" },
+          result: {
+            status: "collected",
+            inventoryDelta: 4,
+            afterLogCount: 4,
+            attemptedBlocks: [{ block: "birch_log", outcome: "dug" }]
+          },
           verification: {
             status: "passed",
             progress: {
@@ -466,6 +471,57 @@ test("action skill probe postcondition accepts non-oak log and plank families", 
 
   assert.equal(await validateProbePostcondition("collectLogs", birchLogTranscript), null);
   assert.equal(await validateProbePostcondition("craftPlanksAndSticks", sprucePlankTranscript), null);
+});
+
+test("action skill probe postcondition rejects collect logs without primitive result evidence", async () => {
+  const weakCollectTranscript = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "collect_logs",
+          result: { status: "collected" },
+          verification: {
+            status: "passed",
+            progress: {
+              itemNames: ["oak_log"],
+              beforeCount: 0,
+              afterCount: 4,
+              targetCount: 4
+            }
+          }
+        }
+      ]
+    });
+  const pickupWithoutDigTranscript = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "collect_logs",
+          result: {
+            status: "collected",
+            inventoryDelta: 4,
+            afterLogCount: 4,
+            attemptedBlocks: [{ block: "oak_log", outcome: "path_blocked" }]
+          },
+          verification: {
+            status: "passed",
+            progress: {
+              itemNames: ["oak_log"],
+              beforeCount: 0,
+              afterCount: 4,
+              targetCount: 4
+            }
+          }
+        }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("collectLogs", weakCollectTranscript) ?? "",
+    /positive log inventory delta and dug-block evidence/
+  );
+  assert.match(
+    await validateProbePostcondition("collectLogs", pickupWithoutDigTranscript) ?? "",
+    /positive log inventory delta and dug-block evidence/
+  );
 });
 
 test("action skill probe postcondition rejects inventory evidence on the wrong tool", async () => {
@@ -506,7 +562,7 @@ test("action skill probe postcondition rejects inventory evidence on the wrong t
 
   assert.match(
     await validateProbePostcondition("collectLogs", collectEvidenceOnWait) ?? "",
-    /log inventory target evidence/
+    /positive log inventory delta and dug-block evidence/
   );
   assert.match(
     await validateProbePostcondition("craftCraftingTable", craftEvidenceOnRemember) ?? "",

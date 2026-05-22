@@ -722,7 +722,10 @@ test("action skill probe matrix audits existing transcript evidence without Dock
             status: "collected",
             beforeLogCount: 0,
             afterLogCount: 4,
-            inventoryDelta: 4
+            inventoryDelta: 4,
+            attemptedBlocks: [
+              { block: "oak_log", position: { x: 1, y: 64, z: 1 }, outcome: "dug" }
+            ]
           },
           verification: {
             status: "passed",
