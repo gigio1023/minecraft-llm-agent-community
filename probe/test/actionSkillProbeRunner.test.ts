@@ -419,7 +419,7 @@ test("action skill probe postcondition accepts shared storage movement evidence"
       steps: [
         {
           tool: "deposit_shared",
-          result: { status: "deposited", chestId: "shared_spawn_chest", movedCount: 1, itemName: "crafting_table" }
+          result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", movedCount: 1, itemName: "crafting_table" }
         },
         {
           tool: "remember",
@@ -450,6 +450,16 @@ test("action skill probe postcondition rejects weak shared storage evidence", as
         { tool: "say", result: { status: "delivered" } }
       ]
     });
+  const depositWithoutLedger = await writeTranscriptPayload({
+      steps: [
+        { tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }
+      ]
+    });
+  const inspectWithoutLedger = await writeTranscriptPayload({
+      steps: [
+        { tool: "inspect_chest", result: { status: "inspected", chestId: "shared_spawn_chest", items: [{ name: "oak_log", count: 2 }] } }
+      ]
+    });
 
   assert.match(
     await validateProbePostcondition("inspectSharedChest", emptyInspect) ?? "",
@@ -462,6 +472,14 @@ test("action skill probe postcondition rejects weak shared storage evidence", as
   assert.match(
     await validateProbePostcondition("handoffItemAtChest", unnamedHandoff) ?? "",
     /named item/
+  );
+  assert.match(
+    await validateProbePostcondition("depositSharedItems", depositWithoutLedger) ?? "",
+    /ledger identity/
+  );
+  assert.match(
+    await validateProbePostcondition("inspectSharedChest", inspectWithoutLedger) ?? "",
+    /ledger identity/
   );
 });
 
@@ -545,7 +563,7 @@ test("action skill probe postcondition enforces ordered social evidence", async 
   const prematureHandoff = await writeTranscriptPayload({
       steps: [
         { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } },
-        { tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }
+        { tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }
       ]
     });
   const prematureBusyFollowUp = await writeTranscriptPayload({
@@ -603,7 +621,7 @@ test("action skill probe postcondition rejects delivered social chat with the wr
     });
   const vagueHandoff = await writeTranscriptPayload({
       steps: [
-        { tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
+        { tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
         { tool: "say", args: { target: "npc_target", text: "hello there" }, result: { status: "delivered" } }
       ]
     });

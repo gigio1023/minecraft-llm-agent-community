@@ -304,7 +304,8 @@ Current harness capabilities:
   evidence;
 - craft probes require a passed runtime verifier, not only a non-throwing
   `bot.craft(...)`;
-- shared-storage probes require positive item movement into the shared chest.
+- shared-storage probes require positive item movement into the shared chest
+  and transcript-visible actor/ledger identity for the storage contribution.
 
 Current live `collectLogs` proof:
 

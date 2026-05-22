@@ -134,12 +134,16 @@ Required evidence:
 - opened shared chest accessor;
 - before/after chest snapshot;
 - before/after inventory snapshot when available;
-- chest id plus positive moved count for deposit/withdraw ledger events.
+- chest id plus positive moved count for deposit/withdraw ledger events;
+- actor id and positive ledger sequence in transcript-visible tool results, so
+  the postcondition can tie storage evidence back to an actor-owned contribution
+  instead of accepting an anonymous container mutation.
 
 Per-action-skill probes currently use a tiny RCON-placed chest fixture. The
 probe passes only when the transcript shows actual chest inspection or positive
-item movement. This keeps shared-storage action skills from passing on role
-permission alone.
+item movement with ledger identity. This keeps shared-storage action skills
+from passing on role permission, movement near a chest, or anonymous item
+movement alone.
 
 ### Social Runtime Actions
 
@@ -152,8 +156,8 @@ Required evidence:
   before/after distance fields, and delivered chat requesting a specific item;
 - `announceResourceDiscovery`: delivered resource-discovery chat and a
   resource memory note persisted after that announcement;
-- `handoffItemAtChest`: named positive shared-chest deposit and delivered
-  handoff chat with matching handoff text;
+- `handoffItemAtChest`: actor/ledger-identified named positive shared-chest
+  deposit and delivered handoff chat with matching handoff text;
 - `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up
   chat.
 

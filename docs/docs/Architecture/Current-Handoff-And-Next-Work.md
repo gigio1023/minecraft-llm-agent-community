@@ -427,11 +427,11 @@ Current postcondition rules:
 - inventory verifier progress must be attached to the expected primitive
   (`collect_logs` or `craft_item`), not an unrelated successful step;
 - `inspectSharedChest` requires an `inspect_chest` result with a non-empty
-  positive item snapshot and chest id;
+  positive item snapshot, chest id, actor id, and positive ledger sequence;
 - `depositSharedItems` requires `deposit_shared` with `itemName` and
-  `chestId` and `movedCount > 0`;
-- `handoffItemAtChest` requires a named positive deposit before delivered
-  handoff chat with matching handoff text;
+  `chestId`, `movedCount > 0`, actor id, and positive ledger sequence;
+- `handoffItemAtChest` requires an actor/ledger-identified named positive
+  deposit before delivered handoff chat with matching handoff text;
 - `approachAndRequestItem` requires measured arrival distance evidence before
   delivered targeted chat requesting a specific item;
 - `announceResourceDiscovery` requires delivered targeted resource-discovery

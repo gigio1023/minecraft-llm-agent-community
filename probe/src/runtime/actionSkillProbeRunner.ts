@@ -605,6 +605,14 @@ function hasChestId(result: Record<string, unknown>) {
   return typeof result.chestId === "string" && result.chestId.trim().length > 0;
 }
 
+function hasLedgerIdentity(result: Record<string, unknown>) {
+  return typeof result.actorId === "string" &&
+    result.actorId.trim().length > 0 &&
+    typeof result.ledgerSeq === "number" &&
+    Number.isInteger(result.ledgerSeq) &&
+    result.ledgerSeq > 0;
+}
+
 function itemSnapshotHasPositiveCount(items: unknown[]) {
   return items
     .map(asRecord)
@@ -614,6 +622,7 @@ function itemSnapshotHasPositiveCount(items: unknown[]) {
 function hasPositiveTransfer(result: Record<string, unknown>) {
   return result.status === "deposited" &&
     hasChestId(result) &&
+    hasLedgerIdentity(result) &&
     typeof result.itemName === "string" &&
     (numberField(result, "movedCount") ?? 0) > 0;
 }
@@ -811,30 +820,31 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   inspectSharedChest: {
     skillId: "inspectSharedChest",
-    evidenceSummary: ["shared chest inspection returned a chest id and non-empty positive item snapshot"],
+    evidenceSummary: ["shared chest inspection returned a ledger-backed chest id and non-empty positive item snapshot"],
     minimumPassingTranscript: {
-      steps: [{ tool: "inspect_chest", result: { status: "inspected", chestId: "shared_spawn_chest", items: [{ name: "oak_log", count: 2 }] } }]
+      steps: [{ tool: "inspect_chest", result: { status: "inspected", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", items: [{ name: "oak_log", count: 2 }] } }]
     },
     validate(steps) {
       return hasToolResult(steps, "inspect_chest", (result) =>
         result.status === "inspected" &&
         hasChestId(result) &&
+        hasLedgerIdentity(result) &&
         itemSnapshotHasPositiveCount(arrayField(result, "items"))
       )
         ? null
-        : "inspectSharedChest did not inspect a live shared chest with chest id and item evidence";
+        : "inspectSharedChest did not inspect a live shared chest with ledger identity, chest id, and item evidence";
     }
   },
   depositSharedItems: {
     skillId: "depositSharedItems",
-    evidenceSummary: ["deposit_shared moved a named item with a chest id and positive count"],
+    evidenceSummary: ["deposit_shared moved a named item with ledger identity, chest id, and positive count"],
     minimumPassingTranscript: {
-      steps: [{ tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }]
+      steps: [{ tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } }]
     },
     validate(steps) {
       return hasToolResult(steps, "deposit_shared", hasPositiveTransfer)
         ? null
-        : "depositSharedItems did not move a named item into shared storage";
+        : "depositSharedItems did not move a named item into shared storage with ledger identity";
     }
   },
   approachAndRequestItem: {
@@ -916,10 +926,10 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   handoffItemAtChest: {
     skillId: "handoffItemAtChest",
-    evidenceSummary: ["deposit_shared moved a positive item count", "say delivered a handoff message"],
+    evidenceSummary: ["deposit_shared moved a positive item count with ledger identity", "say delivered a handoff message"],
     minimumPassingTranscript: {
       steps: [
-        { tool: "deposit_shared", result: { status: "deposited", chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
+        { tool: "deposit_shared", result: { status: "deposited", actorId: "npc_b", ledgerSeq: 1, chestId: "shared_spawn_chest", itemName: "crafting_table", movedCount: 1 } },
         { tool: "say", args: { target: "npc_target", text: "I left a crafting table in the shared chest." }, result: { status: "delivered" } }
       ]
     },
@@ -930,7 +940,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       );
 
       if (depositIndex < 0) {
-        return "handoffItemAtChest did not move a named item into shared storage";
+        return "handoffItemAtChest did not move a named item into shared storage with ledger identity";
       }
       return steps
         .slice(depositIndex + 1)

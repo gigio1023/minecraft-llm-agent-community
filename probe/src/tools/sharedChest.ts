@@ -113,7 +113,11 @@ export async function inspectChest(input: {
 
   return {
     status: "inspected",
+    actorId: input.actorId,
+    roleId: input.roleId,
     chestId: input.chest.chestId,
+    currentTask: input.currentTask,
+    ledgerSeq: ledgerEntry.seq,
     items
   };
 }
@@ -206,7 +210,11 @@ export async function depositToSharedChest(input: {
 
   return {
     status: "deposited",
+    actorId: input.actorId,
+    roleId: input.roleId,
     chestId: input.chest.chestId,
+    currentTask: input.currentTask,
+    ledgerSeq: ledgerEntry.seq,
     itemName: input.itemName,
     movedCount: transfer.movedCount
   };
@@ -299,7 +307,11 @@ export async function withdrawFromSharedChest(input: {
 
   return {
     status: "withdrew",
+    actorId: input.actorId,
+    roleId: input.roleId,
     chestId: input.chest.chestId,
+    currentTask: input.currentTask,
+    ledgerSeq: ledgerEntry.seq,
     itemName: input.itemName,
     movedCount: transfer.movedCount,
     reason: input.reason

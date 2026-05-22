@@ -71,7 +71,11 @@ test("inspectChest records observed contents into the shared storage ledger", as
 
   assert.deepEqual(result, {
     status: "inspected",
+    actorId: "npc_a",
+    roleId: "quartermaster",
     chestId: "shared-chest-1",
+    currentTask: "inspect shared storage",
+    ledgerSeq: 1,
     items: [
       { name: "oak_log", count: 5 },
       { name: "stick", count: 2 }
@@ -108,7 +112,11 @@ test("depositToSharedChest moves allowed items and records one ledger contributi
 
   assert.deepEqual(result, {
     status: "deposited",
+    actorId: "npc_a",
+    roleId: "gatherer",
     chestId: "shared-chest-1",
+    currentTask: "deposit logs",
+    ledgerSeq: 1,
     itemName: "oak_log",
     movedCount: 5
   });
@@ -210,7 +218,11 @@ test("withdrawFromSharedChest lets a crafter take needed inputs and updates bull
 
   assert.deepEqual(result, {
     status: "withdrew",
+    actorId: "npc_b",
+    roleId: "crafter",
     chestId: "shared-chest-1",
+    currentTask: "craft planks and sticks",
+    ledgerSeq: 1,
     itemName: "oak_log",
     movedCount: 4,
     reason: "craft planks"
