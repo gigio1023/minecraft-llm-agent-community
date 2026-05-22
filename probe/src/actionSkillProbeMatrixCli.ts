@@ -37,6 +37,17 @@ type ProbeMatrixCase = ActionSkillProbeConfig & {
 
 export type ProbeMatrixVerdict = "passed" | "failed" | "environment_blocked" | "incomplete";
 
+export type ProbeMatrixEvidenceGap = {
+  skillId: SeedActionSkillId;
+  status: "pending_live_evidence" | "environment_blocked" | "failed" | "error";
+  reason: string;
+  requiredEvidence: {
+    contract: string[];
+    postcondition: string[];
+  };
+  transcriptPath?: string;
+};
+
 export type ProbeMatrixReport = {
   schema: "action-skill-probe-matrix-report/v1";
   mode: "dry_run" | "live";
@@ -47,6 +58,7 @@ export type ProbeMatrixReport = {
   preflight?: ProbeMatrixPreflight;
   results?: ActionSkillProbeResult[];
   verdict: ProbeMatrixVerdict;
+  evidenceGaps: ProbeMatrixEvidenceGap[];
   summary: {
     passed: number;
     failed: number;
@@ -81,6 +93,52 @@ export function classifyProbeMatrixReport(input: {
   }
 
   return "incomplete";
+}
+
+export function buildProbeMatrixEvidenceGaps(input: {
+  cases: ProbeMatrixCase[];
+  preflight?: ProbeMatrixPreflight;
+  results?: ActionSkillProbeResult[];
+}): ProbeMatrixEvidenceGap[] {
+  const resultsBySkill = new Map((input.results ?? []).map((result) => [result.skillId, result]));
+
+  return input.cases.flatMap((testCase): ProbeMatrixEvidenceGap[] => {
+    const result = resultsBySkill.get(testCase.skillId);
+    const requiredEvidence = {
+      contract: [...testCase.contractEvidence],
+      postcondition: [...testCase.postconditionEvidence]
+    };
+
+    if (!result) {
+      if (input.preflight?.status === "environment_blocked") {
+        return [{
+          skillId: testCase.skillId,
+          status: "environment_blocked",
+          reason: input.preflight.reason,
+          requiredEvidence
+        }];
+      }
+
+      return [{
+        skillId: testCase.skillId,
+        status: "pending_live_evidence",
+        reason: "live probe has not produced runtime evidence for this action skill",
+        requiredEvidence
+      }];
+    }
+
+    if (result.status === "passed") {
+      return [];
+    }
+
+    return [{
+      skillId: testCase.skillId,
+      status: result.status,
+      reason: result.errorMessage ?? result.finalWhy ?? "probe did not satisfy the action skill contract",
+      requiredEvidence,
+      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {})
+    }];
+  });
 }
 
 function parseArgs(argv: readonly string[]): MatrixCliOptions {
@@ -355,6 +413,11 @@ export function buildProbeMatrixReport(input: {
       ...summary,
       preflight: input.preflight
     }),
+    evidenceGaps: buildProbeMatrixEvidenceGaps({
+      cases: input.cases,
+      preflight: input.preflight,
+      results
+    }),
     summary
   };
 }
@@ -379,6 +442,18 @@ function printDryRun(cases: ProbeMatrixCase[]) {
   }
 }
 
+function printEvidenceGapSummary(gaps: readonly ProbeMatrixEvidenceGap[]) {
+  if (gaps.length === 0) {
+    console.log("matrix_evidence_gaps count=0");
+    return;
+  }
+
+  console.log(`matrix_evidence_gaps count=${gaps.length}`);
+  for (const gap of gaps.slice(0, 5)) {
+    console.log(`  ${gap.skillId}: ${gap.status} - ${gap.reason.split("\n")[0]}`);
+  }
+}
+
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -396,17 +471,16 @@ async function main() {
 
     if (options.dryRun) {
       printDryRun(cases);
+      const report = buildProbeMatrixReport({
+        mode: "dry_run",
+        actorId,
+        maxActions: options.maxActions ?? 8,
+        cases
+      });
       console.log(`matrix_dry_run total=${cases.length}`);
+      printEvidenceGapSummary(report.evidenceGaps);
       if (options.reportPath) {
-        await writeMatrixReport(
-          options.reportPath,
-          buildProbeMatrixReport({
-            mode: "dry_run",
-            actorId,
-            maxActions: options.maxActions ?? 8,
-            cases
-          })
-        );
+        await writeMatrixReport(options.reportPath, report);
       }
       return;
     }
@@ -415,19 +489,18 @@ async function main() {
     if (preflight.status !== "ready") {
       console.log("matrix_preflight status=environment_blocked");
       console.log(preflight.reason);
-      console.log(`matrix_summary verdict=environment_blocked passed=0 failed=0 error=1 total=0/${cases.length}`);
+      const report = buildProbeMatrixReport({
+        mode: "live",
+        actorId,
+        maxActions: options.maxActions ?? 8,
+        cases,
+        preflight,
+        results: []
+      });
+      console.log(`matrix_summary verdict=${report.verdict} passed=0 failed=0 error=1 total=0/${cases.length}`);
+      printEvidenceGapSummary(report.evidenceGaps);
       if (options.reportPath) {
-        await writeMatrixReport(
-          options.reportPath,
-          buildProbeMatrixReport({
-            mode: "live",
-            actorId,
-            maxActions: options.maxActions ?? 8,
-            cases,
-            preflight,
-            results: []
-          })
-        );
+        await writeMatrixReport(options.reportPath, report);
       }
       process.exitCode = 1;
       return;
@@ -465,19 +538,18 @@ async function main() {
       preflight
     });
     console.log(`matrix_summary verdict=${verdict} passed=${passed} failed=${failed} error=${errored} total=${results.length}/${cases.length}`);
+    const report = buildProbeMatrixReport({
+      mode: "live",
+      actorId,
+      maxActions: options.maxActions ?? 8,
+      cases,
+      preflight,
+      results
+    });
+    printEvidenceGapSummary(report.evidenceGaps);
 
     if (options.reportPath) {
-      await writeMatrixReport(
-        options.reportPath,
-        buildProbeMatrixReport({
-          mode: "live",
-          actorId,
-          maxActions: options.maxActions ?? 8,
-          cases,
-          preflight,
-          results
-        })
-      );
+      await writeMatrixReport(options.reportPath, report);
     }
 
     if (passed !== cases.length || failed > 0 || errored > 0) {

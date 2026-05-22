@@ -225,7 +225,9 @@ Use `--report <path>` to persist the same checklist or live matrix result as a
 JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
 includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or
 `incomplete`, so later reviewers can distinguish live environment blockers from
-real action skill evidence failures.
+real action skill evidence failures. It also includes `evidenceGaps`, one entry
+per non-passing or unrun action skill, with the missing contract and
+postcondition evidence needed before the action skill can be considered proven.
 
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero

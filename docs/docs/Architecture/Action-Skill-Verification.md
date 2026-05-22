@@ -83,6 +83,8 @@ Per-action-skill probes add a second gate after transcript write:
   final claim must still come from post-action inventory observation.
 - matrix reports include a top-level verdict, so `environment_blocked` remains
   separate from runtime verifier failures and incomplete runs.
+- matrix reports also include `evidenceGaps`, which repeats the required
+  contract and postcondition evidence for every unproven action skill.
 
 ### Shared Storage
 

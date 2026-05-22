@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildProbeMatrixEvidenceGaps,
   buildProbeMatrixReport,
   buildProbeMatrixCases,
   classifyProbeMatrixReport,
@@ -91,6 +92,9 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.equal(report.summary.planned, 1);
   assert.equal(report.summary.completed, 0);
   assert.equal(report.verdict, "incomplete");
+  assert.equal(report.evidenceGaps.length, 1);
+  assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
+  assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
   assert.equal(report.cases[0].skillId, "collectLogs");
   assert.ok(report.cases[0].contractEvidence.length > 0);
   assert.ok(report.cases[0].postconditionEvidence.length > 0);
@@ -117,6 +121,9 @@ test("action skill probe matrix report counts environment preflight blockers as 
 
   assert.equal(report.summary.error, 1);
   assert.equal(report.verdict, "environment_blocked");
+  assert.equal(report.evidenceGaps.length, 1);
+  assert.equal(report.evidenceGaps[0].status, "environment_blocked");
+  assert.match(report.evidenceGaps[0].reason, /docker unavailable/);
   assert.equal(report.summary.completed, 0);
   assert.equal(report.summary.planned, 1);
 });
@@ -169,4 +176,41 @@ test("action skill probe matrix classifies reusable report verdicts", () => {
     }),
     "environment_blocked"
   );
+});
+
+test("action skill probe matrix evidence gaps explain failed and unrun cases", () => {
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs", "craftCraftingTable"],
+    maxActions: 8
+  });
+  const gaps = buildProbeMatrixEvidenceGaps({
+    cases,
+    results: [
+      {
+        status: "failed",
+        skillId: "collectLogs",
+        actorId: "npc_b",
+        contract: {
+          skillId: "collectLogs",
+          primitiveIds: ["observe", "collect_logs", "wait"],
+          evidence: ["inventory delta"],
+          protectedBy: ["test/collectLogs.test.ts"]
+        },
+        allowedPrimitives: ["observe", "collect_logs", "wait"],
+        transcriptPath: "data/evidence/collect.json",
+        finalWhy: "log inventory did not increase"
+      }
+    ]
+  });
+
+  assert.equal(gaps.length, 2);
+  assert.equal(gaps[0].skillId, "collectLogs");
+  assert.equal(gaps[0].status, "failed");
+  assert.match(gaps[0].reason, /log inventory did not increase/);
+  assert.equal(gaps[0].transcriptPath, "data/evidence/collect.json");
+  assert.equal(gaps[1].skillId, "craftCraftingTable");
+  assert.equal(gaps[1].status, "pending_live_evidence");
+  assert.ok(gaps[1].requiredEvidence.contract.length > 0);
+  assert.ok(gaps[1].requiredEvidence.postcondition.length > 0);
 });
