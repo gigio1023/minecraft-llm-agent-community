@@ -197,6 +197,58 @@ test("mineBlock walks to nearby mined drops before declaring no pickup", async (
   assert.equal(pickupMoves, 1);
 });
 
+test("mineBlock bounds mined-drop pickup movement and preserves failure evidence", async () => {
+  const block = { name: "stone", position: { x: 2, y: 0, z: 0 } };
+  let blockRemoved = false;
+  let stopped = false;
+
+  const result = await mineBlock({
+    bot: {
+      entity: {
+        position: { x: 0, y: 0, z: 0 }
+      },
+      inventory: {
+        items() {
+          return [
+            { name: "wooden_pickaxe", count: 1 },
+            { name: "cobblestone", count: 0 }
+          ];
+        }
+      },
+      pathfinder: {
+        async goto() {
+          await new Promise<void>(() => {});
+        },
+        stop() {
+          stopped = true;
+        }
+      },
+      findBlock() {
+        return block;
+      },
+      blockAt() {
+        return blockRemoved ? { name: "air", position: block.position } : block;
+      },
+      async dig() {
+        blockRemoved = true;
+      },
+      nearestEntity() {
+        return { name: "item", position: { x: 2.5, y: 0, z: 0.5 } };
+      },
+      setControlState() {},
+      async equip() {}
+    },
+    blockName: "stone",
+    itemName: "cobblestone",
+    pickupWaitMs: 1,
+    pickupMoveTimeoutMs: 5
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(stopped, true);
+  assert.match(result.attemptedBlocks[0]?.reason ?? "", /pathfinder timeout/);
+});
+
 test("mineBlock does not poll inventory while the block is still being dug", async () => {
   const block = { name: "stone", position: { x: 2, y: 0, z: 0 } };
   let cobblestoneCount = 0;

@@ -54,6 +54,18 @@ test("deterministic curriculum selects the next unmet early-game milestone from 
   assert.equal(
     selectDeterministicTask({
       visibleActors: [],
+      inventory: [{ name: "oak_log", count: 3 }],
+      sharedChest: {
+        chestId: "shared-chest-1",
+        items: [{ name: "oak_log", count: 1 }]
+      }
+    })?.id,
+    "craft_planks_and_sticks"
+  );
+
+  assert.equal(
+    selectDeterministicTask({
+      visibleActors: [],
       inventory: [
         { name: "oak_log", count: 2 },
         { name: "oak_planks", count: 6 },

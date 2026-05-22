@@ -101,6 +101,54 @@ function stopMovement(bot: MineBlockBot) {
   }
 }
 
+async function runPathfinderGoto(input: {
+  bot: MineBlockBot;
+  goal: unknown;
+  signal: AbortSignal | undefined;
+  timeoutMs: number;
+  abortMessage: string;
+  timeoutMessage: string;
+}) {
+  if (!input.bot.pathfinder) {
+    return;
+  }
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const gotoPromise = input.bot.pathfinder.goto(input.goal);
+  gotoPromise.catch(() => {
+    // A timeout or abort path owns the returned error. Pathfinder may reject
+    // later after `stop()`, and that late rejection must not mask the evidence.
+  });
+
+  try {
+    await Promise.race([
+      gotoPromise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          input.bot.pathfinder?.stop?.();
+          reject(new Error(input.timeoutMessage));
+        }, input.timeoutMs);
+
+        if (input.signal) {
+          onAbort = () => {
+            input.bot.pathfinder?.stop?.();
+            reject(new Error(input.abortMessage));
+          };
+          input.signal.addEventListener("abort", onAbort, { once: true });
+        }
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    if (onAbort) {
+      input.signal?.removeEventListener("abort", onAbort);
+    }
+  }
+}
+
 async function equipPickaxeIfAvailable(bot: MineBlockBot) {
   if (!bot.equip || !bot.inventory) {
     return undefined;
@@ -119,7 +167,7 @@ async function equipPickaxeIfAvailable(bot: MineBlockBot) {
 }
 
 function findCandidateBlocks(bot: MineBlockBot, blockName: string) {
-  const minimumY = Math.floor(bot.entity.position.y);
+  const minimumY = Math.floor(bot.entity.position.y) - 1;
   const fromBlocks = bot.findBlocks?.({
     matching: (block) => block.name === blockName,
     maxDistance: 12,
@@ -178,7 +226,12 @@ function throwIfAborted(signal: AbortSignal | undefined) {
   }
 }
 
-async function moveToBlock(bot: MineBlockBot, position: Positioned, signal: AbortSignal | undefined) {
+async function moveToBlock(
+  bot: MineBlockBot,
+  position: Positioned,
+  signal: AbortSignal | undefined,
+  timeoutMs: number
+) {
   throwIfAborted(signal);
 
   if (distance(bot.entity.position, position) <= 4.5) {
@@ -187,27 +240,26 @@ async function moveToBlock(bot: MineBlockBot, position: Positioned, signal: Abor
   }
 
   if (bot.pathfinder) {
-    await Promise.race([
-      bot.pathfinder.goto(new goals.GoalNear(position.x, position.y, position.z, 2)),
-      new Promise<never>((_, reject) => {
-        if (!signal) {
-          return;
-        }
-
-        const onAbort = () => {
-          bot.pathfinder?.stop?.();
-          reject(new Error("mine_block was cancelled while pathing"));
-        };
-        signal.addEventListener("abort", onAbort, { once: true });
-      })
-    ]);
+    await runPathfinderGoto({
+      bot,
+      goal: new goals.GoalNear(position.x, position.y, position.z, 2),
+      signal,
+      timeoutMs,
+      abortMessage: "mine_block was cancelled while pathing",
+      timeoutMessage: "mine_block pathfinder timeout while moving to block"
+    });
     return;
   }
 
   await bot.lookAt?.(new Vec3(position.x + 0.5, position.y + 0.5, position.z + 0.5), true);
 }
 
-async function moveNearPickup(bot: MineBlockBot, position: Positioned, signal: AbortSignal | undefined) {
+async function moveNearPickup(
+  bot: MineBlockBot,
+  position: Positioned,
+  signal: AbortSignal | undefined,
+  timeoutMs: number
+) {
   throwIfAborted(signal);
 
   if (distance(bot.entity.position, position) <= 1.25) {
@@ -215,20 +267,14 @@ async function moveNearPickup(bot: MineBlockBot, position: Positioned, signal: A
   }
 
   if (bot.pathfinder) {
-    await Promise.race([
-      bot.pathfinder.goto(new goals.GoalNear(position.x, position.y, position.z, 1)),
-      new Promise<never>((_, reject) => {
-        if (!signal) {
-          return;
-        }
-
-        const onAbort = () => {
-          bot.pathfinder?.stop?.();
-          reject(new Error("mine_block was cancelled while moving to the mined drop"));
-        };
-        signal.addEventListener("abort", onAbort, { once: true });
-      })
-    ]);
+    await runPathfinderGoto({
+      bot,
+      goal: new goals.GoalNear(position.x, position.y, position.z, 1),
+      signal,
+      timeoutMs,
+      abortMessage: "mine_block was cancelled while moving to the mined drop",
+      timeoutMessage: "mine_block pathfinder timeout while moving to the mined drop"
+    });
     return;
   }
 
@@ -248,7 +294,9 @@ export async function mineBlock({
   itemName = BLOCK_DROPS[blockName],
   targetCount = 1,
   signal,
-  pickupWaitMs = 1_500
+  pickupWaitMs = 1_500,
+  moveToBlockTimeoutMs = 6_000,
+  pickupMoveTimeoutMs = 3_000
 }: {
   bot: MineBlockBot;
   blockName: string;
@@ -256,6 +304,8 @@ export async function mineBlock({
   targetCount?: number;
   signal?: AbortSignal;
   pickupWaitMs?: number;
+  moveToBlockTimeoutMs?: number;
+  pickupMoveTimeoutMs?: number;
 }): Promise<MineBlockResult> {
   if (!itemName) {
     throw new Error(`mine_block has no expected drop mapping for ${blockName}`);
@@ -295,7 +345,7 @@ export async function mineBlock({
       }
 
       try {
-        await moveToBlock(bot, block.position, signal);
+        await moveToBlock(bot, block.position, signal, moveToBlockTimeoutMs);
       } catch (error) {
         attemptedBlocks.push({
           block: block.name,
@@ -340,8 +390,19 @@ export async function mineBlock({
           entity.name === "item" && distance(entity.position, block.position) <= 4
         );
 
-        await moveNearPickup(bot, itemEntity?.position ?? block.position, signal);
-        afterCount = await waitForInventoryIncrease(bot, itemName, attemptBeforeCount, signal, 2_000);
+        try {
+          await moveNearPickup(bot, itemEntity?.position ?? block.position, signal, pickupMoveTimeoutMs);
+          afterCount = await waitForInventoryIncrease(bot, itemName, attemptBeforeCount, signal, 2_000);
+        } catch (error) {
+          if (signal?.aborted) {
+            throw error;
+          }
+          const lastAttempt = attemptedBlocks.at(-1);
+          if (lastAttempt?.outcome === "dug") {
+            lastAttempt.reason = error instanceof Error ? error.message : String(error);
+          }
+          afterCount = countInventoryItem(bot, itemName);
+        }
       }
     }
   } finally {

@@ -29,6 +29,15 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
 
   await fs.mkdir(path.dirname(keepPath), { recursive: true });
   await fs.writeFile(keepPath, "{\"kept\":true}\n", "utf8");
+  const staleEvidencePath = path.join(testArtifactRoot, "npc_b", "evidence", "stale.json");
+  const staleProviderInputPath = path.join(testArtifactRoot, "npc_b", "provider-inputs", "turn-0001.json");
+  const staleProviderOutputPath = path.join(testArtifactRoot, "npc_b", "provider-outputs", "turn-0001.json");
+  await fs.mkdir(path.dirname(staleEvidencePath), { recursive: true });
+  await fs.mkdir(path.dirname(staleProviderInputPath), { recursive: true });
+  await fs.mkdir(path.dirname(staleProviderOutputPath), { recursive: true });
+  await fs.writeFile(staleEvidencePath, "{\"category\":\"stale_failure\"}\n", "utf8");
+  await fs.writeFile(staleProviderInputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
+  await fs.writeFile(staleProviderOutputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
 
   try {
     const result = await initializeActorWorkspaces({
@@ -104,6 +113,14 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     await fs.access(paths.actionSkills.retiredDir);
     await fs.access(paths.actionSkills.rejectedDir);
     await fs.access(paths.memoryDir);
+    await fs.access(paths.memory.workingDir);
+    await fs.access(paths.memory.episodicDir);
+    await fs.access(paths.memory.semanticDir);
+    await fs.access(paths.memory.proceduralDir);
+    await fs.access(paths.memory.socialDir);
+    await fs.access(paths.memory.beliefsDir);
+    await fs.access(paths.memory.guardrailsDir);
+    await fs.access(paths.memory.indexDir);
     await fs.access(paths.evidenceDir);
     await fs.access(paths.reviewsDir);
     await fs.access(paths.relationshipsDir);
@@ -114,6 +131,9 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     assert.equal(relationshipEdge.friction, "none");
     await fs.access(paths.providerInputsDir);
     await fs.access(paths.providerOutputsDir);
+    assert.deepEqual(await fs.readdir(paths.evidenceDir), []);
+    assert.deepEqual(await fs.readdir(paths.providerInputsDir), []);
+    assert.deepEqual(await fs.readdir(paths.providerOutputsDir), []);
     await fs.access(path.join(testArtifactRoot, "index.json"));
   } finally {
     await fs.rm(testArtifactRoot, { recursive: true, force: true });

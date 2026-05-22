@@ -114,11 +114,11 @@ test("agent loop deposits crafted resource into shared chest and stops after pub
 
   assert.deepEqual(final, {
     status: "success",
-    why: "shared chest now has a public resource contribution"
+    why: "completed runtime tasks: collect_4_logs, craft_planks_and_sticks, craft_crafting_table, deposit_shared_materials"
   });
   assert.equal(transcriptSteps[0]?.tool, "observe");
   assert.equal(transcriptSteps[1]?.tool, "deposit_shared");
   assert.equal((transcriptSteps[1]?.task as { id: string }).id, "deposit_shared_materials");
   assert.equal((transcriptSteps[1]?.verification as { status: string }).status, "passed");
-  assert.equal(transcriptSteps[2]?.tool, "remember");
+  assert.equal(transcriptSteps.length, 2);
 });

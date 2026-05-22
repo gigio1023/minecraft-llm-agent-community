@@ -30,6 +30,12 @@ The current implementation now includes:
     pressure;
 11. guarded relationship proposal application from reviewer evidence;
 12. managed local live-smoke server readiness without provider auth.
+13. objective-scoped direct generated TypeScript action skill trials with
+    generated source, helper events, provider snapshots, current-run objective
+    evidence, dashboard visibility, and reviewer queue refs.
+14. typed actor memory schema, direct objective memory capture, symbolic
+    objective-scoped memory retrieval, and dashboard visibility for memory
+    records.
 
 ## Current Slice Status
 
@@ -82,6 +88,110 @@ Future work after this slice is to broaden evidence coverage for new gameplay
 paths as they are added, harden reviewer prompts/scoring with real run data, and
 convert any still-needed skill-village generated-code behavior into bounded
 recipes.
+
+## Current Workstream: Autonomous Micro Objectives
+
+Search token: `AUTONOMOUS_OBJECTIVE_EVALUATION`.
+
+The next active slice is objective-level automated evaluation. It should reuse
+the existing action-skill probe and runtime transcript surfaces instead of
+creating a second Mineflayer runtime.
+
+Deliverables:
+
+- objective registry with tiny, verification-friendly goals;
+- objective report schema with `current_run` evidence scope;
+- proposal, argument, and evidence oracle findings;
+- CLI that can either run a fresh probe or audit a supplied transcript;
+- first objective: `collect_current_run_oak_log_1`;
+- follow-up objectives: `mine_current_run_cobblestone_1` and
+  `inspect_then_deposit_oak_log_1`.
+
+The objective evaluator must fail closed when success depends on memory,
+provider explanation, terminal `remember`, or historical actor workspace
+evidence. It may use historical transcripts only in an explicit audit mode, and
+that mode must not be labeled fresh current-run proof.
+
+## Current Workstream: Direct Generated Action Skills
+
+Search token: `DIRECT_GENERATED_ACTION_SKILLS`.
+
+Direct generated TypeScript is now an accepted propagation path for objective
+work. The implementation should separate it from legacy `build/generated-skills`
+dumping:
+
+- generated code is tied to an objective and actor;
+- execution uses a light guard and timeout;
+- helper calls are logged;
+- source, return value, error/timeout, and pre/post evidence are persisted;
+- success is decided by objective verifier output, not by generated code text;
+- background reviewers improve or recipe-ize the code after the run.
+
+The first target objective is `craft_current_run_stone_axe_1`, because it forces
+the runtime to combine gathering, crafting prerequisites, table-bound crafting,
+and inventory verification without hand-registering every intermediate action
+skill first.
+
+Implemented status:
+
+- `probe:objective -- --objective craft_current_run_stone_axe_1 --mode direct-generated`
+  runs the direct generated path by default for the stone axe objective;
+- generated source is stored under
+  `data/actors/<actor_id>/action-skills/direct-trials/<run_id>/`;
+- helper calls record `started`, `completed`, and `failed` events, including
+  nested prerequisite work inside `ensureItem`;
+- direct `craftItem(...)` calls for supported early-game items are routed
+  through the same prerequisite-aware substrate, so the LLM does not need to
+  exactly reproduce a hidden hand-authored crafting walkthrough before the
+  runtime can make progress;
+- `collectLogs` and `mineBlock` keep the Mineflayer dig call atomic, then bound
+  pickup/pathfinder fallback work after the block break so a transient dropped
+  item or unreachable pickup point cannot consume the whole generated-action
+  timeout;
+- timeout abort clears Mineflayer digging, pathfinder, and movement state so the
+  process does not hang after a timed-out generated action;
+- the objective report is always written as the actor-workspace canonical
+  `report.json`, with optional CLI report copies as secondary refs;
+- the deterministic live proof currently reaches `stone_axe` inventory delta
+  `1` and marks the objective `passed`;
+- dashboard state exposes recent direct trials at
+  `actors[].action_skills.direct_trials`;
+- direct trials enqueue per-actor reviewer jobs as immutable
+  `action_skill_direct_trial` refs for later cleanup into bounded candidates.
+
+## Current Workstream: Typed Minecraft Memory Substrate
+
+Search token: `MINECRAFT_MEMORY_CURRENT_LLM_RESEARCH`.
+
+This workstream supports freer LLM action, not a more scripted planner. The
+runtime gives the model a dense Mineflayer helper surface and lets direct
+generated TypeScript attempt a meaningful objective. The memory layer then
+records what actually happened in a shape that can be retrieved, reviewed, and
+promoted later.
+
+Implemented status:
+
+- actor workspaces now create typed memory folders:
+  `working`, `episodic`, `semantic`, `procedural`, `social`, `beliefs`,
+  `guardrails`, and `index`;
+- `ActorMemoryRecord` persists schema, layer, status, confidence, evidence
+  refs, tags, symbolic index fields, and open `content`;
+- direct generated objective reports write `episodic` memory plus either a
+  `procedural` candidate for verified success or a `guardrail` candidate for
+  failed execution/verification;
+- provider context includes a bounded `typed_memory` packet retrieved by
+  objective id/category, target item, active action-skill ids, layer, and
+  status;
+- stale, superseded, and rejected memory is hidden from default retrieval;
+- dashboard memory panels recursively read typed memory subdirectories.
+
+Next implementation after this slice:
+
+- extend per-actor reviewer outputs with semantic, procedural, social,
+  guardrail, and belief memory candidates;
+- add guarded appliers for reviewer memory candidates;
+- add no-memory versus memory-assisted objective runs to measure repeated
+  failure reduction rather than memory recall quality.
 
 ## Coordinator
 
@@ -260,15 +370,14 @@ Coordinator -> final integration
 Do not implement these in this slice unless the user re-approves:
 
 - full arbitrary checkpoint resume;
-- generated TypeScript action skill hot-loop execution;
 - long-term memory compaction workers;
 - global critic ownership;
 - broad multi-bot society mechanics;
 - deep reconnect refactor unless required by hot-path evidence work.
 
-Legacy `build/generated-skills` execution is also deferred. If code still emits
-files there during transition, those files are debug artifacts only and must not
-be read as actor-owned candidate or active skills.
+Loose legacy `build/generated-skills` execution is still deferred. Direct
+generated action skills must be actor-owned objective artifacts, not anonymous
+files read from a legacy output directory.
 
 ## Validation Gate
 

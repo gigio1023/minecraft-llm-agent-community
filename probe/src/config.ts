@@ -195,6 +195,10 @@ export function buildServerEnv(config: ProbeConfig) {
     SPAWN_NPCS: "true",
     SPAWN_ANIMALS: "true",
     SPAWN_MONSTERS: "false",
+    // Live probes mutate blocks around the configured spawn. Vanilla spawn
+    // protection would make survival bots look like they are digging while the
+    // server rejects the block break, so managed smoke worlds disable it.
+    SPAWN_PROTECTION: "0",
     VIEW_DISTANCE: "10",
     SIMULATION_DISTANCE: "10",
     ENABLE_COMMAND_BLOCK: "true",

@@ -26,6 +26,7 @@ export type ActorReviewInputRefKind =
   | "transcript"
   | "langfuse_trace"
   | "action_skill_candidate"
+  | "action_skill_direct_trial"
   | "action_skill_retired"
   | "memory_summary";
 
@@ -112,6 +113,8 @@ function expectedArtifactDir(rootDir: string, actorId: string, kind: ActorReview
       return paths.providerInputsDir;
     case "action_skill_candidate":
       return paths.actionSkills.candidatesDir;
+    case "action_skill_direct_trial":
+      return paths.actionSkills.directTrialsDir;
     case "action_skill_retired":
       return paths.actionSkills.retiredDir;
     case "memory_summary":
@@ -198,6 +201,18 @@ async function readJson<T>(filePath: string): Promise<T> {
 function deterministicFindings(job: ActorReviewJob): ActorReviewFinding[] {
   const refList = job.input_refs.map((inputRef) => inputRef.ref).join(", ");
 
+  if (job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial")) {
+    return [
+      {
+        severity: job.reason === "verification_failure" ? "p1" : "p3",
+        title: job.reason === "verification_failure"
+          ? "Direct generated action skill trial failed"
+          : "Direct generated action skill trial is ready for cleanup",
+        body: `Review the generated source, helper events, and verifier evidence before promoting any bounded action skill. Review refs: ${refList}`
+      }
+    ];
+  }
+
   if (job.reason === "fake_progress_rejection") {
     return [
       {
@@ -256,12 +271,16 @@ export function buildDeterministicReviewerOutput(
 
 function evidenceRefs(job: ActorReviewJob) {
   return job.input_refs
-    .filter((inputRef) => inputRef.kind === "evidence")
+    .filter((inputRef) => inputRef.kind === "evidence" || inputRef.kind === "action_skill_direct_trial")
     .map((inputRef) => inputRef.ref);
 }
 
 function shouldProposeActionSkillRepair(job: ActorReviewJob) {
-  return job.reason === "fake_progress_rejection" || job.reason === "verification_failure";
+  return (
+    job.reason === "fake_progress_rejection" ||
+    job.reason === "verification_failure" ||
+    job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial")
+  );
 }
 
 function buildActionSkillProposal(
@@ -274,9 +293,12 @@ function buildActionSkillProposal(
   }
 
   const primarySkill = job.active_action_skill_snapshot[0];
+  const directTrial = job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial");
   const primitiveIds = primarySkill?.required_primitives.length
     ? primarySkill.required_primitives
-    : ["observe", "wait", "remember"];
+    : directTrial
+      ? ["collect_logs", "craft_item", "craft_with_table", "mine_block", "wait"]
+      : ["observe", "wait", "remember"];
 
   return {
     schema: "action-skill-proposal/v1",
@@ -285,17 +307,20 @@ function buildActionSkillProposal(
     owner_actor_id: job.actor_id,
     source_kind: "derived",
     status: "draft",
-    task_intent: reasonerProposal?.task_intent ?? `repair ${job.reason}`,
+    task_intent: reasonerProposal?.task_intent ??
+      (directTrial ? "distill direct generated Minecraft action into a bounded action skill" : `repair ${job.reason}`),
     evidence_refs: evidenceRefs(job),
     preconditions: reasonerProposal?.preconditions ?? ["reviewer observed immutable runtime evidence"],
     required_primitives: reasonerProposal?.required_primitives?.length
       ? [...reasonerProposal.required_primitives]
-      : [...primitiveIds],
+      : directTrial
+        ? ["collect_logs", "craft_item", "craft_with_table", "mine_block", "wait"]
+        : [...primitiveIds],
     proposed_recipe_id: `reviewer-repair:${job.job_id}`,
     success_verifier: "runtime verification must pass on a future trial",
     known_failure_modes: reasonerProposal?.known_failure_modes?.length
       ? [...reasonerProposal.known_failure_modes]
-      : [job.reason],
+      : directTrial ? ["direct_generated_trial_requires_review"] : [job.reason],
     created_at: now,
     updated_at: now,
     notes:

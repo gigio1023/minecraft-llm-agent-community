@@ -6,6 +6,17 @@ export type ActorWorkspacePaths = {
   actorDir: string;
   actorFile: string;
   memoryDir: string;
+  memory: {
+    rootDir: string;
+    workingDir: string;
+    episodicDir: string;
+    semanticDir: string;
+    proceduralDir: string;
+    socialDir: string;
+    beliefsDir: string;
+    guardrailsDir: string;
+    indexDir: string;
+  };
   relationshipsDir: string;
   evidenceDir: string;
   reviewsDir: string;
@@ -16,6 +27,7 @@ export type ActorWorkspacePaths = {
     indexFile: string;
     activeDir: string;
     candidatesDir: string;
+    directTrialsDir: string;
     retiredDir: string;
     rejectedDir: string;
   };
@@ -29,6 +41,15 @@ export type ActorActionSkillStatusPath =
   | "retired"
   | "rejected";
 
+export type ActorMemoryLayerPath =
+  | "working"
+  | "episodic"
+  | "semantic"
+  | "procedural"
+  | "social"
+  | "belief"
+  | "guardrail";
+
 export function sanitizeWorkspaceFileId(id: string) {
   return id.replace(/[^a-zA-Z0-9_.-]/g, "_");
 }
@@ -36,13 +57,25 @@ export function sanitizeWorkspaceFileId(id: string) {
 export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorWorkspacePaths {
   const actorDir = path.join(rootDir, actorId);
   const actionSkillRootDir = path.join(actorDir, "action-skills");
+  const memoryRootDir = path.join(actorDir, "memory");
 
   return {
     rootDir,
     actorId,
     actorDir,
     actorFile: path.join(actorDir, "actor.json"),
-    memoryDir: path.join(actorDir, "memory"),
+    memoryDir: memoryRootDir,
+    memory: {
+      rootDir: memoryRootDir,
+      workingDir: path.join(memoryRootDir, "working"),
+      episodicDir: path.join(memoryRootDir, "episodic"),
+      semanticDir: path.join(memoryRootDir, "semantic"),
+      proceduralDir: path.join(memoryRootDir, "procedural"),
+      socialDir: path.join(memoryRootDir, "social"),
+      beliefsDir: path.join(memoryRootDir, "beliefs"),
+      guardrailsDir: path.join(memoryRootDir, "guardrails"),
+      indexDir: path.join(memoryRootDir, "index")
+    },
     relationshipsDir: path.join(actorDir, "relationships"),
     evidenceDir: path.join(actorDir, "evidence"),
     reviewsDir: path.join(actorDir, "reviews"),
@@ -53,6 +86,7 @@ export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorW
       indexFile: path.join(actionSkillRootDir, "index.json"),
       activeDir: path.join(actionSkillRootDir, "active"),
       candidatesDir: path.join(actionSkillRootDir, "candidates"),
+      directTrialsDir: path.join(actionSkillRootDir, "direct-trials"),
       retiredDir: path.join(actionSkillRootDir, "retired"),
       rejectedDir: path.join(actionSkillRootDir, "rejected")
     }
@@ -78,6 +112,28 @@ export function getActorActionSkillStatusDir(
   return paths.actionSkills.retiredDir;
 }
 
+export function getActorMemoryLayerDir(
+  paths: ActorWorkspacePaths,
+  layer: ActorMemoryLayerPath
+) {
+  switch (layer) {
+    case "working":
+      return paths.memory.workingDir;
+    case "episodic":
+      return paths.memory.episodicDir;
+    case "semantic":
+      return paths.memory.semanticDir;
+    case "procedural":
+      return paths.memory.proceduralDir;
+    case "social":
+      return paths.memory.socialDir;
+    case "belief":
+      return paths.memory.beliefsDir;
+    case "guardrail":
+      return paths.memory.guardrailsDir;
+  }
+}
+
 export function getActorActionSkillRecordPath(
   rootDir: string,
   actorId: string,
@@ -86,4 +142,14 @@ export function getActorActionSkillRecordPath(
 ) {
   const paths = getActorWorkspacePaths(rootDir, actorId);
   return path.join(getActorActionSkillStatusDir(paths, status), `${sanitizeWorkspaceFileId(skillId)}.json`);
+}
+
+export function getActorMemoryRecordPath(
+  rootDir: string,
+  actorId: string,
+  layer: ActorMemoryLayerPath,
+  memoryId: string
+) {
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+  return path.join(getActorMemoryLayerDir(paths, layer), `${sanitizeWorkspaceFileId(memoryId)}.json`);
 }

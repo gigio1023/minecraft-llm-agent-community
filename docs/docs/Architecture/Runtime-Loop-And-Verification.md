@@ -38,10 +38,16 @@ The hot path must not await:
 - recipe revision;
 - cross-run summarization;
 - Langfuse-heavy trace analysis;
-- generated TypeScript import or execution.
+- generated TypeScript generation or reviewer cleanup.
 
 Those jobs belong to asynchronous sidecars that read immutable evidence and
 write future-facing artifacts.
+
+Direct generated action skill execution is allowed only when it is the selected
+objective action for the current turn and it writes source/helper/evidence
+artifacts. It is not allowed to count as success without the same current-run
+world, inventory, position, container, or transcript evidence required from
+hand-written action skills.
 
 ## Runtime Owns Reality
 

@@ -66,7 +66,7 @@ Forbidden outputs:
 - runtime success/failure verdict;
 - direct mutation of active action skill records;
 - direct promotion of a candidate recipe;
-- generated code import;
+- generated code import without objective trial evidence;
 - another actor's lifecycle record.
 
 Relationship event proposals are not active mutations by themselves. They are

@@ -19,6 +19,7 @@ import {
 } from "../npc/relationships/relationshipLedger.js";
 import type { ActorActionSkillRecord } from "../runtime/actorWorkspaceStore.js";
 import { getActorWorkspacePaths } from "../runtime/actorWorkspacePaths.js";
+import { retrieveActorMemoryForObjective } from "../memory/actorMemory.js";
 import type { JsonValue } from "./inputSnapshot.js";
 
 type JsonRecord = { [key: string]: JsonValue };
@@ -28,6 +29,12 @@ export type ActorProviderContextOptions = {
   actorId: string;
   activeActionSkills: readonly ActorActionSkillRecord[];
   memory?: readonly string[];
+  currentObjective?: {
+    objective_id?: string;
+    objective_category?: string;
+    item_names?: readonly string[];
+    action_skill_ids?: readonly string[];
+  };
   limits?: {
     evidence?: number;
     reviews?: number;
@@ -309,6 +316,17 @@ export async function buildActorProviderContext(
     options.goalStack,
     selectDominantRelationshipActionPressure(relationshipPressureRecords)
   );
+  const typedMemory = await retrieveActorMemoryForObjective(
+    options.actorWorkspaceRootDir,
+    options.actorId,
+    {
+      objectiveId: options.currentObjective?.objective_id,
+      objectiveCategory: options.currentObjective?.objective_category,
+      itemNames: options.currentObjective?.item_names,
+      actionSkillIds: options.currentObjective?.action_skill_ids,
+      limit: limits.memory
+    }
+  );
 
   return {
     schema: "actor-provider-context/v1",
@@ -329,6 +347,7 @@ export async function buildActorProviderContext(
     candidate_action_skills: candidates,
     recent_evidence: recentEvidence,
     recent_reviews: recentReviews,
+    typed_memory: typedMemory as unknown as JsonValue,
     memory: tail(options.memory ?? [], limits.memory),
     rules: {
       providers_propose_only: true,

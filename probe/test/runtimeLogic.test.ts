@@ -615,8 +615,13 @@ test("createOpenAICodexGameplayProvider sends actor workspace context and parses
     args: { targetCount: 4 }
   });
   const requestBody = JSON.parse(String(fetchCalls[0]?.init?.body));
-  assert.match(requestBody.input, /actor-provider-context\/v1/);
-  assert.match(requestBody.input, /fake_progress_rejection/);
+  assert.equal(fetchCalls[0]?.url, "https://chatgpt.com/backend-api/codex/responses");
+  assert.equal(requestBody.instructions.includes("Minecraft gameplay proposal worker"), true);
+  assert.equal(requestBody.stream, true);
+  const requestText = requestBody.input[0].content[0].text;
+  assert.match(requestText, /actor-provider-context\/v1/);
+  assert.match(requestText, /fake_progress_rejection/);
+  assert.match(requestText, /Allowed runtime primitive tools/);
 });
 
 test("createOpenAICodexReviewer parses bounded findings and proposal hints", async () => {

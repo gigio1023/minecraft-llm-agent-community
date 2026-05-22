@@ -17,6 +17,8 @@ const sidebars = {
         'Architecture/Async-Reviewer-Sidecars',
         'Architecture/Implementation-Workstreams',
         'Architecture/Bounded-Action-Skill-Creation',
+        'Architecture/Autonomous-Objective-Evaluation',
+        'Architecture/Direct-Generated-Action-Skills',
         'Architecture/LLM-Context-And-Actor-Workspace',
         'Architecture/Social-Actor-Profiles-And-Relationships',
       ],
@@ -27,6 +29,13 @@ const sidebars = {
       items: [
         'Setup/Headless-Server',
         'Setup/Provider-Setup',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Knowledge',
+      items: [
+        'Knowledge/Minecraft-Encyclopedia-Research-Brief',
       ],
     },
     {
@@ -66,6 +75,9 @@ const sidebars = {
             'Research/2026-05-19-opencode-message-memory-research',
             'Research/2026-05-19-headless-probe-implementation-review',
             'Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills',
+            'Research/2026-05-23-hf-paper-sweep-voyager-successors',
+            'Research/2026-05-23-agent-memory-system-literature-and-plan',
+            'Research/2026-05-23-minecraft-memory-current-llm-research',
           ],
         },
         {

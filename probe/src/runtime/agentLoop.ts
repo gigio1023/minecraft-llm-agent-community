@@ -100,6 +100,37 @@ type ProviderTrace = {
   proposal: JsonValue;
 };
 
+function currentTaskMemoryQuery(
+  currentTask: ReturnType<typeof selectDeterministicTask>,
+  activeActionSkillIds: readonly string[]
+) {
+  if (!currentTask) {
+    return undefined;
+  }
+
+  const itemNames = new Set<string>();
+  const success = currentTask.success;
+  if (success.kind === "inventory_at_least" || success.kind === "shared_chest_has_at_least") {
+    for (const itemName of success.itemNames) {
+      itemNames.add(itemName);
+    }
+  }
+  if (success.kind === "inventory_outputs") {
+    for (const output of success.outputs) {
+      for (const itemName of output.itemNames) {
+        itemNames.add(itemName);
+      }
+    }
+  }
+
+  return {
+    objective_id: currentTask.id,
+    objective_category: currentTask.id.split("_")[0],
+    item_names: [...itemNames],
+    action_skill_ids: [...activeActionSkillIds]
+  };
+}
+
 export type AgentLoopTools<TActor extends RuntimeActor> = {
   validateProposal(proposal: ToolProposal): ValidatedProposal;
   observe(input: { actor: TActor; target: TActor }): Promise<ObserveResult> | ObserveResult;
@@ -348,6 +379,22 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     previousIntent = pressureContext.currentIntent;
 
     const turnId = `turn-${String(step + 1).padStart(4, "0")}`;
+    if (!currentTask && completedTaskIds.has("deposit_shared_materials") && lastResult?.ok === true) {
+      const why = `completed runtime tasks: ${[...completedTaskIds].join(", ")}`;
+      emitAgentLoopEvent(onEvent, {
+        type: "loop_completed",
+        actorId: actor.username,
+        turnId,
+        status: "success",
+        data: { why }
+      });
+
+      return {
+        status: "success",
+        why
+      };
+    }
+
     emitAgentLoopEvent(onEvent, {
       type: "turn_observed",
       actorId: actor.username,
@@ -373,6 +420,10 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
               actorId: actor.username,
               activeActionSkills,
               memory: observation.memory,
+              currentObjective: currentTaskMemoryQuery(
+                currentTask,
+                activeActionSkillContext.activeSkillIds
+              ),
               goalStack: toJsonValue(goalStack)
             })
           }

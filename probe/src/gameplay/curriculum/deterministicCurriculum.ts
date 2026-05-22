@@ -156,6 +156,8 @@ export function selectDeterministicTask(
   // fallback when the runtime cannot currently prove an early-game material task.
   if (state.inventory) {
     const logCount = countItems(state.inventory, LOG_ITEM_NAMES);
+    const sharedLogCount = countItems(state.sharedChest?.items, LOG_ITEM_NAMES);
+    const totalKnownLogCount = logCount + sharedLogCount;
     const plankCount = countItems(state.inventory, PLANK_ITEM_NAMES);
     const stickCount = countItems(state.inventory, ["stick"]);
     const craftingTableCount = countItems(state.inventory, ["crafting_table"]);
@@ -252,7 +254,7 @@ export function selectDeterministicTask(
       };
     }
 
-    if (logCount >= 4) {
+    if (totalKnownLogCount >= 4) {
       return {
         id: "craft_planks_and_sticks",
         reason: "Need planks and sticks before crafting any tool station.",
@@ -304,7 +306,7 @@ export function selectDeterministicTask(
       };
     }
 
-    if (logCount < 4) {
+    if (totalKnownLogCount < 4) {
       return {
         id: "collect_4_logs",
         reason: "Need enough wood to start the early-game crafting chain.",
