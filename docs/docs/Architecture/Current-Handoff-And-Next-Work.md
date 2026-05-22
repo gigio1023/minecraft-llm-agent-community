@@ -309,6 +309,18 @@ bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init
 Do not make this a broad NPC simulation runner. It should be a narrow live
 contract runner.
 
+Matrix command:
+
+```bash
+cd probe
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline
+```
+
+This command enumerates implemented seed action skills from the registry and
+runs them one-by-one through the same live probe harness. It exists to make the
+full action skill verification checklist reproducible after individual probes
+are stable.
+
 Remaining harness work:
 
 - stream explicit probe events into the dashboard instead of relying only on
@@ -344,6 +356,17 @@ It failed before Minecraft startup because Docker/OrbStack was unavailable:
 
 ```text
 dial unix /Users/naem1023/.orbstack/run/docker.sock: connect: no such file or directory
+```
+
+The matrix command now reports the same blocker as an environment error:
+
+```bash
+cd probe
+bun run probe:skills -- --skills craftPlanksAndSticks --max-actions 8 --init-actor-workspace baseline
+```
+
+```text
+matrix_summary passed=0 failed=0 error=1 total=1/1
 ```
 
 Do not treat this as action skill failure evidence. Re-run the matrix once the

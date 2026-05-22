@@ -186,6 +186,18 @@ cd probe
 bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
 ```
 
+Current matrix command:
+
+```bash
+cd probe
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline
+```
+
+Use the matrix command after single-skill probes are stable. It enumerates
+implemented seed action skills from the registry, rejects planned action skills,
+runs each case through the same live harness, and reports
+`matrix_summary passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
+
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero
 when runtime evidence does not satisfy the contract.
@@ -216,6 +228,9 @@ Current live verification blocker:
 - On 2026-05-22, the craft live probe could not start because the local
   Docker/OrbStack daemon was unavailable:
   `dial unix /Users/naem1023/.orbstack/run/docker.sock: connect: no such file or directory`.
+- The same blocker appears through the matrix command:
+  `bun run probe:skills -- --skills craftPlanksAndSticks --max-actions 8 --init-actor-workspace baseline`
+  returns `matrix_summary passed=0 failed=0 error=1 total=1/1`.
 - This is external runtime availability, not action skill evidence. Re-run the
   probe matrix after Docker/OrbStack is running.
 
