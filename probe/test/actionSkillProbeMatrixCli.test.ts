@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildProbeMatrixCases } from "../src/actionSkillProbeMatrixCli.js";
+import {
+  buildProbeMatrixCases,
+  normalizeDockerPreflightResult
+} from "../src/actionSkillProbeMatrixCli.js";
 import { listImplementedSeedActionSkills } from "../src/gameplay/seedSkills/registry.js";
 
 test("action skill probe matrix builds one case for every implemented seed action skill", () => {
@@ -38,4 +41,26 @@ test("action skill probe matrix rejects planned or unknown skill ids", () => {
       }),
     /Unknown or non-implemented action skill/
   );
+});
+
+test("action skill probe matrix preflight separates docker environment blockers", () => {
+  assert.deepEqual(
+    normalizeDockerPreflightResult({
+      code: 0,
+      stdout: "28.0.0",
+      stderr: "",
+      signal: null
+    }),
+    { status: "ready" }
+  );
+
+  const blocked = normalizeDockerPreflightResult({
+    code: 1,
+    stdout: "",
+    stderr: "failed to connect to the docker API",
+    signal: null
+  });
+
+  assert.equal(blocked.status, "environment_blocked");
+  assert.match(blocked.reason, /failed to connect to the docker API/);
 });

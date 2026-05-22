@@ -321,6 +321,11 @@ runs them one-by-one through the same live probe harness. It exists to make the
 full action skill verification checklist reproducible after individual probes
 are stable.
 
+The matrix command runs a Docker preflight before actor workspace initialization
+or Minecraft startup. If Docker/OrbStack is unavailable, it reports an
+environment blocker instead of turning the first action skill into a misleading
+runtime failure.
+
 Remaining harness work:
 
 - stream explicit probe events into the dashboard instead of relying only on
@@ -366,7 +371,8 @@ bun run probe:skills -- --skills craftPlanksAndSticks --max-actions 8 --init-act
 ```
 
 ```text
-matrix_summary passed=0 failed=0 error=1 total=1/1
+matrix_preflight status=environment_blocked
+matrix_summary passed=0 failed=0 error=1 total=0/1
 ```
 
 Do not treat this as action skill failure evidence. Re-run the matrix once the

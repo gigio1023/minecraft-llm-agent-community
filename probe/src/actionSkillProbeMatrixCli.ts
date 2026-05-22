@@ -1,6 +1,7 @@
 import type { SeedActionSkillId } from "./gameplay/seedSkills/registry.js";
 import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.js";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 import type { RoleId } from "./npc/roles/contracts.js";
 import { loadProbeConfig } from "./config.js";
 import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
@@ -23,6 +24,10 @@ type MatrixCliOptions = {
 type ProbeMatrixCase = ActionSkillProbeConfig & {
   summary: string;
 };
+
+export type ProbeMatrixPreflight =
+  | { status: "ready" }
+  | { status: "environment_blocked"; reason: string };
 
 function parseArgs(argv: readonly string[]): MatrixCliOptions {
   const options: MatrixCliOptions = {};
@@ -137,6 +142,81 @@ export function buildProbeMatrixCases(input: {
   });
 }
 
+function runPreflightCommand(command: string, args: readonly string[], timeoutMs: number) {
+  return new Promise<{ code: number | null; stdout: string; stderr: string; signal: NodeJS.Signals | null }>(
+    (resolve, reject) => {
+      const child = spawn(command, args, {
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      let stdout = "";
+      let stderr = "";
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          child.kill("SIGTERM");
+        }
+      }, timeoutMs);
+
+      child.stdout.on("data", (chunk: Buffer | string) => {
+        stdout += chunk.toString();
+      });
+      child.stderr.on("data", (chunk: Buffer | string) => {
+        stderr += chunk.toString();
+      });
+      child.on("error", (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.on("close", (code, signal) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeout);
+        resolve({ code, stdout: stdout.trim(), stderr: stderr.trim(), signal });
+      });
+    }
+  );
+}
+
+export function normalizeDockerPreflightResult(input: {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  signal: NodeJS.Signals | null;
+}): ProbeMatrixPreflight {
+  if (input.code === 0) {
+    return { status: "ready" };
+  }
+
+  const reason = [
+    input.signal ? `signal=${input.signal}` : `exit_code=${input.code ?? "unknown"}`,
+    input.stderr,
+    input.stdout
+  ].filter(Boolean).join("\n");
+
+  return {
+    status: "environment_blocked",
+    reason: reason || "docker is unavailable"
+  };
+}
+
+export async function checkProbeMatrixEnvironment(): Promise<ProbeMatrixPreflight> {
+  try {
+    const result = await runPreflightCommand("docker", ["info", "--format", "{{.ServerVersion}}"], 5_000);
+    return normalizeDockerPreflightResult(result);
+  } catch (error) {
+    return {
+      status: "environment_blocked",
+      reason: formatError(error)
+    };
+  }
+}
+
 async function initializeWorkspaceForCase(testCase: ProbeMatrixCase) {
   const config = loadProbeConfig();
   const actorRoles = { [testCase.actorId]: testCase.roleId };
@@ -182,6 +262,15 @@ async function main() {
     console.log(`Action skill probe matrix: ${cases.length} case(s)`);
     console.log(`actor: ${actorId}`);
     console.log();
+
+    const preflight = await checkProbeMatrixEnvironment();
+    if (preflight.status !== "ready") {
+      console.log("matrix_preflight status=environment_blocked");
+      console.log(preflight.reason);
+      console.log(`matrix_summary passed=0 failed=0 error=1 total=0/${cases.length}`);
+      process.exitCode = 1;
+      return;
+    }
 
     for (const [index, testCase] of cases.entries()) {
       console.log(`─── [${index + 1}/${cases.length}] ${testCase.skillId} ───`);
