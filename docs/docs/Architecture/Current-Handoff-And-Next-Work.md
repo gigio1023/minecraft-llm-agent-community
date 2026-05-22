@@ -387,7 +387,11 @@ reviewers can distinguish historical transcript proof from fresh live proof.
 `historicalTranscript`, `missing`, and `environmentBlocked`.
 `evidenceGaps` lists every unproven action skill with its blocker status,
 reason, required contract and postcondition evidence, and the same
-fresh-evidence command.
+fresh-evidence command. Live and audited rows also preserve structured
+terminal/postcondition diagnosis fields when available:
+`terminalStatus`, `terminalWhy`, `postconditionStatus`,
+`postconditionFailure`, and `failureKind`. Use these fields for dashboards or
+reviewer prompts instead of parsing the display `reason`.
 
 Remaining harness work:
 
@@ -429,6 +433,9 @@ Checked-in protection:
 - the same runner now classifies terminal status separately from postcondition
   evidence, so a failed terminal note with valid Minecraft evidence is reported
   differently from missing evidence;
+- matrix `results`, `skillStatuses`, and `evidenceGaps` now carry structured
+  terminal/postcondition diagnosis fields, so handoff reviewers can tell whether
+  a failure came from control flow, evidence, or both;
 - the same test file includes a minimum accepted evidence payload for every
   implemented action skill through the runtime-owned
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill

@@ -222,6 +222,15 @@ async function main() {
 
     console.log(`\n─── Probe Result ───`);
     console.log(`  status: ${result.status}`);
+    if (result.terminalStatus) {
+      console.log(`  terminal: ${result.terminalStatus}`);
+    }
+    if (result.postconditionStatus) {
+      console.log(`  postcondition: ${result.postconditionStatus}`);
+    }
+    if (result.failureKind) {
+      console.log(`  failure_kind: ${result.failureKind}`);
+    }
     if (result.finalWhy) {
       console.log(`  why:    ${result.finalWhy}`);
     }

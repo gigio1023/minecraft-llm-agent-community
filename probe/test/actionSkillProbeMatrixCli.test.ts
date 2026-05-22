@@ -245,7 +245,12 @@ test("action skill probe matrix evidence gaps explain failed and unrun cases", (
         },
         allowedPrimitives: ["observe", "collect_logs", "wait"],
         transcriptPath: "data/evidence/collect.json",
-        finalWhy: "log inventory did not increase"
+        finalWhy: "log inventory did not increase",
+        terminalStatus: "success",
+        terminalWhy: "terminal memory reached",
+        postconditionStatus: "failed",
+        postconditionFailure: "log inventory did not increase",
+        failureKind: "postcondition_failed"
       }
     ]
   });
@@ -255,6 +260,9 @@ test("action skill probe matrix evidence gaps explain failed and unrun cases", (
   assert.equal(gaps[0].status, "failed");
   assert.equal(gaps[0].evidenceScope, "current_run");
   assert.match(gaps[0].reason, /log inventory did not increase/);
+  assert.equal(gaps[0].terminalStatus, "success");
+  assert.equal(gaps[0].postconditionStatus, "failed");
+  assert.equal(gaps[0].failureKind, "postcondition_failed");
   assert.equal(gaps[0].transcriptPath, "data/evidence/collect.json");
   assert.equal(gaps[1].skillId, "craftCraftingTable");
   assert.equal(gaps[1].status, "pending_live_evidence");
@@ -298,7 +306,10 @@ test("action skill probe matrix skill statuses provide one row per case", () => 
         },
         allowedPrimitives: ["observe", "collect_logs", "wait"],
         transcriptPath: "data/evidence/collect.json",
-        finalWhy: "collect_4_logs completed with runtime inventory evidence"
+        finalWhy: "collect_4_logs completed with runtime inventory evidence",
+        terminalStatus: "success",
+        terminalWhy: "remembered runtime evidence",
+        postconditionStatus: "passed"
       }
     ]
   });
@@ -307,6 +318,8 @@ test("action skill probe matrix skill statuses provide one row per case", () => 
   assert.equal(statuses[0].status, "passed");
   assert.equal(statuses[0].evidenceScope, "current_run");
   assert.equal(statuses[0].transcriptPath, "data/evidence/collect.json");
+  assert.equal(statuses[0].terminalStatus, "success");
+  assert.equal(statuses[0].postconditionStatus, "passed");
   assert.match(statuses[0].reason, /runtime inventory evidence/);
   assert.match(statuses[0].freshEvidenceCommand, /--skill collectLogs/);
   assert.equal(statuses[1].status, "pending_live_evidence");
@@ -438,6 +451,7 @@ test("action skill probe matrix audits existing transcript evidence without Dock
         }
       ],
       final: {
+        status: "failed",
         why: "old failed attempt"
       }
     })
@@ -472,6 +486,7 @@ test("action skill probe matrix audits existing transcript evidence without Dock
         }
       ],
       final: {
+        status: "success",
         why: "new passed attempt"
       }
     })
@@ -480,6 +495,7 @@ test("action skill probe matrix audits existing transcript evidence without Dock
     path.join(evidenceDir, "action_skill_probe_collectLogs-canonical-200.json"),
     JSON.stringify({
       final: {
+        status: "success",
         why: "canonical payload is not a raw probe transcript"
       }
     })
@@ -498,6 +514,9 @@ test("action skill probe matrix audits existing transcript evidence without Dock
   assert.equal(results.length, 1);
   assert.equal(results[0].status, "passed");
   assert.equal(results[0].skillId, "collectLogs");
+  assert.equal(results[0].terminalStatus, "success");
+  assert.equal(results[0].terminalWhy, "new passed attempt");
+  assert.equal(results[0].postconditionStatus, "passed");
   assert.match(results[0].transcriptPath ?? "", /action_skill_probe_collectLogs-200\.json/);
   assert.equal(report.verdict, "incomplete");
   assert.equal(report.summary.passed, 1);

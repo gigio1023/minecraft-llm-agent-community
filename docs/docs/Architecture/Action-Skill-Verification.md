@@ -105,6 +105,11 @@ Per-action-skill probes add a second gate after transcript write:
 - matrix reports also include `evidenceGaps`, which repeats the required
   contract and postcondition evidence for every unproven action skill and the
   same fresh-evidence command.
+- live and audited result rows carry structured terminal/postcondition fields
+  when available: `terminalStatus`, `terminalWhy`, `postconditionStatus`,
+  `postconditionFailure`, and `failureKind`. Reviewers should use these fields
+  to distinguish control-flow failure, missing Minecraft evidence, and combined
+  failure without parsing prose.
 - `--audit-existing-evidence` can re-score saved raw action skill probe
   transcripts without starting Docker. This is historical proof, not a
   substitute for a fresh live matrix after code changes.
@@ -176,6 +181,8 @@ crafting action skills only accept passed inventory evidence on `craft_item`.
 The live probe evaluates postconditions whenever a transcript is written, even
 when the terminal note is failed, so reviewers can distinguish terminal control
 failure from missing Minecraft evidence.
+The matrix report preserves that distinction in structured fields on `results`,
+`skillStatuses`, and `evidenceGaps`.
 `runtimeObserveAndRemember` also requires a real observe result with an
 observation snapshot before the memory write, so a naked terminal memory note
 cannot prove runtime control flow.

@@ -57,6 +57,11 @@ export type ActionSkillProbeResult = {
   allowedPrimitives: AllowedTool[];
   transcriptPath?: string;
   finalWhy?: string;
+  terminalStatus?: string;
+  terminalWhy?: string;
+  postconditionStatus?: "passed" | "failed";
+  postconditionFailure?: string;
+  failureKind?: "terminal_failed" | "postcondition_failed" | "terminal_and_postcondition_failed";
   /** Non-zero only when status is "error". */
   errorMessage?: string;
 };
@@ -899,31 +904,52 @@ export async function validateProbePostcondition(skillId: SeedActionSkillId, tra
 export function classifyActionSkillProbeOutcome(input: {
   final: ActionSkillProbeFinal;
   postconditionFailure: string | null;
-}): Pick<ActionSkillProbeResult, "status" | "finalWhy"> {
+}): Pick<
+  ActionSkillProbeResult,
+  "status" | "finalWhy" | "terminalStatus" | "terminalWhy" | "postconditionStatus" | "postconditionFailure" | "failureKind"
+> {
+  const postconditionStatus = input.postconditionFailure ? "failed" : "passed";
+  const base = {
+    terminalStatus: input.final.status,
+    terminalWhy: input.final.why,
+    postconditionStatus,
+    ...(input.postconditionFailure ? { postconditionFailure: input.postconditionFailure } : {})
+  } satisfies Pick<
+    ActionSkillProbeResult,
+    "terminalStatus" | "terminalWhy" | "postconditionStatus" | "postconditionFailure"
+  >;
+
   if (input.final.status === "success" && !input.postconditionFailure) {
     return {
       status: "passed",
-      finalWhy: input.final.why
+      finalWhy: input.final.why,
+      ...base
     };
   }
 
   if (input.final.status === "success") {
     return {
       status: "failed",
-      finalWhy: input.postconditionFailure ?? input.final.why
+      finalWhy: input.postconditionFailure ?? input.final.why,
+      failureKind: "postcondition_failed",
+      ...base
     };
   }
 
   if (!input.postconditionFailure) {
     return {
       status: "failed",
-      finalWhy: `terminal status ${input.final.status} even though postcondition passed: ${input.final.why}`
+      finalWhy: `terminal status ${input.final.status} even though postcondition passed: ${input.final.why}`,
+      failureKind: "terminal_failed",
+      ...base
     };
   }
 
   return {
     status: "failed",
-    finalWhy: `${input.final.why}; postcondition: ${input.postconditionFailure}`
+    finalWhy: `${input.final.why}; postcondition: ${input.postconditionFailure}`,
+    failureKind: "terminal_and_postcondition_failed",
+    ...base
   };
 }
 
@@ -1310,7 +1336,12 @@ export async function runLiveActionSkillProbe(
       contract,
       allowedPrimitives,
       transcriptPath,
-      finalWhy: outcome.finalWhy
+      finalWhy: outcome.finalWhy,
+      terminalStatus: outcome.terminalStatus,
+      terminalWhy: outcome.terminalWhy,
+      postconditionStatus: outcome.postconditionStatus,
+      ...(outcome.postconditionFailure ? { postconditionFailure: outcome.postconditionFailure } : {}),
+      ...(outcome.failureKind ? { failureKind: outcome.failureKind } : {})
     };
   } catch (error) {
     return {

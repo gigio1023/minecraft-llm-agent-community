@@ -1,6 +1,6 @@
 # SPEC
 
-Updated: 2026-05-21
+Updated: 2026-05-22
 
 ## 1. What This Is
 
@@ -257,7 +257,11 @@ aggregates the same rows into `currentRun`, `historicalTranscript`, `missing`,
 and `environmentBlocked` counts.
 `evidenceGaps` remains the focused list of non-passing or unrun action skills,
 with the missing contract and postcondition evidence needed before the action
-skill can be considered proven.
+skill can be considered proven. Live and audited result rows also carry
+structured `terminalStatus`, `terminalWhy`, `postconditionStatus`,
+`postconditionFailure`, and `failureKind` fields when available. Reviewers and
+dashboards should read those fields instead of parsing the human `reason`
+string.
 
 The per-action-skill postcondition is output-specific. Craft probes must prove
 the expected inventory outputs, not merely any passed verifier. Ordered social

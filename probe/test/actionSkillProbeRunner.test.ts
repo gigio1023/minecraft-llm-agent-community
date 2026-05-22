@@ -191,7 +191,10 @@ test("actionSkillProbeRunner classifies final status and postcondition evidence 
     }),
     {
       status: "passed",
-      finalWhy: "terminal memory reached"
+      finalWhy: "terminal memory reached",
+      terminalStatus: "success",
+      terminalWhy: "terminal memory reached",
+      postconditionStatus: "passed"
     }
   );
 
@@ -202,7 +205,12 @@ test("actionSkillProbeRunner classifies final status and postcondition evidence 
     }),
     {
       status: "failed",
-      finalWhy: "missing inventory evidence"
+      finalWhy: "missing inventory evidence",
+      terminalStatus: "success",
+      terminalWhy: "terminal memory reached",
+      postconditionStatus: "failed",
+      postconditionFailure: "missing inventory evidence",
+      failureKind: "postcondition_failed"
     }
   );
 
@@ -213,7 +221,11 @@ test("actionSkillProbeRunner classifies final status and postcondition evidence 
     }),
     {
       status: "failed",
-      finalWhy: "terminal status failed even though postcondition passed: blocked repeatedly"
+      finalWhy: "terminal status failed even though postcondition passed: blocked repeatedly",
+      terminalStatus: "failed",
+      terminalWhy: "blocked repeatedly",
+      postconditionStatus: "passed",
+      failureKind: "terminal_failed"
     }
   );
 
@@ -224,7 +236,12 @@ test("actionSkillProbeRunner classifies final status and postcondition evidence 
     }),
     {
       status: "failed",
-      finalWhy: "blocked repeatedly; postcondition: missing inventory evidence"
+      finalWhy: "blocked repeatedly; postcondition: missing inventory evidence",
+      terminalStatus: "failed",
+      terminalWhy: "blocked repeatedly",
+      postconditionStatus: "failed",
+      postconditionFailure: "missing inventory evidence",
+      failureKind: "terminal_and_postcondition_failed"
     }
   );
 });

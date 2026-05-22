@@ -45,6 +45,11 @@ export type ProbeMatrixEvidenceGap = {
   status: "pending_live_evidence" | "environment_blocked" | "failed" | "error";
   evidenceScope: ProbeMatrixEvidenceScope;
   reason: string;
+  terminalStatus?: string;
+  terminalWhy?: string;
+  postconditionStatus?: "passed" | "failed";
+  postconditionFailure?: string;
+  failureKind?: "terminal_failed" | "postcondition_failed" | "terminal_and_postcondition_failed";
   requiredEvidence: {
     contract: string[];
     postcondition: string[];
@@ -58,6 +63,11 @@ export type ProbeMatrixSkillStatus = {
   status: "passed" | "pending_live_evidence" | "environment_blocked" | "failed" | "error";
   evidenceScope: ProbeMatrixEvidenceScope;
   reason: string;
+  terminalStatus?: string;
+  terminalWhy?: string;
+  postconditionStatus?: "passed" | "failed";
+  postconditionFailure?: string;
+  failureKind?: "terminal_failed" | "postcondition_failed" | "terminal_and_postcondition_failed";
   requiredEvidence: {
     contract: string[];
     postcondition: string[];
@@ -184,6 +194,11 @@ export function buildProbeMatrixEvidenceGaps(input: {
       status: result.status,
       evidenceScope: input.mode === "evidence_audit" ? "historical_transcript" : "current_run",
       reason: result.errorMessage ?? result.finalWhy ?? "probe did not satisfy the action skill contract",
+      ...(result.terminalStatus ? { terminalStatus: result.terminalStatus } : {}),
+      ...(result.terminalWhy ? { terminalWhy: result.terminalWhy } : {}),
+      ...(result.postconditionStatus ? { postconditionStatus: result.postconditionStatus } : {}),
+      ...(result.postconditionFailure ? { postconditionFailure: result.postconditionFailure } : {}),
+      ...(result.failureKind ? { failureKind: result.failureKind } : {}),
       requiredEvidence,
       ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {}),
       freshEvidenceCommand
@@ -250,6 +265,11 @@ export function buildProbeMatrixSkillStatuses(input: {
         (result.status === "passed"
           ? "probe transcript satisfies the action skill postcondition"
           : "probe did not satisfy the action skill contract"),
+      ...(result.terminalStatus ? { terminalStatus: result.terminalStatus } : {}),
+      ...(result.terminalWhy ? { terminalWhy: result.terminalWhy } : {}),
+      ...(result.postconditionStatus ? { postconditionStatus: result.postconditionStatus } : {}),
+      ...(result.postconditionFailure ? { postconditionFailure: result.postconditionFailure } : {}),
+      ...(result.failureKind ? { failureKind: result.failureKind } : {}),
       requiredEvidence,
       ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {}),
       freshEvidenceCommand
@@ -289,6 +309,7 @@ type ExistingEvidencePayload = {
   };
   steps?: unknown;
   final?: {
+    status?: unknown;
     why?: unknown;
   };
 };
@@ -338,6 +359,8 @@ export async function auditExistingActionSkillEvidence(input: {
     }
 
     const postconditionFailure = await validateProbePostcondition(testCase.skillId, filePath);
+    const terminalStatus = typeof payload.final?.status === "string" ? payload.final.status : undefined;
+    const terminalWhy = typeof payload.final?.why === "string" ? payload.final.why : undefined;
     candidates.push({
       status: postconditionFailure ? "failed" : "passed",
       skillId: testCase.skillId,
@@ -348,7 +371,11 @@ export async function auditExistingActionSkillEvidence(input: {
       contract: getActionSkillVerificationContract(testCase.skillId),
       allowedPrimitives: testCase.primitiveIds as ActionSkillProbeResult["allowedPrimitives"],
       transcriptPath: filePath,
-      finalWhy: postconditionFailure ?? (typeof payload.final?.why === "string" ? payload.final.why : "existing transcript satisfies postcondition"),
+      finalWhy: postconditionFailure ?? terminalWhy ?? "existing transcript satisfies postcondition",
+      ...(terminalStatus ? { terminalStatus } : {}),
+      ...(terminalWhy ? { terminalWhy } : {}),
+      postconditionStatus: postconditionFailure ? "failed" : "passed",
+      ...(postconditionFailure ? { postconditionFailure, failureKind: "postcondition_failed" } : {}),
       timestamp: readTimestampFromEvidenceFile(entry)
     });
   }
@@ -601,6 +628,15 @@ async function initializeWorkspaceForCase(testCase: ProbeMatrixCase) {
 
 function printResult(result: ActionSkillProbeResult) {
   console.log(`  status: ${result.status}`);
+  if (result.terminalStatus) {
+    console.log(`  terminal: ${result.terminalStatus}`);
+  }
+  if (result.postconditionStatus) {
+    console.log(`  postcondition: ${result.postconditionStatus}`);
+  }
+  if (result.failureKind) {
+    console.log(`  failure_kind: ${result.failureKind}`);
+  }
   if (result.finalWhy) {
     console.log(`  why:    ${result.finalWhy}`);
   }
