@@ -448,7 +448,7 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
 
       if (skillId === "approachAndRequestItem") {
         if (input.lastResult.tool === "move_to" && input.lastResult.status === "arrived") {
-          return { tool: "say", args: { target: targetActorId, text: "can you spare one starter item?" } };
+          return { tool: "say", args: { target: targetActorId, text: "can you spare one oak log?" } };
         }
         if (input.lastResult.tool === "say" && input.lastResult.status === "delivered") {
           return { tool: "remember", args: { note: "approachAndRequestItem arrived and delivered request" } };
@@ -655,7 +655,8 @@ function hasDirectedTargetArg(step: ProbeTranscriptStep) {
 }
 
 function isRequestText(text: string) {
-  return /request|need|spare|share|starter|item/i.test(text);
+  return /request|need|spare|share|give|bring/i.test(text) &&
+    /\b(oak\s+log|log|plank|stick|crafting\s+table|chest|food|coal|cobblestone)\b/i.test(text);
 }
 
 function isResourceAnnouncementText(text: string) {
@@ -838,7 +839,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   approachAndRequestItem: {
     skillId: "approachAndRequestItem",
-    evidenceSummary: ["move_to arrived within range", "say delivered a request-like message"],
+    evidenceSummary: ["move_to arrived within range", "say delivered a request for a specific item"],
     minimumPassingTranscript: {
       steps: [
         {
@@ -851,7 +852,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } }
       ]
     },
     validate(steps) {
@@ -876,7 +877,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
           textArgMatches(step, isRequestText)
         )
         ? null
-        : "approachAndRequestItem did not deliver a request-like message after arriving";
+        : "approachAndRequestItem did not deliver a targeted request for a specific item after arriving";
     }
   },
   announceResourceDiscovery: {

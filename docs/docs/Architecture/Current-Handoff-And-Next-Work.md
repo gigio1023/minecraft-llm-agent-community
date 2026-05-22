@@ -433,7 +433,7 @@ Current postcondition rules:
 - `handoffItemAtChest` requires a named positive deposit before delivered
   handoff chat with matching handoff text;
 - `approachAndRequestItem` requires measured arrival distance evidence before
-  delivered targeted request-like chat;
+  delivered targeted chat requesting a specific item;
 - `announceResourceDiscovery` requires delivered targeted resource-discovery
   chat and a resource memory note persisted after that announcement;
 - `waitForBusyCrafter` requires busy response before bounded wait before

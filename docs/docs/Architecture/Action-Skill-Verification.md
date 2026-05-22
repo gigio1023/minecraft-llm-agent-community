@@ -149,7 +149,7 @@ text was proposed by the provider.
 Required evidence:
 
 - `approachAndRequestItem`: measured arrival within interaction range, including
-  before/after distance fields, and delivered request-like chat;
+  before/after distance fields, and delivered chat requesting a specific item;
 - `announceResourceDiscovery`: delivered resource-discovery chat and a
   resource memory note persisted after that announcement;
 - `handoffItemAtChest`: named positive shared-chest deposit and delivered

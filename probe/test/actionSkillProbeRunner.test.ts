@@ -529,7 +529,7 @@ test("action skill probe postcondition requires wait before runtime control memo
 test("action skill probe postcondition enforces ordered social evidence", async () => {
   const prematureRequest = await writeTranscriptPayload({
       steps: [
-        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } },
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } },
         {
           tool: "move_to",
           result: {
@@ -617,7 +617,7 @@ test("action skill probe postcondition rejects delivered social chat with the wr
 
   assert.match(
     await validateProbePostcondition("approachAndRequestItem", vagueRequest) ?? "",
-    /request-like message/
+    /specific item/
   );
   assert.match(
     await validateProbePostcondition("announceResourceDiscovery", vagueAnnouncement) ?? "",
@@ -646,7 +646,7 @@ test("action skill probe postcondition rejects delivered social chat without a t
             distanceDelta: 2
           }
         },
-        { tool: "say", args: { text: "can you spare one starter item?" }, result: { status: "delivered" } }
+        { tool: "say", args: { text: "can you spare one oak log?" }, result: { status: "delivered" } }
       ]
     });
   const untargetedBusy = await writeTranscriptPayload({
@@ -659,11 +659,34 @@ test("action skill probe postcondition rejects delivered social chat without a t
 
   assert.match(
     await validateProbePostcondition("approachAndRequestItem", untargetedRequest) ?? "",
-    /request-like message/
+    /specific item/
   );
   assert.match(
     await validateProbePostcondition("waitForBusyCrafter", untargetedBusy) ?? "",
     /busy response/
+  );
+});
+
+test("action skill probe postcondition rejects generic item requests", async () => {
+  const genericRequest = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "move_to",
+          result: {
+            status: "arrived",
+            arrived: true,
+            beforeDistance: 3,
+            afterDistance: 1,
+            distanceDelta: 2
+          }
+        },
+        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("approachAndRequestItem", genericRequest) ?? "",
+    /specific item/
   );
 });
 
@@ -694,7 +717,7 @@ test("action skill probe postcondition requires measured arrival evidence before
   const unmeasuredArrival = await writeTranscriptPayload({
       steps: [
         { tool: "move_to", result: { status: "arrived", arrived: true } },
-        { tool: "say", args: { target: "npc_target", text: "can you spare one starter item?" }, result: { status: "delivered" } }
+        { tool: "say", args: { target: "npc_target", text: "can you spare one oak log?" }, result: { status: "delivered" } }
       ]
     });
 
