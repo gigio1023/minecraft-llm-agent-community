@@ -199,7 +199,53 @@ test("action skill probe postcondition rejects craft completion without passed v
 
   const failure = await validateProbePostcondition("craftCraftingTable", transcriptPath);
 
-  assert.match(failure ?? "", /never produced a passed runtime verification/);
+  assert.match(failure ?? "", /crafting table inventory evidence/);
+});
+
+test("action skill probe postcondition rejects passed craft verification without required output evidence", async () => {
+  const craftingTableTranscript = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "craft_item",
+          result: { status: "crafted", itemName: "stick" },
+          verification: {
+            status: "passed",
+            progress: {
+              itemNames: ["stick"],
+              beforeCount: 0,
+              afterCount: 4,
+              targetCount: 2
+            }
+          }
+        }
+      ]
+    });
+
+  const planksAndSticksTranscript = await writeTranscriptPayload({
+      steps: [
+        {
+          tool: "craft_item",
+          result: { status: "crafted", itemName: "planks" },
+          verification: {
+            status: "passed",
+            progress: {
+              outputs: [
+                { itemNames: ["oak_planks"], beforeCount: 0, afterCount: 4, targetCount: 4 }
+              ]
+            }
+          }
+        }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("craftCraftingTable", craftingTableTranscript) ?? "",
+    /crafting table inventory evidence/
+  );
+  assert.match(
+    await validateProbePostcondition("craftPlanksAndSticks", planksAndSticksTranscript) ?? "",
+    /plank and stick inventory evidence/
+  );
 });
 
 test("action skill probe postcondition accepts shared storage movement evidence", async () => {
@@ -219,6 +265,41 @@ test("action skill probe postcondition accepts shared storage movement evidence"
   const failure = await validateProbePostcondition("depositSharedItems", transcriptPath);
 
   assert.equal(failure, null);
+});
+
+test("action skill probe postcondition enforces ordered social evidence", async () => {
+  const prematureRequest = await writeTranscriptPayload({
+      steps: [
+        { tool: "say", result: { status: "delivered" } },
+        { tool: "move_to", result: { status: "arrived", arrived: true } }
+      ]
+    });
+  const prematureHandoff = await writeTranscriptPayload({
+      steps: [
+        { tool: "say", result: { status: "delivered" } },
+        { tool: "deposit_shared", result: { status: "deposited", movedCount: 1 } }
+      ]
+    });
+  const prematureBusyFollowUp = await writeTranscriptPayload({
+      steps: [
+        { tool: "wait", result: { status: "waited" } },
+        { tool: "say", result: { status: "busy" } },
+        { tool: "say", result: { status: "delivered" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("approachAndRequestItem", prematureRequest) ?? "",
+    /after arriving/
+  );
+  assert.match(
+    await validateProbePostcondition("handoffItemAtChest", prematureHandoff) ?? "",
+    /announce the shared chest handoff/
+  );
+  assert.match(
+    await validateProbePostcondition("waitForBusyCrafter", prematureBusyFollowUp) ?? "",
+    /wait after busy response/
+  );
 });
 
 test("action skill probe postcondition rejects empty transcripts for every implemented action skill", async () => {

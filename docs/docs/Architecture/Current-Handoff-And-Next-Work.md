@@ -399,17 +399,22 @@ Remaining harness work:
 
 Current postcondition rules:
 
-- `collectLogs`, `craftPlanksAndSticks`, and `craftCraftingTable` require at
-  least one passed runtime verifier in the transcript;
+- `collectLogs` requires passed runtime verifier progress with log inventory at
+  the target count;
+- `craftPlanksAndSticks` requires passed runtime verifier progress with both
+  plank and stick output counts;
+- `craftCraftingTable` requires passed runtime verifier progress with crafting
+  table inventory output;
 - `inspectSharedChest` requires an `inspect_chest` result with a real item
   snapshot;
 - `depositSharedItems` requires `deposit_shared` with `movedCount > 0`;
-- `handoffItemAtChest` requires a positive deposit and delivered chat;
-- `approachAndRequestItem` requires arrival distance evidence and delivered
+- `handoffItemAtChest` requires a positive deposit before delivered handoff
+  chat;
+- `approachAndRequestItem` requires arrival distance evidence before delivered
   chat;
 - `announceResourceDiscovery` requires delivered chat;
-- `waitForBusyCrafter` requires busy response, bounded wait, and delivered
-  follow-up.
+- `waitForBusyCrafter` requires busy response before bounded wait before
+  delivered follow-up.
 
 Checked-in protection:
 

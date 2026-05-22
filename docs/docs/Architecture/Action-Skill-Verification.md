@@ -77,8 +77,11 @@ Per-action-skill probes add a second gate after transcript write:
 
 - `craftPlanksAndSticks` and `craftCraftingTable` pass only when the runtime
   verifier reaches `passed`;
-- a non-throwing `bot.craft(...)`, a `crafted` result, or a terminal memory note
-  is not enough;
+- a non-throwing `bot.craft(...)`, a `crafted` result, a terminal memory note,
+  or an unrelated passed verifier is not enough;
+- the probe postcondition must see the expected output inventory evidence:
+  planks and sticks for `craftPlanksAndSticks`, and a crafting table for
+  `craftCraftingTable`;
 - probe fixtures may give the actor starting logs, planks, or sticks, but the
   final claim must still come from post-action inventory observation.
 - matrix reports include a top-level verdict, so `environment_blocked` remains
@@ -137,6 +140,11 @@ Required evidence:
   chat;
 - `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up.
 
+For ordered social action skills, evidence order matters. A delivered request
+before arrival, a handoff message before deposit, or a follow-up before waiting
+does not satisfy the postcondition even if each individual primitive appears in
+the transcript.
+
 ## Current Coverage
 
 Implemented seed action skills are indexed in
@@ -155,6 +163,10 @@ payload through `actionSkillPostconditionSpecs` in
 provider terminal note or no-op result could otherwise look like success, and
 keeps the acceptance payloads beside the runtime postcondition rules instead of
 burying them in tests.
+
+The same postcondition rules reject weak passed verifications when the progress
+payload does not contain the expected inventory output, and reject social
+transcripts when required primitives appear out of order.
 
 Planned action skills may remain in the registry without verification contracts.
 They must not become active until their primitive boundaries and evidence rules

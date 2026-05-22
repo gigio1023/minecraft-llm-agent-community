@@ -457,8 +457,52 @@ function numberField(record: Record<string, unknown>, name: string) {
   return typeof record[name] === "number" ? record[name] : undefined;
 }
 
-function hasPassedVerification(steps: ProbeTranscriptStep[]) {
-  return steps.some((step) => step.verification?.status === "passed");
+function arrayField(record: Record<string, unknown>, name: string): unknown[] {
+  return Array.isArray(record[name]) ? record[name] : [];
+}
+
+function hasPassedVerificationProgress(
+  steps: ProbeTranscriptStep[],
+  predicate: (progress: Record<string, unknown>) => boolean
+) {
+  return steps.some((step) => {
+    if (step.verification?.status !== "passed") {
+      return false;
+    }
+
+    return predicate(asRecord(step.verification.progress));
+  });
+}
+
+function progressHasTargetInventory(input: {
+  progress: Record<string, unknown>;
+  itemName: string;
+  minimumAfterCount?: number;
+}) {
+  const itemNames = arrayField(input.progress, "itemNames");
+  const afterCount = numberField(input.progress, "afterCount") ?? 0;
+  const targetCount = numberField(input.progress, "targetCount") ?? input.minimumAfterCount ?? 1;
+
+  return itemNames.includes(input.itemName) && afterCount >= targetCount && afterCount >= (input.minimumAfterCount ?? 1);
+}
+
+function progressHasCraftOutputs(
+  progress: Record<string, unknown>,
+  requirements: readonly { itemName: string; minimumAfterCount: number }[]
+) {
+  const outputs = arrayField(progress, "outputs").map(asRecord);
+
+  return requirements.every((requirement) =>
+    outputs.some((output) => {
+      const itemNames = arrayField(output, "itemNames");
+      const afterCount = numberField(output, "afterCount") ?? 0;
+      const targetCount = numberField(output, "targetCount") ?? requirement.minimumAfterCount;
+
+      return itemNames.includes(requirement.itemName) &&
+        afterCount >= targetCount &&
+        afterCount >= requirement.minimumAfterCount;
+    })
+  );
 }
 
 function hasToolResult(
@@ -469,53 +513,131 @@ function hasToolResult(
   return steps.some((step) => step.tool === tool && predicate(asRecord(step.result)));
 }
 
+function hasToolResultAfter(
+  steps: ProbeTranscriptStep[],
+  input: {
+    afterTool: string;
+    tool: string;
+    predicate: (result: Record<string, unknown>) => boolean;
+  }
+) {
+  const afterIndex = steps.findIndex((step) => step.tool === input.afterTool);
+  if (afterIndex < 0) {
+    return false;
+  }
+
+  return steps
+    .slice(afterIndex + 1)
+    .some((step) => step.tool === input.tool && input.predicate(asRecord(step.result)));
+}
+
 export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, ActionSkillPostconditionSpec>> = {
   runtimeObserveAndRemember: {
     skillId: "runtimeObserveAndRemember",
-    evidenceSummary: ["memory note was persisted through remember"],
+    evidenceSummary: ["observation step ran before memory note was persisted"],
     minimumPassingTranscript: {
-      steps: [{ tool: "remember", result: { status: "remembered", note: "observed" } }]
+      steps: [
+        { tool: "observe", result: { status: "ok" } },
+        { tool: "remember", result: { status: "remembered", note: "observed" } }
+      ]
     },
     validate(steps) {
-      return hasToolResult(steps, "remember", (result) => result.status === "remembered")
+      return hasToolResultAfter(steps, {
+        afterTool: "observe",
+        tool: "remember",
+        predicate: (result) => result.status === "remembered"
+      })
         ? null
-        : "runtimeObserveAndRemember did not persist memory";
+        : "runtimeObserveAndRemember did not observe before persisting memory";
     }
   },
   collectLogs: {
     skillId: "collectLogs",
-    evidenceSummary: ["runtime verifier passed after log inventory increase"],
+    evidenceSummary: ["runtime verifier passed after log inventory reached the target count"],
     minimumPassingTranscript: {
-      steps: [{ tool: "collect_logs", result: { status: "collected" }, verification: { status: "passed" } }]
+      steps: [{
+        tool: "collect_logs",
+        result: { status: "collected" },
+        verification: {
+          status: "passed",
+          progress: {
+            itemNames: ["oak_log"],
+            beforeCount: 0,
+            afterCount: 4,
+            targetCount: 4
+          }
+        }
+      }]
     },
     validate(steps) {
-      return hasPassedVerification(steps)
+      return hasPassedVerificationProgress(steps, (progress) =>
+        progressHasTargetInventory({
+          progress,
+          itemName: "oak_log",
+          minimumAfterCount: 4
+        })
+      )
         ? null
-        : "collectLogs never produced a passed runtime verification in transcript";
+        : "collectLogs never produced passed log inventory target evidence in transcript";
     }
   },
   craftPlanksAndSticks: {
     skillId: "craftPlanksAndSticks",
     evidenceSummary: ["runtime verifier passed after plank and stick inventory outputs"],
     minimumPassingTranscript: {
-      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
+      steps: [{
+        tool: "craft_item",
+        result: { status: "crafted" },
+        verification: {
+          status: "passed",
+          progress: {
+            outputs: [
+              { itemNames: ["oak_planks"], beforeCount: 0, afterCount: 4, targetCount: 4 },
+              { itemNames: ["stick"], beforeCount: 0, afterCount: 4, targetCount: 2 }
+            ]
+          }
+        }
+      }]
     },
     validate(steps) {
-      return hasPassedVerification(steps)
+      return hasPassedVerificationProgress(steps, (progress) =>
+        progressHasCraftOutputs(progress, [
+          { itemName: "oak_planks", minimumAfterCount: 4 },
+          { itemName: "stick", minimumAfterCount: 2 }
+        ])
+      )
         ? null
-        : "craftPlanksAndSticks never produced a passed runtime verification in transcript";
+        : "craftPlanksAndSticks never produced passed plank and stick inventory evidence in transcript";
     }
   },
   craftCraftingTable: {
     skillId: "craftCraftingTable",
     evidenceSummary: ["runtime verifier passed after crafting table inventory output"],
     minimumPassingTranscript: {
-      steps: [{ tool: "craft_item", result: { status: "crafted" }, verification: { status: "passed" } }]
+      steps: [{
+        tool: "craft_item",
+        result: { status: "crafted" },
+        verification: {
+          status: "passed",
+          progress: {
+            itemNames: ["crafting_table"],
+            beforeCount: 0,
+            afterCount: 1,
+            targetCount: 1
+          }
+        }
+      }]
     },
     validate(steps) {
-      return hasPassedVerification(steps)
+      return hasPassedVerificationProgress(steps, (progress) =>
+        progressHasTargetInventory({
+          progress,
+          itemName: "crafting_table",
+          minimumAfterCount: 1
+        })
+      )
         ? null
-        : "craftCraftingTable never produced a passed runtime verification in transcript";
+        : "craftCraftingTable never produced passed crafting table inventory evidence in transcript";
     }
   },
   inspectSharedChest: {
@@ -552,10 +674,18 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       ]
     },
     validate(steps) {
-      if (!hasToolResult(steps, "move_to", (result) => result.status === "arrived" && result.arrived === true)) {
+      const arrived = steps.findIndex(
+        (step) => step.tool === "move_to" &&
+          asRecord(step.result).status === "arrived" &&
+          asRecord(step.result).arrived === true
+      );
+
+      if (arrived < 0) {
         return "approachAndRequestItem did not reach interaction range";
       }
-      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+      return steps
+        .slice(arrived + 1)
+        .some((step) => step.tool === "say" && asRecord(step.result).status === "delivered")
         ? null
         : "approachAndRequestItem did not deliver a request after arriving";
     }
@@ -582,10 +712,18 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       ]
     },
     validate(steps) {
-      if (!hasToolResult(steps, "deposit_shared", (result) => result.status === "deposited" && (numberField(result, "movedCount") ?? 0) > 0)) {
+      const depositIndex = steps.findIndex(
+        (step) => step.tool === "deposit_shared" &&
+          asRecord(step.result).status === "deposited" &&
+          (numberField(asRecord(step.result), "movedCount") ?? 0) > 0
+      );
+
+      if (depositIndex < 0) {
         return "handoffItemAtChest did not move any item into shared storage";
       }
-      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+      return steps
+        .slice(depositIndex + 1)
+        .some((step) => step.tool === "say" && asRecord(step.result).status === "delivered")
         ? null
         : "handoffItemAtChest did not announce the shared chest handoff";
     }
@@ -601,13 +739,21 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       ]
     },
     validate(steps) {
-      if (!hasToolResult(steps, "say", (result) => result.status === "busy")) {
+      const busyIndex = steps.findIndex(
+        (step) => step.tool === "say" && asRecord(step.result).status === "busy"
+      );
+      if (busyIndex < 0) {
         return "waitForBusyCrafter did not observe a busy response";
       }
-      if (!hasToolResult(steps, "wait", (result) => result.status === "waited")) {
+      const waitIndex = steps.findIndex(
+        (step, index) => index > busyIndex && step.tool === "wait" && asRecord(step.result).status === "waited"
+      );
+      if (waitIndex < 0) {
         return "waitForBusyCrafter did not wait after busy response";
       }
-      return hasToolResult(steps, "say", (result) => result.status === "delivered")
+      return steps
+        .slice(waitIndex + 1)
+        .some((step) => step.tool === "say" && asRecord(step.result).status === "delivered")
         ? null
         : "waitForBusyCrafter did not deliver a follow-up after waiting";
     }

@@ -259,6 +259,11 @@ and `environmentBlocked` counts.
 with the missing contract and postcondition evidence needed before the action
 skill can be considered proven.
 
+The per-action-skill postcondition is output-specific. Craft probes must prove
+the expected inventory outputs, not merely any passed verifier. Ordered social
+probes must prove the causal sequence, such as arrival before request, deposit
+before handoff chat, and busy response before wait before follow-up.
+
 This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
 one actor-owned action skill through the real runtime gate and exits non-zero
 when runtime evidence does not satisfy the contract.
