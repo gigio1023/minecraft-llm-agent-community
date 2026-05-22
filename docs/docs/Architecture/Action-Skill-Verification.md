@@ -58,6 +58,18 @@ Required evidence:
 - distance delta;
 - bounded timeout result, with `pathfinder.stop()` called when available.
 
+### Waiting
+
+`wait` is pacing evidence, not gameplay progress. It must still be bounded and
+visible in the transcript so ordered runtime-control and social action skills
+cannot pass on a bare `status: waited` marker.
+
+Required evidence:
+
+- positive tick count for action-skill postconditions that require waiting;
+- transcript-visible bounded duration in milliseconds;
+- later world, chat, memory, or inventory evidence for actual progress.
+
 ### Crafting
 
 `craft_item` must resolve a real Mineflayer recipe before calling craft.
@@ -167,7 +179,8 @@ Required evidence:
 - `handoffItemAtChest`: actor/ledger-identified named positive shared-chest
   deposit and delivered handoff chat result evidence with matching handoff text;
 - `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up
-  chat result evidence.
+  chat result evidence. The wait step must carry positive tick and duration
+  evidence, not just `status: waited`.
 
 For ordered social action skills, evidence order matters. A delivered request
 before arrival, a handoff message before deposit, or a follow-up before waiting

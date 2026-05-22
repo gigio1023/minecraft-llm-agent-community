@@ -538,7 +538,14 @@ test("action skill probe postcondition requires wait before runtime control memo
       steps: [
         { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
         { tool: "remember", result: { status: "remembered", note: "observed" } },
-        { tool: "wait", result: { status: "waited", ticks: 20 } }
+        { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } }
+      ]
+    });
+  const waitedWithoutDuration = await writeTranscriptPayload({
+      steps: [
+        { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
+        { tool: "wait", result: { status: "waited", ticks: 20 } },
+        { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     });
 
@@ -549,6 +556,10 @@ test("action skill probe postcondition requires wait before runtime control memo
   assert.match(
     await validateProbePostcondition("runtimeObserveAndRemember", rememberedBeforeWait) ?? "",
     /memory note after waiting/
+  );
+  assert.match(
+    await validateProbePostcondition("runtimeObserveAndRemember", waitedWithoutDuration) ?? "",
+    /bounded wait/
   );
 });
 
@@ -636,7 +647,7 @@ test("action skill probe postcondition rejects delivered social chat with the wr
   const vagueFollowUp = await writeTranscriptPayload({
       steps: [
         { tool: "say", args: { target: "npc_target" }, result: busySayResult() },
-        { tool: "wait", result: { status: "waited" } },
+        { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } },
         { tool: "say", args: { target: "npc_target", text: "hello there" }, result: deliveredSayResult("hello there") }
       ]
     });

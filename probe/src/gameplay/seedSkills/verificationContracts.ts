@@ -20,7 +20,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     primitiveIds: ["observe", "wait", "remember"],
     evidence: [
       "observation snapshot is available to the provider",
-      "wait resolves without mutating gameplay state",
+      "wait resolves with positive ticks and bounded duration evidence",
       "memory note is persisted in runtime memory"
     ],
     protectedBy: ["test/runtimeLogic.test.ts", "test/transcript.test.ts"]
@@ -116,7 +116,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     evidence: [
       "busy state is treated as a valid defer signal",
       "busy say result records actor and target evidence",
-      "wait completes as a bounded runtime action",
+      "wait completes with positive ticks and bounded duration evidence",
       "follow-up say result records delivered target and text evidence"
     ],
     protectedBy: ["test/runtimeLogic.test.ts", "test/mutualSocialRuntime.test.ts"]

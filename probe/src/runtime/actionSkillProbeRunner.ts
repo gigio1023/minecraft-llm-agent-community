@@ -682,6 +682,14 @@ function hasDeliveredSpeechEvidence(step: ProbeTranscriptStep, predicate: (text:
     textResultMatches(step, predicate);
 }
 
+function hasBoundedWaitResult(step: ProbeTranscriptStep) {
+  const result = asRecord(step.result);
+  return step.tool === "wait" &&
+    result.status === "waited" &&
+    (numberField(result, "ticks") ?? 0) > 0 &&
+    (numberField(result, "durationMs") ?? -1) >= 0;
+}
+
 function isRequestText(text: string) {
   return /request|need|spare|share|give|bring/i.test(text) &&
     /\b(oak\s+log|log|plank|stick|crafting\s+table|chest|food|coal|cobblestone)\b/i.test(text);
@@ -710,7 +718,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     minimumPassingTranscript: {
       steps: [
         { tool: "observe", result: { status: "ok", observation: { status: "ok", visibleActors: [], memory: [] } } },
-        { tool: "wait", result: { status: "waited", ticks: 20 } },
+        { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } },
         { tool: "remember", result: { status: "remembered", note: "observed" } }
       ]
     },
@@ -727,8 +735,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       }
 
       const waitIndex = steps.findIndex((step, index) => {
-        const result = asRecord(step.result);
-        return index > observeIndex && step.tool === "wait" && result.status === "waited";
+        return index > observeIndex && hasBoundedWaitResult(step);
       });
 
       if (waitIndex < 0) {
@@ -970,7 +977,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
     minimumPassingTranscript: {
       steps: [
         { tool: "say", args: { target: "npc_target", text: "are you free to talk?" }, result: { status: "busy", actorId: "npc_b", targetId: "npc_target", reason: "npc_target is busy" } },
-        { tool: "wait", result: { status: "waited" } },
+        { tool: "wait", result: { status: "waited", ticks: 20, durationMs: 1000 } },
         { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered", actorId: "npc_b", targetId: "npc_target", text: "checking again when you are ready" } }
       ]
     },
@@ -985,7 +992,7 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         return "waitForBusyCrafter did not observe a busy response";
       }
       const waitIndex = steps.findIndex(
-        (step, index) => index > busyIndex && step.tool === "wait" && asRecord(step.result).status === "waited"
+        (step, index) => index > busyIndex && hasBoundedWaitResult(step)
       );
       if (waitIndex < 0) {
         return "waitForBusyCrafter did not wait after busy response";

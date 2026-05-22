@@ -197,6 +197,8 @@ Implemented surfaces:
   reached or dug;
 - `collect_logs` requires log inventory increase, not just block removal;
 - `move_to` bounds `pathfinder.goto(...)` with timeout and `pathfinder.stop()`;
+- `wait` reports positive tick and bounded duration evidence for ordered
+  action-skill postconditions;
 - `craft_item` resolves real registry/recipe data and awaits `bot.craft(...)`;
 - `craft_item` returns blocked, not crafted, when available inventory evidence
   shows no target item increase after `bot.craft(...)`;
@@ -421,8 +423,8 @@ Remaining harness work:
 Current postcondition rules:
 
 - `runtimeObserveAndRemember` requires an observe result with an observation
-  snapshot, a completed bounded wait after that observation, and then a
-  non-empty memory note;
+  snapshot, a completed bounded wait with positive tick/duration evidence after
+  that observation, and then a non-empty memory note;
 - `collectLogs` requires passed runtime verifier progress with supported
   log-family inventory at the target count;
 - `craftPlanksAndSticks` requires passed runtime verifier progress with both
@@ -444,7 +446,8 @@ Current postcondition rules:
   chat result evidence and a resource memory note persisted after that
   announcement;
 - `waitForBusyCrafter` requires busy response before bounded wait before
-  delivered targeted follow-up chat result evidence.
+  delivered targeted follow-up chat result evidence; the wait result must carry
+  positive ticks and duration evidence.
 
 Checked-in protection:
 

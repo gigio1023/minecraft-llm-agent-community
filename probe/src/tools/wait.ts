@@ -1,6 +1,7 @@
 export type WaitResult = {
   status: "waited";
   ticks: number;
+  durationMs: number;
 };
 
 type WaitArgs = {
@@ -20,10 +21,12 @@ function delay(ms: number) {
  * still come from a later observation.
  */
 export async function wait({ ticks }: WaitArgs): Promise<WaitResult> {
-  await delay(ticks * 50);
+  const durationMs = ticks * 50;
+  await delay(durationMs);
 
   return {
     status: "waited",
-    ticks
+    ticks,
+    durationMs
   };
 }

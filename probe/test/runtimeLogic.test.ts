@@ -1030,7 +1030,7 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(actor.chatLog, []);
   assert.deepEqual(target.chatLog, []);
 
-  assert.deepEqual(await wait({ ticks: 0 }), { status: "waited", ticks: 0 });
+  assert.deepEqual(await wait({ ticks: 0 }), { status: "waited", ticks: 0, durationMs: 0 });
 
   assert.deepEqual(await say({ actor, target, dialogueState, text: "hi npc_b" }), {
     status: "delivered",
