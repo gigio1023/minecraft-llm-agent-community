@@ -10,6 +10,7 @@ import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 import {
   actionSkillPostconditionSpecs,
   actionSkillProbeRequiresManagedFixture,
+  buildProbePreconditionRconCommands,
   getActionSkillProbePreconditionMode,
   hasDeterministicActionSkillProbeDriver,
   runLiveActionSkillProbe,
@@ -47,6 +48,7 @@ type ProbeMatrixCase = ActionSkillProbeConfig & {
   primitiveIds: string[];
   contractEvidence: string[];
   postconditionEvidence: string[];
+  fixtureCommands: string[][];
 };
 
 export type ProbeMatrixVerdict = "passed" | "failed" | "environment_blocked" | "incomplete";
@@ -675,6 +677,7 @@ export function buildProbeMatrixCases(input: {
   const implementedSkills = listImplementedSeedActionSkills();
   const selectedIds = input.skillIds ?? implementedSkills.map((skill) => skill.id);
   const byId = new Map(implementedSkills.map((skill) => [skill.id, skill]));
+  const config = loadProbeConfig();
 
   return selectedIds.map((rawSkillId) => {
     assertSeedActionSkillId(rawSkillId);
@@ -713,6 +716,11 @@ export function buildProbeMatrixCases(input: {
       primitiveIds: [...skill.primitiveIds],
       contractEvidence: [...contract.evidence],
       postconditionEvidence: [...postconditionSpec.evidenceSummary],
+      fixtureCommands: buildProbePreconditionRconCommands({
+        actorUsername: input.actorId,
+        skillId: skill.id,
+        spawnConfig: config.spawn
+      }),
       readinessItems: buildProbeMatrixReadinessItems({
         skillId: skill.id,
         roleId,
@@ -874,6 +882,13 @@ function printDryRun(cases: ProbeMatrixCase[]) {
     console.log(`  readiness:     ${testCase.readinessItems.map((item) => item.id).join(", ")}`);
     console.log(`  contract:      ${testCase.contractEvidence.join("; ")}`);
     console.log(`  postcondition: ${testCase.postconditionEvidence.join("; ")}`);
+    console.log(
+      `  fixture cmds:  ${
+        testCase.fixtureCommands.length > 0
+          ? testCase.fixtureCommands.map((command) => command.join(" ")).join(" | ")
+          : "(none)"
+      }`
+    );
   }
 }
 

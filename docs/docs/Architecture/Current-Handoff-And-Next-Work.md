@@ -390,7 +390,9 @@ world. It prints each implemented action skill with:
   verification contract, postcondition spec, deterministic probe driver, and
   fixture/precondition mode;
 - verification contract evidence;
-- postcondition evidence.
+- postcondition evidence;
+- planned RCON fixture commands, or `(none)` when the probe must not mutate the
+  world before execution.
 
 Implemented action skills are now required to have explicit deterministic live
 probe driver coverage and a probe fixture/precondition mode. A newly implemented
@@ -413,9 +415,10 @@ observed. The same report includes `skillStatuses`, one row per selected action
 skill, so dashboards and reviewer sidecars can render the whole matrix without
 reconstructing it from `results` and `evidenceGaps`. Each `cases[]` row also
 includes `readinessItems`, the explicit verification-preparation checklist for
-the selected action skill. Each status row includes a `freshEvidenceCommand`,
-the exact single-skill probe command to run for fresh live Minecraft proof. Each
-status row also includes `evidenceScope`:
+the selected action skill, and `fixtureCommands`, the exact RCON setup command
+plan for Minecraft preconditions. Each status row includes a
+`freshEvidenceCommand`, the exact single-skill probe command to run for fresh
+live Minecraft proof. Each status row also includes `evidenceScope`:
 `current_run`, `historical_transcript`, `missing`, or `environment_blocked`, so
 reviewers can distinguish historical transcript proof from fresh live proof.
 `summary.statusCounts` aggregates those rows by

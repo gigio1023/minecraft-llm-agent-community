@@ -38,6 +38,11 @@ test("action skill probe matrix builds one case for every implemented seed actio
   assert.ok(cases.every((entry) => entry.primitiveIds.length > 0));
   assert.ok(cases.every((entry) => entry.contractEvidence.length > 0));
   assert.ok(cases.every((entry) => entry.postconditionEvidence.length > 0));
+  assert.equal(
+    cases.find((entry) => entry.skillId === "runtimeObserveAndRemember")?.fixtureCommands.length,
+    0
+  );
+  assert.ok((cases.find((entry) => entry.skillId === "collectLogs")?.fixtureCommands.length ?? 0) > 0);
 });
 
 test("action skill probe matrix can narrow to selected implemented skills", () => {
@@ -210,6 +215,7 @@ test("action skill probe matrix builds a reusable JSON report shape", () => {
   assert.deepEqual(report.evidenceGaps[0].requiredEvidence.postcondition, report.cases[0].postconditionEvidence);
   assert.equal(report.cases[0].skillId, "collectLogs");
   assert.equal(report.cases[0].probePreconditionMode, "placed_logs");
+  assert.ok(report.cases[0].fixtureCommands.some((command) => command.at(-1) === "oak_log"));
   assert.deepEqual(report.cases[0].readinessItems.map((item) => item.id), [
     "implemented_seed_action_skill",
     "role_selected",

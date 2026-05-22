@@ -265,11 +265,11 @@ actor workspace or probe world.
 Use `--dry-run` when the Minecraft runtime is unavailable or before a live
 matrix run. It prints the implemented action skill checklist, including role,
 primitive ownership, gameplay preconditions, deterministic probe fixture mode,
-verification contract evidence, and postcondition evidence, without Docker,
-actor workspace initialization, or world mutation. Every implemented action
-skill must have an explicit deterministic probe driver and fixture/precondition
-mode before it can appear in the matrix; a missing branch is a validation error,
-not a fallback terminal memory note.
+verification contract evidence, postcondition evidence, and planned RCON
+fixture commands, without Docker, actor workspace initialization, or world
+mutation. Every implemented action skill must have an explicit deterministic
+probe driver and fixture/precondition mode before it can appear in the matrix; a
+missing branch is a validation error, not a fallback terminal memory note.
 Use `--audit-existing-evidence` when Docker is unavailable but existing
 transcripts should be re-scored. It scans raw `action_skill_probe_*` evidence
 artifacts, skips canonical transcript projections, re-applies each action
