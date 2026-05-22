@@ -47,10 +47,16 @@ For every action skill, ask:
 - Does pathfinder stop on timeout or abort?
 - Does the tool avoid chasing unrelated dropped items or entities?
 - Does `bot.dig` require a held tool or line of sight?
+- Does the primitive pass the full Mineflayer block object to `bot.dig(...)`
+  rather than a copied `{name, position}` object that drops methods like
+  `digTime()`?
+- Does block breaking stay atomic until `bot.dig(...)` resolves or fails?
 - Does crafting require a crafting table object, and is one available?
 - Does container interaction use an actual opened chest/furnace or only a ledger?
 - Does success use `bot.inventory.items()`, `blockAt`, chest contents, or
   position distance rather than status text?
+- If a block was removed but inventory did not change yet, does the primitive
+  move to the drop or recently dug block positions before declaring failure?
 - Does the role contract allow every primitive used by the action skill?
 
 ## Action Skill Status
@@ -140,3 +146,8 @@ Implementation corrections:
 - Do not use one generic primitive name for different Minecraft mechanics.
   Mining logs, mining stone, opening containers, crafting at a table, and
   smelting are different runtime contracts.
+- Live fixture setup is part of the action-skill contract. Prefer
+  actor-relative fixtures for block work so the test does not depend on a stale
+  absolute spawn Y or on chunks from previous failed runs.
+- `canDigBlock` can be a useful hint, but live proof comes from `bot.dig(...)`
+  resolving, `blockAt` changing, and inventory/container evidence changing.

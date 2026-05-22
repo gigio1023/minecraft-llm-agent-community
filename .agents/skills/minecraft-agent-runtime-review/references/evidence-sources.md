@@ -54,6 +54,26 @@ jq '{final:.final.status, why:.final.why, perActor:.final.per_actor_final}' \
   data/evidence/<run>.json
 ```
 
+Inspect the current implemented action-skill matrix:
+
+```bash
+jq '{verdict, summary, gaps:.evidenceGaps, results:[.results[] | {skillId,status,transcriptPath,errorMessage}]}' \
+  tmp/action-skill-live-matrix-current-mine-cobblestone.json
+```
+
+Inspect recent actor-scoped tool attempts after a matrix failure:
+
+```bash
+for f in $(ls -t data/actors/<actor_id>/evidence/tool-attempt-turn-*.json | head -8); do
+  printf '\n---%s\n' "$f"
+  jq '{created_at, result:.tool_attempt.result, before_inventory:.data.before.inventory, after_inventory:.data.after.inventory, verification:.data.verification, pre_position:.pre_position, post_position:.post_position}' "$f"
+done
+```
+
+Use the matrix report as the broad gate and tool-attempt artifacts as the
+mechanism trace. A single-skill pass is useful, but it does not replace a full
+current-run matrix when the goal is "all implemented action skills."
+
 ## Langfuse
 
 Only review Langfuse when the run used a provider-backed path and a trace/session

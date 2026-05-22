@@ -6,7 +6,8 @@ description: >
   diffs, then infer concrete implementation flaws and next fixes. Use for
   prompts like "agent 행동 리뷰해줘", "실행 결과에서 인사이트 뽑아줘",
   "나무 캐는 시늉만 해", "NPC가 멀리 가", "review this probe artifact",
-  "why did the NPC stall?", "Langfuse trace까지 보고 구현 개선해줘", or after
+  "why did the NPC stall?", "matrix 12/12 깨졌어", "collectLogs 3/4에서 멈춰",
+  "mine_block 실패 봐줘", "Langfuse trace까지 보고 구현 개선해줘", or after
   running probe:v0/probe:v1/live NPC smoke tests in this repo.
 ---
 
@@ -54,6 +55,11 @@ looked wrong.
 Read `references/minecraft-skill-audit.md` when reviewing seed action skills,
 Mineflayer primitives, Minecraft progression, or advertised action-skill
 capabilities.
+
+Read `references/live-matrix-lessons.md` when a deterministic action-skill
+matrix fails, a single-skill probe passes but the full matrix fails, block
+mining/chopping stalls, storage observation breaks unrelated probes, or the run
+depends on generated fixture state.
 
 Read `references/skill-creation-review.md` when reviewing proposals to create,
 promote, supersede, or retire an action skill from runtime evidence.
@@ -121,6 +127,12 @@ Prefer concrete classifications:
   pickup without enough local guards, cancellation, or drift checks.
 - `target-selection-gap`: the tool chose a target that was too high, too far,
   stale, unreachable, or unrelated to the current task.
+- `fixture-gap`: live fixture setup creates stale, high, unloaded, or
+  cross-run-contaminated world state.
+- `pickup-race`: the block was removed but the dropped item entered inventory
+  later than the primitive or verifier expected.
+- `current-run-proof-gap`: a historical transcript or single-skill pass exists,
+  but the full implemented action-skill matrix does not pass in the current run.
 
 ### 4. Turn Review Into Code Work
 
