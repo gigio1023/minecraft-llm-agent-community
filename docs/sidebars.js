@@ -75,9 +75,6 @@ const sidebars = {
             'Research/2026-05-19-opencode-message-memory-research',
             'Research/2026-05-19-headless-probe-implementation-review',
             'Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills',
-            'Research/2026-05-23-hf-paper-sweep-voyager-successors',
-            'Research/2026-05-23-agent-memory-system-literature-and-plan',
-            'Research/2026-05-23-minecraft-memory-current-llm-research',
           ],
         },
         {

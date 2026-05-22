@@ -12,10 +12,10 @@ research without confusing archived plans for the active implementation path.
 | `MINECRAFT_AGENT_LOOP_MIGRATION` | Current bounded-runtime rebuild direction and non-negotiable scope | `SPEC.md`, `Architecture/Runtime-Loop-And-Verification.md`, `AGENTS.md` |
 | `HEADLESS_MINEFLAYER_PROBE` | Headless Mineflayer runtime on a local server; use `bun run --cwd probe server:ready` for a user-joinable Docker endpoint | `Setup/Headless-Server.md`, `Architecture/Minimal-Probe.md`, `Architecture/Runtime-Loop-And-Verification.md` |
 | `MINECRAFT_GAMEPLAY_MODEL` | Real boring gameplay competence before larger social goals | `Architecture/Runtime-Loop-And-Verification.md`, `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md` |
-| `HF_PAPER_SWEEP_VOYAGER_SUCCESSORS` | Hugging Face paper sweep over Voyager successors, Minecraft skill libraries, objective curricula, reviewer loops, and social simulation fit | `Research/2026-05-23-hf-paper-sweep-voyager-successors.md`, `Architecture/Direct-Generated-Action-Skills.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
-| `AGENT_MEMORY_SYSTEM_LITERATURE_PLAN` | Literature-backed memory system plan for dense Mineflayer substrate with freer LLM autonomy | `Research/2026-05-23-agent-memory-system-literature-and-plan.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Direct-Generated-Action-Skills.md` |
-| `MINECRAFT_MEMORY_CURRENT_LLM_RESEARCH` | 2026-focused Minecraft and agent-memory research refresh read through the lens of current LLM capability | `Research/2026-05-23-minecraft-memory-current-llm-research.md`, `Research/2026-05-23-agent-memory-system-literature-and-plan.md`, `Architecture/Direct-Generated-Action-Skills.md` |
-| `TYPED_ACTOR_MEMORY` | Actor-owned Minecraft memory schema, direct objective capture, symbolic retrieval, and provider context injection | `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md`, `Research/2026-05-23-minecraft-memory-current-llm-research.md` |
+| `HF_PAPER_SWEEP_VOYAGER_SUCCESSORS` | Hugging Face paper sweep over Voyager successors, Minecraft skill libraries, objective curricula, reviewer loops, and social simulation fit | `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`, `Architecture/Direct-Generated-Action-Skills.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
+| `AGENT_MEMORY_SYSTEM_LITERATURE_PLAN` | Literature-backed memory system plan for dense Mineflayer substrate with freer LLM autonomy | `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Direct-Generated-Action-Skills.md` |
+| `MINECRAFT_MEMORY_CURRENT_LLM_RESEARCH` | 2026-focused Minecraft and agent-memory research refresh read through the lens of current LLM capability | `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`, `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`, `Architecture/Direct-Generated-Action-Skills.md` |
+| `TYPED_ACTOR_MEMORY` | Actor-owned Minecraft memory schema, direct objective capture, symbolic retrieval, and provider context injection | `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md`, `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md` |
 | `SKILL_VILLAGE_FAILURE` | Why the prior village-style direction failed | `Research/2026-05-19-skill-village-failure-report.md` |
 | `NO_VOYAGER_EVAL_LOOP` | Do not return to loose, unverifiable eval-based gameplay execution | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `AGENTS.md` |
 | `NO_MANUAL_CLIENT_GATE` | No manual GUI client should be required for the first proof | `Setup/Headless-Server.md` |
@@ -78,9 +78,9 @@ For any onboarding developer or agent, read in this order:
 21. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
 22. `Research/2026-05-19-skill-village-failure-report.md`
 23. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
-24. `Research/2026-05-23-hf-paper-sweep-voyager-successors.md`
-25. `Research/2026-05-23-agent-memory-system-literature-and-plan.md`
-26. `Research/2026-05-23-minecraft-memory-current-llm-research.md`
+24. `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`
+25. `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`
+26. `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`
 
 ## Active vs Historical Docs
 
@@ -110,6 +110,7 @@ Treat these as active, project-defining documents:
 Treat these as supporting research or historical context:
 
 - everything under `Research/`
+- offline retrieval-only research under `docs/research-archive/`
 - older probe plans under `Plans/` unless they are explicitly marked active
 
 If a plan describes a path that is no longer the active implementation target,
