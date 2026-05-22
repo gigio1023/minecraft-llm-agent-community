@@ -437,6 +437,10 @@ export function buildProbeMatrixNextActions(
 }
 
 function buildEnvironmentRestoreCommand(reason: string) {
+  if (reason.includes("MC_PORT manual server cannot prepare managed RCON fixtures")) {
+    return `unset MC_PORT && ${dockerPreflightCommand}`;
+  }
+
   const manualPort = reason.match(/MC_PORT=(\d+)/)?.[1];
   if (manualPort) {
     return `lsof -nP -iTCP:${manualPort} -sTCP:LISTEN`;

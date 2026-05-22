@@ -238,8 +238,9 @@ first few single-skill probe commands needed to collect fresh live evidence.
 It also prints `matrix_next_actions`, a reviewer-friendly list of P0 follow-up
 actions that classifies each gap as environment restoration, fresh live proof,
 or failed-probe repair. Environment restoration is de-duplicated into one
-Docker preflight command instead of repeating every blocked action-skill probe
-command.
+actionable command instead of repeating every blocked action-skill probe
+command; fixture-backed `MC_PORT` blockers tell the reviewer to unset
+`MC_PORT` before checking the managed Docker server.
 It also runs a Docker preflight before actor workspace initialization or
 Minecraft startup unless `MC_PORT` points at an already-running manual
 Minecraft server that passes a Minecraft protocol ping. When Docker is

@@ -153,9 +153,10 @@ Per-action-skill probes add a second gate after transcript write:
   had run.
 - matrix CLI output prints `matrix_next_actions`, so a reviewer can see whether
   the next step is restoring the environment, running fresh live proof, or
-  repairing a failed probe. Environment restoration is one Docker preflight
-  action, while per-skill fresh probe commands stay on the skill status and gap
-  rows.
+  repairing a failed probe. Environment restoration is one actionable command,
+  while per-skill fresh probe commands stay on the skill status and gap rows.
+  Fixture-backed `MC_PORT` blockers explicitly unset `MC_PORT` before checking
+  the managed Docker server.
 - matrix reports also include `evidenceGaps`, which repeats the required
   contract and postcondition evidence for every unproven action skill and the
   same fresh-evidence command.

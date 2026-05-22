@@ -452,6 +452,26 @@ test("action skill probe matrix next action uses manual port diagnostics for MC_
   assert.equal(action.command, "lsof -nP -iTCP:32771 -sTCP:LISTEN");
 });
 
+test("action skill probe matrix next action unsets MC_PORT for managed fixture blockers", () => {
+  const [testCase] = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs"],
+    maxActions: 8
+  });
+  const [blockedGap] = buildProbeMatrixEvidenceGaps({
+    cases: [testCase],
+    preflight: {
+      status: "environment_blocked",
+      reason: "MC_PORT manual server cannot prepare managed RCON fixtures for: collectLogs"
+    }
+  });
+
+  const [action] = buildProbeMatrixNextActions([blockedGap]);
+
+  assert.equal(action.kind, "restore_environment");
+  assert.equal(action.command, "unset MC_PORT && docker info --format '{{.ServerVersion}}'");
+});
+
 test("action skill probe matrix skill statuses provide one row per case", () => {
   const cases = buildProbeMatrixCases({
     actorId: "npc_b",
