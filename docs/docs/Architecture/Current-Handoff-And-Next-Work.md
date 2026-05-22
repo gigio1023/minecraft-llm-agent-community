@@ -497,6 +497,8 @@ Checked-in protection:
   mode coverage before the matrix accepts them;
 - probe fixture setup has a pure RCON command planner, so craft, storage, and
   social preconditions can be checked without starting Minecraft;
+- `none`-mode probes emit no fixture RCON commands, preventing setup from
+  mutating the world for observation-only probes;
 - the same test file includes a minimum accepted evidence payload for every
   implemented action skill through the runtime-owned
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill

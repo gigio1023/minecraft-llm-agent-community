@@ -217,6 +217,17 @@ test("actionSkillProbeRunner identifies action skills that require managed RCON 
   assert.equal(actionSkillProbeRequiresManagedFixture("inspectSharedChest"), true);
 });
 
+test("actionSkillProbeRunner does not mutate fixtures for none-mode probes", () => {
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "runtimeObserveAndRemember",
+      spawnConfig: { x: 10, y: 64, z: -5 }
+    }),
+    []
+  );
+});
+
 test("actionSkillProbeRunner plans deterministic craft precondition fixtures", () => {
   assert.deepEqual(
     buildProbePreconditionRconCommands({

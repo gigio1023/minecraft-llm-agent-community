@@ -323,6 +323,10 @@ export function buildProbePreconditionRconCommands(input: {
     throw new Error(`Missing action skill probe precondition mode for implemented skill: ${input.skillId}`);
   }
 
+  if (preconditionMode === "none") {
+    return [];
+  }
+
   const chest = fixturePosition(input.spawnConfig, probeFixtureOffsets.sharedChest);
   const commands: string[][] = [
     ["setblock", String(chest.x), String(chest.y), String(chest.z), "air"]

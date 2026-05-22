@@ -195,7 +195,8 @@ mode is `none`; fixture-backed probes require the managed server because their
 RCON setup is part of the evidence contract.
 Fixture-backed probes derive their setup from a pure RCON command planner, so
 crafting, storage, and social preconditions can be reviewed and tested without
-starting Minecraft.
+starting Minecraft. `none`-mode probes do not emit setup commands; they must not
+mutate the probe world merely because the managed server is available.
 When Docker is unavailable and no live manual server override exists, it reports
 `environment_blocked` with the Docker preflight command and exits without
 mutating actor workspace state.
