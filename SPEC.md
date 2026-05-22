@@ -200,6 +200,13 @@ cd probe
 bun run probe:skills -- --dry-run
 ```
 
+Current existing-evidence audit command:
+
+```bash
+cd probe
+bun run probe:skills -- --audit-existing-evidence
+```
+
 Optional matrix report artifact:
 
 ```bash
@@ -221,6 +228,11 @@ matrix run. It prints the implemented action skill checklist, including role,
 primitive ownership, preconditions, verification contract evidence, and
 postcondition evidence, without Docker, actor workspace initialization, or world
 mutation.
+Use `--audit-existing-evidence` when Docker is unavailable but existing
+transcripts should be re-scored. It scans raw `action_skill_probe_*` evidence
+artifacts, skips canonical transcript projections, re-applies each action
+skill's postcondition rule, and reports which skills already have historical
+live proof versus which still need fresh runtime evidence.
 Use `--report <path>` to persist the same checklist or live matrix result as a
 JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
 includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or
@@ -253,6 +265,10 @@ Current live `collectLogs` proof:
 - artifact: `data/evidence/action_skill_probe_collectLogs-1779385755355.json`;
 - result: inventory increased from `0` to `4` logs and verifier passed
   `collect_4_logs reached 4/4 relevant inventory items`.
+- existing-evidence audit:
+  `bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-existing-evidence-audit.json`
+  currently re-scores the same artifact as passed and reports `1/10` implemented
+  action skills with historical live proof.
 
 Current live verification blocker:
 

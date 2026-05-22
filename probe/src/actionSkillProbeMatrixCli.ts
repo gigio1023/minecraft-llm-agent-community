@@ -3,7 +3,7 @@ import { listImplementedSeedActionSkills } from "./gameplay/seedSkills/registry.
 import { getActionSkillVerificationContract } from "./gameplay/seedSkills/verificationContracts.js";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RoleId } from "./npc/roles/contracts.js";
 import { loadProbeConfig } from "./config.js";
@@ -11,6 +11,7 @@ import { initializeActorWorkspaces } from "./runtime/actorWorkspace.js";
 import {
   actionSkillPostconditionSpecs,
   runLiveActionSkillProbe,
+  validateProbePostcondition,
   validateSkillProbeConfig,
   type ActionSkillProbeConfig,
   type ActionSkillProbeResult
@@ -24,6 +25,8 @@ type MatrixCliOptions = {
   initActorWorkspace?: boolean;
   continueOnFailure?: boolean;
   dryRun?: boolean;
+  auditExistingEvidence?: boolean;
+  evidenceDir?: string;
   reportPath?: string;
 };
 
@@ -50,7 +53,7 @@ export type ProbeMatrixEvidenceGap = {
 
 export type ProbeMatrixReport = {
   schema: "action-skill-probe-matrix-report/v1";
-  mode: "dry_run" | "live";
+  mode: "dry_run" | "live" | "evidence_audit";
   createdAt: string;
   actorId: string;
   maxActions: number;
@@ -141,6 +144,94 @@ export function buildProbeMatrixEvidenceGaps(input: {
   });
 }
 
+type ExistingEvidencePayload = {
+  metadata?: {
+    action_skill_probe?: {
+      actor_id?: unknown;
+      skill_id?: unknown;
+    };
+  };
+  steps?: unknown;
+  final?: {
+    why?: unknown;
+  };
+};
+
+function readTimestampFromEvidenceFile(name: string) {
+  const match = name.match(/-(\d+)\.json$/);
+  return match ? Number(match[1]) : 0;
+}
+
+async function readExistingEvidencePayload(filePath: string): Promise<ExistingEvidencePayload | null> {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8")) as ExistingEvidencePayload;
+  } catch {
+    return null;
+  }
+}
+
+export async function auditExistingActionSkillEvidence(input: {
+  evidenceDir: string;
+  cases: ProbeMatrixCase[];
+}): Promise<ActionSkillProbeResult[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(input.evidenceDir);
+  } catch {
+    return [];
+  }
+
+  const caseBySkill = new Map(input.cases.map((testCase) => [testCase.skillId, testCase]));
+  const candidates: Array<ActionSkillProbeResult & { timestamp: number }> = [];
+
+  for (const entry of entries) {
+    if (!entry.startsWith("action_skill_probe_") || entry.includes("-canonical-") || !entry.endsWith(".json")) {
+      continue;
+    }
+
+    const filePath = path.join(input.evidenceDir, entry);
+    const payload = await readExistingEvidencePayload(filePath);
+    const skillId = payload?.metadata?.action_skill_probe?.skill_id;
+    if (typeof skillId !== "string" || !caseBySkill.has(skillId as SeedActionSkillId) || !Array.isArray(payload?.steps)) {
+      continue;
+    }
+
+    const testCase = caseBySkill.get(skillId as SeedActionSkillId);
+    if (!testCase) {
+      continue;
+    }
+
+    const postconditionFailure = await validateProbePostcondition(testCase.skillId, filePath);
+    candidates.push({
+      status: postconditionFailure ? "failed" : "passed",
+      skillId: testCase.skillId,
+      actorId:
+        typeof payload.metadata?.action_skill_probe?.actor_id === "string"
+          ? payload.metadata.action_skill_probe.actor_id
+          : testCase.actorId,
+      contract: getActionSkillVerificationContract(testCase.skillId),
+      allowedPrimitives: testCase.primitiveIds as ActionSkillProbeResult["allowedPrimitives"],
+      transcriptPath: filePath,
+      finalWhy: postconditionFailure ?? (typeof payload.final?.why === "string" ? payload.final.why : "existing transcript satisfies postcondition"),
+      timestamp: readTimestampFromEvidenceFile(entry)
+    });
+  }
+
+  const results: ActionSkillProbeResult[] = [];
+  for (const testCase of input.cases) {
+    const skillCandidates = candidates
+      .filter((candidate) => candidate.skillId === testCase.skillId)
+      .sort((left, right) => right.timestamp - left.timestamp);
+    const best = skillCandidates.find((candidate) => candidate.status === "passed") ?? skillCandidates[0];
+    if (best) {
+      const { timestamp: _timestamp, ...result } = best;
+      results.push(result);
+    }
+  }
+
+  return results;
+}
+
 function parseArgs(argv: readonly string[]): MatrixCliOptions {
   const options: MatrixCliOptions = {};
 
@@ -179,6 +270,12 @@ function parseArgs(argv: readonly string[]): MatrixCliOptions {
       case "--dry-run":
         options.dryRun = true;
         break;
+      case "--audit-existing-evidence":
+        options.auditExistingEvidence = true;
+        break;
+      case "--evidence-dir":
+        options.evidenceDir = next();
+        break;
       case "--report":
         options.reportPath = next();
         break;
@@ -207,6 +304,8 @@ function printUsage() {
     "  --init-actor-workspace baseline   Initialize actor workspace before each run",
     "  --continue-on-failure     Continue after failed/error probes",
     "  --dry-run                 Print action skill verification checklist without Docker",
+    "  --audit-existing-evidence Audit existing action skill transcripts without Docker",
+    "  --evidence-dir <path>     Evidence directory for --audit-existing-evidence",
     "  --report <path>           Write a JSON matrix report artifact",
     "  --help                    Show this help"
   ].join("\n"));
@@ -481,6 +580,33 @@ async function main() {
       printEvidenceGapSummary(report.evidenceGaps);
       if (options.reportPath) {
         await writeMatrixReport(options.reportPath, report);
+      }
+      return;
+    }
+
+    if (options.auditExistingEvidence) {
+      const evidenceDir = options.evidenceDir ?? loadProbeConfig().evidenceDir;
+      const auditedResults = await auditExistingActionSkillEvidence({ evidenceDir, cases });
+      const report = buildProbeMatrixReport({
+        mode: "evidence_audit",
+        actorId,
+        maxActions: options.maxActions ?? 8,
+        cases,
+        results: auditedResults
+      });
+
+      console.log(`matrix_evidence_audit dir=${evidenceDir}`);
+      for (const result of auditedResults) {
+        console.log(`─── ${result.skillId} ───`);
+        printResult(result);
+      }
+      console.log(`matrix_summary verdict=${report.verdict} passed=${report.summary.passed} failed=${report.summary.failed} error=${report.summary.error} total=${report.summary.completed}/${report.summary.planned}`);
+      printEvidenceGapSummary(report.evidenceGaps);
+      if (options.reportPath) {
+        await writeMatrixReport(options.reportPath, report);
+      }
+      if (report.verdict !== "passed") {
+        process.exitCode = 1;
       }
       return;
     }

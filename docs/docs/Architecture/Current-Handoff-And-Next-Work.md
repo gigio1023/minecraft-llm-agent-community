@@ -323,6 +323,13 @@ cd probe
 bun run probe:skills -- --dry-run
 ```
 
+Existing-evidence audit command:
+
+```bash
+cd probe
+bun run probe:skills -- --audit-existing-evidence
+```
+
 Report artifact command:
 
 ```bash
@@ -348,6 +355,11 @@ world. It prints each implemented action skill with:
 - declared preconditions;
 - verification contract evidence;
 - postcondition evidence.
+
+The existing-evidence audit also avoids Docker and Minecraft startup. It scans
+raw `action_skill_probe_*` transcripts under the evidence directory, skips
+canonical projection files, re-applies runtime-owned postcondition specs, and
+reports which action skills already have historical live proof.
 
 `--report <path>` writes the same matrix checklist or live result as JSON with
 schema `action-skill-probe-matrix-report/v1`. Use this when handing off action
@@ -419,6 +431,24 @@ matrix_summary passed=0 failed=0 error=1 total=0/1
 
 Do not treat this as action skill failure evidence. Re-run the matrix once the
 daemon is available.
+
+Latest existing-evidence audit:
+
+```bash
+cd probe
+bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-existing-evidence-audit.json
+```
+
+Current result:
+
+```text
+matrix_summary verdict=incomplete passed=1 failed=0 error=0 total=1/10
+matrix_evidence_gaps count=9
+```
+
+The passed historical proof is `collectLogs`, backed by
+`data/evidence/action_skill_probe_collectLogs-1779385755355.json`. The remaining
+nine implemented action skills still need live runtime evidence.
 
 ### P0: Live `collect_logs` Validation
 

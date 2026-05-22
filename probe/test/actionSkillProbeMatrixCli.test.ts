@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
+  auditExistingActionSkillEvidence,
   buildProbeMatrixEvidenceGaps,
   buildProbeMatrixReport,
   buildProbeMatrixCases,
@@ -213,4 +217,95 @@ test("action skill probe matrix evidence gaps explain failed and unrun cases", (
   assert.equal(gaps[1].status, "pending_live_evidence");
   assert.ok(gaps[1].requiredEvidence.contract.length > 0);
   assert.ok(gaps[1].requiredEvidence.postcondition.length > 0);
+});
+
+test("action skill probe matrix audits existing transcript evidence without Docker", async () => {
+  const evidenceDir = await mkdtemp(path.join(tmpdir(), "action-skill-matrix-evidence-"));
+  const cases = buildProbeMatrixCases({
+    actorId: "npc_b",
+    skillIds: ["collectLogs", "craftCraftingTable"],
+    maxActions: 8
+  });
+
+  await writeFile(
+    path.join(evidenceDir, "action_skill_probe_collectLogs-100.json"),
+    JSON.stringify({
+      metadata: {
+        action_skill_probe: {
+          actor_id: "npc_b",
+          skill_id: "collectLogs"
+        }
+      },
+      steps: [
+        {
+          tool: "collect_logs",
+          result: {
+            status: "blocked",
+            beforeLogCount: 0,
+            afterLogCount: 0
+          }
+        }
+      ],
+      final: {
+        why: "old failed attempt"
+      }
+    })
+  );
+  await writeFile(
+    path.join(evidenceDir, "action_skill_probe_collectLogs-200.json"),
+    JSON.stringify({
+      metadata: {
+        action_skill_probe: {
+          actor_id: "npc_b",
+          skill_id: "collectLogs"
+        }
+      },
+      steps: [
+        {
+          tool: "collect_logs",
+          result: {
+            status: "collected",
+            beforeLogCount: 0,
+            afterLogCount: 4,
+            inventoryDelta: 4
+          },
+          verification: {
+            status: "passed"
+          }
+        }
+      ],
+      final: {
+        why: "new passed attempt"
+      }
+    })
+  );
+  await writeFile(
+    path.join(evidenceDir, "action_skill_probe_collectLogs-canonical-200.json"),
+    JSON.stringify({
+      final: {
+        why: "canonical payload is not a raw probe transcript"
+      }
+    })
+  );
+
+  const results = await auditExistingActionSkillEvidence({ evidenceDir, cases });
+  const report = buildProbeMatrixReport({
+    mode: "evidence_audit",
+    actorId: "npc_b",
+    maxActions: 8,
+    cases,
+    results,
+    createdAt: "2026-05-22T00:00:00.000Z"
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].status, "passed");
+  assert.equal(results[0].skillId, "collectLogs");
+  assert.match(results[0].transcriptPath ?? "", /action_skill_probe_collectLogs-200\.json/);
+  assert.equal(report.verdict, "incomplete");
+  assert.equal(report.summary.passed, 1);
+  assert.equal(report.summary.completed, 1);
+  assert.equal(report.evidenceGaps.length, 1);
+  assert.equal(report.evidenceGaps[0].skillId, "craftCraftingTable");
+  assert.equal(report.evidenceGaps[0].status, "pending_live_evidence");
 });
