@@ -150,7 +150,8 @@ Required evidence:
 
 - `approachAndRequestItem`: measured arrival within interaction range, including
   before/after distance fields, and delivered request-like chat;
-- `announceResourceDiscovery`: delivered resource-discovery chat;
+- `announceResourceDiscovery`: delivered resource-discovery chat and a
+  resource memory note persisted after that announcement;
 - `handoffItemAtChest`: named positive shared-chest deposit and delivered
   handoff chat with matching handoff text;
 - `waitForBusyCrafter`: busy response, bounded wait, and delivered follow-up

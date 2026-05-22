@@ -435,7 +435,7 @@ Current postcondition rules:
 - `approachAndRequestItem` requires measured arrival distance evidence before
   delivered targeted request-like chat;
 - `announceResourceDiscovery` requires delivered targeted resource-discovery
-  chat;
+  chat and a resource memory note persisted after that announcement;
 - `waitForBusyCrafter` requires busy response before bounded wait before
   delivered targeted follow-up chat.
 

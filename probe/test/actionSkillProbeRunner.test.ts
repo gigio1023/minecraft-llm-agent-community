@@ -555,6 +555,12 @@ test("action skill probe postcondition enforces ordered social evidence", async 
         { tool: "say", args: { target: "npc_target", text: "checking again when you are ready" }, result: { status: "delivered" } }
       ]
     });
+  const prematureResourceMemory = await writeTranscriptPayload({
+      steps: [
+        { tool: "remember", result: { status: "remembered", note: "found oak logs near spawn" } },
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } }
+      ]
+    });
 
   assert.match(
     await validateProbePostcondition("approachAndRequestItem", prematureRequest) ?? "",
@@ -567,6 +573,10 @@ test("action skill probe postcondition enforces ordered social evidence", async 
   assert.match(
     await validateProbePostcondition("waitForBusyCrafter", prematureBusyFollowUp) ?? "",
     /wait after busy response/
+  );
+  assert.match(
+    await validateProbePostcondition("announceResourceDiscovery", prematureResourceMemory) ?? "",
+    /resource memory note after announcing/
   );
 });
 
@@ -654,6 +664,29 @@ test("action skill probe postcondition rejects delivered social chat without a t
   assert.match(
     await validateProbePostcondition("waitForBusyCrafter", untargetedBusy) ?? "",
     /busy response/
+  );
+});
+
+test("action skill probe postcondition requires resource memory after resource announcement", async () => {
+  const announcedWithoutMemory = await writeTranscriptPayload({
+      steps: [
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } }
+      ]
+    });
+  const announcedWithVagueMemory = await writeTranscriptPayload({
+      steps: [
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } },
+        { tool: "remember", result: { status: "remembered", note: "hello there" } }
+      ]
+    });
+
+  assert.match(
+    await validateProbePostcondition("announceResourceDiscovery", announcedWithoutMemory) ?? "",
+    /resource memory note/
+  );
+  assert.match(
+    await validateProbePostcondition("announceResourceDiscovery", announcedWithVagueMemory) ?? "",
+    /resource memory note/
   );
 });
 

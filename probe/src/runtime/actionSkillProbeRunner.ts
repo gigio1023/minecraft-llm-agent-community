@@ -662,6 +662,10 @@ function isResourceAnnouncementText(text: string) {
   return /found|located|discovered|near/i.test(text) && /log|wood|resource|oak/i.test(text);
 }
 
+function isResourceMemoryText(text: string) {
+  return /found|located|discovered|resource|log|wood|oak/i.test(text);
+}
+
 function isHandoffText(text: string) {
   return /left|deposited|placed|shared|chest|handoff/i.test(text);
 }
@@ -877,19 +881,36 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
   },
   announceResourceDiscovery: {
     skillId: "announceResourceDiscovery",
-    evidenceSummary: ["say delivered a resource-discovery announcement"],
+    evidenceSummary: ["say delivered a resource-discovery announcement", "resource note was persisted after announcement"],
     minimumPassingTranscript: {
-      steps: [{ tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } }]
+      steps: [
+        { tool: "say", args: { target: "npc_target", text: "I found oak logs near spawn." }, result: { status: "delivered" } },
+        { tool: "remember", result: { status: "remembered", note: "announceResourceDiscovery delivered resource announcement" } }
+      ]
     },
     validate(steps) {
-      return steps.some((step) =>
-        step.tool === "say" &&
-        asRecord(step.result).status === "delivered" &&
-        hasDirectedTargetArg(step) &&
-        textArgMatches(step, isResourceAnnouncementText)
-      )
+      const announcementIndex = steps.findIndex((step) =>
+          step.tool === "say" &&
+          asRecord(step.result).status === "delivered" &&
+          hasDirectedTargetArg(step) &&
+          textArgMatches(step, isResourceAnnouncementText)
+      );
+
+      if (announcementIndex < 0) {
+        return "announceResourceDiscovery did not deliver a resource-discovery message";
+      }
+
+      return steps
+        .slice(announcementIndex + 1)
+        .some((step) => {
+          const result = asRecord(step.result);
+          return step.tool === "remember" &&
+            result.status === "remembered" &&
+            typeof result.note === "string" &&
+            isResourceMemoryText(result.note);
+        })
         ? null
-        : "announceResourceDiscovery did not deliver a resource-discovery message";
+        : "announceResourceDiscovery did not persist a resource memory note after announcing";
     }
   },
   handoffItemAtChest: {
