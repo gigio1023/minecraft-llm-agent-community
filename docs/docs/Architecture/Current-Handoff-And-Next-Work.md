@@ -446,13 +446,14 @@ terminal/postcondition diagnosis fields when available:
 `postconditionFailure`, and `failureKind`. Use these fields for dashboards or
 reviewer prompts instead of parsing the display `reason`.
 
-Remaining harness work:
+Current harness status:
 
-- stream explicit probe events into the dashboard instead of relying only on
-  artifact polling;
-- run the new craft/storage/social probe matrix after Docker/OrbStack is
-  available locally;
-- add a small live matrix runner only after the single-skill command is stable.
+- the single-skill live harness is stable enough for current implemented action
+  skills;
+- the live matrix runner is implemented and has produced fresh current-run proof
+  for every implemented seed action skill;
+- dashboard runtime event streaming is implemented as best-effort observer
+  telemetry and remains intentionally outside the gameplay success path.
 
 Current postcondition rules:
 
@@ -507,53 +508,78 @@ Checked-in protection:
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill
   without a postcondition rule becomes visible in tests.
 
-Latest local limitation:
+Latest live matrix:
 
-On 2026-05-22, the craft live probe was attempted with:
-
-```bash
-cd probe
-bun run probe:skill -- --actor npc_b --skill craftPlanksAndSticks --max-actions 8 --init-actor-workspace baseline --no-dashboard
-```
-
-It failed before Minecraft startup because Docker/OrbStack was unavailable:
-
-```text
-dial unix /Users/naem1023/.orbstack/run/docker.sock: connect: no such file or directory
-```
-
-The matrix command now reports the same blocker as an environment error:
+After OrbStack/Docker was restored on 2026-05-22, the current implemented
+action-skill matrix passed:
 
 ```bash
 cd probe
-bun run probe:skills -- --skills craftPlanksAndSticks --max-actions 8 --init-actor-workspace baseline
+bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-final.json
 ```
 
 ```text
-matrix_preflight status=environment_blocked
-matrix_summary passed=0 failed=0 error=1 total=0/1
+matrix_summary verdict=passed passed=10 failed=0 error=0 total=10/10
+matrix_status_counts passed=10 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=10 historical_transcript=0 missing=0 environment_blocked=0
+matrix_evidence_gaps count=0
 ```
 
-Do not treat this as action skill failure evidence. Re-run the matrix once the
-daemon is available.
+Fresh current-run transcripts were produced for:
+
+- `runtimeObserveAndRemember`;
+- `collectLogs`;
+- `craftPlanksAndSticks`;
+- `craftCraftingTable`;
+- `inspectSharedChest`;
+- `depositSharedItems`;
+- `approachAndRequestItem`;
+- `announceResourceDiscovery`;
+- `handoffItemAtChest`;
+- `waitForBusyCrafter`.
+
+The generated transcripts and matrix report live under ignored `data/evidence/`
+and `tmp/` paths. Treat the command output as the current durable handoff
+summary, not as committed artifact content.
+
+Latest deterministic 3-NPC smoke:
+
+```bash
+cd probe
+bun run src/cli.ts --provider deterministic --npcs 3 --max-actions 20 --observe-ms 0 --no-dashboard
+```
+
+```text
+transcript: data/evidence/agent_loop_probe_v0-1779431536545.json
+final.status: success
+npc_b: collect_logs afterLogCount=4, inventoryDelta=4
+npc_b: deposit_shared itemName=oak_log, movedCount=1
+```
+
+The managed probe start now clears bot inventories and prepares a tiny baseline
+resource surface near spawn: one shared chest and four low `oak_log` blocks.
+That keeps broader product smoke runs from inheriting stale action-skill
+fixture inventory while still giving the gatherer a real boring task to finish.
 
 Latest existing-evidence audit:
 
 ```bash
 cd probe
-bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-existing-evidence-audit.json
+bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-existing-evidence-current.json
 ```
 
 Current result:
 
 ```text
-matrix_summary verdict=incomplete passed=1 failed=0 error=0 total=1/10
-matrix_evidence_gaps count=9
+matrix_summary verdict=incomplete passed=10 failed=0 error=0 total=10/10
+matrix_status_counts passed=10 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=0 historical_transcript=10 missing=0 environment_blocked=0
+matrix_evidence_gaps count=0
 ```
 
-The passed historical proof is `collectLogs`, backed by
-`data/evidence/action_skill_probe_collectLogs-1779385755355.json`. The remaining
-nine implemented action skills still need live runtime evidence.
+This is intentionally still `incomplete`: existing-evidence audit mode only
+re-scores saved raw transcripts as historical proof. It must not replace a
+fresh live matrix after code changes.
 
 ### P0: Live `collect_logs` Validation
 
@@ -563,19 +589,19 @@ Latest confirmed command:
 
 ```bash
 cd probe
-bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard
+bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 8 --init-actor-workspace baseline --no-dashboard
 ```
 
 Latest confirmed artifact:
 
 ```text
-data/evidence/action_skill_probe_collectLogs-1779385755355.json
+data/evidence/action_skill_probe_collectLogs-1779430617926.json
 ```
 
 Confirmed evidence:
 
 - final status: `success`;
-- final reason: `collect_4_logs completed with runtime inventory evidence`;
+- final reason: `collectLogs completed with runtime verification evidence`;
 - `collect_logs` attempted four `oak_log` blocks in the prepared fixture;
 - inventory increased from `0` to `4`;
 - verifier reason: `collect_4_logs reached 4/4 relevant inventory items`.
@@ -723,14 +749,19 @@ Check:
 
 ## Suggested Next Work Order
 
-1. Run live `collectLogs` probe until it passes repeatably.
-2. Feed failures into actor evidence and reviewer queue.
+1. Keep the 10-action-skill live matrix as the regression gate after action
+   skill, primitive, role, or verifier changes.
+2. Add repeatability checks for the most interruption-sensitive skills,
+   starting with `collectLogs` variants: reachable low log, first candidate
+   unreachable then second reachable, dropped-item pickup after dig, no log
+   nearby, and abort while pathing or digging.
 3. Use dashboard runtime events to inspect each live probe turn while keeping
    the dashboard as an observer, not a control plane.
-4. Re-run craft/storage/social probes once Docker/OrbStack is available.
+4. Feed live failures into actor evidence and reviewer queue.
 5. Add crafting-table primitive.
 6. Add generic `mine_block`.
-7. Only then re-run 3-NPC LLM gameplay.
+7. Only then re-run broader 3-NPC LLM gameplay as a product smoke, not as a
+   substitute for per-action-skill proof.
 
 This keeps the project focused on real action skill competence before scaling
 back to broader NPC behavior.

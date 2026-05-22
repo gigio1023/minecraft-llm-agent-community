@@ -356,28 +356,41 @@ Current harness capabilities:
 - shared-storage probes require positive item movement into the shared chest
   and transcript-visible actor/ledger identity for the storage contribution.
 
-Current live `collectLogs` proof:
+Current live action-skill matrix proof:
 
-- command: `bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline --no-dashboard`;
-- artifact: `data/evidence/action_skill_probe_collectLogs-1779385755355.json`;
-- result: inventory increased from `0` to `4` logs and verifier passed
-  `collect_4_logs reached 4/4 relevant inventory items`.
-- existing-evidence audit:
-  `bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-existing-evidence-audit.json`
-  currently re-scores the same artifact as passed and reports `1/10` implemented
-  action skills with historical live proof.
+- command:
+  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-final.json`;
+- result:
+  `matrix_summary verdict=passed passed=10 failed=0 error=0 total=10/10`;
+- evidence scope:
+  `matrix_scope_counts current_run=10 historical_transcript=0 missing=0 environment_blocked=0`;
+- implemented action skills with fresh live proof:
+  `runtimeObserveAndRemember`, `collectLogs`, `craftPlanksAndSticks`,
+  `craftCraftingTable`, `inspectSharedChest`, `depositSharedItems`,
+  `approachAndRequestItem`, `announceResourceDiscovery`, `handoffItemAtChest`,
+  and `waitForBusyCrafter`.
 
-Current live verification blocker:
+The corresponding transcript artifacts under `data/evidence/` and the JSON
+matrix report under `tmp/` are intentionally ignored runtime evidence. Preserve
+the command and summary in docs, but do not commit those generated artifacts.
 
-- On 2026-05-22, the craft live probe could not start because the local
-  Docker/OrbStack daemon was unavailable:
-  `dial unix /Users/naem1023/.orbstack/run/docker.sock: connect: no such file or directory`.
-- The same blocker appears through the matrix command:
-  `bun run probe:skills -- --skills craftPlanksAndSticks --max-actions 8 --init-actor-workspace baseline`
-  returns `matrix_preflight status=environment_blocked` and
-  `matrix_summary passed=0 failed=0 error=1 total=0/1`.
-- This is external runtime availability, not action skill evidence. Re-run the
-  probe matrix after Docker/OrbStack is running.
+Current deterministic 3-NPC product smoke:
+
+- command:
+  `bun run src/cli.ts --provider deterministic --npcs 3 --max-actions 20 --observe-ms 0 --no-dashboard`;
+- result:
+  `final.status=success`;
+- meaningful gameplay evidence:
+  `npc_b` ran `collect_logs`, reached `afterLogCount=4`, then deposited
+  `oak_log` into the shared chest with `movedCount=1`;
+- artifact:
+  `data/evidence/agent_loop_probe_v0-1779431536545.json`.
+
+Existing-evidence audits are still historical by design. Running
+`bun run probe:skills -- --audit-existing-evidence` after the live matrix
+re-scores the latest saved transcripts as 10 historical passes, but it returns
+top-level `verdict=incomplete` because a historical audit is not a fresh
+current-run proof.
 
 ## 5. Non-Negotiable Rules
 

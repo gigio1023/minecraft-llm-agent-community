@@ -47,8 +47,29 @@ const PLANK_ITEM_NAMES = [
   "cherry_planks"
 ] as const;
 
+const SHARED_DEPOSIT_ITEM_PREFERENCE = [
+  "crafting_table",
+  "oak_log",
+  "birch_log",
+  "spruce_log",
+  "jungle_log",
+  "acacia_log",
+  "dark_oak_log",
+  "mangrove_log",
+  "cherry_log",
+  ...PLANK_ITEM_NAMES
+] as const;
+
 function hasNoToolResult(input: NextInput) {
   return input.lastResult === null;
+}
+
+function readPreferredDepositItem(input: NextInput) {
+  const inventory = input.observation?.inventory ?? [];
+
+  return SHARED_DEPOSIT_ITEM_PREFERENCE.find((itemName) =>
+    inventory.some((item) => item.name === itemName && item.count > 0)
+  ) ?? "crafting_table";
 }
 
 export function createDeterministicProvider() {
@@ -126,7 +147,7 @@ export function createDeterministicProvider() {
           tool: "deposit_shared",
           args: {
             chestId: input.currentTask.success.chestId,
-            itemName: "crafting_table",
+            itemName: readPreferredDepositItem(input),
             count: 1
           }
         };

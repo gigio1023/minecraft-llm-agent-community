@@ -28,7 +28,11 @@ import { replyTo } from "../src/mutual/tools/replyTo.js";
 import type { MutualJsonValue, MutualStepRecord, Proposal, ToolResult } from "../src/mutual/types.js";
 import { runMutualLoop } from "../src/mutual/mutualLoop.js";
 import { toToolResult } from "../src/mutual/tools/wrapper.js";
-import { finalizeRunProbe } from "../src/runProbe.js";
+import {
+  buildManagedProbeBaselineRconCommands,
+  buildManagedSpawnRconPlan,
+  finalizeRunProbe
+} from "../src/runProbe.js";
 import { readManualMinecraftPort } from "../src/server/manualMinecraftPort.js";
 import { runAgentLoop } from "../src/runtime/agentLoop.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
@@ -253,6 +257,31 @@ test("dialogue state exposes busy then available and rejects unsupported tools",
   });
 
   assert.throws(() => validateProposal({ tool: "drop_database", args: {} }), /Unsupported tool/);
+});
+
+test("managed probe spawn plan clears bot inventories after teleport", () => {
+  const plan = buildManagedSpawnRconPlan(["npc_a", "npc_b"], { x: 13.183, y: 73, z: -17.877 });
+
+  assert.deepEqual(plan.worldSpawn, ["setworldspawn", "13", "73", "-18"]);
+  assert.deepEqual(plan.actors.map((actor) => actor.teleport), [
+    ["tp", "npc_a", "13.183", "73", "-17.877"],
+    ["tp", "npc_b", "15.183", "73", "-17.877"]
+  ]);
+  assert.deepEqual(plan.actors.map((actor) => actor.clearInventory), [
+    ["clear", "npc_a"],
+    ["clear", "npc_b"]
+  ]);
+});
+
+test("managed probe baseline prepares logs and shared chest near spawn", () => {
+  assert.deepEqual(buildManagedProbeBaselineRconCommands({ x: 13.183, y: 73, z: -17.877 }), [
+    ["setblock", "14", "73", "-22", "air"],
+    ["setblock", "14", "73", "-22", "chest"],
+    ["setblock", "16", "73", "-21", "oak_log"],
+    ["setblock", "17", "73", "-21", "oak_log"],
+    ["setblock", "18", "73", "-21", "oak_log"],
+    ["setblock", "19", "73", "-21", "oak_log"]
+  ]);
 });
 
 test("buildDialogueContext snapshots persona, observation, transcript, memory, and rules", () => {
@@ -807,6 +836,30 @@ test("deterministic provider follows the planned runtime contract sequence", () 
     {
       tool: "remember",
       args: { note: "collect_4_logs completed with runtime inventory evidence" }
+    }
+  );
+
+  assert.deepEqual(
+    provider.next({
+      observation: { ...observation, inventory: [{ name: "oak_log", count: 4 }] },
+      currentTask: {
+        id: "deposit_shared_materials",
+        reason: "Need to make gathered materials available through shared storage.",
+        blockers: [],
+        preferredActorRoles: ["gatherer"],
+        primitiveIds: ["observe", "inspect_chest", "deposit_shared", "wait"],
+        success: {
+          kind: "shared_chest_has_at_least",
+          chestId: "shared-chest-1",
+          itemNames: ["oak_log"],
+          targetCount: 1
+        }
+      },
+      lastResult: { tool: "collect_logs", ok: true, status: "collected" }
+    }),
+    {
+      tool: "deposit_shared",
+      args: { chestId: "shared-chest-1", itemName: "oak_log", count: 1 }
     }
   );
 });

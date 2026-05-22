@@ -35,7 +35,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
       "log inventory count increases after dig or nearby drop pickup"
     ],
     protectedBy: ["test/collectLogs.test.ts"],
-    liveProbe: "bun run src/cli.ts --npcs 1 --max-actions 20 --observe-ms 120000"
+    liveProbe: "bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 8 --init-actor-workspace baseline --no-dashboard"
   },
   {
     skillId: "craftPlanksAndSticks",

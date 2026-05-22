@@ -58,6 +58,7 @@ type RunProbeOptions = {
 };
 
 type ObserveActor = Parameters<typeof observe>[0]["actor"];
+type SpawnConfig = { x: number; y: number; z: number };
 
 function asObserveActor(bot: import("mineflayer").Bot): ObserveActor {
   return bot as unknown as ObserveActor;
@@ -171,9 +172,65 @@ export function finalizeRunProbe({
   throw new Error("Probe ended unexpectedly");
 }
 
+export function buildManagedSpawnRconPlan(
+  actorUsernames: readonly string[],
+  spawnConfig: SpawnConfig
+) {
+  const { x, y, z } = spawnConfig;
+  const offsets = [
+    [0, 0, 0],
+    [2, 0, 0],
+    [-2, 0, 0],
+    [0, 0, 2],
+    [0, 0, -2]
+  ];
+
+  return {
+    worldSpawn: [
+      "setworldspawn",
+      String(Math.floor(x)),
+      String(Math.floor(y)),
+      String(Math.floor(z))
+    ],
+    actors: actorUsernames.map((username, index) => {
+      const [dx, dy, dz] = offsets[index % offsets.length];
+
+      return {
+        username,
+        teleport: ["tp", username, String(x + dx), String(y + dy), String(z + dz)],
+        clearInventory: ["clear", username]
+      };
+    })
+  };
+}
+
+export function buildManagedProbeBaselineRconCommands(spawnConfig: SpawnConfig) {
+  const baseX = Math.floor(spawnConfig.x);
+  const baseY = Math.floor(spawnConfig.y);
+  const baseZ = Math.floor(spawnConfig.z);
+  const sharedChest = { x: baseX + 1, y: baseY, z: baseZ - 4 };
+  const logBase = { x: baseX + 3, y: baseY, z: baseZ - 3 };
+  const commands: string[][] = [
+    ["setblock", String(sharedChest.x), String(sharedChest.y), String(sharedChest.z), "air"],
+    ["setblock", String(sharedChest.x), String(sharedChest.y), String(sharedChest.z), "chest"]
+  ];
+
+  for (let index = 0; index < 4; index += 1) {
+    commands.push([
+      "setblock",
+      String(logBase.x + index),
+      String(logBase.y),
+      String(logBase.z),
+      "oak_log"
+    ]);
+  }
+
+  return commands;
+}
+
 async function teleportBotsToRequestedSpawn(
   bots: Record<string, import("mineflayer").Bot>,
-  spawnConfig: { x: number; y: number; z: number },
+  spawnConfig: SpawnConfig,
   rcon?: {
     composeFile: string;
     composeDir: string;
@@ -204,49 +261,66 @@ async function teleportBotsToRequestedSpawn(
       }
     );
   };
+  const actorIds = Object.keys(bots);
+  const plan = buildManagedSpawnRconPlan(
+    actorIds.map((actorId) => bots[actorId].username),
+    spawnConfig
+  );
 
   try {
     console.log("Setting server world spawn via RCON...");
-    await runRcon([
-      "setworldspawn",
-      String(Math.floor(x)),
-      String(Math.floor(y)),
-      String(Math.floor(z))
-    ]);
+    await runRcon(plan.worldSpawn);
   } catch (error) {
     console.warn("Failed to set world spawn via RCON. Error:", error);
   }
-
-  const actorIds = Object.keys(bots);
-  const offsets = [
-    [0, 0, 0],
-    [2, 0, 0],
-    [-2, 0, 0],
-    [0, 0, 2],
-    [0, 0, -2]
-  ];
 
   console.log("Waiting for 2 seconds to ensure bots are ready for commands...");
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
   await Promise.all(
     actorIds.map(async (actorId, index) => {
-      const [dx, dy, dz] = offsets[index % offsets.length];
       const bot = bots[actorId];
-      const tpArgs = ["tp", bot.username, String(x + dx), String(y + dy), String(z + dz)];
+      const actorPlan = plan.actors[index];
+      const tpArgs = actorPlan.teleport;
       console.log(`[${actorId}] Sending teleport via RCON: ${tpArgs.join(" ")}`);
       
       try {
         await runRcon(tpArgs);
       } catch (error) {
         console.warn(`[${actorId}] RCON teleport failed, trying bot.chat fallback...`);
-        bot.chat(`/tp @s ${x + dx} ${y + dy} ${z + dz}`);
+        bot.chat(`/tp @s ${tpArgs[2]} ${tpArgs[3]} ${tpArgs[4]}`);
       }
     })
   );
 
   console.log("Waiting for 2 seconds for teleport to take effect...");
   await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  await Promise.all(
+    actorIds.map(async (actorId, index) => {
+      const actorPlan = plan.actors[index];
+
+      try {
+        // Managed probe starts should be clean gameplay baselines. Without this,
+        // repeated live probes can inherit items from earlier action-skill
+        // fixtures and skip the boring tasks they were meant to verify.
+        await runRcon(actorPlan.clearInventory);
+      } catch (error) {
+        console.warn(`[${actorId}] RCON inventory clear failed. Error:`, error);
+      }
+    })
+  );
+
+  for (const command of buildManagedProbeBaselineRconCommands(spawnConfig)) {
+    try {
+      // The general probe is a product smoke, not a random-world survival
+      // challenge. Prepare the smallest stable resource surface needed for the
+      // current implemented action skills to do real work after a clean start.
+      await runRcon(command);
+    } catch (error) {
+      console.warn(`Managed baseline fixture command failed (${command.join(" ")}). Error:`, error);
+    }
+  }
 }
 
 export async function runProbe(options: RunProbeOptions = {}): Promise<ProbeRunResult> {

@@ -403,6 +403,15 @@ export async function collectLogs({
     );
 
     if (!block) {
+      const inventoryDelta =
+        beforeLogCount !== undefined && afterLogCount !== undefined
+          ? afterLogCount - beforeLogCount
+          : undefined;
+      const dugWithoutPickup =
+        attemptedBlocks.some((attemptedBlock) => attemptedBlock.outcome === "dug") &&
+        inventoryDelta !== undefined &&
+        inventoryDelta <= 0;
+
       return {
         status: "blocked",
         block: lastBlock?.name,
@@ -410,12 +419,11 @@ export async function collectLogs({
         attemptedBlocks,
         beforeLogCount,
         afterLogCount,
-        inventoryDelta:
-          beforeLogCount !== undefined && afterLogCount !== undefined
-            ? afterLogCount - beforeLogCount
-            : undefined,
+        inventoryDelta,
         blockRemoved: lastBlockRemoved,
-        reason: "collect_logs found no reachable low log block within 12 blocks."
+        reason: dugWithoutPickup
+          ? "collect_logs dug a log, but log inventory did not increase."
+          : "collect_logs found no reachable low log block within 12 blocks."
       };
     }
 
@@ -530,18 +538,12 @@ export async function collectLogs({
         };
       }
 
-      return {
-        status: "blocked",
-        block: block.name,
-        target: block.position,
-        attemptedBlocks,
-        beforeLogCount,
-        afterLogCount,
-        inventoryDelta:
-          totalInventoryDelta,
-        blockRemoved: lastBlockRemoved,
-        reason: "collect_logs dug a log, but log inventory did not increase."
-      };
+      // A single pickup miss is not enough to end the whole action skill when
+      // other nearby log candidates still exist. Keep success strict
+      // (inventory delta required), but continue through the bounded candidate
+      // set so one bad drop/pickup timing does not become fake task failure.
+      exhaustedCandidates.add(candidateKey);
+      continue;
     }
   }
 

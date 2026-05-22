@@ -299,6 +299,52 @@ test("collectLogs skips an unreachable log candidate and tries the next one", as
   ]);
 });
 
+test("collectLogs keeps trying candidates after one dug log is not picked up", async () => {
+  const blocks = [
+    { name: "oak_log", position: { x: 2, y: 0, z: 0 } },
+    { name: "oak_log", position: { x: 4, y: 0, z: 0 } }
+  ];
+  let logCount = 0;
+  let digCalls = 0;
+
+  const bot = {
+    entity: {
+      position: { x: 0, y: 0, z: 0 }
+    },
+    inventory: {
+      items() {
+        return [{ name: "oak_log", count: logCount }];
+      }
+    },
+    pathfinder: {
+      async goto() {}
+    },
+    findBlocks() {
+      return blocks.map((block) => block.position);
+    },
+    blockAt(position: { x: number; y: number; z: number }) {
+      return blocks.find((block) => block.position.x === position.x) ?? { name: "air" };
+    },
+    async dig() {
+      digCalls += 1;
+      if (digCalls === 2) {
+        logCount = 1;
+      }
+    },
+    nearestEntity() {
+      return null;
+    },
+    async lookAt() {},
+    setControlState() {}
+  };
+
+  const result = await collectLogs({ bot, pickupWaitMs: 10 });
+
+  assert.equal(result.status, "collected");
+  assert.equal(digCalls, 2);
+  assert.deepEqual(result.attemptedBlocks?.map((attempt) => attempt.outcome), ["dug", "dug"]);
+});
+
 test("collectLogs preserves full Mineflayer block objects from findBlocks before dig", async () => {
   const fullBlock = {
     name: "oak_log",
