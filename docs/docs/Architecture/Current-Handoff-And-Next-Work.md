@@ -495,6 +495,8 @@ Checked-in protection:
   rather than selecting the best historical pass;
 - implemented action skills must have deterministic probe driver and fixture
   mode coverage before the matrix accepts them;
+- probe fixture setup has a pure RCON command planner, so craft, storage, and
+  social preconditions can be checked without starting Minecraft;
 - the same test file includes a minimum accepted evidence payload for every
   implemented action skill through the runtime-owned
   `actionSkillPostconditionSpecs`, so adding a new implemented action skill
@@ -720,7 +722,7 @@ Check:
 2. Feed failures into actor evidence and reviewer queue.
 3. Use dashboard runtime events to inspect each live probe turn while keeping
    the dashboard as an observer, not a control plane.
-4. Add precondition setup for craft probes.
+4. Re-run craft/storage/social probes once Docker/OrbStack is available.
 5. Add crafting-table primitive.
 6. Add generic `mine_block`.
 7. Only then re-run 3-NPC LLM gameplay.

@@ -193,6 +193,9 @@ ping.
 Manual `MC_PORT` probes are allowed only for action skills whose precondition
 mode is `none`; fixture-backed probes require the managed server because their
 RCON setup is part of the evidence contract.
+Fixture-backed probes derive their setup from a pure RCON command planner, so
+crafting, storage, and social preconditions can be reviewed and tested without
+starting Minecraft.
 When Docker is unavailable and no live manual server override exists, it reports
 `environment_blocked` with the Docker preflight command and exits without
 mutating actor workspace state.

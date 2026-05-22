@@ -313,6 +313,74 @@ function fixturePosition(
   };
 }
 
+export function buildProbePreconditionRconCommands(input: {
+  actorUsername: string;
+  skillId: SeedActionSkillId;
+  spawnConfig: { x: number; y: number; z: number };
+}): string[][] {
+  const preconditionMode = getActionSkillProbePreconditionMode(input.skillId);
+  if (!preconditionMode) {
+    throw new Error(`Missing action skill probe precondition mode for implemented skill: ${input.skillId}`);
+  }
+
+  const chest = fixturePosition(input.spawnConfig, probeFixtureOffsets.sharedChest);
+  const commands: string[][] = [
+    ["setblock", String(chest.x), String(chest.y), String(chest.z), "air"]
+  ];
+  const give = (itemName: string, count: number) => {
+    commands.push(["give", input.actorUsername, `minecraft:${itemName}`, String(count)]);
+  };
+  const placeChestFixture = (itemsNbt?: string) => {
+    commands.push(["setblock", String(chest.x), String(chest.y), String(chest.z), "chest"]);
+    if (itemsNbt) {
+      commands.push([
+        "data",
+        "merge",
+        "block",
+        String(chest.x),
+        String(chest.y),
+        String(chest.z),
+        itemsNbt
+      ]);
+    }
+  };
+
+  if (preconditionMode === "placed_logs") {
+    const base = fixturePosition(input.spawnConfig, probeFixtureOffsets.collectLogBase);
+    for (let index = 0; index < 4; index += 1) {
+      commands.push(["setblock", String(base.x + index), String(base.y), String(base.z), "oak_log"]);
+    }
+  }
+
+  if (preconditionMode === "inventory_logs") {
+    give("oak_log", 4);
+  }
+
+  if (preconditionMode === "inventory_planks_and_sticks") {
+    give("oak_planks", 4);
+    give("stick", 2);
+  }
+
+  if (preconditionMode === "inspectable_shared_chest") {
+    give("crafting_table", 1);
+    placeChestFixture('{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}');
+  }
+
+  if (preconditionMode === "depositable_shared_chest") {
+    give("crafting_table", input.skillId === "handoffItemAtChest" ? 2 : 1);
+    placeChestFixture();
+  }
+
+  if (preconditionMode === "social_bootstrap_inventory") {
+    // A local crafting table in inventory suppresses the bootstrap curriculum,
+    // letting social probes validate their own primitives instead of being
+    // redirected to wood gathering.
+    give("crafting_table", 1);
+  }
+
+  return commands;
+}
+
 async function setupProbePreconditions(input: {
   bots: ProbeBots;
   actorId: string;
@@ -343,66 +411,13 @@ async function setupProbePreconditions(input: {
     return;
   }
 
-  const give = (itemName: string, count: number) =>
-    runRcon(["give", actor.username, `minecraft:${itemName}`, String(count)]);
-  const clearChestFixture = () => {
-    const chest = fixturePosition(spawnConfig, probeFixtureOffsets.sharedChest);
-    return runRcon(["setblock", String(chest.x), String(chest.y), String(chest.z), "air"]);
-  };
-  const placeChestFixture = async (itemsNbt?: string) => {
-    const chest = fixturePosition(spawnConfig, probeFixtureOffsets.sharedChest);
-    await runRcon(["setblock", String(chest.x), String(chest.y), String(chest.z), "chest"]);
-    if (itemsNbt) {
-      await runRcon([
-        "data",
-        "merge",
-        "block",
-        String(chest.x),
-        String(chest.y),
-        String(chest.z),
-        itemsNbt
-      ]);
-    }
-  };
-
-  await clearChestFixture();
-
-  if (preconditionMode === "placed_logs") {
-    const base = fixturePosition(spawnConfig, probeFixtureOffsets.collectLogBase);
-
-    // The collectLogs live probe owns a tiny repeatable tree fixture. Relying
-    // on natural spawn trees makes repeated probes deplete the world and turns
-    // later failures into setup noise instead of action-skill evidence.
-    await Promise.allSettled(
-      Array.from({ length: 4 }, (_, index) =>
-        runRcon(["setblock", String(base.x + index), String(base.y), String(base.z), "oak_log"])
-      )
-    );
-  }
-
-  if (preconditionMode === "inventory_logs") {
-    await give("oak_log", 4);
-  }
-
-  if (preconditionMode === "inventory_planks_and_sticks") {
-    await Promise.allSettled([give("oak_planks", 4), give("stick", 2)]);
-  }
-
-  if (preconditionMode === "inspectable_shared_chest") {
-    await Promise.allSettled([give("crafting_table", 1)]);
-    await placeChestFixture('{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}');
-  }
-
-  if (preconditionMode === "depositable_shared_chest") {
-    await give("crafting_table", skillId === "handoffItemAtChest" ? 2 : 1);
-    await placeChestFixture();
-  }
-
-  if (preconditionMode === "social_bootstrap_inventory") {
-    // A local crafting table in inventory suppresses the bootstrap curriculum,
-    // letting social probes validate their own primitives instead of being
-    // redirected to wood gathering.
-    await give("crafting_table", 1);
+  const commands = buildProbePreconditionRconCommands({
+    actorUsername: actor.username,
+    skillId,
+    spawnConfig
+  });
+  for (const command of commands) {
+    await runRcon(command);
   }
 
   await new Promise((resolve) => setTimeout(resolve, skillId === "collectLogs" ? 3000 : 1500));

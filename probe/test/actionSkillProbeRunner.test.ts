@@ -7,6 +7,7 @@ import {
   actionSkillProbeProviderMetadata,
   actionSkillProbeRequiresManagedFixture,
   actionSkillPostconditionSpecs,
+  buildProbePreconditionRconCommands,
   buildSkillProbeActionSkillRecords,
   classifyActionSkillProbeOutcome,
   getActionSkillProbePreconditionMode,
@@ -214,6 +215,70 @@ test("actionSkillProbeRunner identifies action skills that require managed RCON 
   assert.equal(actionSkillProbeRequiresManagedFixture("collectLogs"), true);
   assert.equal(actionSkillProbeRequiresManagedFixture("craftPlanksAndSticks"), true);
   assert.equal(actionSkillProbeRequiresManagedFixture("inspectSharedChest"), true);
+});
+
+test("actionSkillProbeRunner plans deterministic craft precondition fixtures", () => {
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "craftPlanksAndSticks",
+      spawnConfig: { x: 10, y: 64, z: -5 }
+    }),
+    [
+      ["setblock", "11", "64", "-9", "air"],
+      ["give", "npc_b", "minecraft:oak_log", "4"]
+    ]
+  );
+
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "craftCraftingTable",
+      spawnConfig: { x: 10, y: 64, z: -5 }
+    }),
+    [
+      ["setblock", "11", "64", "-9", "air"],
+      ["give", "npc_b", "minecraft:oak_planks", "4"],
+      ["give", "npc_b", "minecraft:stick", "2"]
+    ]
+  );
+});
+
+test("actionSkillProbeRunner plans deterministic storage and social fixtures", () => {
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "inspectSharedChest",
+      spawnConfig: { x: 0, y: 70, z: 0 }
+    }),
+    [
+      ["setblock", "1", "70", "-4", "air"],
+      ["give", "npc_b", "minecraft:crafting_table", "1"],
+      ["setblock", "1", "70", "-4", "chest"],
+      [
+        "data",
+        "merge",
+        "block",
+        "1",
+        "70",
+        "-4",
+        '{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}'
+      ]
+    ]
+  );
+
+  assert.deepEqual(
+    buildProbePreconditionRconCommands({
+      actorUsername: "npc_b",
+      skillId: "handoffItemAtChest",
+      spawnConfig: { x: 0, y: 70, z: 0 }
+    }),
+    [
+      ["setblock", "1", "70", "-4", "air"],
+      ["give", "npc_b", "minecraft:crafting_table", "2"],
+      ["setblock", "1", "70", "-4", "chest"]
+    ]
+  );
 });
 
 test("actionSkillProbeRunner uses deterministic provider metadata for live probes", () => {
