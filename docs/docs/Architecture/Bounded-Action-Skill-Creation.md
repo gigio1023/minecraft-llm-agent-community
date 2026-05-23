@@ -113,11 +113,10 @@ changed".
 
 ### Generated Code Bundle
 
-A possible future artifact. It is not a Phase 1 hot-loop behavior.
-
-If introduced later, generated code must be treated like a proposed patch: it is
-written outside the live run, reviewed, tested, and promoted intentionally. It
-must not be auto-imported by the runtime just because a provider produced it.
+Generated code is now a direct objective propagation artifact. It can run during
+an objective trial, but its result is treated like proposed behavior until
+current-run evidence verifies the objective. Background reviewers can later turn
+useful generated code into bounded recipes.
 
 ## Lifecycle
 

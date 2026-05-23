@@ -36,13 +36,15 @@ Reviewer and repair work runs after the turn from saved artifacts.
 
 ## What It Is Not
 
-This is not a raw generated-code gameplay loop. It is also not a persona-first
+This is not a loose generated-code gameplay loop. It is also not a persona-first
 NPC demo.
 
 The current proof is simpler: complete concrete Minecraft tasks, reject fake
 progress, and make failures easy to inspect.
 
-This is not a revival of raw Voyager-style generated-code execution.
+This is not a revival of unverifiable Voyager-style generated-code execution.
+Direct generated TypeScript is allowed when it is tied to an objective,
+helper-call artifacts, and current-run evidence.
 
 The repo should not treat a model-written JavaScript file, a progress-looking
 animation, or an optimistic provider explanation as success. Success belongs to

@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from "node:fs";
+import { watch, type Dirent, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Elysia } from "elysia";
@@ -9,6 +9,7 @@ type JsonEntry = {
   file: string;
   path: string;
   json: JsonRecord | null;
+  modifiedMs: number;
 };
 
 export type DashboardServer = {
@@ -56,16 +57,25 @@ async function readJsonIfExists(filePath: string): Promise<JsonRecord | null> {
 
 async function listJson(dir: string, limit = 8): Promise<JsonEntry[]> {
   try {
-    const entries = (await fs.readdir(dir))
-      .filter((entry) => entry.endsWith(".json"))
-      .sort()
-      .slice(-limit);
+    const entries = await Promise.all(
+      (await fs.readdir(dir))
+        .filter((entry) => entry.endsWith(".json"))
+        .map(async (entry) => {
+          const filePath = path.join(dir, entry);
+          const stat = await fs.stat(filePath);
+          return { entry, filePath, modifiedMs: stat.mtimeMs };
+        })
+    );
 
     return Promise.all(
-      entries.map(async (entry) => ({
+      entries
+        .sort((left, right) => left.modifiedMs - right.modifiedMs || left.entry.localeCompare(right.entry))
+        .slice(-limit)
+        .map(async ({ entry, filePath, modifiedMs }) => ({
         file: entry,
-        path: path.join(dir, entry),
-        json: await readJsonIfExists(path.join(dir, entry))
+        path: filePath,
+        modifiedMs,
+        json: await readJsonIfExists(filePath)
       }))
     );
   } catch (error) {
@@ -75,6 +85,98 @@ async function listJson(dir: string, limit = 8): Promise<JsonEntry[]> {
 
     throw error;
   }
+}
+
+async function listDirectTrialReports(dir: string, limit = 8): Promise<JsonEntry[]> {
+  try {
+    const entries = (
+      await Promise.all(
+      (await fs.readdir(dir, { withFileTypes: true }))
+        .filter((entry) => entry.isDirectory())
+        .map(async (entry) => {
+          const filePath = path.join(dir, entry.name, "report.json");
+          try {
+            const stat = await fs.stat(filePath);
+            return { entry: `${entry.name}/report.json`, filePath, modifiedMs: stat.mtimeMs };
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+              return null;
+            }
+
+            throw error;
+          }
+        })
+      )
+    ).filter((entry): entry is { entry: string; filePath: string; modifiedMs: number } => entry !== null);
+
+    return Promise.all(
+      entries
+        .sort((left, right) => left.modifiedMs - right.modifiedMs || left.entry.localeCompare(right.entry))
+        .slice(-limit)
+        .map(async ({ entry, filePath, modifiedMs }) => ({
+          file: entry,
+          path: filePath,
+          modifiedMs,
+          json: await readJsonIfExists(filePath)
+        }))
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+async function listJsonRecursive(dir: string, limit = 16): Promise<JsonEntry[]> {
+  const entries: Array<{ entry: string; filePath: string; modifiedMs: number }> = [];
+
+  async function visit(currentDir: string) {
+    let dirEntries: Dirent[];
+    try {
+      dirEntries = await fs.readdir(currentDir, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return;
+      }
+
+      throw error;
+    }
+
+    await Promise.all(
+      dirEntries.map(async (entry) => {
+        const filePath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          await visit(filePath);
+          return;
+        }
+        if (!entry.isFile() || !entry.name.endsWith(".json")) {
+          return;
+        }
+        const stat = await fs.stat(filePath);
+        entries.push({
+          entry: path.relative(dir, filePath),
+          filePath,
+          modifiedMs: stat.mtimeMs
+        });
+      })
+    );
+  }
+
+  await visit(dir);
+
+  return Promise.all(
+    entries
+      .sort((left, right) => left.modifiedMs - right.modifiedMs || left.entry.localeCompare(right.entry))
+      .slice(-limit)
+      .map(async ({ entry, filePath, modifiedMs }) => ({
+        file: entry,
+        path: filePath,
+        modifiedMs,
+        json: await readJsonIfExists(filePath)
+      }))
+  );
 }
 
 async function listActors() {
@@ -93,7 +195,7 @@ async function listActors() {
 }
 
 async function latestTranscript() {
-  const entries = await listJson(evidenceRoot, 20);
+  const entries = await listJson(evidenceRoot, 80);
   return (
     entries
       .filter((entry) => entry.file.startsWith("agent_loop_probe_v0-"))
@@ -135,6 +237,25 @@ function compactActionSkill(record: JsonRecord | null) {
 
 function latestJson(entries: readonly JsonEntry[]) {
   return entries.at(-1)?.json ?? null;
+}
+
+function readTranscriptActorIds(transcript: JsonRecord | null) {
+  const final = getRecord(transcript, "final");
+  const sessions = Array.isArray(final?.actor_sessions) ? final.actor_sessions : [];
+  return sessions
+    .filter(isRecord)
+    .map((session) => asString(session.actor_id))
+    .filter(Boolean);
+}
+
+function readRuntimeEventActorIds() {
+  return Array.from(
+    new Set(
+      recentRuntimeEvents
+        .map((event) => event.actorId)
+        .filter((actorId): actorId is string => typeof actorId === "string" && actorId.length > 0)
+    )
+  ).sort();
 }
 
 function readObservation(input: JsonRecord | null) {
@@ -218,6 +339,8 @@ function readRelationships(entries: readonly JsonEntry[]) {
 function readMemoryItems(entries: readonly JsonEntry[]) {
   return entries.map((entry) => ({
     file: entry.file,
+    layer: asString(entry.json?.layer) ?? path.dirname(entry.file),
+    status: asString(entry.json?.status) ?? null,
     summary:
       asString(entry.json?.summary) ||
       asString(entry.json?.note) ||
@@ -238,7 +361,8 @@ async function readActor(actorId: string) {
   const relationships = await listJson(path.join(actorDir, "relationships"), 8);
   const activeSkills = await listJson(path.join(actorDir, "action-skills/active"), 40);
   const candidates = await listJson(path.join(actorDir, "action-skills/candidates"), 8);
-  const memory = await listJson(path.join(actorDir, "memory"), 8);
+  const directTrials = await listDirectTrialReports(path.join(actorDir, "action-skills/direct-trials"), 8);
+  const memory = await listJsonRecursive(path.join(actorDir, "memory"), 16);
   const latestInput = latestJson(providerInputs);
   const latestOutput = latestJson(providerOutputs);
   const latestEvidence = latestJson(evidence);
@@ -287,14 +411,18 @@ async function readActor(actorId: string) {
         file: entry.file,
         json: compactActionSkill(entry.json)
       })),
-      candidates
+      candidates,
+      direct_trials: directTrials
     }
   };
 }
 
 async function buildState() {
-  const actors = await Promise.all((await listActors()).map(readActor));
   const latest = await latestTranscript();
+  const liveActorIds = readRuntimeEventActorIds();
+  const transcriptActorIds = readTranscriptActorIds(latest?.json ?? null);
+  const actorIds = liveActorIds.length > 0 ? liveActorIds : transcriptActorIds.length > 0 ? transcriptActorIds : await listActors();
+  const actors = await Promise.all(actorIds.map(readActor));
   const failures = actors.filter((actor) =>
     ["failed", "blocked", "timeout", "cancelled"].includes(String(actor.summary.status ?? ""))
   ).length;
@@ -566,6 +694,28 @@ function html() {
         return '<div class="skill-slot"><div class="skill-name">' + icon((json.required_primitives ?? [])[0] ?? json.skill_id, json.skill_id) + '<strong>' + esc(json.skill_id) + '</strong></div><div class="sub">' + esc(json.notes ?? json.success_verifier ?? "") + '</div><div class="primitive-row">' + primitives + '</div></div>';
       }).join('') + '</div>';
     }
+    function directTrialList(trials) {
+      if (!trials?.length) return '<div class="sub">direct generated trial 없음</div>';
+      return '<div class="skill-loadout">' + trials.slice(-6).reverse().map((trial) => {
+        const json = trial.json ?? {};
+        const generated = json.generated ?? {};
+        const evidence = json.evidence ?? {};
+        const execution = generated.execution ?? {};
+        const helpers = Array.isArray(execution.helperEvents) ? execution.helperEvents : [];
+        const helperNames = helpers
+          .filter((event) => event && event.status === "completed")
+          .slice(-6)
+          .map((event) => chip(event.name))
+          .join('');
+        return '<div class="skill-slot">' +
+          '<div class="skill-name">' + icon(evidence.itemName ?? json.objectiveId, json.objectiveId) + '<strong>' + esc(json.objectiveId ?? trial.file) + '</strong></div>' +
+          '<div class="primitive-row"><span class="pill ' + statusClass(json.status) + '">' + esc(json.status ?? 'unknown') + '</span><span class="pill ' + statusClass(execution.status) + '">' + esc(execution.status ?? 'not-run') + '</span><span class="pill">' + esc(generated.providerId ?? 'provider') + '</span></div>' +
+          '<div class="sub">' + esc(evidence.verifierReason ?? '') + '</div>' +
+          '<div class="primitive-row">' + helperNames + '</div>' +
+          '<details><summary>direct trial raw</summary><pre>' + esc(fmt(json)) + '</pre></details>' +
+        '</div>';
+      }).join('') + '</div>';
+    }
     function relationshipList(relationships) {
       if (!relationships?.length) return '<div class="sub">relationship edge 없음</div>';
       const widths = { unproven:20, distrusted:20, cautious:45, reliable:72, trusted:100, none:5, annoyed:35, frustrated:60, resentful:82, hostile:100 };
@@ -581,7 +731,7 @@ function html() {
     }
     function memoryList(memory) {
       if (!memory?.length) return '<div class="sub">memory artifact 없음</div>';
-      return '<div class="timeline">' + memory.map((item) => '<div class="event"><strong>' + esc(item.file) + '</strong><div class="sub">' + esc(item.summary) + '</div></div>').join('') + '</div>';
+      return '<div class="timeline">' + memory.map((item) => '<div class="event"><strong>' + esc(item.file) + '</strong><div class="primitive-row"><span class="pill">' + esc(item.layer ?? 'memory') + '</span><span class="pill ' + statusClass(item.status) + '">' + esc(item.status ?? 'unknown') + '</span></div><div class="sub">' + esc(item.summary) + '</div></div>').join('') + '</div>';
     }
     function runtimeEventList(events) {
       const rows = (events ?? []).slice(-12).reverse();
@@ -614,6 +764,7 @@ function html() {
           '<section class="panel"><h3>Visible Actors</h3>' + itemList((actor.world.visible_actors ?? []).map((a) => ({ name: a.id + (a.busy ? ' busy' : ''), count: a.distance })), 'visible actor 없음') + '</section>' +
           '<section class="panel"><h3>Relationships</h3>' + relationshipList(actor.relationships) + '</section>' +
           '<section class="panel wide"><h3>Active Action Skills</h3>' + actionSkillList(actor.action_skills.active) + '</section>' +
+          '<section class="panel wide"><h3>Direct Generated Trials</h3>' + directTrialList(actor.action_skills.direct_trials) + '</section>' +
           '<section class="panel wide"><h3>Memory</h3>' + memoryList(actor.memory) + '</section>' +
         '</div>' +
         '<details><summary>Raw LLM input</summary><pre>' + esc(fmt(latestInput)) + '</pre></details>' +

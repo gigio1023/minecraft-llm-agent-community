@@ -43,6 +43,7 @@ test("loads probe config and builds vanilla server env", () => {
   assert.equal(env.SPAWN_NPCS, "true");
   assert.equal(env.SPAWN_ANIMALS, "true");
   assert.equal(env.SPAWN_MONSTERS, "false");
+  assert.equal(env.SPAWN_PROTECTION, "0");
   assert.equal(env.ENABLE_RCON, "true");
   assert.equal(env.VIEW_DISTANCE, "10");
   assert.equal(env.SIMULATION_DISTANCE, "10");

@@ -1,6 +1,6 @@
 # SPEC
 
-Updated: 2026-05-22
+Updated: 2026-05-23
 
 ## 1. What This Is
 
@@ -24,6 +24,7 @@ to carry the whole architecture:
    - reviewer input evidence.
 3. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor workspace source-of-truth model;
+   - typed Minecraft memory substrate;
    - action skill lifecycle;
    - recipe and validator requirements;
    - non-destructive initialization.
@@ -48,6 +49,16 @@ to carry the whole architecture:
    - landed implementation surfaces;
    - verified commands;
    - next improvement order.
+10. `docs/docs/Architecture/Autonomous-Objective-Evaluation.md`
+   - bounded objective grammar;
+   - current-run objective oracles;
+   - reference-project lessons without reintroducing Voyager-style eval;
+   - path from single action-skill probes to small autonomous tasks.
+11. `docs/docs/Architecture/Direct-Generated-Action-Skills.md`
+   - raw TypeScript action skill execution as a first-class propagation path;
+   - light execution guards;
+   - helper-call evidence;
+   - reviewer cleanup into stable action skills and recipes.
 
 Treat this file as the source of truth for priority and scope. Treat the split
 docs as the source of truth for detailed implementation contracts.
@@ -73,15 +84,43 @@ provider nor reviewer can turn optimistic text into success.
 profile, memory, evidence, provider inputs, reviews, relationship edges, and
 active/candidate/retired/rejected action skill records.
 
-Action skill evolution follows a lifecycle:
+Action skill evolution follows two compatible paths.
+
+Fast propagation path:
+
+```text
+objective -> generated TypeScript action skill -> direct execution
+-> current-run objective verifier -> candidate or active storage with evidence
+-> background reviewer cleanup
+```
+
+Stable recipe path:
 
 ```text
 proposal -> bounded recipe -> role/primitive validation -> timed trial evidence
 -> promotion, supersession, retirement, or rejection
 ```
 
-Legacy generated TypeScript is archive material until it is converted into this
-bounded lifecycle. It is not active runtime capability.
+Loose legacy generated TypeScript under `build/generated-skills` is still not
+the source of truth. New generated TypeScript belongs to actor-owned direct
+trial artifacts with helper-call evidence and objective verifier results.
+
+Memory is now a typed actor-owned substrate, not a loose text tail. The schema
+is explicit enough for indexing, retrieval, and review, but the `content` field
+remains open so stronger LLMs can generate new plans and new observations
+without waiting for every possible Minecraft tactic to be pre-modeled.
+
+Current memory path:
+
+```text
+direct objective/action attempt
+-> immutable episodic memory
+-> procedural candidate or guardrail candidate
+-> objective-scoped retrieval into future provider context
+```
+
+Memory can guide generated action code. It cannot satisfy objectives, mutate
+active action skill state, or replace current-run verifier evidence.
 
 ### Replayable Evidence
 
@@ -119,8 +158,9 @@ Future extensions outside the current bounded delivery scope:
   phase-one gameplay and live dialogue;
 - actor-scoped evidence coverage for future gameplay paths outside phase-one
   `runAgentLoop` and mutual dispatchers;
-- migration of the legacy skill-village path from generated TypeScript proposals
-  into executable bounded recipes, if that path remains needed.
+- migration of the legacy skill-village path from loose generated TypeScript
+  proposals into actor-owned direct generated action skill trials, if that path
+  remains needed.
 
 Deferred unless the user re-approves:
 
@@ -168,16 +208,95 @@ Priority order:
 
 1. Validate `collect_logs` and adjacent boring tasks against live Minecraft
    evidence, not optimistic transcript labels.
-2. Use the per-action-skill live harness before returning to broad multi-NPC
+2. Add autonomous micro-objective reports that ask for one tiny outcome and
+   accept only current-run world-state evidence.
+3. Use the per-action-skill live harness before returning to broad multi-NPC
    runs.
-3. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
+4. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
    verifier, target-selection, and action-skill gaps.
-4. Harden reviewer prompts/scoring only from immutable run evidence.
-5. Convert any still-useful legacy generated-code experiments into bounded
-   candidate recipes before runtime use.
-6. Keep the gameplay hot path bounded and free of blocking critic/generation
+5. Harden reviewer prompts/scoring only from immutable run evidence.
+6. Let direct generated TypeScript action skills attempt small objectives, then
+   use reviewer cleanup to turn stable attempts into smaller recipes or active
+   action skill records.
+7. Convert direct objective reports into typed actor memory and retrieve that
+   memory by objective, item, action skill, verifier status, and diagnosis.
+8. Keep the gameplay hot path bounded and free of blocking critic/reviewer
    work.
-7. Keep the managed local server path easy to start, inspect, and stop.
+9. Keep the managed local server path easy to start, inspect, and stop.
+
+Current objective command:
+
+```bash
+cd probe
+bun run probe:objective -- --objective collect_current_run_oak_log_1 --provider openai-codex --actor npc_b --max-actions 8
+```
+
+The objective command can also audit a saved transcript:
+
+```bash
+cd probe
+bun run probe:objective -- --objective collect_current_run_oak_log_1 --transcript ../data/evidence/agent_loop_probe_v0-<timestamp>.json
+```
+
+Objective reports are not historical proof by default. They evaluate one
+current transcript and mark success only when the objective oracle finds runtime
+verification and world/inventory deltas in that transcript.
+
+Current direct generated action skill policy:
+
+- direct generated TypeScript is allowed for objective-scoped propagation;
+- the LLM may choose its own TypeScript action plan; prompts and objectives
+  must not force a hidden, hand-scripted Minecraft walkthrough;
+- Mineflayer helpers should absorb known early-game mechanics such as log to
+  planks, sticks, crafting table placement, wooden pickaxe, cobblestone, and
+  stone axe crafting, so reasonable generated calls like
+  `craftItem("crafting_table", 1)` can still produce real prerequisite
+  evidence;
+- generated source, helper calls, timeout/error, and objective verifier output
+  must be persisted together;
+- generated return values are never sufficient proof;
+- direct trial reports must become typed actor memory records:
+  - `episodic` for immutable current-run attempt evidence;
+  - `procedural` candidate when the current-run verifier passes;
+  - `guardrail` candidate when execution or verification fails;
+- background reviewers improve working generated code after the run, not before
+  the first attempt.
+
+Current direct generated objective proof:
+
+- command:
+  `bun run probe:objective -- --objective craft_current_run_stone_axe_1 --mode direct-generated --provider deterministic --actor npc_b --report ../tmp/objective-stone-axe-direct-current.json`;
+- result:
+  `objective_summary status=passed objective=craft_current_run_stone_axe_1 scope=current_run`;
+- evidence:
+  actor workspace direct trial report
+  `data/actors/npc_b/action-skills/direct-trials/craft_current_run_stone_axe_1-npc_b-1779464924961/report.json`
+  recorded generated source, helper events, current-run pre/post inventory,
+  `stone_axe` delta `1`, verifier status `passed`, and reviewer input refs;
+- dashboard:
+  actor state includes direct generated trial cards under
+  `action_skills.direct_trials`;
+- reviewer:
+  direct trials enqueue actor-scoped review jobs as immutable
+  `action_skill_direct_trial` refs. Reviewer output may propose cleanup into a
+  bounded action skill candidate, but still cannot mutate active records.
+- provider smoke:
+  `--provider openai-codex` also produced objective-specific generated
+  TypeScript and passed the same current-run verifier in actor workspace trial
+  `craft_current_run_stone_axe_1-npc_b-1779475080615` with model
+  `gpt-5.4-mini`, reasoning `low`.
+- memory-assisted retry:
+  the successful provider input included previous failed direct-trial
+  `episodic` and `guardrail` memories, but the pass still came only from
+  current-run `stone_axe` inventory evidence.
+- substrate proof:
+  the successful run accepted a model-generated plan that used free-form
+  helper composition, including substrate-assisted `ensureItem` and
+  `craftItem` calls for crafting-table access, sticks, wooden pickaxe,
+  cobblestone, and final table-bound `stone_axe` crafting. The mining and log
+  collection helpers keep `bot.dig(...)` atomic, but bound post-dig pickup and
+  pathfinder fallback work so a dropped item cannot stall the whole objective
+  until the outer generated-action timeout.
 
 Current harness command:
 
@@ -412,14 +531,13 @@ current-run proof.
   evidence.
 - Do not confuse animation, partial motion, optimistic text, or provider claims
   with success.
-- The hot path must not await critic, reflection, generated code, or slow
-  summarization.
+- The hot path must not await critic, reflection, or slow summarization.
 - Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
   agent skills.
 - Actor workspace is the only source of truth for actor-owned active,
   candidate, retired, rejected, and superseded action skill records.
-- Generated TypeScript action skill bundles must not be auto-imported into the
-  hot loop.
+- Generated TypeScript action skill bundles must be tied to actor-owned direct
+  trial artifacts before reuse.
 - `build/generated-skills` is a legacy exploratory output location only. It must
   not be treated as an actor-owned action skill store.
 - Per-NPC reviewers write actor-scoped review notes and candidate proposals; they

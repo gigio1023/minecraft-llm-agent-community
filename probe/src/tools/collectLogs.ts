@@ -128,19 +128,28 @@ function abortError() {
 async function runAbortable<T>(
   bot: MiningBot,
   signal: AbortSignal | undefined,
-  action: Promise<T>
+  action: Promise<T>,
+  timeoutMs?: number
 ) {
-  if (!signal) {
+  if (!signal && timeoutMs === undefined) {
     return action;
   }
 
-  if (signal.aborted) {
+  if (signal?.aborted) {
     stopMovement(bot);
     throw abortError();
   }
 
   let abortHandler: (() => void) | undefined;
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  action.catch(() => {
+    // Timeout/abort may already have returned a structured primitive failure.
+    // Late Mineflayer rejection after stop() should not hide that evidence.
+  });
   const aborted = new Promise<never>((_, reject) => {
+    if (!signal) {
+      return;
+    }
     abortHandler = () => {
       // The runtime treats abort as a session boundary, not just a rejected
       // promise. Mineflayer may otherwise keep walking or digging after the
@@ -150,12 +159,25 @@ async function runAbortable<T>(
     };
     signal.addEventListener("abort", abortHandler, { once: true });
   });
+  const timedOut = new Promise<never>((_, reject) => {
+    if (timeoutMs === undefined) {
+      return;
+    }
+
+    timeoutHandle = setTimeout(() => {
+      stopMovement(bot);
+      reject(new Error(`collect_logs timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
 
   try {
-    return await Promise.race([action, aborted]);
+    return await Promise.race([action, aborted, timedOut]);
   } finally {
     if (abortHandler) {
-      signal.removeEventListener("abort", abortHandler);
+      signal?.removeEventListener("abort", abortHandler);
+    }
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
     }
   }
 }
@@ -166,6 +188,14 @@ async function moveNear(
   signal?: AbortSignal,
   range = 2
 ) {
+  if (
+    typeof (bot.entity.position as { distanceTo?: unknown }).distanceTo === "function" &&
+    distance(bot.entity.position, position) <= Math.min(4.5, range + 2.5)
+  ) {
+    await runAbortable(bot, signal, bot.lookAt(position, true));
+    return;
+  }
+
   if (bot.pathfinder) {
     // Pathfinder is the preferred movement boundary because it owns collision
     // and route retries. The manual fallback below is only a short nudge for
@@ -173,7 +203,8 @@ async function moveNear(
     await runAbortable(
       bot,
       signal,
-      bot.pathfinder.goto(new goals.GoalNear(position.x, position.y, position.z, range))
+      bot.pathfinder.goto(new goals.GoalNear(position.x, position.y, position.z, range)),
+      5_000
     );
     return;
   }
@@ -186,6 +217,40 @@ async function moveNear(
   } finally {
     bot.setControlState("forward", false);
   }
+}
+
+async function nudgeToward(
+  bot: MiningBot,
+  position: Positioned,
+  signal?: AbortSignal,
+  durationMs = 700
+) {
+  await runAbortable(bot, signal, bot.lookAt(position, true), 1_000);
+  bot.setControlState("forward", true);
+
+  try {
+    await runAbortable(bot, signal, delay(durationMs), durationMs + 500);
+  } finally {
+    bot.setControlState("forward", false);
+  }
+}
+
+async function moveOntoBlock(
+  bot: MiningBot,
+  position: Positioned,
+  signal?: AbortSignal
+) {
+  if (!bot.pathfinder) {
+    await nudgeToward(bot, position, signal, 900);
+    return;
+  }
+
+  await runAbortable(
+    bot,
+    signal,
+    bot.pathfinder.goto(new goals.GoalBlock(position.x, position.y, position.z)),
+    5_000
+  );
 }
 
 function isLogName(name: string) {
@@ -295,8 +360,21 @@ async function tryPickupLogDrop(input: {
   pickupWaitMs: number;
   searchWaitMs?: number;
   finalGraceMs?: number;
+  nudgeMs?: number;
 }) {
-  await moveToNearbyDrop(input.bot, input.blockPosition, input.signal, input.searchWaitMs);
+  try {
+    await moveToNearbyDrop(input.bot, input.blockPosition, input.signal, input.searchWaitMs);
+    await moveOntoBlock(input.bot, input.blockPosition, input.signal);
+  } catch {
+    // Pickup movement is best-effort after the atomic dig has completed. If
+    // pathing to a transient item entity times out, still wait for inventory
+    // evidence because the item may have been picked up during the failed move.
+    stopMovement(input.bot);
+  }
+  const nudgeMs = input.nudgeMs ?? 500;
+  if (nudgeMs > 0 && distance(input.bot.entity.position, input.blockPosition) <= 4) {
+    await nudgeToward(input.bot, input.blockPosition, input.signal, nudgeMs);
+  }
   return waitAfterPickupMove(
     input.bot,
     input.beforeLogCount,
@@ -334,8 +412,9 @@ async function sweepDugLogDrops(input: {
       beforeLogCount: currentLogCount,
       signal: input.signal,
       pickupWaitMs: 150,
-      searchWaitMs: 150,
-      finalGraceMs: 150
+      searchWaitMs: 50,
+      finalGraceMs: 50,
+      nudgeMs: 0
     });
   }
 
@@ -351,7 +430,7 @@ async function digLogBlockToBreak(
   // stopping and restarting would reset the block-break animation. Await the
   // single dig promise, then inspect pickup evidence after the block break has
   // either completed or failed.
-  await runAbortable(bot, signal, bot.dig(block, true));
+  await runAbortable(bot, signal, bot.dig(block, true), 15_000);
 }
 
 function findReachableLogs(bot: MiningBot) {
@@ -588,7 +667,9 @@ export async function collectLogs({
         blockPosition: block.position,
         beforeLogCount: afterLogCount,
         signal,
-        pickupWaitMs
+        pickupWaitMs,
+        searchWaitMs: pickupWaitMs < 500 ? 150 : undefined,
+        finalGraceMs: pickupWaitMs < 500 ? 150 : undefined
       });
     }
 

@@ -42,6 +42,14 @@ data/actors/
   <actor_id>/
     actor.json
     memory/
+      working/
+      episodic/
+      semantic/
+      procedural/
+      social/
+      beliefs/
+      guardrails/
+      index/
     evidence/
     reviews/
     provider-inputs/
@@ -54,9 +62,11 @@ data/actors/
 ```
 
 Initialization means "restore this baseline shape." It does not mean delete
-history. Candidate action skills, retired action skills, evidence, reviews,
-provider input snapshots, and memory files are review assets and should survive
-ordinary startup initialization.
+history. Candidate action skills, retired action skills, reviews, relationships,
+and memory files are review assets and should survive ordinary startup
+initialization. Runtime evidence and provider packets are volatile current-run
+artifacts and may be cleared when a run explicitly asks for baseline
+initialization.
 
 ## Source Of Truth Rule
 
@@ -88,7 +98,14 @@ Current code initializes:
 - `action-skills/candidates`;
 - `action-skills/retired`;
 - `action-skills/rejected`;
-- `memory`;
+- `memory/working`;
+- `memory/episodic`;
+- `memory/semantic`;
+- `memory/procedural`;
+- `memory/social`;
+- `memory/beliefs`;
+- `memory/guardrails`;
+- `memory/index`;
 - `evidence`;
 - `reviews`;
 - `provider-inputs`.
@@ -117,14 +134,21 @@ Current code also:
   default;
 - archives older `build/generated-skills` TypeScript files into actor workspace
   candidate proposals for manual recipe conversion;
-- keeps exploratory generated TypeScript execution behind explicit legacy
-  opt-in.
+- supports actor-owned direct generated TypeScript trials when they are tied to
+  objective evidence and helper-call artifacts.
+- writes direct generated objective reports into typed actor memory:
+  episodic attempt records, procedural candidates for verified success, and
+  guardrail candidates for failed execution or failed verification.
+- retrieves typed memory into provider context by objective, item, action skill,
+  verifier status, and diagnosis while leaving objective success to current-run
+  verifiers.
 
 Future extensions:
 
 - production hardening for LLM reviewer prompt/scoring quality;
-- conversion of any still-needed legacy skill-village generated-code behavior
-  into executable bounded recipes.
+- migration of any still-needed legacy skill-village generated-code behavior
+  into actor-owned direct generated action skill trials or executable bounded
+  recipes.
 
 ## Action Skill Record
 
@@ -163,8 +187,8 @@ reviewers and later tools do not need to understand multiple ownership formats.
 
 ## Action Skill Recipe
 
-The immediate implementation should treat new action skills as bounded recipes,
-not executable generated code.
+Bounded recipes are the stable cleanup format for action skills after direct
+generated code or reviewer evidence has shown value.
 
 ```ts
 type ActionSkillRecipe = {
@@ -221,20 +245,75 @@ promote directly.
 
 ## Generated TypeScript Bundles
 
-Generated TypeScript action skill bundles are not an immediate hot-loop behavior.
+Generated TypeScript action skill bundles are now an immediate objective
+propagation format when they are actor-owned and evidence-bound:
 
-If introduced later, generated code must be treated like a proposed patch:
-
-- written outside the live run as an actor workspace candidate artifact;
-- reviewed;
-- tested;
-- promoted intentionally;
-- never auto-imported because a provider produced it.
+- written as actor workspace direct trial artifacts;
+- executed with light guards and timeout;
+- reviewed through helper-call and pre/post evidence;
+- promoted or retained intentionally;
+- never counted as success because the generated return value says so.
 
 During the transition, anything still emitted to `build/generated-skills` is a
 legacy artifact. It can be inspected by humans or migration tools, but it is not
 available to runtime selection until it has been converted into a validated
 actor workspace candidate recipe.
+
+## Typed Actor Memory Record
+
+Typed memory exists to make freer LLM behavior reusable without scripting the
+LLM's future choices. The schema is stable at the indexing boundary and flexible
+inside `content`.
+
+```ts
+type ActorMemoryRecord = {
+  schema: "actor-memory-record/v1";
+  memory_id: string;
+  actor_id: string;
+  layer:
+    | "working"
+    | "episodic"
+    | "semantic"
+    | "procedural"
+    | "social"
+    | "belief"
+    | "guardrail";
+  status: "candidate" | "active" | "superseded" | "stale" | "rejected";
+  confidence: "observed" | "reviewed" | "inferred" | "uncertain";
+  scope: { kind: "actor_private"; actor_id: string } |
+    { kind: "shared"; shared_with_actor_ids: string[] };
+  created_at: string;
+  updated_at: string;
+  summary: string;
+  evidence_refs: string[];
+  tags: string[];
+  index: {
+    objective_ids: string[];
+    objective_categories: string[];
+    item_names: string[];
+    block_names: string[];
+    tool_names: string[];
+    action_skill_ids: string[];
+    diagnoses: string[];
+    verifier_statuses: string[];
+    causal_refs: string[];
+  };
+  content: Record<string, unknown>;
+};
+```
+
+Current implementation writes:
+
+- `episodic` records for every direct generated objective report;
+- `procedural` candidate records for verified direct trials;
+- `guardrail` candidate records for failed direct trials.
+
+Provider context receives a bounded `typed_memory` packet. Retrieval is symbolic
+first: objective id, objective category, target items, action-skill ids, layer,
+and status. Embedding/vector retrieval can come later, but it must not replace
+objective and causality signals.
+
+Memory is never proof. It is a hint substrate for future autonomous LLM action.
 
 ## Acceptance Checks
 
@@ -249,3 +328,6 @@ actor workspace candidate recipe.
 - invalid primitives, missing verifiers, role-incompatible primitives, and
   success-by-text are rejected;
 - retired and rejected variants remain inspectable.
+- direct generated objective reports create typed memory records;
+- provider context includes objective-scoped typed memory without allowing stale
+  or rejected memory to satisfy runtime objectives.

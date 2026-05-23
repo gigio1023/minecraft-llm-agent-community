@@ -17,6 +17,8 @@ const sidebars = {
         'Architecture/Async-Reviewer-Sidecars',
         'Architecture/Implementation-Workstreams',
         'Architecture/Bounded-Action-Skill-Creation',
+        'Architecture/Autonomous-Objective-Evaluation',
+        'Architecture/Direct-Generated-Action-Skills',
         'Architecture/LLM-Context-And-Actor-Workspace',
         'Architecture/Social-Actor-Profiles-And-Relationships',
       ],
@@ -27,6 +29,13 @@ const sidebars = {
       items: [
         'Setup/Headless-Server',
         'Setup/Provider-Setup',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Knowledge',
+      items: [
+        'Knowledge/Minecraft-Encyclopedia-Research-Brief',
       ],
     },
     {

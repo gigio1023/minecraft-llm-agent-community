@@ -43,12 +43,27 @@ function ownedSeedActionSkills(
   return ownership.filter((record) => record.owner_actor_id === actorId);
 }
 
+async function clearDirectoryContents(dir: string) {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
+
+    throw error;
+  }
+
+  await Promise.all(entries.map((entry) => fs.rm(path.join(dir, entry), { recursive: true, force: true })));
+}
+
 /**
  * Restores the actor workspace baseline without deleting actor-owned artifacts.
  *
- * Candidate action skills, retired action skills, evidence, and memory can carry
- * review value across runs, so initialization only recreates required directories
- * and rewrites the baseline index files.
+ * Candidate action skills, retired action skills, memory, and relationships can
+ * carry review value across runs. Runtime evidence and provider packets are
+ * volatile: keeping them in a fresh run lets stale failures steer the provider.
  */
 export async function initializeActorWorkspaces(
   options: ActorWorkspaceInitOptions
@@ -69,8 +84,14 @@ export async function initializeActorWorkspaces(
       workspaceDirs.map((workspaceDir) => fs.mkdir(workspaceDir, { recursive: true }))
     );
 
+    await Promise.all([
+      clearDirectoryContents(paths.evidenceDir),
+      clearDirectoryContents(paths.providerInputsDir),
+      clearDirectoryContents(paths.providerOutputsDir)
+    ]);
+
     // actor.json is the per-run baseline contract. It can be rewritten because
-    // durable candidate/evidence artifacts live under child directories.
+    // durable action skill and relationship artifacts live under child dirs.
     await writeJson(paths.actorFile, {
       schema: "actor-workspace/v1",
       actor_id: actor.actor_id,
