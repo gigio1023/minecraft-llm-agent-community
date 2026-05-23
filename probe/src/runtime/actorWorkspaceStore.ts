@@ -159,6 +159,12 @@ export function getRequiredActorWorkspaceDirs(rootDir: string, actorId: string) 
     paths.evidenceDir,
     paths.reviewsDir,
     paths.providerInputsDir,
-    paths.providerOutputsDir
+    paths.providerOutputsDir,
+    paths.goalsDir,
+    path.join(paths.goalsDir, "life"),
+    paths.strategicGoalsDir,
+    paths.cycleGoalsDir,
+    paths.judgmentsDir,
+    paths.worldEventsDir
   ];
 }

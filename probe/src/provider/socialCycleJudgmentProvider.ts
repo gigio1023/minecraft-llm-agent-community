@@ -1,0 +1,254 @@
+import { randomUUID } from "node:crypto";
+
+import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
+import type { ActionIntent, ActorCycleGoal, CycleJudgment } from "../runtime/goals/types.js";
+import { validateCycleJudgment } from "../runtime/goals/types.js";
+import { writeCycleJudgment } from "../runtime/goals/cycleJudgmentStore.js";
+import {
+  clampCycleJudgmentOutcome,
+  deterministicJudgmentOutcome
+} from "../runtime/socialCycleProgress.js";
+import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
+import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
+import { asStringArray } from "./llmJsonArrays.js";
+import { writeProviderInputSnapshot } from "./providerInputStore.js";
+import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
+import type { JsonValue } from "./inputSnapshot.js";
+
+const judgmentSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    cycle_judgment: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        outcome: {
+          type: "string",
+          enum: ["verified_progress", "no_progress", "blocked", "unsafe", "socially_resolved"]
+        },
+        what_happened: { type: "string" },
+        why_it_mattered_for_life_goal: { type: "string" },
+        verifier_status: {
+          type: "string",
+          enum: ["passed", "failed", "not_applicable"]
+        },
+        memory_writes: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              layer: {
+                type: "string",
+                enum: ["episodic", "procedural", "social", "belief", "guardrail"]
+              },
+              summary: { type: "string" },
+              confidence: {
+                type: "string",
+                enum: ["observed", "inferred", "uncertain"]
+              }
+            },
+            required: ["layer", "summary", "confidence"]
+          }
+        },
+        relationship_event_proposals: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              target_actor_id: { type: "string" },
+              kind: { type: "string" },
+              evidence_refs: { type: "array", items: { type: "string" } }
+            },
+            required: ["target_actor_id", "kind", "evidence_refs"]
+          }
+        },
+        next_goal_pressure: { type: "array", items: { type: "string" } }
+      },
+      required: [
+        "outcome",
+        "what_happened",
+        "why_it_mattered_for_life_goal",
+        "verifier_status",
+        "memory_writes",
+        "relationship_event_proposals",
+        "next_goal_pressure"
+      ]
+    }
+  },
+  required: ["cycle_judgment"]
+} as const;
+
+export type CycleJudgmentProviderResult =
+  | { ok: true; judgment: CycleJudgment; judgmentRef: string; inputRef: string; outputRef: string }
+  | { ok: false; error: string; inputRef: string; outputRef: string };
+
+export async function runSocialCycleJudgmentProvider(input: {
+  providerId: "openai-api" | "deterministic-social";
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  cycleId: string;
+  cycleGoal: ActorCycleGoal;
+  actionIntent: ActionIntent;
+  context: SocialCycleContextPacket;
+  runtimeResult: JsonValue;
+  evidenceRefs: string[];
+  executedTools: string[];
+  verifierStatus: CycleJudgment["verifier_status"];
+  runId?: string;
+  openAi?: OpenAiJsonProviderConfig;
+}): Promise<CycleJudgmentProviderResult> {
+  const snapshotId = `cycle-judgment-${input.cycleId}-${randomUUID()}`;
+  const providerInput = {
+    stage: "cycle_judgment",
+    ActorSoul: input.context.ActorSoul,
+    ActorLifeGoal: input.context.ActorLifeGoal,
+    cycle_goal: input.cycleGoal,
+    action_intent: input.actionIntent,
+    runtime_result: input.runtimeResult,
+    evidence_refs: input.evidenceRefs,
+    executed_tools: input.executedTools,
+    verifier_status: input.verifierStatus
+  } as JsonValue;
+
+  const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
+    schema: "provider-input-snapshot/v1",
+    snapshot_id: snapshotId,
+    actor_id: input.actorId,
+    turn_id: input.cycleId,
+    provider_id: input.providerId,
+    model: input.openAi?.model ?? "deterministic-social",
+    created_at: new Date().toISOString(),
+    input: providerInput
+  });
+
+  let judgmentBody: Omit<CycleJudgment, "schema" | "actor_id" | "cycle_id" | "cycle_goal_id" | "evidence_refs">;
+
+  if (input.providerId === "deterministic-social") {
+    judgmentBody = {
+      outcome: deterministicJudgmentOutcome({
+        verifierStatus: input.verifierStatus,
+        executedTools: input.executedTools
+      }),
+      what_happened: `Runtime ${input.verifierStatus} for ${input.actionIntent.kind}`,
+      why_it_mattered_for_life_goal:
+        "Baseline cycle records truthful runtime evidence against gatherer LifeGoal.",
+      verifier_status: input.verifierStatus,
+      memory_writes: [
+        {
+          layer: "episodic",
+          summary: input.actionIntent.why_this_action,
+          confidence: "observed"
+        }
+      ],
+      relationship_event_proposals: [],
+      next_goal_pressure: input.context.previous_cycle_judgments.length
+        ? ["Consider prior judgment when choosing the next CycleGoal"]
+        : ["Continue settlement contribution under LifeGoal"]
+    };
+  } else {
+    const result = await callOpenAiJsonSchema<{
+      cycle_judgment: {
+        outcome: CycleJudgment["outcome"];
+        what_happened: string;
+        why_it_mattered_for_life_goal: string;
+        verifier_status: CycleJudgment["verifier_status"];
+        memory_writes: CycleJudgment["memory_writes"];
+        relationship_event_proposals: CycleJudgment["relationship_event_proposals"];
+        next_goal_pressure: string[];
+      };
+    }>({
+      config: input.openAi!,
+      schemaName: "social_cycle_judgment",
+      schema: judgmentSchema,
+      system: `Write CycleJudgment from runtime evidence only. Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs.
+observe-only cycles are no_progress, not verified_progress. ActorSoul and ActorLifeGoal must inform why_it_mattered_for_life_goal. JSON only.`,
+      user: JSON.stringify(providerInput)
+    });
+
+    if (!result.ok) {
+      const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
+        schema: "provider-output-snapshot/v1",
+        snapshot_id: `${snapshotId}-out`,
+        actor_id: input.actorId,
+        turn_id: input.cycleId,
+        provider_id: input.providerId,
+        model: result.model,
+        created_at: new Date().toISOString(),
+        raw_output_text: result.rawText ?? "",
+        parsed_output: { error: result.message },
+        proposal: { error: result.message }
+      });
+      return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
+    }
+
+    const payload = normalizeOpenAiJsonPayload(result.parsed as Record<string, unknown>);
+    const raw = (payload.cycle_judgment ?? {}) as Record<string, unknown>;
+    judgmentBody = {
+      outcome: raw.outcome as CycleJudgment["outcome"],
+      what_happened: String(raw.what_happened ?? ""),
+      why_it_mattered_for_life_goal: String(raw.why_it_mattered_for_life_goal ?? ""),
+      verifier_status: input.verifierStatus,
+      memory_writes: Array.isArray(raw.memory_writes)
+        ? (raw.memory_writes as CycleJudgment["memory_writes"])
+        : [],
+      relationship_event_proposals: Array.isArray(raw.relationship_event_proposals)
+        ? (raw.relationship_event_proposals as CycleJudgment["relationship_event_proposals"])
+        : [],
+      next_goal_pressure: asStringArray(raw.next_goal_pressure)
+    };
+  }
+
+  const judgment: CycleJudgment = clampCycleJudgmentOutcome({
+    judgment: {
+      schema: "cycle-judgment/v1",
+      actor_id: input.actorId,
+      cycle_id: input.cycleId,
+      cycle_goal_id: input.cycleGoal.goal_id,
+      evidence_refs: [...input.evidenceRefs],
+      ...(input.runId ? { run_id: input.runId } : {}),
+      ...judgmentBody
+    },
+    actionIntent: input.actionIntent,
+    executedTools: input.executedTools
+  });
+
+  const validated = validateCycleJudgment(judgment);
+  if (!validated.ok) {
+    return {
+      ok: false,
+      error: validated.errors.join("; "),
+      inputRef: inputPath,
+      outputRef: ""
+    };
+  }
+
+  const { ref: judgmentRef } = await writeCycleJudgment(
+    input.actorWorkspaceRootDir,
+    input.actorId,
+    validated.judgment
+  );
+
+  const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
+    schema: "provider-output-snapshot/v1",
+    snapshot_id: `${snapshotId}-out`,
+    actor_id: input.actorId,
+    turn_id: input.cycleId,
+    provider_id: input.providerId,
+    model: input.openAi?.model ?? "deterministic-social",
+    created_at: new Date().toISOString(),
+    raw_output_text: JSON.stringify(validated.judgment),
+    parsed_output: validated.judgment as unknown as JsonValue,
+    proposal: { judgment_ref: judgmentRef }
+  });
+
+  return {
+    ok: true,
+    judgment: validated.judgment,
+    judgmentRef,
+    inputRef: inputPath,
+    outputRef: outputPath
+  };
+}

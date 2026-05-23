@@ -19,8 +19,12 @@ const sidebars = {
         'Architecture/Bounded-Action-Skill-Creation',
         'Architecture/Autonomous-Objective-Evaluation',
         'Architecture/Direct-Generated-Action-Skills',
+        'Architecture/Soul-Life-Goal-Runtime-Architecture',
+        'Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan',
         'Architecture/LLM-Context-And-Actor-Workspace',
         'Architecture/Social-Actor-Profiles-And-Relationships',
+        'Architecture/Single-Actor-Long-Term-Diamond-Handoff',
+        'Architecture/Social-Simulation-Next-Goal-Handoff',
       ],
     },
     {

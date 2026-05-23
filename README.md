@@ -63,6 +63,8 @@ Read these first:
 3. `docs/docs/Agent-Search-Index.md`
 4. `docs/docs/Terminology.md`
 5. `docs/docs/Architecture/Minimal-Probe.md`
+6. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+7. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 
 Historical plans and research still exist in `docs/docs/Plans/` and
 `docs/docs/Research/`, but not every older plan is still an active implementation
@@ -144,6 +146,10 @@ Primary evidence should come from:
 - `SPEC.md` is the canonical rebuild spec.
 - `AGENTS.md` is the canonical repo guidance for agents.
 - `docs/docs/Architecture/Minimal-Probe.md` describes the active current-phase goal.
+- `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
+  runtime success from actor soul, life goal, and cycle-goal authority.
+- `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+  is the current Composer 2.5 implementation handoff for that architecture.
 - Older plan docs are useful as historical context, but some are now archived and
   should not be treated as the current build plan.
 

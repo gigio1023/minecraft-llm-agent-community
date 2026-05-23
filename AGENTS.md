@@ -161,6 +161,11 @@ practice.
 - Configuration comments should explain non-obvious defaults, auth boundaries,
   artifact locations, and destructive-vs-non-destructive behavior. Do not label
   obvious scalar defaults.
+- Prefer TSDoc `@remarks` for invariants that must survive refactors (for example,
+  “WorldEvent is pressure, not LifeGoal”). Use `@see` to link architecture docs
+  when a module implements a written contract.
+- Keep JSDoc tags sparse: `@param` only when the name is not self-explanatory;
+  avoid `@returns` on obvious `Promise<void>` helpers.
 
 Reference anchors:
 
@@ -192,6 +197,83 @@ Reference anchors:
   deprecated instead of leaving it ambiguous.
 - Prefer one canonical definition doc over several drifting ones.
 - Never use absolute local paths in committed docs.
+
+## Default LLM Planner (Codegen)
+
+For **Mineflayer TypeScript codegen** (long-objective / direct-generated planner),
+do **not** use Gemini Native Audio Dialog as the primary path. Recorded verdict:
+`docs/docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
+
+Use:
+
+- **REST `text-genai`** (`gemini-2.5-flash` via `@google/genai`) — current working
+  path; `--force-path text-genai` on long-objective CLI, or
+- **Gemini OpenAI-compatible Chat Completions** (OpenAI SDK + same `system`/`user`
+  message shape) — evaluate via `probe/scripts/experimentGeminiOpenAiCompatMatrix.ts`.
+
+Native Audio Dialog (`live-transcription`) remains in the repo for dialog/smoke
+only: text in, audio out, **transcription-only** readback. It is not reliable for
+`export async function run(ctx)` generation.
+
+Codegen-friendly defaults (override in ignored `.env`):
+
+```text
+GEMINI_PLANNER_PRIMARY=text-genai
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription
+```
+
+Implementation:
+
+- `probe/src/provider/gemini/nativeAudioDialog.ts`
+- `callGeminiLivePlanner()` prefers `live-transcription` first
+- Long-objective planning goes through `ObjectivePhasePlannerPort`
+  (`probe/src/provider/planner/`) — Gemini, OpenAI Codex, or explicit
+  `builtin-planner`
+- When LLM output is empty, blocked, or rejected, the runner falls back to
+  **builtin phase source**: repo-authored `export async function run(ctx)` templates
+  in `builtinPhaseSources.ts`. This is **not** loading an existing seed action skill
+  from the gameplay registry; it is the same *execution shape* as a generated
+  program, but checked in per phase.
+- CLI `--provider deterministic` is kept as an alias for `--provider builtin-planner`
+
+Do not treat optional Gemini smoke CLIs as the main validation loop. They are
+shallow wiring checks only.
+
+## Testing Priority
+
+Prefer **real implementation runs** with truthful artifacts over smoke-only
+proof:
+
+1. Run the actual command (`probe:long-objective`, `probe:objective`, etc.).
+2. Read the report JSON, actor workspace provider snapshots, helper events, and
+   verifier output.
+3. Feed failures back into substrate or prompt fixes.
+
+Smoke tests (`probe:gemini-live-smoke`, `probe:gemini-native-audio-dialog-smoke`)
+are allowed only as quick optional wiring checks. They do not replace Minecraft
+current-run verification.
+
+## Social Cycle Runtime (Soul / LifeGoal)
+
+Use `probe:social-cycle` for the Soul/LifeGoal/CycleGoal vertical slice. This path
+uses **OpenAI API** (`OPENAI_API_KEY` in repo-local `.env`), not
+`openai-codex` / `build/provider-auth/openai-codex-auth.json`.
+
+```bash
+cd probe
+OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+  --actor npc_b \
+  --provider openai-api \
+  --cycles 2 \
+  --max-actions-per-cycle 3 \
+  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --no-dashboard
+```
+
+`deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
+Do not use `probe:long-objective` as the social-life runtime.
+
+Canonical plan: `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
 
 ## Auth Rule
 

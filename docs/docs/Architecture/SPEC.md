@@ -28,6 +28,9 @@ The active architecture is defined by boundaries more than feature count:
   reviews, provider inputs, and relationships under actor workspace.
 - **Replayable evidence**: provider packets, turn evidence, verifier deltas, and
   review refs make failures inspectable.
+- **Soul/life/cycle goal authority**: for social-agency experiments, durable
+  ActorSoul and LifeGoal should steer per-cycle goals before runtime action
+  selection.
 - **Bounded social pressure**: profiles, goals, obligations, and relationships
   shape intent without granting tools or bypassing action-skill gates.
 - **Async repair**: reviewers diagnose from immutable artifacts after the turn;
@@ -65,10 +68,12 @@ driver of the next slice.
 5. `Async-Reviewer-Sidecars.md`
 6. `Implementation-Workstreams.md`
 7. `Bounded-Action-Skill-Creation.md`
-8. `LLM-Context-And-Actor-Workspace.md`
-9. `Social-Actor-Profiles-And-Relationships.md`
-10. `../Setup/Headless-Server.md`
-11. `../Setup/Provider-Setup.md`
+8. `Soul-Life-Goal-Runtime-Architecture.md`
+9. `composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+10. `LLM-Context-And-Actor-Workspace.md`
+11. `Social-Actor-Profiles-And-Relationships.md`
+12. `../Setup/Headless-Server.md`
+13. `../Setup/Provider-Setup.md`
 
 ## Historical Note
 

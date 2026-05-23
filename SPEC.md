@@ -59,6 +59,26 @@ to carry the whole architecture:
    - light execution guards;
    - helper-call evidence;
    - reviewer cleanup into stable action skills and recipes.
+12. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+   - actor soul, persistent life goal, cycle goal, and cycle judgment as the
+     missing continuity layer;
+   - mapping to actor workspace, goal stack, pressure intent, action skills,
+     verifier, and memory;
+   - metrics that separate runtime success from social-life goal agency.
+13. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+   - Composer 2.5 handoff for a complete social-life vertical slice;
+   - OpenAI API `gpt-5.4-mini` provider plan with configurable fallback;
+   - Goal Mind, Action Planner, Cycle Judgment contracts and validation commands.
+14. `docs/docs/Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`
+   - next active handoff for single-actor long-term objectives;
+   - diamond objective ladder;
+   - Gemini Live planner integration plan;
+   - truthful phase reports and stop reasons.
+15. `docs/docs/Architecture/Social-Simulation-Next-Goal-Handoff.md`
+   - next bounded social simulation slice;
+   - social objective ladder;
+   - Cursor Composer handoff prompt;
+   - test gates for shared-resource social exchange.
 
 Treat this file as the source of truth for priority and scope. Treat the split
 docs as the source of truth for detailed implementation contracts.
@@ -220,9 +240,18 @@ Priority order:
    action skill records.
 7. Convert direct objective reports into typed actor memory and retrieve that
    memory by objective, item, action skill, verifier status, and diagnosis.
-8. Keep the gameplay hot path bounded and free of blocking critic/reviewer
+8. Use the same single actor to attempt longer Minecraft dependency chains:
+   stone pickaxe, iron ingot, iron pickaxe, diamond ore location, and diamond
+   acquisition. Accept a truthful stop reason and next implementation task when
+   diamond is not reached yet.
+9. Keep the gameplay hot path bounded and free of blocking critic/reviewer
    work.
-9. Keep the managed local server path easy to start, inspect, and stop.
+10. Keep the managed local server path easy to start, inspect, and stop.
+
+The next implementation planning handoff is
+`docs/docs/Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`. Treat
+relationship/social-loop proof as the next layer after one actor can make
+truthful progress through longer dependency chains.
 
 Current objective command:
 

@@ -28,6 +28,9 @@ export type ActorProviderContextOptions = {
   actorWorkspaceRootDir: string;
   actorId: string;
   activeActionSkills: readonly ActorActionSkillRecord[];
+  /** Social-cycle stages inject constitutional soul/life goal packets explicitly. */
+  actorSoul?: JsonValue;
+  actorLifeGoal?: JsonValue;
   memory?: readonly string[];
   currentObjective?: {
     objective_id?: string;
@@ -338,6 +341,8 @@ export async function buildActorProviderContext(
           : null
     },
     actor_profile: actorProfile,
+    ...(options.actorSoul ? { actor_soul: options.actorSoul } : {}),
+    ...(options.actorLifeGoal ? { actor_life_goal: options.actorLifeGoal } : {}),
     ...(goalStack ? { goal_stack: goalStack } : {}),
     relationships,
     incoming_relationships: incomingRelationships,

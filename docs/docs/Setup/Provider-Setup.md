@@ -97,6 +97,41 @@ diagnosing it.
 Use `--no-dashboard` to disable the server or `--dashboard-port <port>` to move
 it off the default port.
 
+## Gemini Native Audio Dialog (Default Planner)
+
+For long-objective and direct-generated planner calls, this repo defaults to
+**Gemini 2.5 Flash Native Audio Dialog** over Live API (`v1alpha`):
+
+```text
+GEMINI_API_KEY=...                         # ignored local only
+GEMINI_PLANNER_PRIMARY=native-audio-dialog
+GEMINI_LIVE_API_VERSION=v1alpha
+GEMINI_NATIVE_AUDIO_DIALOG_MODEL=gemini-2.5-flash-native-audio-latest
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=live-transcription,text-genai
+```
+
+Behavior:
+
+- user sends **text** turns;
+- model may return audio internally;
+- runtime keeps only **output transcription text**;
+- `text-genai` is fallback on Live/session failure.
+
+Real validation command (preferred over smoke-only checks):
+
+```bash
+cd probe
+bun run server:ready
+bun run probe:long-objective -- \
+  --objective craft_current_run_stone_pickaxe_1 \
+  --actor npc_b \
+  --provider gemini-live-planner \
+  --report ../tmp/long-stone-pickaxe-gemini.json
+```
+
+Read `AGENTS.md` for testing priority: implementation runs and report feedback
+matter more than shallow smoke CLIs.
+
 ## Reviewer Provider Switch
 
 Per-actor review jobs use the deterministic reviewer by default.
@@ -128,3 +163,31 @@ When provider-backed paths are used, Langfuse traces should help answer:
 
 Trace evidence is supplementary to transcript and runtime artifacts, not a
 replacement for them.
+
+## Social Cycle Provider (OpenAI API)
+
+The Soul/LifeGoal/CycleGoal vertical slice uses the OpenAI API directly, not the
+Codex auth store.
+
+```text
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.4-mini
+SOCIAL_CYCLE_REASONING=low
+SOCIAL_CYCLE_MAX_COMPLETION_TOKENS=1600
+```
+
+Run:
+
+```bash
+cd probe
+OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+  --actor npc_b \
+  --provider openai-api \
+  --cycles 2 \
+  --max-actions-per-cycle 3 \
+  --report ../tmp/social-cycle-openai-real-action.json \
+  --no-dashboard
+```
+
+Use `deterministic-social` only for tests and baseline implementation reports.
+If `gpt-5.4-mini` is unavailable, retry with `OPENAI_MODEL=gpt-5-mini`.

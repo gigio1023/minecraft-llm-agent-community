@@ -34,6 +34,11 @@ observe -> gate -> execute -> verify -> record
 
 Reviewer and repair work runs after the turn from saved artifacts.
 
+The next architecture layer is actor-owned goal continuity: `soul.md`, a
+persistent LifeGoal, per-cycle CycleGoal selection, and CycleJudgment artifacts.
+It separates "Minecraft evidence passed" from "the actor's social-life judgment
+actually controlled the current goal."
+
 ## What It Is Not
 
 This is not a loose generated-code gameplay loop. It is also not a persona-first
@@ -55,6 +60,8 @@ transcript evidence.
 
 - [Runtime Loop And Verification](Architecture/Runtime-Loop-And-Verification.md)
 - [Actor Workspace And Action Skill Memory](Architecture/Actor-Workspace-And-Action-Skill-Memory.md)
+- [Soul Life Goal Runtime Architecture](Architecture/Soul-Life-Goal-Runtime-Architecture.md)
+- [Composer 2.5 Soul Life Goal Runtime Implementation Plan](Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md)
 - [Async Reviewer Sidecars](Architecture/Async-Reviewer-Sidecars.md)
 - [Social Actor Profiles And Relationships](Architecture/Social-Actor-Profiles-And-Relationships.md)
 - [Headless Server Setup](Setup/Headless-Server.md)

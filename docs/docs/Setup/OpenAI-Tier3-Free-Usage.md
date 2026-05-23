@@ -1,0 +1,37 @@
+# OpenAI API — Tier 3 data-sharing free daily usage
+
+Recorded for this repo’s **`openai` provider** experiments (not `openai-codex` / ChatGPT Codex backend).
+
+## Eligibility
+
+When your organization is eligible to share evaluation/traffic with OpenAI, daily free token pools apply. See:
+
+- [Sharing feedback, evaluation, and fine-tuning data (and API inputs/outputs) with OpenAI](https://help.openai.com/en/articles/10306912-sharing-feedback-evaluation-and-fine-tuning-data-and-api-inputs-and-outputs-with-openai)
+
+## Free daily token pools (summary)
+
+| Pool | Limit | Example models |
+|------|--------|----------------|
+| **Large** | Up to **1M tokens / day** | `gpt-5.4`, `gpt-5.2`, `gpt-5.1`, `gpt-5.1-codex`, `gpt-5`, `gpt-5-codex`, `gpt-5-chat-latest`, `gpt-4.1`, `gpt-4o`, `o1`, `o3` |
+| **Mini / nano** | Up to **10M tokens / day** | `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.1-codex-mini`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-4o-mini`, `o1-mini`, `o3-mini`, `o4-mini`, `codex-mini-latest` |
+
+Usage beyond these pools, and usage on models outside the lists, is billed at standard rates. Some limitations apply (see OpenAI help article above).
+
+## This repo
+
+- **Auth:** `OPENAI_API_KEY` in repo-root `.env` (gitignored).
+- **Default experiment model:** `gpt-5.4-mini` (mini pool, 10M tokens/day).
+- **Not the same as:** `openai-codex` gameplay provider (`chatgpt.com/backend-api/codex/responses`) or `build/provider-auth/openai-codex-auth.json`.
+- **Structured output:** prefer `response_format.type = "json_schema"` per [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs); `json_object` is legacy/looser. Strict schemas require every property under `args` to appear in `required` (see `TOOL_PROPOSAL_JSON_SCHEMA` in `plannerProviderMatrixShared.ts`).
+- **Chat Completions params:** `gpt-5.4-mini` uses `max_completion_tokens` (not `max_tokens`).
+- **`.env` loading:** experiment scripts call `loadRepoDotEnv(repo, { overrideKeys: ["OPENAI_API_KEY"] })` so a stale shell `OPENAI_API_KEY` does not shadow repo `.env`.
+- **Planner matrix script:** `probe/scripts/experimentPlannerProviderMatrix.ts` → `tmp/planner-provider-matrix-report.json`.
+
+## Gemini contrast (free tier reference)
+
+| Model | RPM | TPM | RPD |
+|-------|-----|-----|-----|
+| Gemini 3.1 Flash Lite | 15 | 250k | 500 |
+| Gemma 4 31B | 15 | unlimited | 1.5k |
+
+See `docs/docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md` — Native Audio Dialog is not used for codegen.
