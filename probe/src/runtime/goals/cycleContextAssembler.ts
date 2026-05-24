@@ -13,6 +13,10 @@ import type {
   StrategicGoal,
   WorldEvent
 } from "./types.js";
+import {
+  buildActionSurfacePacket,
+  type ActionSurfacePacket
+} from "../actionSurface.js";
 import { lifeGoalRef } from "./lifeGoalStore.js";
 import { soulRef } from "./actorSoulStore.js";
 import {
@@ -29,6 +33,13 @@ export type SocialCycleRelationshipContext = {
   incoming_relationship_pressures: unknown[];
 };
 
+/**
+ * Provider-facing social-cycle context assembled from runtime-owned artifacts.
+ *
+ * @remarks `action_surface` is the actor's executable body, while
+ * `settlement_state` remains pressure/evidence context; neither is a domain
+ * strategy that can replace ActorSoul or LifeGoal.
+ */
 export type SocialCycleContextPacket = {
   schema: "social-cycle-context/v1";
   ActorSoul: ActorSoul;
@@ -51,6 +62,7 @@ export type SocialCycleContextPacket = {
     success_verifier: string;
   }>;
   allowed_primitive_ids: string[];
+  action_surface: ActionSurfacePacket;
   relationship_context: SocialCycleRelationshipContext;
   memory_packet: ActorMemoryRetrievalPacket;
   settlement_state: SettlementState;
@@ -109,6 +121,7 @@ function memoryItemNamesFromWorldEvents(worldEvents: readonly WorldEvent[]) {
   });
 }
 
+/** Builds the compact context packet used by CycleGoal, ActionIntent, and judgment providers. */
 export async function assembleSocialCycleContext(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
@@ -157,6 +170,12 @@ export async function assembleSocialCycleContext(input: {
     ],
     memoryWriteCount: input.memoryWriteCount
   });
+  const actionSurface = buildActionSurfacePacket({
+    actorId: input.actorId,
+    activeActionSkills: input.activeActionSkills,
+    allowedPrimitiveIds: input.allowedPrimitiveIds,
+    recentBlockers: settlementState.blocker_histogram
+  });
 
   const providerContext = await buildActorProviderContext({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -192,6 +211,7 @@ export async function assembleSocialCycleContext(input: {
       success_verifier: record.success_verifier
     })),
     allowed_primitive_ids: [...input.allowedPrimitiveIds],
+    action_surface: actionSurface,
     relationship_context: {
       relationships: Array.isArray(providerContext.relationships)
         ? providerContext.relationships

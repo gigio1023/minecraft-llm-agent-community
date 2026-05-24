@@ -72,6 +72,18 @@ If a recommendation would make the actor ignore Soul/LifeGoal continuity,
 relationships, or social consequences in favor of generic task completion, reject
 or reframe it.
 
+Do not turn one domain goal into core architecture. House, shelter, base,
+storage, mining, farming, travel, repair, conversation, and conflict are
+possible social pressures, not mandatory CycleGoal phases. Do not add
+`StructurePlacementPlan`, `ShelterBlueprint`, `HomeBasePlan`, or similar
+building-first planning artifacts as always-on runtime context. If such an
+artifact is useful, keep it local to a bounded action skill, fixture, or offline
+design tool and make the current Soul/LifeGoal pressure justify its use.
+
+Codex/MCP-style references should be adapted as autonomy substrate: action
+surface, direct/deferred tool exposure, hooks, permission gates, event streams,
+verification, and artifacts. Do not adapt them as hidden domain strategy.
+
 ## Canonical Docs
 
 Read these first:
@@ -242,6 +254,10 @@ Important search tokens:
 - Mineflayer provides the game client API.
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
   eval.
+- Prefer autonomy substrate over domain-specific strategy encoding. Improve
+  context packets, `action_surface`, gates, hooks, verifier feedback, and actor
+  memory before adding a specialized planner for one activity such as house
+  building.
 - Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
   artifacts, structured logs, and optional viewer evidence.
 - Failures should be explainable from artifacts without immediate reproduction.
@@ -291,6 +307,11 @@ practice.
 - During comment passes, explicitly inspect every TypeScript file with zero
   comments. Either add a high-signal contract/invariant comment or leave it
   uncommented only when the file is a trivial CLI/re-export/declarative constant.
+- When the user explicitly requests a comment pass, report whether existing
+  guidance was sufficient, then update only comments that clarify contracts,
+  invariants, runtime evidence, or non-obvious Mineflayer behavior. Tests may
+  receive comments only for non-obvious invariants; do not pad every test with
+  narration.
 - Configuration comments should explain non-obvious defaults, auth boundaries,
   artifact locations, and destructive-vs-non-destructive behavior. Do not label
   obvious scalar defaults.

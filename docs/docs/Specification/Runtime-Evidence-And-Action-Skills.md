@@ -53,6 +53,12 @@ Action skills are not Codex/Claude agent skills. Conversation-like behavior is
 an action skill when it goes through the Minecraft runtime and leaves runtime
 evidence.
 
+Action skills are available behaviors, not strategic goals. A shelter-building
+action skill, chest action skill, mining action skill, or conversation action
+skill should be selected because the current Soul/LifeGoal pressure and runtime
+evidence make it relevant, not because the core runtime always routes cycles
+through that activity.
+
 Action skill requirements:
 
 - actor owner;
@@ -83,6 +89,26 @@ A verifier should reject fake progress:
 The verifier should also preserve partial/progressing evidence when useful. A
 truthful blocker is better than a false pass.
 
+The social runtime may use `partial_verified_progress` when a current run
+produces real world, inventory, movement, container, or block mutation but the
+final verifier or action-skill postcondition does not pass. This status must
+not be used to claim completion.
+
+## Action Surface
+
+The provider-visible action surface is the actor's current body. It should show:
+
+- direct primitives and action skills that are executable now;
+- deferred primitives or action skills that explain missing affordances;
+- relevant preconditions and verifier expectations;
+- recent blockers and missing primitive blockers;
+- rules that remind the provider that runtime verification decides success.
+
+The action surface is substrate. It is not a domain strategy. For example,
+`build_pattern` may appear as a direct primitive for a settler, but that does
+not mean every CycleGoal should consider building. It only means building is
+available if current pressure justifies it.
+
 ## Transcript And Artifacts
 
 Every meaningful run should leave artifacts that explain:
@@ -108,15 +134,16 @@ The runtime should move toward a compressed settlement state packet containing:
 
 - current inventory counts;
 - shared chest snapshot;
-- known base, spawn, table, chest, and shelter positions;
-- shelter verifier status;
+- known positions that are relevant to current pressure, such as actor, table,
+  chest, shelter, or other work sites;
+- verifier status for relevant domain-specific action skills;
 - pending obligations and handoffs;
 - recent blockers;
 - recent CycleJudgments;
 - available action skills and missing primitive blockers.
 
 This packet should be computed from runtime artifacts, not hallucinated by the
-provider.
+provider. It is a pressure/evidence packet, not a universal home-base checklist.
 
 ## Current Evidence Belongs In Handoff Docs
 

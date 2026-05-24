@@ -152,6 +152,13 @@ function cycleGoalFromLlm(input: {
   };
 }
 
+/**
+ * Produces the next bounded CycleGoal without granting domain strategy authority.
+ *
+ * @remarks The provider may prioritize shelter, storage, movement, or speech,
+ * but only as pressure interpreted under ActorSoul/LifeGoal and the current
+ * action surface.
+ */
 export async function runSocialCycleGoalProvider(input: {
   providerId: "openai-api" | "deterministic-social";
   actorWorkspaceRootDir: string;
@@ -235,8 +242,10 @@ ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a Wo
 WorldEvents are pressure only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
 Choose an ordinary Minecraft CycleGoal when the situation calls for it. Collecting logs is just collecting logs unless observation, memory, or relationships make it socially relevant.
 The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
+Use action_surface as the current actor body and affordance catalog. Direct entries are usable now; deferred entries are diagnostics about missing or non-exposed affordances.
 For survival and settlement goals, value evidence of diversified progress: safe positioning, resource discovery, enough starter wood, crafting, stone/tool progression, and shared storage. Do not make surplus collection of one stocked material the continuing goal unless live evidence shows it is still the best need.
-Use settlement_state and settlement_checklist as runtime-owned evidence about what is already complete, blocked, or pending. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Use settlement_state and settlement_checklist as runtime-owned pressure/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal home-building plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Do not make shelter, home, base, or structure construction an always-on CycleGoal. Building is one possible social pressure among many, selected only when ActorSoul/LifeGoal, WorldEvent pressure, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
 If observation includes nearbyResources or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose a different plausible next direction such as movement, observation, gathering, crafting, speech, or memory based on the live context. Output JSON only.`;
 

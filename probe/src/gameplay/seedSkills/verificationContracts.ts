@@ -99,7 +99,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     skillId: "buildBasicShelter",
     primitiveIds: ["observe", "build_pattern", "remember"],
     evidence: [
-      "starter shelter blueprint expands to bounded wall and roof coordinates",
+      "starter shelter pattern expands to bounded wall and roof coordinates",
       "build_pattern records per-cell placement evidence",
       "shelter verifier re-reads current world blocks for wall, roof, floor support, and clear interior evidence"
     ],

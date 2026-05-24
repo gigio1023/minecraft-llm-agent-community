@@ -29,6 +29,11 @@ The actor may still gather logs, craft tools, build shelter, place blocks, or
 deposit items. Those actions matter because they create social consequences and
 durable evidence. They are not isolated benchmark objectives.
 
+The runtime should increase actor autonomy by improving context, action
+surface, gates, hooks, verification, and artifact memory. It should not encode
+one example activity, such as building a house or shelter, as the hidden shape
+of every cycle.
+
 ## Soul And Actor Identity
 
 When `soul.md` or an ActorSoul artifact exists, treat it as the actor's identity
@@ -78,6 +83,11 @@ Examples:
 - Building shelter while updating memory about settlement safety is
   social-simulation progress.
 
+These examples are not a priority order. Shelter is one possible pressure source
+among many, not the architecture. A cycle about storage, request fulfillment,
+scarcity, repair, movement, or conflict should not be forced through a building
+plan.
+
 The runtime evidence proves what happened. CycleJudgment explains why it matters
 under Soul/LifeGoal.
 
@@ -113,6 +123,10 @@ The spec expects these pressure sources to become first-class context over time:
 
 These are not permission grants. They shape intent only. Runtime gates and
 active action skills still decide what can execute.
+
+No pressure source should become a universal cycle phase. The actor should see
+the current pressure and the current action surface, then choose within
+Soul/LifeGoal continuity.
 
 ## First Useful Social Slice
 

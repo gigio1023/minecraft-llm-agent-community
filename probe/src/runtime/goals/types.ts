@@ -174,8 +174,10 @@ export type ActionIntent = {
   fallback_if_blocked: string;
 };
 
+/** Cycle outcomes distinguish final success from useful current-run mutation that still failed a verifier. */
 export type CycleJudgmentOutcome =
   | "verified_progress"
+  | "partial_verified_progress"
   | "no_progress"
   | "blocked"
   | "unsafe"
@@ -183,6 +185,7 @@ export type CycleJudgmentOutcome =
 
 const cycleJudgmentOutcomes: readonly CycleJudgmentOutcome[] = [
   "verified_progress",
+  "partial_verified_progress",
   "no_progress",
   "blocked",
   "unsafe",

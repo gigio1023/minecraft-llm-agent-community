@@ -17,6 +17,7 @@ leaving enough runtime evidence to explain the result.
 - starts or connects to a local Minecraft server;
 - runs Mineflayer actors through a bounded TypeScript loop;
 - lets a provider propose one action at a time;
+- exposes an `action_surface` packet with direct/deferred runtime affordances;
 - verifies progress from Minecraft state, not model text;
 - writes transcripts, provider inputs, evidence, and review artifacts.
 
@@ -40,6 +41,7 @@ Reviewer and repair work runs after the turn from saved artifacts.
 flowchart TD
   Workspace["actor workspace"]
   Context["bounded provider context"]
+  Surface["action_surface"]
   Proposal["CycleGoal / ActionIntent proposal"]
   Gate["active action skill gate"]
   Action["Mineflayer action skill or primitive"]
@@ -48,7 +50,8 @@ flowchart TD
   Review["async reviewer sidecars"]
 
   Workspace --> Context
-  Context --> Proposal
+  Context --> Surface
+  Surface --> Proposal
   Proposal --> Gate
   Gate --> Action
   Action --> Evidence
@@ -66,19 +69,22 @@ The latest live testing showed this separation matters. A 100-cycle home-base
 stress test with the OpenAI social-cycle provider reused prior judgment and
 memory, collected logs, crafted planks, and placed partial shelter shell blocks,
 but did not claim a finished home because the shelter verifier did not pass.
-That result belongs in future work, not the long-term spec.
+That result belongs in future work, not the long-term spec. It should improve
+the autonomy substrate, not turn house-building into the architecture.
 
 ```mermaid
 flowchart LR
   Goal["home-base WorldEvent pressure"]
   Context["Soul/LifeGoal + memory + prior judgment"]
+  Surface["action_surface"]
   Action["bounded Minecraft actions"]
   Partial["partial block placement"]
   Verifier["shelter verifier"]
   Future["future work: pivot rules and partial-progress reporting"]
 
   Goal --> Context
-  Context --> Action
+  Context --> Surface
+  Surface --> Action
   Action --> Partial
   Partial --> Verifier
   Verifier --> Future
@@ -87,7 +93,7 @@ flowchart LR
 ## What It Is Not
 
 This is not a loose generated-code gameplay loop, generic Minecraft benchmark,
-race-to-diamond project, or persona-first NPC demo.
+race-to-diamond project, house-building architecture, or persona-first NPC demo.
 
 The current proof is simpler: complete concrete Minecraft tasks, reject fake
 progress, and make failures easy to inspect.

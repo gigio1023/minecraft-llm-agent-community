@@ -17,6 +17,7 @@ export type SocialPrimitiveAttemptStatus = {
   status: string;
 };
 
+/** Converts primitive-level statuses into the verifier status stored on a cycle attempt. */
 export function deriveProgressVerifierStatus(input: {
   toolAttempts?: readonly SocialPrimitiveAttemptStatus[];
   executedTools?: readonly string[];
@@ -48,6 +49,22 @@ export function deriveProgressVerifierStatus(input: {
     : "failed";
 }
 
+/**
+ * Detects current-run mutation that should be preserved without claiming final success.
+ *
+ * @remarks This protects runs such as partial block placement: useful evidence
+ * should survive review, but it must not become a completed shelter/home claim.
+ */
+export function hasPartialVerifiedProgress(input: {
+  toolAttempts?: readonly SocialPrimitiveAttemptStatus[];
+  toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
+}) {
+  const statusRows = input.toolAttempts ?? input.toolStatuses ?? [];
+  return statusRows.some((entry) =>
+    isPartialMeaningfulToolStatus(entry.tool, entry.status)
+  );
+}
+
 export function isMeaningfulProgressVerifier(
   verifierStatus: "passed" | "failed" | "not_applicable",
   executedTools: string[]
@@ -58,18 +75,46 @@ export function isMeaningfulProgressVerifier(
   );
 }
 
+/** Rejects provider-written outcomes that are stronger than runtime evidence supports. */
 export function clampCycleJudgmentOutcome(input: {
   judgment: CycleJudgment;
   actionIntent: ActionIntent;
   executedTools: string[];
+  toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
 }): CycleJudgment {
-  if (input.judgment.outcome !== "verified_progress") {
+  if (
+    input.judgment.outcome !== "verified_progress" &&
+    input.judgment.outcome !== "partial_verified_progress"
+  ) {
     return input.judgment;
   }
 
   const meaningful = input.executedTools.filter(isMeaningfulGameplayPrimitive);
   if (meaningful.length === 0) {
     return { ...input.judgment, outcome: "no_progress" };
+  }
+
+  const hasPartial = hasPartialVerifiedProgress({ toolStatuses: input.toolStatuses });
+
+  if (
+    input.judgment.outcome === "verified_progress" &&
+    input.judgment.verifier_status !== "passed"
+  ) {
+    return {
+      ...input.judgment,
+      outcome: hasPartial ? "partial_verified_progress" : "blocked"
+    };
+  }
+
+  if (
+    input.judgment.outcome === "partial_verified_progress" &&
+    input.judgment.verifier_status === "passed"
+  ) {
+    return { ...input.judgment, outcome: "verified_progress" };
+  }
+
+  if (input.judgment.outcome === "partial_verified_progress" && !hasPartial) {
+    return { ...input.judgment, outcome: "blocked" };
   }
 
   if (
@@ -83,12 +128,20 @@ export function clampCycleJudgmentOutcome(input: {
   return input.judgment;
 }
 
+/** Deterministic provider baseline mirrors the same full/partial/blocked semantics as LLM runs. */
 export function deterministicJudgmentOutcome(input: {
   verifierStatus: CycleJudgment["verifier_status"];
   executedTools: string[];
+  toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
 }): CycleJudgmentOutcome {
   if (isMeaningfulProgressVerifier(input.verifierStatus, input.executedTools)) {
     return "verified_progress";
+  }
+  if (
+    input.verifierStatus === "failed" &&
+    hasPartialVerifiedProgress({ toolStatuses: input.toolStatuses })
+  ) {
+    return "partial_verified_progress";
   }
   if (input.verifierStatus === "failed") {
     return "blocked";
@@ -117,6 +170,15 @@ export function isSuccessfulMeaningfulToolStatus(tool: string, status: string): 
       return status === "withdrawn";
     case "move_to":
       return status === "arrived" || status === "moved";
+    default:
+      return false;
+  }
+}
+
+export function isPartialMeaningfulToolStatus(tool: string, status: string): boolean {
+  switch (tool) {
+    case "build_pattern":
+      return status === "progressing";
     default:
       return false;
   }

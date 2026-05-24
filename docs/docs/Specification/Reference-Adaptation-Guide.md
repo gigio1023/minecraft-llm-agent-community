@@ -123,6 +123,29 @@ Adaptation:
 - improve Minecraft primitive UX, verifier diagnostics, and context packets
   before increasing provider authority.
 
+### Codex-Style Tool Runtime
+
+Reference: [OpenAI Codex](https://github.com/openai/codex)
+
+Mechanism:
+
+- tools are registered, exposed, and dispatched through a runtime boundary;
+- some tools are direct, some are deferred/searchable, and some are hidden;
+- pre/post tool hooks, permission gates, sandbox policy, event streams, and
+  goal accounting shape what the model can safely do;
+- the core system provides context and action surfaces rather than
+  hard-coding task strategies for each programming language.
+
+Adaptation:
+
+- expose Minecraft primitives and actor-owned action skills through an
+  `action_surface` packet;
+- keep direct/deferred affordance exposure separate from domain strategy;
+- use pre/post action hooks and verifier artifacts to explain success, partial
+  progress, blockers, and unsafe attempts;
+- do not translate "house-building MCP demo" into core architecture. Translate
+  it into better tool descriptions, schemas, hooks, and verifier evidence.
+
 ## Social Simulation And Persona References
 
 ### Generative Agents
@@ -195,7 +218,9 @@ Adaptation:
 
 - put Soul and environment pressure in the same context packet;
 - include scarcity, shelter, chest, obligations, trust, conflict, and settlement
-  state.
+  state when relevant;
+- never privilege one pressure source, such as shelter, as the default
+  architecture for all cycles.
 
 ### Social Simulation Realism
 

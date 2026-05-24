@@ -38,6 +38,7 @@ import { listActorMemoryRefs, writeActorMemoryRecords } from "../memory/actorMem
 import { getActorProfile } from "../npc/profiles.js";
 import {
   isMeaningfulProgressVerifier,
+  hasPartialVerifiedProgress,
   type SocialPrimitiveAttemptStatus
 } from "./socialCycleProgress.js";
 import { createBots, closeBots } from "./createBots.js";
@@ -528,8 +529,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
         lastVerifier = execution.verifierStatus;
         actionSkillExecutionUnit = execution.actionSkillExecutionUnit;
+        // Report-level gameplay progress includes verified partial mutation so
+        // long runs do not hide useful world changes behind a failed final verifier.
         if (
-          isMeaningfulProgressVerifier(execution.verifierStatus, execution.executedTools)
+          isMeaningfulProgressVerifier(execution.verifierStatus, execution.executedTools) ||
+          hasPartialVerifiedProgress({ toolStatuses: execution.toolStatuses })
         ) {
           anyMeaningfulProgress = true;
         }
@@ -552,6 +556,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           runtimeResult: execution.runtimeResult,
           evidenceRefs: execution.evidenceRefs,
           executedTools: execution.executedTools,
+          toolStatuses: execution.toolStatuses,
           verifierStatus: execution.verifierStatus,
           runId,
           openAi

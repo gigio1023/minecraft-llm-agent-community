@@ -23,7 +23,10 @@ Short-term product:
 - strong observability through transcript and runtime artifacts;
 - truthful reconnect/session lifecycle evidence when reconnect is in scope;
 - architecture space for per-actor action skill ownership and later action
-  skill evolution.
+  skill evolution;
+- an autonomy substrate that exposes context, `action_surface`, hooks,
+  verification, and artifacts without turning one domain goal into the runtime
+  strategy.
 
 Long-term north star:
 
@@ -38,6 +41,7 @@ Not current goals:
 - full human-like personhood;
 - long-run autonomy as a product deliverable;
 - a Voyager clone;
+- a house-building or structure-planning architecture;
 - pretending partial animation is the same thing as competence.
 
 ## Current Runtime Shape
@@ -48,6 +52,7 @@ flowchart TD
   LifeGoal["ActorLifeGoal"]
   Pressure["WorldEvent, role, relationship, memory, inventory, settlement pressure"]
   Context["social-cycle-context/v1"]
+  Surface["action-surface/v1: direct/deferred affordances"]
   CycleGoal["CycleGoal"]
   Intent["ActionIntent"]
   Gate["runtime gate: actor-owned action skills + allowed primitives"]
@@ -59,7 +64,8 @@ flowchart TD
   Soul --> Context
   LifeGoal --> Context
   Pressure --> Context
-  Context --> CycleGoal
+  Context --> Surface
+  Surface --> CycleGoal
   CycleGoal --> Intent
   Intent --> Gate
   Gate --> Execute
@@ -73,6 +79,11 @@ The provider proposes goals and actions. The runtime owns Minecraft truth:
 validation, execution, timeout, cancellation, verification, transcript, and
 artifact persistence.
 
+`action_surface` is the actor's current body. It is not a home-building
+checklist. Shelter, storage, mining, crafting, speech, and movement are all
+ordinary affordances until ActorSoul/LifeGoal pressure and runtime evidence make
+one of them relevant.
+
 ## What Success Looks Like
 
 The first meaningful success is not a big multi-agent story.
@@ -82,7 +93,8 @@ It is this:
 - an actor chooses a bounded CycleGoal from soul, life goal, world pressure,
   memory, and previous judgment;
 - the actor actually attempts Minecraft actions like collecting logs, mining
-  coal, or preparing simple shelter through runtime gates;
+  coal, storage work, conversation, movement, or preparing simple shelter
+  through runtime gates;
 - every action attempt is recorded, including blocked and no-progress attempts;
 - later cycles reuse previous judgment or memory;
 - failures are explainable from transcript, checkpoint-like artifacts, and traces;
@@ -113,25 +125,31 @@ audited cleanly and stayed truthful:
   blocks;
 - the run did not claim a completed home without shelter verification.
 
-The main next work is planner/control hardening, not changing the long-term
-spec: required action arguments, repeated-blocker pivot rules, partial-progress
-reporting, review-summary schema catch-up, and fresh-world cleanup ownership.
+That run is a stress test, not a product identity change. The main next work is
+planner/control substrate hardening, not a home-base architecture: required
+action arguments, repeated-blocker pivot rules, partial-progress reporting,
+review-summary schema catch-up, fresh-world cleanup ownership, and broader
+action-surface diagnostics.
 See `docs/docs/Architecture/Future-Works.md`.
 
 The active social-cycle implementation now carries a runtime-owned
-`settlement-state/v1` packet and `settlement-checklist/v1` report fields. Those
-fields summarize inventory, shared storage, known table/chest/shelter positions,
-recent blockers, available action skills, missing primitive blockers, memory
-reuse, and checklist progress. They are evidence packets, not provider claims.
+`action-surface/v1` context packet plus `settlement-state/v1` and
+`settlement-checklist/v1` compatibility report fields. These fields summarize
+direct/deferred affordances, inventory, shared storage, known positions, recent
+blockers, available action skills, missing primitive blockers, memory reuse, and
+checklist progress. They are evidence packets, not provider claims or a fixed
+home-building plan.
 
 ```mermaid
 flowchart LR
   Matrix["14/14 action-skill matrix"]
+  Surface["action-surface/v1"]
   Settlement["settlement-state/v1"]
   Postconditions["action-skill postconditions"]
   SocialReport["social-cycle report"]
   Audit["report audit"]
 
+  Surface --> SocialReport
   Matrix --> Postconditions
   Postconditions --> Settlement
   Settlement --> SocialReport

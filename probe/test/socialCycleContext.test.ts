@@ -129,6 +129,18 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   assert.equal(contextCitesPreviousJudgment(context, "cycle-0001"), true);
   assert.equal(context.memory_packet.retrieved_episodic[0]?.memory_id, "social-cycle-blocker");
   assert.equal(context.memory_packet.retrieval_policy.objective_category, "social_cycle");
+
+  // The action surface exposes what the actor can do now, without treating
+  // missing action skill primitives as executable planner options.
+  assert.equal(context.action_surface.schema, "action-surface/v1");
+  assert.equal(context.action_surface.rules.exposes_actor_body_not_strategy, true);
+  assert.ok(context.action_surface.direct_primitives.some((entry) => entry.primitive_id === "observe"));
+  assert.ok(
+    context.action_surface.deferred_action_skills.some((entry) =>
+      entry.action_skill_id === "collectLogs" &&
+      entry.missing_primitives.includes("collect_logs")
+    )
+  );
   assert.equal(context.settlement_state.inventory_counts.oak_log, 2);
   assert.equal(context.settlement_state.progress.has_crafting_table, true);
   assert.equal(context.settlement_state.shared_storage.status, "contributed");

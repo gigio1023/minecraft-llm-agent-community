@@ -46,6 +46,39 @@ Read the product identity spec:
 
 - `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
 
+## 2.1 Autonomy Substrate, Not Domain Strategy
+
+The long-term architecture should give the actor more usable context, a clearer
+action surface, verifier-backed feedback, hook points, and artifact-grounded
+memory. It must not turn one example goal into core runtime strategy.
+
+House, shelter, base, storage, mining, farming, travel, repair, conversation,
+and conflict are possible social pressures. None of them should become an
+always-on CycleGoal phase, privileged planner object, or universal checklist
+unless the active ActorSoul, LifeGoal, WorldEvent, memory, relationship state,
+or observation makes that pressure relevant in the current cycle.
+
+Concrete rules:
+
+- Do not add `StructurePlacementPlan`, `ShelterBlueprint`, `HomeBasePlan`, or
+  similar domain-specific planning artifacts as mandatory core cycle context.
+- Building-oriented artifacts may exist as local inputs to a bounded action
+  skill, fixture, or offline design tool, but they are not the runtime's
+  general planning language.
+- `buildBasicShelter` is one bounded seed action skill. It is not the product
+  architecture, default objective, or proof of social simulation by itself.
+- The runtime may expose an `action_surface` packet, direct/deferred
+  affordances, pre/post action hooks, approval-like gates, verifier status,
+  event streams, and review artifacts. Those are substrate capabilities.
+- A provider may choose building only when current pressure makes building a
+  reasonable action. The system should not push every social goal through house
+  construction.
+
+This mirrors the useful lesson from Codex-style tool runtimes: the core system
+does not hard-code a strategy for every programming language. It exposes tools,
+context, hooks, approvals, events, and evidence so the model can act within a
+bounded environment. This repo should do the Minecraft/Soul-grounded equivalent.
+
 ## 3. Complete Spec Reading Map
 
 Read these documents to understand the full spec:
@@ -109,6 +142,9 @@ Setup docs:
   terminal memory note with success.
 - Social simulation must not be expected from persona text alone.
 - Social simulation must not be reduced to generic task completion.
+- Autonomy support must be implemented as substrate: context, action surface,
+  gates, hooks, verification, artifacts, and memory. Do not encode one domain
+  goal, such as house or shelter construction, as the core cycle architecture.
 
 ## 5. Near-Term Proof
 
@@ -192,6 +228,9 @@ Reference mechanisms must be translated into this project:
   progress;
 - affordance/interface work -> better runtime primitives, gates, context
   packets, and diagnostics.
+- tool-runtime work -> direct/deferred action exposure, hookable execution,
+  permission gates, event streams, and evidence accounting; not a hidden
+  domain strategy.
 
 Detailed reference mapping with links lives in:
 
@@ -212,6 +251,7 @@ Reference anchors include:
 - [Belief-Behavior Consistency](https://huggingface.co/papers/2507.02197)
 - [Persona-Environment Behavioral Alignment](https://huggingface.co/papers/2509.16457)
 - [Embodied Agent Interface](https://huggingface.co/papers/2410.07166)
+- [OpenAI Codex](https://github.com/openai/codex)
 
 ## 9. Current State Is Not The Spec
 

@@ -124,6 +124,9 @@ Implemented surfaces:
 - actor-provider-context builder;
 - active action skills, candidates, recent evidence, reviews, memory, profile,
   goals, and relationship pressure in provider-facing context;
+- social-cycle context now includes `action_surface`, a direct/deferred
+  affordance packet for the actor's current body. It is not a domain strategy or
+  home-building checklist;
 - social-cycle context now includes a runtime-owned `settlement_state` packet
   with inventory counts, checklist progress, blocker histogram, active action
   skill ids, shared storage summary, and known table/chest/shelter status;

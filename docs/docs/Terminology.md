@@ -129,6 +129,19 @@ A **runtime primitive** is a small, trusted game operation such as `observe`,
 Runtime primitives are lower-level than action skills. Action skills compose
 runtime primitives.
 
+## Action Surface
+
+An **action surface** is the provider-visible packet of direct and deferred
+runtime affordances for the current actor. In code and artifacts the schema is
+`action-surface/v1` and the field name is `action_surface`.
+
+Direct entries are executable now. Deferred entries explain missing role
+permission, missing actor-owned action skill support, missing primitive support,
+or another blocker.
+
+An action surface is not a strategy checklist. It must not imply that one domain
+goal, such as building a house or shelter, should always be considered.
+
 ## Tool Call
 
 A **tool call** is a provider's structured request to run one runtime primitive
@@ -276,6 +289,10 @@ target a runtime primitive or an owned action skill, subject to runtime gates.
 A **CycleJudgment** is the evidence-backed interpretation of what happened in a
 cycle. It should cite runtime evidence and describe what matters for the next
 cycle.
+
+`partial_verified_progress` is a CycleJudgment outcome for current-run world,
+inventory, movement, container, or block mutation that did not satisfy the final
+verifier or action-skill postcondition. It is not completion.
 
 ## Role
 

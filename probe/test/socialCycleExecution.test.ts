@@ -10,6 +10,7 @@ import type { ActorActionSkillRecord } from "../src/runtime/actorWorkspaceStore.
 import {
   clampCycleJudgmentOutcome,
   deriveProgressVerifierStatus,
+  hasPartialVerifiedProgress,
   isMeaningfulGameplayPrimitive
 } from "../src/runtime/socialCycleProgress.js";
 import type { ActionIntent, CycleJudgment } from "../src/runtime/goals/types.js";
@@ -118,10 +119,15 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
   }
 });
 
-test("deriveProgressVerifierStatus does not verify partial build patterns", () => {
+test("deriveProgressVerifierStatus keeps partial build patterns below full verifier success", () => {
+  // Partial block placement is real evidence, but it must not pass the final verifier.
   assert.equal(
     deriveProgressVerifierStatus({ toolAttempts: [{ tool: "build_pattern", status: "progressing" }] }),
     "failed"
+  );
+  assert.equal(
+    hasPartialVerifiedProgress({ toolAttempts: [{ tool: "build_pattern", status: "progressing" }] }),
+    true
   );
 });
 
@@ -158,6 +164,44 @@ test("clampCycleJudgmentOutcome rejects verified_progress without meaningful too
     executedTools: ["observe"]
   });
   assert.equal(clamped.outcome, "no_progress");
+});
+
+test("clampCycleJudgmentOutcome downgrades unpassed verified progress to partial when evidence mutated world", () => {
+  // This guards against a provider turning useful block mutation into a completed home claim.
+  const judgment: CycleJudgment = {
+    schema: "cycle-judgment/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "cycle-goal-1",
+    outcome: "verified_progress",
+    what_happened: "Placed some shelter shell blocks",
+    why_it_mattered_for_life_goal: "Partial safety work matters but is not a completed shelter.",
+    verifier_status: "failed",
+    evidence_refs: [],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    next_goal_pressure: []
+  };
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "cycle-goal-1",
+    kind: "use_primitive",
+    primitive_id: "build_pattern",
+    args: {},
+    why_this_action: "respond to shelter pressure",
+    expected_evidence: [],
+    fallback_if_blocked: "remember"
+  };
+
+  const clamped = clampCycleJudgmentOutcome({
+    judgment,
+    actionIntent: intent,
+    executedTools: ["build_pattern"],
+    toolStatuses: [{ tool: "build_pattern", status: "progressing" }]
+  });
+  assert.equal(clamped.outcome, "partial_verified_progress");
 });
 
 test("use_action_skill resolves full owned primitive bundle", () => {

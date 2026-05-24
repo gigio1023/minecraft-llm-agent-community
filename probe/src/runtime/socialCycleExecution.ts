@@ -49,6 +49,11 @@ import {
   type ToolResultRecord
 } from "./settlement/settlementState.js";
 import { runAction } from "./actions/actionRunner.js";
+import {
+  attachRuntimeHooksToResult,
+  runPrimitivePostActionHooks,
+  runPrimitivePreActionHooks
+} from "./actions/actionHooks.js";
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "observe",
@@ -804,8 +809,22 @@ async function executePrimitiveWithEvidence(input: {
   gateBlocked: boolean;
   status: string;
 }> {
+  // Hook records are written into tool evidence so reviewers can separate
+  // permission blocks, missing live bots, and post-action progress classification.
   const permission = checkActiveActionSkillPermission(input.gate, input.tool);
-  if (!permission.allowed) {
+  const preHooks = runPrimitivePreActionHooks({
+    tool: input.tool,
+    permission,
+    hasLiveBot: Boolean(input.bot)
+  });
+  if (!preHooks.allowed) {
+    const toolResult = attachRuntimeHooksToResult({
+      result: preHooks.blockedResult ?? { status: "blocked", reason: "pre-action hook blocked execution" },
+      hooks: preHooks.records
+    });
+    const reason =
+      preHooks.records.find((record) => record.status === "blocked")?.reason ??
+      "pre-action hook blocked execution";
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
@@ -813,29 +832,10 @@ async function executePrimitiveWithEvidence(input: {
       evidenceId: `${input.cycleId}-${input.tool}-gate-blocked`,
       tool: input.tool,
       args: input.args,
-      result: { status: "blocked", reason: permission.reason },
-      verifierReason: permission.reason
+      result: toolResult,
+      verifierReason: reason
     });
-    return { toolResult: { status: "blocked", reason: permission.reason }, evidenceRef: ref, gateBlocked: true, status: "blocked" };
-  }
-
-  if (!input.bot) {
-    const ref = await writeToolEvidence({
-      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
-      actorId: input.actorId,
-      cycleId: input.cycleId,
-      evidenceId: `${input.cycleId}-${input.tool}-synthetic`,
-      tool: input.tool,
-      args: input.args,
-      result: { status: "blocked", reason: "No live bot for primitive execution" },
-      verifierReason: "no_bot"
-    });
-    return {
-      toolResult: { status: "blocked", reason: "No live bot for primitive execution" },
-      evidenceRef: ref,
-      gateBlocked: true,
-      status: "blocked"
-    };
+    return { toolResult, evidenceRef: ref, gateBlocked: true, status: "blocked" };
   }
 
   const actionResult = await runAction({
@@ -862,6 +862,15 @@ async function executePrimitiveWithEvidence(input: {
       } as JsonValue);
 
   const status = readToolStatus(toolResult);
+  const postHooks = runPrimitivePostActionHooks({
+    tool: input.tool,
+    status,
+    result: toolResult
+  });
+  const resultWithHooks = attachRuntimeHooksToResult({
+    result: toolResult,
+    hooks: [...preHooks.records, ...postHooks]
+  });
   const ref = await writeToolEvidence({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
     actorId: input.actorId,
@@ -869,10 +878,10 @@ async function executePrimitiveWithEvidence(input: {
     evidenceId: `${input.cycleId}-${input.tool}`,
     tool: input.tool,
     args: input.args,
-    result: toolResult,
+    result: resultWithHooks,
     verifierReason: status
   });
-  return { toolResult, evidenceRef: ref, gateBlocked: false, status };
+  return { toolResult: resultWithHooks, evidenceRef: ref, gateBlocked: false, status };
 }
 
 export async function executeSocialActionIntent(input: {

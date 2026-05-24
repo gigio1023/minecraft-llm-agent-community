@@ -98,3 +98,23 @@ test("validateCycleJudgment rejects invalid outcome and malformed memory writes"
 
   assert.equal(result.ok, false);
 });
+
+test("validateCycleJudgment accepts partial verified progress as a bounded evidence outcome", () => {
+  // The schema accepts partial progress so reports can preserve mutation evidence without claiming completion.
+  const result = validateCycleJudgment({
+    schema: "cycle-judgment/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    outcome: "partial_verified_progress",
+    what_happened: "Placed some blocks but the final structure verifier did not pass.",
+    why_it_mattered_for_life_goal: "The actor made real progress without claiming completion.",
+    verifier_status: "failed",
+    evidence_refs: ["evidence/cycle-0001-build_pattern.json"],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    next_goal_pressure: ["Continue from verified partial evidence or pivot if blocked."]
+  });
+
+  assert.equal(result.ok, true);
+});
