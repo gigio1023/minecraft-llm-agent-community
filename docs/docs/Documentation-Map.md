@@ -81,6 +81,7 @@ These documents are allowed to contain dated implementation state:
 
 - `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
 - `docs/docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+- `docs/docs/Architecture/Future-Works.md`
 - dated run reports under `docs/docs/Research/`
 
 When a live matrix, provider result, or runtime report changes, update these
@@ -157,3 +158,6 @@ active replacement.
   as pressure and evidence substrate.
 - The current action-skill evidence baseline is 14/14 live matrix, not the older
   12/12 baseline.
+- Future work discovered from long-horizon live runs is tracked in
+  `docs/docs/Architecture/Future-Works.md` and must not be treated as a spec
+  change unless explicitly promoted through the spec governance process.

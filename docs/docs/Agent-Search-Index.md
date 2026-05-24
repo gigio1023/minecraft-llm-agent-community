@@ -51,6 +51,8 @@ research without confusing archived plans for the active implementation path.
 | `OPENAI_API_GPT54_MINI_SOCIAL_RUNTIME` | Use OpenAI API from repo-root `.env` with default `gpt-5.4-mini` or explicit fallback for social CycleGoal/ActionIntent/CycleJudgment providers | `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`, `Setup/Provider-Setup.md`, `Setup/OpenAI-Tier3-Free-Usage.md` |
 | `OBJECTIVE_PHASE_EVIDENCE_GATES` | Coal, shelter, and similar exploration/propagation concepts run as objective phases or direct-generated trials behind runtime evidence gates | `SPEC.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md`, `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`, `Architecture/Direct-Generated-Action-Skills.md` |
 | `REAL_SERVER_SIMULATION_TEST_PLAN` | Live-server simulation test protocol for connected Mineflayer actors, OpenAI social cycles, action-skill evidence, and coal/shelter readiness gates | `Architecture/Real-Server-Simulation-Test-Plan.md`, `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`, `Setup/Headless-Server.md` |
+| `FUTURE_WORKS` | Live-run follow-ups that do not change the long-term spec: 100-cycle home-base findings, blocked-retry pivot rules, partial-progress reporting, review summary catch-up, and MCP house-building reference adaptation | `Architecture/Future-Works.md`, `Architecture/Real-Server-Simulation-Test-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `MCP_HOUSE_BUILDING_REFERENCE` | External Minecraft MCP/Claude reference ideas for tool-surface design and structure-building affordances, adapted under this repo's action-skill and verifier model | `Architecture/Future-Works.md`, `Specification/Reference-Adaptation-Guide.md`, `Architecture/Bounded-Action-Skill-Creation.md` |
 | `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT` | Current architecture explanation, implementation cross-check, external research synthesis, and next settlement-cycle gates | `Architecture/Current-Architecture-And-Implementation-Audit.md`, `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
 | `MINECRAFT_ENCYCLOPEDIA_RESEARCH_BRIEF` | Handoff prompt for building a versioned repo-local Minecraft knowledge layer instead of relying on stale LLM memory | `Knowledge/Minecraft-Encyclopedia-Research-Brief.md` |
 | `MINECRAFT_ACTION_SKILL_KNOWLEDGE` | Minecraft mechanics and data mapped into action skills, runtime primitives, and verifier evidence | `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`, `Architecture/Action-Skill-Verification.md`, `probe/src/gameplay/seedSkills/registry.ts` |
@@ -103,17 +105,18 @@ For any onboarding developer or agent, read in this order:
 20. `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 21. `Architecture/Real-Server-Simulation-Test-Plan.md`
 22. `Architecture/Current-Architecture-And-Implementation-Audit.md`
-23. `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`
-24. `Architecture/LLM-Context-And-Actor-Workspace.md`
-25. `Architecture/Social-Actor-Profiles-And-Relationships.md`
-26. `Setup/Headless-Server.md`
-27. `Setup/Provider-Setup.md`
-28. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
-29. `Research/2026-05-19-skill-village-failure-report.md`
-30. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
-31. `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`
-32. `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`
-33. `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`
+23. `Architecture/Future-Works.md`
+24. `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`
+25. `Architecture/LLM-Context-And-Actor-Workspace.md`
+26. `Architecture/Social-Actor-Profiles-And-Relationships.md`
+27. `Setup/Headless-Server.md`
+28. `Setup/Provider-Setup.md`
+29. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
+30. `Research/2026-05-19-skill-village-failure-report.md`
+31. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
+32. `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`
+33. `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`
+34. `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`
 
 ## Active vs Historical Docs
 
@@ -141,6 +144,7 @@ Treat these as active, project-defining documents:
 - `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 - `Architecture/Real-Server-Simulation-Test-Plan.md`
 - `Architecture/Current-Architecture-And-Implementation-Audit.md`
+- `Architecture/Future-Works.md`
 - `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`
 - `Architecture/LLM-Context-And-Actor-Workspace.md`
 - `Architecture/Social-Actor-Profiles-And-Relationships.md`

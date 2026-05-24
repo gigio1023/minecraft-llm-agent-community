@@ -21,6 +21,11 @@ const links = [
     text: 'How turns become verified artifacts.',
     to: '/docs/Architecture/Runtime-Loop-And-Verification',
   },
+  {
+    title: 'Future works',
+    text: 'What the latest live home-base run exposed.',
+    to: '/docs/Architecture/Future-Works',
+  },
 ];
 
 function HomePage() {
@@ -40,8 +45,9 @@ function HomePage() {
             </span>
           </Heading>
           <p className={styles.lead}>
-            A headless Minecraft probe for bounded agent actions, truthful
-            transcripts, and evidence you can inspect after the run.
+            A headless Minecraft runtime for Soul-grounded social-cycle
+            experiments, bounded agent actions, truthful transcripts, and
+            evidence you can inspect after the run.
           </p>
           <div className={styles.actions}>
             <Link className={styles.primaryAction} to="/docs/intro">

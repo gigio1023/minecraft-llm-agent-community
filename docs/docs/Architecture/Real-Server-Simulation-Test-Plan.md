@@ -79,6 +79,7 @@ bun run server:stop
 | T3 | Multi-actor connection smoke | deterministic | two actors | both actors connect and produce causal transcript artifacts |
 | T4 | Live OpenAI social cycle under resource pressure | OpenAI API `gpt-5.4-mini` | one actor | attempts resource progression without fake pass |
 | T5 | Coal or shelter readiness gate | selected provider | one actor | passes only with `mine_block`/craft/build evidence, otherwise blocks |
+| T6 | Long-horizon home-base stress test | OpenAI API `gpt-5.4-mini` | one actor | context continuity, truthful blocked state, partial or complete home-building evidence |
 
 ## T0: Server Preflight
 
@@ -274,9 +275,52 @@ Shelter readiness requires:
 - a verifier that checks the constructed block pattern in the world;
 - no shelter claim from collected materials alone.
 
-Until placement/build verification exists, shelter tests must end as blocked or
-partial progress. A run that collects wood and claims "built shelter" fails this
-plan.
+Until complete shelter verification passes, shelter tests must end as blocked or
+partial progress. A run that collects wood or places only a partial shell and
+claims "built shelter" fails this plan.
+
+## T6: Long-Horizon Home-Base Stress Test
+
+This is a manual, high-cost live test. It is useful after T0 and T1 are clean.
+It should run one actor only.
+
+```bash
+OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+  --actor npc_b \
+  --provider openai-api \
+  --model gpt-5.4-mini \
+  --cycles 100 \
+  --max-actions-per-cycle 3 \
+  --isolate-workspace \
+  --fresh-world \
+  --prepare-spawn-access \
+  --world-seed home-100cycle-20260524 \
+  --world-event "Long-horizon settlement pressure: help npc_b make a small believable home base, a starter shelter or homestead, not a race to diamonds. Progress should be incremental and evidence-first: observe the area, gather wood, craft basic materials, place or use a crafting table, gather stone when reachable, contribute to shared storage when useful, and build or improve a small shelter near the settlement. Do not claim the home is complete without block placement, inventory, container, or verifier evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
+  --report ../tmp/live-social-cycle-openai-home-100.json \
+  --no-dashboard
+```
+
+Pass criteria:
+
+- OpenAI provider is used; builtin and deterministic authority remain false.
+- `fixture_dependency` is false after fresh-world setup.
+- Previous judgment or memory is used in later cycles.
+- The actor makes at least one meaningful current-run Minecraft change such as
+  collected logs, crafted material, or placed shelter shell blocks.
+- The report does not mark a completed home unless shelter verification passes.
+- Repeated blockers are visible in evidence and can be grouped by reason.
+
+Known current result:
+
+- latest run recorded 54 cycles before cleanup hit a host file-permission
+  blocker;
+- the report audit passed;
+- logs were collected, planks were crafted, and `build_pattern` placed partial
+  shelter shell blocks;
+- the home was not completed and the runtime did not claim completion.
+
+Follow-up items from this test live in
+`docs/docs/Architecture/Future-Works.md`.
 
 ## Report Review Checklist
 

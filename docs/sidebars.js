@@ -33,6 +33,7 @@ const sidebars = {
         'Architecture/LLM-Context-And-Actor-Workspace',
         'Architecture/Social-Actor-Profiles-And-Relationships',
         'Architecture/Social-Simulation-Next-Goal-Handoff',
+        'Architecture/Future-Works',
       ],
     },
     {

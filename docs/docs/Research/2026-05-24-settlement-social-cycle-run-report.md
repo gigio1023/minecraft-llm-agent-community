@@ -112,8 +112,10 @@ and the loop continues instead of fabricating progress.
 
 ## Remaining Gaps
 
-- Shelter construction is still not proven. A real `place_block` primitive and
-  build-pattern verifier are still needed.
+- Finished shelter construction is still not proven in an OpenAI long-horizon
+  run. The later 100-cycle home-base stress test did reach
+  `build_pattern:progressing` and placed partial shelter shell blocks, but the
+  shelter verifier correctly rejected the incomplete shell.
 - `mine_block` needs better stone discovery or bounded excavation support; the
   60-cycle run found no reachable stone within the current 12-block scan.
 - Table-bound crafting still receives repeated blocked attempts when inputs are
@@ -121,6 +123,28 @@ and the loop continues instead of fabricating progress.
 - Storage was wired into the social executor, but the final 60-cycle run did
   not choose a successful deposit. The prepared chest and primitive are present;
   public-storage behavior needs stronger observation/retrieval pressure.
+
+## 100-Cycle Home-Base Follow-Up
+
+A later one-actor OpenAI run used a fresh world and a long-horizon WorldEvent to
+make a small believable home base:
+
+```text
+tmp/live-social-cycle-openai-home-100.json
+```
+
+The run requested 100 cycles and recorded 54 cycles before cleanup hit a
+host-side file-permission blocker. The report audit passed. The run used
+OpenAI provider authority rather than builtin fallback, reused previous
+judgment and memory, collected logs, crafted planks, and placed partial shelter
+shell blocks.
+
+The important result is not "home complete." The important result is that the
+runtime produced diagnosable partial progress and did not claim completion
+without shelter verification.
+
+Future-work follow-ups are tracked in
+`docs/docs/Architecture/Future-Works.md`.
 
 ## Validation
 

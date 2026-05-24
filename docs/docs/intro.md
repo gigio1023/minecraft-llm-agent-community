@@ -62,6 +62,28 @@ persistent LifeGoal, per-cycle CycleGoal selection, and CycleJudgment artifacts.
 It separates "Minecraft evidence passed" from "the actor's social-life judgment
 actually controlled the current goal."
 
+The latest live testing showed this separation matters. A 100-cycle home-base
+stress test with the OpenAI social-cycle provider reused prior judgment and
+memory, collected logs, crafted planks, and placed partial shelter shell blocks,
+but did not claim a finished home because the shelter verifier did not pass.
+That result belongs in future work, not the long-term spec.
+
+```mermaid
+flowchart LR
+  Goal["home-base WorldEvent pressure"]
+  Context["Soul/LifeGoal + memory + prior judgment"]
+  Action["bounded Minecraft actions"]
+  Partial["partial block placement"]
+  Verifier["shelter verifier"]
+  Future["future work: pivot rules and partial-progress reporting"]
+
+  Goal --> Context
+  Context --> Action
+  Action --> Partial
+  Partial --> Verifier
+  Verifier --> Future
+```
+
 ## What It Is Not
 
 This is not a loose generated-code gameplay loop, generic Minecraft benchmark,
@@ -90,6 +112,7 @@ transcript evidence.
 - [Actor Workspace And Action Skill Memory](Architecture/Actor-Workspace-And-Action-Skill-Memory.md)
 - [Soul Life Goal Runtime Architecture](Architecture/Soul-Life-Goal-Runtime-Architecture.md)
 - [Composer 2.5 Soul Life Goal Runtime Implementation Plan](Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md)
+- [Future Works](Architecture/Future-Works.md)
 - [Async Reviewer Sidecars](Architecture/Async-Reviewer-Sidecars.md)
 - [Social Actor Profiles And Relationships](Architecture/Social-Actor-Profiles-And-Relationships.md)
 - [Headless Server Setup](Setup/Headless-Server.md)

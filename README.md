@@ -100,6 +100,24 @@ matrix_summary verdict=passed passed=14 failed=0 error=0 total=14/14
 matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment_blocked=0
 ```
 
+The latest long-horizon OpenAI social-cycle stress test asked one actor to work
+toward a small home base for up to 100 cycles. It reached 54 recorded cycles
+before a cleanup-only file-permission blocker stopped the command. The report
+audited cleanly and stayed truthful:
+
+- `builtin_goal_authority=false`;
+- `builtin_execution_source=false`;
+- `fixture_dependency=false`;
+- prior `CycleJudgment` and memory were reused in later provider context;
+- the actor collected logs, crafted planks, and placed partial shelter shell
+  blocks;
+- the run did not claim a completed home without shelter verification.
+
+The main next work is planner/control hardening, not changing the long-term
+spec: required action arguments, repeated-blocker pivot rules, partial-progress
+reporting, review-summary schema catch-up, and fresh-world cleanup ownership.
+See `docs/docs/Architecture/Future-Works.md`.
+
 The active social-cycle implementation now carries a runtime-owned
 `settlement-state/v1` packet and `settlement-checklist/v1` report fields. Those
 fields summarize inventory, shared storage, known table/chest/shelter positions,
@@ -164,7 +182,9 @@ Read these first:
 9. `docs/docs/Terminology.md`
 10. `docs/docs/Architecture/Minimal-Probe.md`
 11. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-12. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+12. `docs/docs/Architecture/Real-Server-Simulation-Test-Plan.md`
+13. `docs/docs/Architecture/Future-Works.md`
+14. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 
 Historical plans and research still exist in `docs/docs/Plans/` and
 `docs/docs/Research/`, but not every older plan is still an active implementation
@@ -308,6 +328,8 @@ flowchart TB
 - `docs/docs/Architecture/Minimal-Probe.md` describes the active current-phase goal.
 - `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
   runtime success from actor soul, life goal, and cycle-goal authority.
+- `docs/docs/Architecture/Future-Works.md` records live-run follow-ups and
+  external reference ideas without changing the long-term spec.
 - `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
   is the current Composer 2.5 implementation handoff for that architecture.
 - Older plan docs are useful as historical context, but some are now archived and

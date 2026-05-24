@@ -289,6 +289,38 @@ warning. It does not fail the build.
 
 ## Important Live Evidence So Far
 
+Latest fresh action-skill matrix:
+
+- `14/14` implemented action skills passed with `current_run` evidence;
+- `buildBasicShelter`, `placeCraftingTable`, `mineCobblestone`, storage, and
+  social handoff contracts all passed their isolated live postconditions;
+- this proves the seed action skills can work when their preconditions are made
+  explicit by the harness.
+
+Latest long-horizon OpenAI home-base stress test:
+
+- command target: one actor, `gpt-5.4-mini`, fresh world, 100 cycles, home-base
+  WorldEvent pressure;
+- recorded result: 54 cycles before cleanup hit a host file-permission blocker;
+- report audit: passed;
+- `builtin_goal_authority=false`, `builtin_execution_source=false`,
+  `fixture_dependency=false`;
+- later provider inputs used prior judgment and memory;
+- concrete progress included `collect_logs` inventory delta `+2`,
+  `craft_item` `oak_planks +4`, and `build_pattern` placing four partial
+  shelter shell blocks;
+- the run did not claim a finished home because the shelter verifier still saw
+  an incomplete shell.
+
+Interpretation:
+
+- the runtime is preserving truth and context;
+- the planner/control layer still needs stronger argument validation,
+  repeated-blocker pivot rules, partial-progress reporting, and review-summary
+  schema catch-up;
+- those follow-ups are now tracked in `Architecture/Future-Works.md` rather
+  than changing the long-term spec.
+
 The 3-actor/3-bot smoke run with `--max-actions 20` produced a partial result:
 
 - `npc_a` and `npc_c` succeeded;
@@ -754,11 +786,13 @@ Implemented behavior:
 - runtime postconditions require passed `wooden_pickaxe` inventory evidence;
 - the action-skill matrix includes `craftWoodenPickaxe` as current-run proof.
 
-Remaining placement boundary:
+Placement boundary:
 
-- placing a crafting table from inventory is still a separate future action
-  skill. Do not overload `craft_with_table` with placement until placement has
-  its own evidence contract.
+- placing a crafting table from inventory is now represented by the separate
+  `placeCraftingTable` action skill and `place_block` evidence path;
+- keep `craft_with_table` focused on table-bound crafting and local table
+  fallback only when the primitive can prove the table position and crafted
+  inventory delta.
 
 Do not overload inventory-only `craft_item` with table discovery and placement.
 
@@ -839,18 +873,23 @@ Check:
 
 ## Suggested Next Work Order
 
-1. Keep the 10-action-skill live matrix as the regression gate after action
+1. Keep the 14-action-skill live matrix as the regression gate after action
    skill, primitive, role, or verifier changes.
-2. Add repeatability checks for the most interruption-sensitive skills,
+2. Implement the P0 future-work items from `Architecture/Future-Works.md`:
+   planner argument contract hardening, repeated-blocker pivot rules, and
+   partial-progress status.
+3. Add repeatability checks for the most interruption-sensitive skills,
    starting with `collectLogs` variants: reachable low log, first candidate
    unreachable then second reachable, dropped-item pickup after dig, no log
    nearby, and abort while pathing or digging.
-3. Use dashboard runtime events to inspect each live probe turn while keeping
+4. Update the social-cycle review summary CLI so it reads the current nested
+   report shape instead of rendering most action attempts as `missing:?`.
+5. Use dashboard runtime events to inspect each live probe turn while keeping
    the dashboard as an observer, not a control plane.
-4. Feed live failures into actor evidence and reviewer queue.
-5. Add crafting-table primitive.
-6. Expand mining only after the narrow `mineCobblestone` proof remains stable.
-7. Only then re-run broader 3-actor/3-bot LLM gameplay as a product smoke, not as a
+6. Feed live failures into actor evidence and reviewer queue.
+7. Expand mining and resource discovery only after the narrow
+   `mineCobblestone` proof remains stable.
+8. Only then re-run broader 3-actor/3-bot LLM gameplay as a product smoke, not as a
    substitute for per-action-skill proof.
 
 This keeps the project focused on real action skill competence before scaling
