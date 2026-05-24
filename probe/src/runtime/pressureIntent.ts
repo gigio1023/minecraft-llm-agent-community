@@ -481,7 +481,7 @@ function mapPressureToIntentKind(pressureKind?: PressureKind): IntentKind {
 }
 
 /**
- * Builds the pressure and intent context recorded by each agent-loop turn.
+ * Builds the pressure and intent context recorded by each runtime-loop turn.
  *
  * This is runtime-owned scaffolding, not a social-simulation model by itself:
  * it explains why the loop chose or continued an intent before any provider

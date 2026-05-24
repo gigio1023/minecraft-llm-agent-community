@@ -160,6 +160,7 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
   transcript: TranscriptRecorder;
   initialCompletedTaskIds?: string[];
   activeActionSkills: readonly ActorActionSkillRecord[];
+  stopAfterRuntimeTaskCompletion?: boolean;
   stepDelayMs?: number;
   maxActions?: number;
   artifacts?: {
@@ -338,6 +339,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   transcript,
   initialCompletedTaskIds = [],
   activeActionSkills,
+  stopAfterRuntimeTaskCompletion = true,
   stepDelayMs = 1000,
   maxActions = DEFAULT_MAX_ACTIONS,
   artifacts,
@@ -386,7 +388,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     });
 
     // Pressure/intent context is recorded even while the provider remains
-    // deterministic so future agent-loop changes can explain why a primitive
+    // deterministic so future runtime-loop changes can explain why a primitive
     // was allowed, continued, or interrupted.
     const pressureContext = buildPressureIntentContext({
       actorId: actor.username,
@@ -399,7 +401,12 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     previousIntent = pressureContext.currentIntent;
 
     const turnId = `turn-${String(step + 1).padStart(4, "0")}`;
-    if (!currentTask && completedTaskIds.has("deposit_shared_materials") && lastResult?.ok === true) {
+    if (
+      stopAfterRuntimeTaskCompletion &&
+      !currentTask &&
+      completedTaskIds.has("deposit_shared_materials") &&
+      lastResult?.ok === true
+    ) {
       const why = `completed runtime tasks: ${[...completedTaskIds].join(", ")}`;
       emitAgentLoopEvent(onEvent, {
         type: "loop_completed",

@@ -230,7 +230,7 @@ function defaultPlaceTarget(actor: import("mineflayer").Bot): Positioned {
   };
 }
 
-function defaultBuildAnchor(actor: import("mineflayer").Bot): Positioned {
+export function defaultBuildAnchor(actor: import("mineflayer").Bot): Positioned {
   return {
     x: Math.floor(actor.entity.position.x) + 2,
     y: Math.floor(actor.entity.position.y),
@@ -1612,7 +1612,7 @@ export function validateSkillProbeConfig(config: ActionSkillProbeConfig): void {
 }
 
 /**
- * Runs one action skill through the real Mineflayer agent loop with a narrowed
+ * Runs one action skill through the real Mineflayer runtime loop with a narrowed
  * active-action-skill gate. This is the live harness from the handoff: it
  * creates evidence from actual bot state and fails when the loop cannot reach a
  * runtime-verifiable terminal result within the configured action budget.
@@ -1662,11 +1662,7 @@ export async function runLiveActionSkillProbe(
     const provider = createActionSkillProbeProvider(
       input.skillId,
       target.username,
-      {
-        x: Math.floor(config.spawn.x) + 2,
-        y: Math.floor(config.spawn.y),
-        z: Math.floor(config.spawn.z) + 2
-      }
+      defaultBuildAnchor(actor)
     );
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
@@ -1702,6 +1698,7 @@ export async function runLiveActionSkillProbe(
       maxActions: input.maxActions,
       initialCompletedTaskIds: probeCompletedTaskHints[input.skillId] ?? [],
       activeActionSkills,
+      stopAfterRuntimeTaskCompletion: false,
       artifacts: {
         actorWorkspaceRootDir: config.actorWorkspace.rootDir,
         providerInputSnapshots: {

@@ -40,10 +40,10 @@ export type DialogueObservation = DialogueJsonObject;
 export type DialogueTranscriptEntry = DialogueJsonObject;
 
 /**
- * Resolves known actor personas and deterministic fallbacks for extra bots.
+ * Resolves known dialogue profiles and deterministic fallbacks for extra bots.
  *
  * Fallbacks keep smoke runs stable when the actor roster changes without making
- * persona richness a Phase 1 delivery target.
+ * dialogue profile richness a Phase 1 delivery target.
  */
 export function getDialoguePersona(actorId: string, index = 0): DialoguePersona {
   return toDialoguePersona(getActorProfile(actorId, index));

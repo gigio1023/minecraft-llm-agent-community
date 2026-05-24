@@ -31,7 +31,7 @@ const DEFAULT_TIMEOUT_MS = 5_000;
  *
  * These are deliberately shorter than a full probe run. A primitive that cannot
  * finish or report cancellation inside its slot should leave an explicit timeout
- * artifact instead of making the whole agent loop look like it stalled.
+ * artifact instead of making the whole runtime loop look like it stalled.
  */
 const DEFAULT_TIMEOUT_POLICY: ActionTimeoutPolicy = {
   defaultTimeoutMs: DEFAULT_TIMEOUT_MS,

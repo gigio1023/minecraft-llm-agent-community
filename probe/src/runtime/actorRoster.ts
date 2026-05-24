@@ -16,14 +16,14 @@ function assertActorId(actorId: string) {
  * Normalizes the active actor roster for probe runs.
  *
  * The bounds keep early runtime evidence readable: enough actors for mutual
- * behavior, but not enough to hide single-bot competence failures in crowd noise.
+ * behavior, but not enough to hide single-actor competence failures in crowd noise.
  */
 export function normalizeActorIds(actorIds?: readonly string[]) {
   const resolved = (actorIds && actorIds.length > 0 ? [...actorIds] : [...DEFAULT_ACTOR_IDS.slice(0, 2)])
     .map((actorId) => actorId.trim());
 
   if (resolved.length < MIN_ACTOR_COUNT || resolved.length > MAX_ACTOR_COUNT) {
-    throw new Error(`Actor roster must contain between ${MIN_ACTOR_COUNT} and ${MAX_ACTOR_COUNT} NPCs`);
+    throw new Error(`Actor roster must contain between ${MIN_ACTOR_COUNT} and ${MAX_ACTOR_COUNT} actors`);
   }
 
   for (const actorId of resolved) {
@@ -62,7 +62,7 @@ export function selectMutualPair(actorIds: readonly string[]) {
   const normalized = normalizeActorIds(actorIds);
 
   if (normalized.length < 2) {
-    throw new Error("Mutual interaction probes require at least two NPCs");
+    throw new Error("Mutual interaction probes require at least two actors");
   }
 
   return [normalized[0], normalized[1]] as const;

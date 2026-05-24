@@ -762,7 +762,7 @@ function html() {
     }
     function runtimeEventList(events) {
       const rows = (events ?? []).slice(-12).reverse();
-      if (!rows.length) return '<h3>Runtime Events</h3><div class="sub">agent loop 이벤트 대기 중</div>';
+      if (!rows.length) return '<h3>Runtime Events</h3><div class="sub">runtime loop 이벤트 대기 중</div>';
       return '<h3>Runtime Events</h3><div class="runtime-events">' + rows.map((event) => {
         const detail = [event.turnId, event.tool, event.status].filter(Boolean).join(' / ');
         return '<div class="runtime-event"><strong>' + esc(event.actorId) + ' · ' + esc(event.type) + '</strong><div class="sub">' + esc(detail || event.at) + '</div><div class="primitive-row">' + (event.tool ? chip(event.tool) : '') + (event.taskId ? '<span class="chip">' + esc(event.taskId) + '</span>' : '') + '</div></div>';

@@ -493,7 +493,7 @@ test("action skill probe matrix next action unsets MC_PORT for managed fixture b
   const [action] = buildProbeMatrixNextActions([blockedGap]);
 
   assert.equal(action.kind, "restore_environment");
-  assert.equal(action.command, "unset MC_PORT && docker info --format '{{.ServerVersion}}'");
+  assert.equal(action.command, "unset MC_PORT && docker info");
 });
 
 test("action skill probe matrix next actions refresh historical transcript passes", () => {

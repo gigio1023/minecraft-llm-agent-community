@@ -13,7 +13,7 @@ export const llmConversations: Record<ActorId, CodexInputMessage[]> = {
  * Builds the actor-specific prompt history for the exploratory live loop.
  *
  * Histories are kept per actor so generated action skills do not collapse all
- * NPCs into one shared model conversation.
+ * actors into one shared model conversation.
  */
 export function buildActorInput(actorId: ActorId, nextMessage: string) {
   return [

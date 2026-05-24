@@ -164,7 +164,7 @@ export async function runLiveDialogueProbe(): Promise<ProbeRunResult> {
     );
 
     if (!actorA || !actorB) {
-      throw new Error("live mutual dialogue probe requires at least two NPCs");
+      throw new Error("live mutual dialogue probe requires at least two actors");
     }
 
     const memories = Object.fromEntries(

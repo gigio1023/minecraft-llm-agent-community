@@ -232,7 +232,7 @@ test("writes a mutual transcript artifact with personas, category verdicts, and 
     },
     {
       status: "success",
-      why: "both NPCs responded to each other's dialogue and world actions"
+      why: "both actors responded to each other's dialogue and world actions"
     }
   );
 
