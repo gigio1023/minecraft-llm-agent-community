@@ -316,6 +316,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           model: input.model,
           maxOutputTokens: Number(process.env.SOCIAL_CYCLE_MAX_OUTPUT_TOKENS ?? 1600),
           requestTimeoutMs: Number(process.env.GEMINI_TEXT_REQUEST_TIMEOUT_MS ?? 900_000),
+          maxRetries: Number(process.env.GEMINI_JSON_MAX_RETRIES ?? 2),
           repoRoot
         }
       : undefined;

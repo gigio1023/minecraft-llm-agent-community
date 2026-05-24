@@ -192,9 +192,13 @@ export function loadMutualProbeConfig(): ProbeConfig {
 }
 
 export function buildServerEnv(config: ProbeConfig) {
+  const uid = typeof process.getuid === "function" ? process.getuid() : 1000;
+  const gid = typeof process.getgid === "function" ? process.getgid() : 1000;
   return {
     MC_IMAGE: config.server.image,
     MC_DATA_DIR: path.resolve(here, "../../tmp/probe-server"),
+    MC_UID: String(uid),
+    MC_GID: String(gid),
     MC_HOST_PORT: String(config.server.hostPort),
     EULA: "TRUE",
     VERSION: config.server.version,
