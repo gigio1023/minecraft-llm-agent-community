@@ -18,6 +18,10 @@ function parseArgs(argv: string[]) {
     worldEvents: Array<{ summary: string; kind: WorldEventKind }>;
     connectToWorld?: boolean;
     isolateWorkspace?: boolean;
+    freshWorld?: boolean;
+    worldSeed?: string;
+    levelType?: string;
+    prepareSpawnAccess?: boolean;
   } = { worldEvents: [] };
 
   for (let index = 0; index < argv.length; index++) {
@@ -56,6 +60,16 @@ function parseArgs(argv: string[]) {
       options.connectToWorld = false;
     } else if (arg === "--isolate-workspace") {
       options.isolateWorkspace = true;
+    } else if (arg === "--fresh-world") {
+      options.freshWorld = true;
+    } else if (arg === "--world-seed" && next) {
+      options.worldSeed = next;
+      index++;
+    } else if (arg === "--level-type" && next) {
+      options.levelType = next;
+      index++;
+    } else if (arg === "--prepare-spawn-access") {
+      options.prepareSpawnAccess = true;
     }
   }
 
@@ -73,10 +87,9 @@ async function main() {
   const model = parsed.model ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
-  const reportPath = path.resolve(
-    repoRoot,
-    parsed.report ?? `tmp/social-cycle-${actorId}.json`
-  );
+  const reportPath = parsed.report
+    ? path.resolve(parsed.report)
+    : path.resolve(repoRoot, `tmp/social-cycle-${actorId}.json`);
 
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
 
@@ -90,6 +103,10 @@ async function main() {
     worldEvents: parsed.worldEvents,
     connectToWorld: parsed.connectToWorld,
     isolateWorkspace: parsed.isolateWorkspace,
+    freshWorld: parsed.freshWorld,
+    worldSeed: parsed.worldSeed,
+    levelType: parsed.levelType,
+    prepareSpawnAccess: parsed.prepareSpawnAccess,
     reasoning: process.env.SOCIAL_CYCLE_REASONING
   });
 

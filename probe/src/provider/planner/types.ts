@@ -16,6 +16,12 @@ export type ObjectivePlannerPathId = "text-genai" | "live-transcription";
  */
 export type DirectGeneratedSourceKind = "llm-generated-ts" | "builtin-phase-source";
 
+/** Runtime-facing resolution after policy checks have decided whether source may run. */
+export type DirectGeneratedSourceResolutionStatus =
+  | "ready"
+  | "provider_blocked"
+  | "unsafe_or_rejected_source";
+
 export type ObjectivePhasePlannerRequest = {
   actorId: string;
   turnId: string;

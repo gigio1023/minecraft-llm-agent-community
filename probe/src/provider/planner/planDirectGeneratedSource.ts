@@ -2,18 +2,20 @@ import { assertDirectGeneratedActionSkillSource } from "../../generatedActionSki
 import { getBuiltinPhaseSource } from "./builtinPhaseSources.js";
 import type {
   DirectGeneratedSourcePlan,
+  DirectGeneratedSourceResolutionStatus,
   ObjectivePhasePlannerPort,
   ObjectivePhasePlannerRequest
 } from "./types.js";
 
 export type ResolvedDirectGeneratedSource = DirectGeneratedSourcePlan & {
+  resolutionStatus: DirectGeneratedSourceResolutionStatus;
   usedBuiltinFallback: boolean;
 };
 
 /**
- * Domain-facing planner orchestration: ask the selected LLM adapter, then fall back
- * to builtin phase source when needed. Runtime sandbox rejection after execution
- * is still retried by the long-objective runner.
+ * Domain-facing planner orchestration: explicit builtin planners resolve to
+ * repo-authored source; LLM planners must produce source that passes the direct
+ * action-skill policy before the runtime can execute it.
  */
 export async function planDirectGeneratedSource(input: {
   planner: ObjectivePhasePlannerPort;
@@ -29,43 +31,34 @@ export async function planDirectGeneratedSource(input: {
       sourceKind: "builtin-phase-source",
       source,
       model: "builtin-phase-program",
-      usedBuiltinFallback: true
+      resolutionStatus: "ready",
+      usedBuiltinFallback: false
     };
   }
 
   if (proposal.source.trim()) {
     try {
       assertDirectGeneratedActionSkillSource(proposal.source);
-      return { ...proposal, usedBuiltinFallback: false };
+      return {
+        ...proposal,
+        resolutionStatus: "ready",
+        usedBuiltinFallback: false
+      };
     } catch (error) {
-      return toBuiltinPhaseSource(
-        proposal,
-        input.request.phaseId,
-        `planner source rejected by sandbox: ${error instanceof Error ? error.message : String(error)}`
-      );
+      return {
+        ...proposal,
+        resolutionStatus: "unsafe_or_rejected_source",
+        usedBuiltinFallback: false,
+        fallbackReason: `planner source rejected by sandbox: ${error instanceof Error ? error.message : String(error)}`
+      };
     }
   }
 
-  return toBuiltinPhaseSource(
-    proposal,
-    input.request.phaseId,
-    proposal.fallbackReason ?? proposal.errorKind ?? "planner returned no source"
-  );
-}
-
-function toBuiltinPhaseSource(
-  proposal: DirectGeneratedSourcePlan,
-  phaseId: string,
-  reason: string
-): ResolvedDirectGeneratedSource {
-  const source = getBuiltinPhaseSource(phaseId);
-  assertDirectGeneratedActionSkillSource(source);
   return {
     ...proposal,
-    sourceKind: "builtin-phase-source",
-    source,
-    model: "builtin-phase-program",
-    usedBuiltinFallback: true,
-    fallbackReason: reason
+    source: "",
+    resolutionStatus: "provider_blocked",
+    usedBuiltinFallback: false,
+    fallbackReason: proposal.fallbackReason ?? proposal.errorKind ?? "planner returned no source"
   };
 }

@@ -6,7 +6,8 @@ const PLANK_ITEM_NAMES = [
   "acacia_planks",
   "dark_oak_planks",
   "mangrove_planks",
-  "cherry_planks"
+  "cherry_planks",
+  "pale_oak_planks"
 ] as const;
 
 type Recipe = unknown;
@@ -63,13 +64,21 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
   const resolvedItemName = resolveCraftTarget(bot, itemName);
 
   if (!resolvedItemName) {
-    throw new Error(`No craftable recipe found for ${itemName}`);
+    return {
+      status: "blocked",
+      itemName,
+      reason: `No craftable inventory recipe found for ${itemName}`
+    };
   }
 
   const item = bot.registry.itemsByName[resolvedItemName];
 
   if (!item) {
-    throw new Error(`Unknown craft item: ${resolvedItemName}`);
+    return {
+      status: "blocked",
+      itemName: resolvedItemName,
+      reason: `Unknown craft item: ${resolvedItemName}`
+    };
   }
 
   const [recipe] = bot.recipesFor(item.id, null, 1, null);
@@ -78,7 +87,11 @@ export async function craftItem({ bot, itemName }: { bot: CraftingBot; itemName:
     // Passing null for the crafting table deliberately limits this primitive to
     // inventory recipes. Table-bound recipes need a separate runtime boundary
     // that can find, place, and verify use of a crafting table.
-    throw new Error(`No craftable recipe found for ${resolvedItemName}`);
+    return {
+      status: "blocked",
+      itemName: resolvedItemName,
+      reason: `No craftable inventory recipe found for ${resolvedItemName}`
+    };
   }
 
   const beforeCount = countInventoryItem(bot, resolvedItemName);

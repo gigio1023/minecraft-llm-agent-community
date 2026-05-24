@@ -5,8 +5,8 @@
 Headless Minecraft agent-loop runtime research.
 
 This repository is not currently trying to ship a full NPC society.
-It is rebuilding a small, bounded, observable runtime that can later grow into a
-social simulation seed.
+It is rebuilding a small, bounded, observable runtime whose near-term proof is a
+single-actor social-life simulation seed.
 
 [Documentation & Web Portal](https://naem1023.github.io/minecraft-llm-agent-community/)
 
@@ -15,11 +15,14 @@ social simulation seed.
 Short-term product:
 
 - a tiny headless Minecraft runtime;
-- one bot that can make real end-to-end progress on boring gameplay tasks;
+- one actor that acts in Minecraft from `ActorSoul`, `LifeGoal`, and
+  `WorldEvent` pressure;
+- memory and CycleJudgment records that affect later cycles;
+- real end-to-end progress on boring gameplay tasks;
 - strong observability through transcript and runtime artifacts;
 - truthful reconnect/session lifecycle evidence when reconnect is in scope;
-- architecture space for per-agent action skill ownership and later action skill
-  evolution.
+- architecture space for per-agent action skill ownership and later action
+  skill evolution.
 
 Long-term north star:
 
@@ -30,7 +33,9 @@ Long-term north star:
 Not current goals:
 
 - persona richness as a content deliverable;
+- full human-like personhood;
 - long-run autonomy as a product deliverable;
+- a Voyager clone;
 - pretending partial animation is the same thing as competence.
 
 ## What Success Looks Like
@@ -39,8 +44,14 @@ The first meaningful success is not a big multi-agent story.
 
 It is this:
 
-- a bot actually completes boring tasks like collecting logs;
+- an actor chooses a bounded CycleGoal from soul, life goal, world pressure,
+  memory, and previous judgment;
+- the actor actually attempts Minecraft actions like collecting logs, mining
+  coal, or preparing simple shelter through runtime gates;
+- every action attempt is recorded, including blocked and no-progress attempts;
+- later cycles reuse previous judgment or memory;
 - failures are explainable from transcript, checkpoint-like artifacts, and traces;
+- builtin or deterministic fallback is labeled as fallback, not LLM agency;
 - the runtime is small enough to refactor without guesswork;
 - later social simulation work can build on top without starting over again.
 
@@ -96,13 +107,40 @@ existing managed endpoint. Stop it with `bun run --cwd probe server:stop`.
 
 ### Provider auth
 
-Provider-backed paths use an ignored local auth store such as:
+Social-cycle provider calls use the OpenAI API through `OPENAI_API_KEY` in the
+repo-root `.env`. The default social-cycle model is `gpt-5.4-mini` when the
+local account has access to that free-tier mini model.
+
+```text
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.4-mini
+```
+
+Gameplay paths that use `openai-codex` are separate. They use an ignored local
+auth store such as:
 
 ```text
 build/provider-auth/openai-codex-auth.json
 ```
 
 Deterministic mode should remain usable without live provider access.
+
+### Run the social cycle
+
+```bash
+cd probe
+OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+  --actor npc_b \
+  --provider openai-api \
+  --cycles 2 \
+  --max-actions-per-cycle 3 \
+  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --no-dashboard
+```
+
+This is the social-life runtime. Long-objective and direct-generated objective
+commands are evaluation or propagation tracks, and their reports must state when
+they use builtin fallback or primitive helper expansion.
 
 ### Run the probe
 

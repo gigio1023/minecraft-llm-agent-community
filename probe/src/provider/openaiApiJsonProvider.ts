@@ -52,6 +52,67 @@ function classifyOpenAiError(error: unknown): OpenAiErrorKind {
   return "api_error";
 }
 
+function extractFirstJsonValue(text: string) {
+  const start = text.search(/[\[{]/);
+  if (start < 0) {
+    return null;
+  }
+
+  const opening = text[start];
+  const closing = opening === "{" ? "}" : "]";
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{" || char === "[") {
+      stack.push(char === "{" ? "}" : "]");
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      if (stack.pop() !== char) {
+        return null;
+      }
+      if (stack.length === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+export function parseOpenAiJsonText<T>(rawText: string): T {
+  try {
+    return JSON.parse(rawText) as T;
+  } catch (primaryError) {
+    const firstJson = extractFirstJsonValue(rawText);
+    if (!firstJson || firstJson.trim() === rawText.trim()) {
+      throw primaryError;
+    }
+    return JSON.parse(firstJson) as T;
+  }
+}
+
 /**
  * Calls OpenAI Chat Completions with JSON schema response format.
  * Never logs or returns the API key.
@@ -111,7 +172,7 @@ export async function callOpenAiJsonSchema<T>(input: {
     }
 
     try {
-      const parsed = JSON.parse(rawText) as T;
+      const parsed = parseOpenAiJsonText<T>(rawText);
       return {
         ok: true,
         parsed,

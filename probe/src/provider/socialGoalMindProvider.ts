@@ -18,6 +18,7 @@ import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
+import { listActorMemoryRefs } from "../memory/actorMemory.js";
 
 const goalMindSchema = {
   type: "object",
@@ -84,7 +85,7 @@ function normalizeCycleGoalFields(
   context: SocialCycleContextPacket
 ) {
   const fallbackSummary =
-    "Continue gatherer work with evidence-first bounded action under active LifeGoal.";
+    "Continue evidence-first survival and settlement work under the active LifeGoal.";
   return {
     summary:
       typeof raw.summary === "string" && raw.summary.trim().length > 0
@@ -100,8 +101,8 @@ function normalizeCycleGoalFields(
         : "runtime_primitive_or_evidence",
     evidence_required: asStringArray(raw.evidence_required),
     stop_conditions: asStringArray(raw.stop_conditions),
-    allowed_action_skill_ids: asStringArray(raw.allowed_action_skill_ids),
-    allowed_primitive_ids: asStringArray(raw.allowed_primitive_ids)
+    allowed_action_skill_ids: context.owned_action_skills.map((skill) => skill.skill_id),
+    allowed_primitive_ids: [...context.allowed_primitive_ids]
   };
 }
 
@@ -115,6 +116,7 @@ function cycleGoalFromLlm(input: {
 }): ActorCycleGoal {
   const judgmentRefs = input.context.previous_cycle_judgments.map((entry) => entry.ref);
   const worldEventRefs = input.context.world_events.map((event) => `world-events/${event.event_id}.json`);
+  const memoryRefs = listActorMemoryRefs(input.context.memory_packet).map((ref) => ref.memory_id);
   const cg = input.parsed.cycle_goal;
   return {
     schema: "actor-cycle-goal/v1",
@@ -130,7 +132,7 @@ function cycleGoalFromLlm(input: {
       soul_ref: soulRef(input.context.ActorSoul.actor_id),
       observation_refs: [],
       world_event_refs: worldEventRefs,
-      memory_refs: [],
+      memory_refs: memoryRefs,
       relationship_refs: [],
       previous_cycle_judgment_refs: judgmentRefs
     },
@@ -185,6 +187,7 @@ export async function runSocialGoalMindProvider(input: {
       worldEventRefs: input.context.world_events.map((e) => `world-events/${e.event_id}.json`),
       judgmentRefs: input.context.previous_cycle_judgments.map((j) => j.ref)
     });
+    const memoryRefs = listActorMemoryRefs(input.context.memory_packet).map((ref) => ref.memory_id);
     const cycleGoal = buildDeterministicCycleGoal({
       soul: input.context.ActorSoul,
       lifeGoal: input.context.ActorLifeGoal,
@@ -192,7 +195,7 @@ export async function runSocialGoalMindProvider(input: {
       strategicGoal: strategic,
       observationRefs: [],
       worldEventRefs: input.context.world_events.map((e) => `world-events/${e.event_id}.json`),
-      memoryRefs: [],
+      memoryRefs,
       relationshipRefs: [],
       judgmentRefs: input.context.previous_cycle_judgments.map((j) => j.ref),
       allowedActionSkillIds: input.allowedActionSkillIds,
@@ -229,7 +232,11 @@ export async function runSocialGoalMindProvider(input: {
 
   const system = `You are the Goal Mind for a Minecraft social simulation actor.
 ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a WorldEvent summary.
-WorldEvents are pressure only. Output JSON only.`;
+WorldEvents are pressure only. The word social means the actor has a persona and relationships; it does not mean every action must be chat or coordination.
+Choose an ordinary Minecraft CycleGoal when the situation calls for it. Collecting logs is just collecting logs unless observation, memory, or relationships make it socially relevant.
+The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
+For survival and settlement goals, value evidence of diversified progress: safe positioning, resource discovery, enough starter wood, crafting, stone/tool progression, and shared storage. Do not make surplus collection of one stocked material the continuing goal unless live evidence shows it is still the best need.
+If observation includes nearbyResources or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose a different plausible next direction such as movement, observation, gathering, crafting, speech, or memory based on the live context. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
   const result = await callOpenAiJsonSchema<{

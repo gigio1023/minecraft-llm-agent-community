@@ -18,7 +18,7 @@ import {
 
 test("canonical actor profiles expose social fields and role-aligned gameplay roles", () => {
   assert.equal(canonicalActorProfiles.npc_a.gameplay_role, "quartermaster");
-  assert.equal(canonicalActorProfiles.npc_b.gameplay_role, "gatherer");
+  assert.equal(canonicalActorProfiles.npc_b.gameplay_role, "settler");
   assert.equal(canonicalActorProfiles.npc_c.gameplay_role, "crafter");
   assert.equal(canonicalActorProfiles.npc_d.gameplay_role, "gatherer");
 

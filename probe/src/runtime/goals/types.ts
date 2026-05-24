@@ -211,6 +211,17 @@ export type SocialCycleRunReport = {
     reasoning: string;
   };
   runtime_status: "passed" | "failed" | "blocked" | "timeout";
+  server?: {
+    mode: "manual" | "live_smoke" | "fresh_world";
+    seed: string;
+    level_type: string;
+    version: string;
+    endpoint?: string;
+    spawn_access_prepared?: boolean;
+    spawn_access_position?: { x: number; y: number; z: number };
+  };
+  /** Producer workspace root used to resolve actor-relative artifact refs during audit. */
+  actor_workspace_root_dir?: string;
   agency_status: {
     life_goal_source: ActorLifeGoalSource;
     strategic_goal_source: "llm_planner" | "runtime_rule";
@@ -236,6 +247,21 @@ export type SocialCycleRunReport = {
     evidence_refs: string[];
     judgment_ref: string;
     verifier_status: "passed" | "failed" | "not_applicable";
+    action_attempts?: Array<{
+      attempt_id: string;
+      action_index: number;
+      turn_id: string;
+      action_intent_ref: string;
+      provider_input_refs: string[];
+      provider_output_refs: string[];
+      evidence_refs: string[];
+      judgment_ref: string;
+      verifier_status: "passed" | "failed" | "not_applicable";
+      executed_tools: string[];
+      tool_statuses: Array<{ tool: string; status: string }>;
+      runtime_result?: unknown;
+      runtime_status: string;
+    }>;
   }>;
   provider_error?: string;
   action_skill_execution_unit?: boolean;

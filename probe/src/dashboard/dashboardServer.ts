@@ -668,6 +668,7 @@ function html() {
       gatherer: "oak_log",
       crafter: "crafting_table",
       quartermaster: "chest",
+      settler: "chest",
       collect_logs: "oak_log",
       mine_block: "cobblestone",
       craft_item: "crafting_table",

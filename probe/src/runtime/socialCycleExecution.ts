@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Bot } from "mineflayer";
+import { goals } from "mineflayer-pathfinder";
+import { Vec3 } from "vec3";
 
 import type { AllowedTool } from "../tools/index.js";
 import { validateProposal } from "../tools/index.js";
@@ -19,19 +21,61 @@ import { wait } from "../tools/wait.js";
 import { remember } from "../tools/remember.js";
 import { collectLogs } from "../tools/collectLogs.js";
 import { mineBlock } from "../tools/mineBlock.js";
+import { craftItem } from "../tools/craftItem.js";
+import { craftWithTable } from "../tools/craftWithTable.js";
+import { createMineflayerSharedChestAccessor } from "../tools/liveSharedChest.js";
+import { depositToSharedChest, inspectChest, withdrawFromSharedChest } from "../tools/sharedChest.js";
 import { say } from "../tools/say.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import { getActorWorkspacePaths } from "./actorWorkspacePaths.js";
-import { compileAllowedPrimitiveIds } from "./intentToSkill.js";
-import type { IntentKind } from "./pressureIntent.js";
-import type { RoleId } from "../npc/roles/contracts.js";
-import { deriveProgressVerifierStatus } from "./socialCycleProgress.js";
+import {
+  canDepositSharedItem,
+  getRoleContract,
+  readKeepItemCount,
+  type RoleId
+} from "../npc/roles/contracts.js";
+import { getActorProfile } from "../npc/profiles.js";
+import { createSharedStorageLedger } from "../gameplay/storage/sharedStorageLedger.js";
+import { createTeamBulletin } from "../npc/social/teamBulletin.js";
+import {
+  deriveProgressVerifierStatus,
+  type SocialPrimitiveAttemptStatus
+} from "./socialCycleProgress.js";
+
+export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
+  "observe",
+  "move_to",
+  "wait",
+  "remember",
+  "collect_logs",
+  "mine_block",
+  "craft_item",
+  "craft_with_table",
+  "inspect_chest",
+  "deposit_shared",
+  "withdraw_shared",
+  "say"
+]);
+
+export function isSocialExecutablePrimitive(primitiveId: string): primitiveId is AllowedTool {
+  return SOCIAL_EXECUTABLE_PRIMITIVES.has(primitiveId);
+}
+
+export function filterExecutableSocialActionSkills(
+  records: readonly ActorActionSkillRecord[]
+): ActorActionSkillRecord[] {
+  return records.filter((record) =>
+    record.required_primitives.length > 0 &&
+    record.required_primitives.every(isSocialExecutablePrimitive)
+  );
+}
 
 export type SocialCycleExecutionResult = {
   observation: ObserveResult | Record<string, unknown>;
   runtimeResult: JsonValue;
   evidenceRefs: string[];
   executedTools: string[];
+  toolStatuses: SocialPrimitiveAttemptStatus[];
   verifierStatus: "passed" | "failed" | "not_applicable";
   gateBlocked: boolean;
   actionSkillExecutionUnit: boolean;
@@ -41,6 +85,7 @@ function syntheticObservation(actorId: string): ObserveResult {
   return {
     status: "ok",
     observerId: actorId,
+    position: { x: 0, y: 0, z: 0 },
     visibleActors: [],
     memory: ["synthetic observation: no live world connection"],
     inventory: []
@@ -125,11 +170,349 @@ function readString(args: Record<string, unknown>, key: string, fallback: string
   return typeof args[key] === "string" ? args[key] : fallback;
 }
 
+function readOptionalString(args: Record<string, unknown>, key: string) {
+  return typeof args[key] === "string" && args[key].trim().length > 0
+    ? args[key].trim()
+    : undefined;
+}
+
 function readOptionalCount(args: Record<string, unknown>) {
   return typeof args.targetCount === "number" ? args.targetCount : undefined;
 }
 
+function readTransferCount(args: Record<string, unknown>) {
+  if (typeof args.count === "number") {
+    return Math.max(1, Math.floor(args.count));
+  }
+  if (typeof args.targetCount === "number") {
+    return Math.max(1, Math.floor(args.targetCount));
+  }
+  return 64;
+}
+
+function chooseDepositItemName(input: {
+  bot: Bot;
+  roleId: RoleId;
+  args: Record<string, unknown>;
+}) {
+  const explicit = readOptionalString(input.args, "itemName");
+  if (explicit) {
+    return explicit;
+  }
+
+  const priority = [
+    "crafting_table",
+    "wooden_pickaxe",
+    "cobblestone",
+    "stick",
+    "oak_planks",
+    "birch_planks",
+    "spruce_planks",
+    "jungle_planks",
+    "acacia_planks",
+    "dark_oak_planks",
+    "mangrove_planks",
+    "cherry_planks",
+    "pale_oak_planks",
+    "oak_log",
+    "birch_log",
+    "spruce_log",
+    "jungle_log",
+    "acacia_log",
+    "dark_oak_log",
+    "mangrove_log",
+    "cherry_log",
+    "pale_oak_log"
+  ];
+  const priorityIndex = (itemName: string) => {
+    const index = priority.indexOf(itemName);
+    return index === -1 ? priority.length : index;
+  };
+  const items = input.bot.inventory.items()
+    .filter((item) => canDepositSharedItem(input.roleId, item.name))
+    .filter((item) => item.count > readKeepItemCount(input.roleId, item.name))
+    .sort((left, right) => {
+      const priorityDelta = priorityIndex(left.name) - priorityIndex(right.name);
+      return priorityDelta !== 0 ? priorityDelta : right.count - left.count;
+    });
+
+  return items[0]?.name;
+}
+
+function planksForLog(itemName: string) {
+  return itemName.endsWith("_log") ? itemName.replace(/_log$/, "_planks") : undefined;
+}
+
+function chooseCraftItemName(input: {
+  bot: Bot;
+  args: Record<string, unknown>;
+}) {
+  const explicit = readOptionalString(input.args, "itemName");
+  if (explicit) {
+    return normalizeCraftItemName(input.bot, explicit);
+  }
+
+  const actionSkillId = readOptionalString(input.args, "actionSkillId");
+  if (actionSkillId === "craftCraftingTable") {
+    return "crafting_table";
+  }
+  if (actionSkillId === "craftWoodenPickaxe") {
+    return "wooden_pickaxe";
+  }
+  if (actionSkillId === "craftPlanksAndSticks") {
+    const inventory = input.bot.inventory.items();
+    const planks = inventory.find((item) => item.name.endsWith("_planks") && item.count >= 2);
+    const hasSticks = inventory.some((item) => item.name === "stick" && item.count > 0);
+    if (planks && !hasSticks) {
+      return "stick";
+    }
+    const log = inventory.find((item) => item.name.endsWith("_log") && item.count > 0);
+    const plankName = log ? planksForLog(log.name) : undefined;
+    return plankName ?? (planks ? "stick" : undefined);
+  }
+
+  return undefined;
+}
+
+function firstCraftablePlanksName(bot: Bot) {
+  const log = bot.inventory.items().find((item) => item.name.endsWith("_log") && item.count > 0);
+  return log ? planksForLog(log.name) : undefined;
+}
+
+function normalizeCraftItemName(bot: Bot, itemName: string) {
+  const normalized = itemName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  if (bot.registry.itemsByName[normalized]) {
+    return normalized;
+  }
+
+  if (normalized === "sticks") {
+    return "stick";
+  }
+
+  if (normalized === "planks" || normalized === "wood_planks") {
+    return firstCraftablePlanksName(bot) ?? "oak_planks";
+  }
+
+  if (normalized === "planks_and_sticks" || normalized === "wood_planks_and_sticks") {
+    const hasPlanks = bot.inventory.items().some((item) => item.name.endsWith("_planks") && item.count >= 2);
+    return hasPlanks ? "stick" : (firstCraftablePlanksName(bot) ?? "oak_planks");
+  }
+
+  if (normalized === "wood_pickaxe" || normalized === "pickaxe") {
+    return "wooden_pickaxe";
+  }
+
+  return normalized;
+}
+
+function argsForPrimitive(intent: ActionIntent, primitive: AllowedTool) {
+  return {
+    ...intent.args,
+    ...(intent.action_skill_id ? { actionSkillId: intent.action_skill_id } : {}),
+    primitiveId: primitive
+  };
+}
+
+type Positioned = { x: number; y: number; z: number };
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function round(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function positionOf(bot: Bot): Positioned {
+  return {
+    x: bot.entity.position.x,
+    y: bot.entity.position.y,
+    z: bot.entity.position.z
+  };
+}
+
+function distance(left: Positioned, right: Positioned) {
+  return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
+}
+
+function readPositionedObject(value: unknown): Positioned | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.x === "number" &&
+    typeof record.y === "number" &&
+    typeof record.z === "number"
+  ) {
+    return { x: record.x, y: record.y, z: record.z };
+  }
+  return null;
+}
+
+function readScoutDistance(args: Record<string, unknown>) {
+  const raw = typeof args.distance === "number" ? args.distance : 8;
+  return Math.max(2, Math.min(12, Math.floor(raw)));
+}
+
+function readScoutTarget(args: Record<string, unknown>, origin: Positioned): Positioned {
+  const objectTarget =
+    readPositionedObject(args.position) ??
+    readPositionedObject(args.targetPosition) ??
+    readPositionedObject(args.target_position);
+  if (objectTarget) {
+    return objectTarget;
+  }
+
+  if (
+    typeof args.x === "number" &&
+    typeof args.y === "number" &&
+    typeof args.z === "number"
+  ) {
+    return { x: args.x, y: args.y, z: args.z };
+  }
+
+  const step = readScoutDistance(args);
+  const direction = typeof args.direction === "string" ? args.direction.toLowerCase() : "east";
+  switch (direction) {
+    case "north":
+      return { x: origin.x, y: origin.y, z: origin.z - step };
+    case "south":
+      return { x: origin.x, y: origin.y, z: origin.z + step };
+    case "west":
+      return { x: origin.x - step, y: origin.y, z: origin.z };
+    case "east":
+    default:
+      return { x: origin.x + step, y: origin.y, z: origin.z };
+  }
+}
+
+function blockAt(bot: Bot, x: number, y: number, z: number) {
+  return bot.blockAt(new Vec3(Math.floor(x), Math.floor(y), Math.floor(z)));
+}
+
+function isAirLikeBlock(block: unknown) {
+  const name = (block as { name?: unknown } | null)?.name;
+  return name === "air" || name === "cave_air" || name === "void_air";
+}
+
+function hasSolidCollision(block: unknown) {
+  const box = (block as { boundingBox?: unknown } | null)?.boundingBox;
+  if (box === "block") {
+    return true;
+  }
+  const name = (block as { name?: unknown } | null)?.name;
+  return typeof name === "string" && !isAirLikeBlock(block) && name !== "water" && name !== "lava";
+}
+
+function resolveSurfaceTarget(bot: Bot, target: Positioned, origin: Positioned): Positioned {
+  const x = Math.floor(target.x);
+  const z = Math.floor(target.z);
+  const startY = Math.floor(Math.max(origin.y, target.y)) + 8;
+  const minY = Math.floor(Math.min(origin.y, target.y)) - 16;
+
+  for (let y = startY; y >= minY; y -= 1) {
+    const support = blockAt(bot, x, y - 1, z);
+    const feet = blockAt(bot, x, y, z);
+    const head = blockAt(bot, x, y + 1, z);
+    if (hasSolidCollision(support) && isAirLikeBlock(feet) && isAirLikeBlock(head)) {
+      return { x: x + 0.5, y, z: z + 0.5 };
+    }
+  }
+
+  return target;
+}
+
+async function manualMoveToward(input: {
+  bot: Bot;
+  target: Positioned;
+  durationMs: number;
+}) {
+  await input.bot.lookAt(new Vec3(input.target.x, input.target.y, input.target.z), true);
+  input.bot.setControlState("sprint", true);
+  input.bot.setControlState("forward", true);
+  try {
+    await delay(input.durationMs);
+  } finally {
+    input.bot.setControlState("forward", false);
+    input.bot.setControlState("sprint", false);
+  }
+}
+
+async function runSocialMoveTo(input: {
+  bot: Bot;
+  args: Record<string, unknown>;
+}): Promise<JsonValue> {
+  const before = positionOf(input.bot);
+  const requestedTarget = readScoutTarget(input.args, before);
+  const target = resolveSurfaceTarget(input.bot, requestedTarget, before);
+  const timeoutMs = typeof input.args.timeoutMs === "number" ? input.args.timeoutMs : 8_000;
+  const manualDurationMs =
+    typeof input.args.durationMs === "number" ? input.args.durationMs : 1_200;
+  let pathfinderFailureReason: string | undefined;
+  let manualFallbackUsed = false;
+
+  if (input.bot.pathfinder) {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        input.bot.pathfinder.goto(new goals.GoalNear(target.x, target.y, target.z, 1)),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            input.bot.pathfinder.stop?.();
+            reject(new Error(`move_to scout timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+        })
+      ]);
+    } catch (error) {
+      input.bot.pathfinder.stop?.();
+      pathfinderFailureReason = error instanceof Error ? error.message : String(error);
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
+  } else {
+    manualFallbackUsed = true;
+    await manualMoveToward({ bot: input.bot, target, durationMs: manualDurationMs });
+  }
+
+  const afterPathfinder = positionOf(input.bot);
+  if (pathfinderFailureReason && distance(before, afterPathfinder) < 1) {
+    manualFallbackUsed = true;
+    await manualMoveToward({ bot: input.bot, target, durationMs: manualDurationMs });
+  }
+
+  const after = positionOf(input.bot);
+  const distanceMoved = round(distance(before, after));
+  const distanceToTarget = round(distance(after, target));
+  const arrived = distanceToTarget <= 2.5;
+  const moved = distanceMoved >= 1;
+
+  return {
+    status: arrived ? "arrived" : moved ? "moved" : "blocked",
+    requestedTarget,
+    target,
+    beforePosition: before,
+    afterPosition: after,
+    distanceMoved,
+    distanceToTarget,
+    pathfinderFailureReason,
+    manualFallbackUsed,
+    reason: arrived
+      ? "move_to reached the bounded scouting waypoint."
+      : moved
+        ? `move_to moved ${distanceMoved} blocks toward the scouting waypoint${pathfinderFailureReason ? " after pathfinder fallback" : ""}.`
+        : pathfinderFailureReason
+          ? `move_to scout failed: ${pathfinderFailureReason}; manual fallback also produced no measured movement.`
+          : "move_to did not produce measured movement."
+  } as JsonValue;
+}
+
 async function runSocialPrimitive(input: {
+  actorId: string;
   tool: AllowedTool;
   args: Record<string, unknown>;
   bot: Bot;
@@ -140,12 +523,18 @@ async function runSocialPrimitive(input: {
   const actor = asObserveActor(input.bot);
   const target = asObserveActor(input.targetBot ?? input.bot);
   const proposal = validateProposal({ tool: input.tool, args: input.args });
+  const roleId = getActorProfile(input.actorId).gameplay_role;
 
   switch (proposal.tool) {
     case "observe": {
       const observed = await observe({ actor, target, dialogueState, memory });
       return observed as unknown as JsonValue;
     }
+    case "move_to":
+      return runSocialMoveTo({
+        bot: input.bot,
+        args: proposal.args
+      });
     case "wait":
       return (await wait({ ticks: readTicks(proposal.args) })) as unknown as JsonValue;
     case "remember":
@@ -164,6 +553,100 @@ async function runSocialPrimitive(input: {
         blockName: readString(proposal.args, "blockName", "stone"),
         targetCount: readOptionalCount(proposal.args)
       })) as unknown as JsonValue;
+    case "craft_item": {
+      const itemName = chooseCraftItemName({ bot: input.bot, args: proposal.args });
+      if (!itemName) {
+        return { status: "blocked", reason: "craft_item requires itemName" };
+      }
+      return (await craftItem({ bot: input.bot, itemName })) as unknown as JsonValue;
+    }
+    case "craft_with_table": {
+      const itemName = chooseCraftItemName({ bot: input.bot, args: proposal.args });
+      if (!itemName) {
+        return { status: "blocked", reason: "craft_with_table requires itemName" };
+      }
+      return (await craftWithTable({ bot: input.bot, itemName })) as unknown as JsonValue;
+    }
+    case "inspect_chest": {
+      const chest = createMineflayerSharedChestAccessor(input.bot);
+      const ledger = createSharedStorageLedger();
+      const bulletin = createTeamBulletin();
+      try {
+        return (await inspectChest({
+          actorId: input.actorId,
+          roleId,
+          chest,
+          ledger,
+          bulletin,
+          currentTask: readOptionalString(proposal.args, "currentTask")
+        })) as unknown as JsonValue;
+      } catch (error) {
+        return {
+          status: "blocked",
+          reason: error instanceof Error ? error.message : String(error)
+        };
+      }
+    }
+    case "deposit_shared": {
+      const itemName = chooseDepositItemName({ bot: input.bot, roleId, args: proposal.args });
+      if (!itemName) {
+        return {
+          status: "blocked",
+          reason: "deposit_shared found no depositable inventory item above role reserve"
+        };
+      }
+      const chest = createMineflayerSharedChestAccessor(input.bot);
+      const ledger = createSharedStorageLedger();
+      const bulletin = createTeamBulletin();
+      try {
+        return (await depositToSharedChest({
+          actorId: input.actorId,
+          roleId,
+          chest,
+          inventory: input.bot.inventory,
+          ledger,
+          bulletin,
+          itemName,
+          count: readTransferCount(proposal.args),
+          currentTask: readOptionalString(proposal.args, "currentTask")
+        })) as unknown as JsonValue;
+      } catch (error) {
+        return {
+          status: "blocked",
+          reason: error instanceof Error ? error.message : String(error),
+          itemName
+        };
+      }
+    }
+    case "withdraw_shared": {
+      const itemName = readOptionalString(proposal.args, "itemName");
+      if (!itemName) {
+        return { status: "blocked", reason: "withdraw_shared requires itemName" };
+      }
+      const chest = createMineflayerSharedChestAccessor(input.bot);
+      const ledger = createSharedStorageLedger();
+      const bulletin = createTeamBulletin();
+      try {
+        return (await withdrawFromSharedChest({
+          actorId: input.actorId,
+          roleId,
+          chest,
+          inventory: input.bot.inventory,
+          ledger,
+          bulletin,
+          itemName,
+          count: readTransferCount(proposal.args),
+          reason: readString(proposal.args, "reason", "settlement task"),
+          currentTask: readOptionalString(proposal.args, "currentTask")
+        })) as unknown as JsonValue;
+      } catch (error) {
+        return {
+          status: "blocked",
+          reason: error instanceof Error ? error.message : String(error),
+          itemName
+        };
+      }
+    }
     case "say":
       return (await say({
         actor: input.bot as unknown as Parameters<typeof say>[0]["actor"],
@@ -191,7 +674,10 @@ async function executePrimitiveWithEvidence(input: {
   gateBlocked: boolean;
   status: string;
 }> {
-  const permission = checkActiveActionSkillPermission(input.gate, input.tool);
+  const permission =
+    input.tool === "move_to"
+      ? ({ allowed: true } as const)
+      : checkActiveActionSkillPermission(input.gate, input.tool);
   if (!permission.allowed) {
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -228,6 +714,7 @@ async function executePrimitiveWithEvidence(input: {
   let toolResult: JsonValue;
   try {
     toolResult = await runSocialPrimitive({
+      actorId: input.actorId,
       tool: input.tool,
       args: input.args,
       bot: input.bot,
@@ -258,6 +745,7 @@ export async function executeSocialActionIntent(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
+  turnId?: string;
   cycleGoal: ActorCycleGoal;
   intent: ActionIntent;
   activeActionSkills: readonly ActorActionSkillRecord[];
@@ -272,6 +760,8 @@ export async function executeSocialActionIntent(input: {
 
   const evidenceRefs: string[] = [];
   const executedTools: string[] = [];
+  const toolStatuses: SocialPrimitiveAttemptStatus[] = [];
+  const turnId = input.turnId ?? input.cycleId;
   let gateBlocked = false;
   let actionSkillExecutionUnit = false;
   const memory = createMemory(8);
@@ -281,8 +771,8 @@ export async function executeSocialActionIntent(input: {
       const ref = await writeToolEvidence({
         actorWorkspaceRootDir: input.actorWorkspaceRootDir,
         actorId: input.actorId,
-        cycleId: input.cycleId,
-        evidenceId: `synthetic-${input.cycleId}-${randomUUID()}`,
+        cycleId: turnId,
+        evidenceId: `synthetic-${turnId}-${randomUUID()}`,
         tool: input.intent.kind,
         args: input.intent.args,
         result: { status: "ok", synthetic: true },
@@ -290,11 +780,13 @@ export async function executeSocialActionIntent(input: {
       });
       evidenceRefs.push(ref);
       executedTools.push(input.intent.kind);
+      toolStatuses.push({ tool: input.intent.kind, status: "ok" });
       return {
         observation,
         runtimeResult: { status: "ok", synthetic: true, kind: input.intent.kind },
         evidenceRefs,
         executedTools,
+        toolStatuses,
         verifierStatus: "not_applicable",
         gateBlocked: false,
         actionSkillExecutionUnit: false
@@ -309,8 +801,8 @@ export async function executeSocialActionIntent(input: {
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
-      cycleId: input.cycleId,
-      evidenceId: `${input.cycleId}-${input.intent.kind}`,
+      cycleId: turnId,
+      evidenceId: `${turnId}-${input.intent.kind}`,
       tool: input.intent.kind,
       args: input.intent.args,
       result: result as unknown as JsonValue,
@@ -318,12 +810,17 @@ export async function executeSocialActionIntent(input: {
     });
     evidenceRefs.push(ref);
     executedTools.push(input.intent.kind);
+    toolStatuses.push({
+      tool: input.intent.kind,
+      status: "status" in result ? String(result.status) : "ok"
+    });
 
     return {
       observation,
       runtimeResult: result as unknown as JsonValue,
       evidenceRefs,
       executedTools,
+      toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: false,
       actionSkillExecutionUnit: false
@@ -340,6 +837,7 @@ export async function executeSocialActionIntent(input: {
       runtimeResult: { status: "blocked", reason: resolved.blockedReason },
       evidenceRefs,
       executedTools,
+      toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
       actionSkillExecutionUnit
@@ -352,6 +850,7 @@ export async function executeSocialActionIntent(input: {
       runtimeResult: { status: "blocked", reason: "No primitive resolved for intent" },
       evidenceRefs,
       executedTools,
+      toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
       actionSkillExecutionUnit
@@ -368,6 +867,7 @@ export async function executeSocialActionIntent(input: {
         },
         evidenceRefs,
         executedTools,
+        toolStatuses,
         verifierStatus: "not_applicable",
         gateBlocked: true,
         actionSkillExecutionUnit
@@ -390,6 +890,7 @@ export async function executeSocialActionIntent(input: {
       },
       evidenceRefs,
       executedTools,
+      toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
       actionSkillExecutionUnit
@@ -397,23 +898,22 @@ export async function executeSocialActionIntent(input: {
   }
 
   let lastToolResult: JsonValue = { status: "blocked", reason: "No primitives executed" };
-  let lastStatus = "unknown";
 
   for (const primitive of primitivesToRun) {
     const step = await executePrimitiveWithEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
-      cycleId: input.cycleId,
+      cycleId: turnId,
       tool: primitive,
-      args: input.intent.args,
+      args: argsForPrimitive(input.intent, primitive),
       bot: input.bot,
       targetBot: input.targetBot,
       gate
     });
     evidenceRefs.push(step.evidenceRef);
     executedTools.push(primitive);
+    toolStatuses.push({ tool: primitive, status: step.status });
     lastToolResult = step.toolResult;
-    lastStatus = step.status;
 
     if (step.gateBlocked || step.status === "error" || step.status === "blocked") {
       gateBlocked = step.gateBlocked;
@@ -422,8 +922,7 @@ export async function executeSocialActionIntent(input: {
   }
 
   const verifierStatus = deriveProgressVerifierStatus({
-    executedTools,
-    lastToolStatus: lastStatus
+    toolAttempts: toolStatuses
   });
 
   return {
@@ -431,33 +930,16 @@ export async function executeSocialActionIntent(input: {
     runtimeResult: {
       action_skill_execution_unit: actionSkillExecutionUnit,
       executed_tools: executedTools,
+      tool_statuses: toolStatuses as unknown as JsonValue,
       last_tool_result: lastToolResult
     },
     evidenceRefs,
     executedTools,
+    toolStatuses,
     verifierStatus,
     gateBlocked,
     actionSkillExecutionUnit
   };
-}
-
-const SOCIAL_RESOURCE_PRESSURE_INTENTS: IntentKind[] = [
-  "bootstrap_progress",
-  "resupply_shared_storage",
-  "recover_basic_tools"
-];
-
-function socialIntentKindsForRole(roleId: RoleId): IntentKind[] {
-  switch (roleId) {
-    case "gatherer":
-      return ["bootstrap_progress", "resupply_shared_storage"];
-    case "crafter":
-      return ["bootstrap_progress", "recover_basic_tools"];
-    case "quartermaster":
-      return ["bootstrap_progress", "resupply_shared_storage", "inspect_settlement_state"];
-    default:
-      return ["bootstrap_progress"];
-  }
 }
 
 export function resolvePrimitivesForSocialIntent(
@@ -469,6 +951,13 @@ export function resolvePrimitivesForSocialIntent(
   blockedReason?: string;
 } {
   if (intent.kind === "use_primitive" && intent.primitive_id) {
+    if (!isSocialExecutablePrimitive(intent.primitive_id)) {
+      return {
+        primitives: [],
+        actionSkillExecutionUnit: false,
+        blockedReason: `Primitive ${intent.primitive_id} is not executable in the social cycle runtime`
+      };
+    }
     return {
       primitives: [intent.primitive_id as AllowedTool],
       actionSkillExecutionUnit: false
@@ -484,6 +973,13 @@ export function resolvePrimitivesForSocialIntent(
         blockedReason: "No owned action skill primitives for intent"
       };
     }
+    if (!owned.required_primitives.every(isSocialExecutablePrimitive)) {
+      return {
+        primitives: [],
+        actionSkillExecutionUnit: false,
+        blockedReason: `Action skill ${owned.skill_id} includes primitives this social executor cannot run`
+      };
+    }
     return {
       primitives: owned.required_primitives.map((primitive) => primitive as AllowedTool),
       actionSkillExecutionUnit: true
@@ -497,17 +993,8 @@ export function resolvePrimitivesForSocialIntent(
   };
 }
 
-/** Resource-pressure allowlist for social cycles; not the generic nearby-opportunity compile path. */
+/** Role-safe runtime affordances for the Soul/LifeGoal cycle; social context is not a hardcoded strategy funnel. */
 export function compileSocialAllowedPrimitives(roleId: string) {
-  const primitiveIds = new Set<string>();
-  for (const intentKind of socialIntentKindsForRole(roleId as RoleId)) {
-    for (const primitiveId of compileAllowedPrimitiveIds({
-      intentKind,
-      roleId: roleId as RoleId,
-      lifecycleMode: "normal"
-    })) {
-      primitiveIds.add(primitiveId);
-    }
-  }
-  return [...primitiveIds];
+  const contract = getRoleContract(roleId as RoleId);
+  return contract.allowedTools.filter(isSocialExecutablePrimitive);
 }

@@ -32,12 +32,39 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
   const staleEvidencePath = path.join(testArtifactRoot, "npc_b", "evidence", "stale.json");
   const staleProviderInputPath = path.join(testArtifactRoot, "npc_b", "provider-inputs", "turn-0001.json");
   const staleProviderOutputPath = path.join(testArtifactRoot, "npc_b", "provider-outputs", "turn-0001.json");
+  const staleActiveSkillPath = path.join(
+    testArtifactRoot,
+    "npc_b",
+    "action-skills",
+    "active",
+    "craftCraftingTable.json"
+  );
   await fs.mkdir(path.dirname(staleEvidencePath), { recursive: true });
   await fs.mkdir(path.dirname(staleProviderInputPath), { recursive: true });
   await fs.mkdir(path.dirname(staleProviderOutputPath), { recursive: true });
+  await fs.mkdir(path.dirname(staleActiveSkillPath), { recursive: true });
   await fs.writeFile(staleEvidencePath, "{\"category\":\"stale_failure\"}\n", "utf8");
   await fs.writeFile(staleProviderInputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
   await fs.writeFile(staleProviderOutputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
+  await fs.writeFile(
+    staleActiveSkillPath,
+    JSON.stringify({
+      schema: "actor-action-skill/v1",
+      skill_id: "craftCraftingTable",
+      owner_actor_id: "npc_b",
+      source_kind: "seed",
+      status: "active",
+      created_at: "2026-05-19T00:00:00.000Z",
+      updated_at: "2026-05-19T00:00:00.000Z",
+      required_primitives: ["observe", "craft_item", "wait"],
+      preconditions: ["inventory has planks"],
+      success_verifier: "runtime verifier for craftCraftingTable",
+      known_failure_modes: [],
+      evidence_refs: [],
+      review_refs: []
+    }, null, 2),
+    "utf8"
+  );
 
   try {
     const result = await initializeActorWorkspaces({
@@ -75,7 +102,7 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     assert.equal(actorFile.schema, "actor-workspace/v1");
     assert.equal(actorFile.actor_id, "npc_b");
     assert.equal(actorFile.actor_profile.display_name, "Jun");
-    assert.equal(actorFile.actor_profile.gameplay_role, "gatherer");
+    assert.equal(actorFile.actor_profile.gameplay_role, "settler");
     assert.equal(actorFile.action_skill_library, "action-skills/index.json");
 
     const paths = getActorWorkspacePaths(testArtifactRoot, "npc_b");

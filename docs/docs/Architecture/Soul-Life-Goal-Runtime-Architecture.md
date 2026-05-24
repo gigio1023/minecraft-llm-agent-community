@@ -32,6 +32,23 @@ goal이 아니라 외부 압력, 요청, 실험 제약, 또는 scenario event다
 목표 아래에서 soul, 사회적 역할, 기억, 관계, 생존 상태, 이전 cycle 판단을
 근거로 하위 목표를 계속 만들어야 한다.
 
+## Near-Term Proof
+
+The near-term proof is a bounded social-life simulation seed for one actor.
+
+That actor must:
+
+- act in Minecraft through the runtime gate;
+- reason from `ActorSoul`, `LifeGoal`, and `WorldEvent` pressure;
+- store or refine memory from verifier-backed evidence;
+- use prior CycleJudgment or memory in a later cycle;
+- leave artifacts that explain success, failure, stall, and no progress.
+
+This proof is not full human-like personhood, long-run autonomy, or a Voyager
+clone. It is also not optimistic LLM narration. The runtime may prove concepts
+with primitive implementations, but reports must say exactly what was primitive,
+builtin, helper-expanded, blocked, or unimplemented.
+
 ## Correction
 
 이전 `SessionPlan` 중심 표현은 너무 “외부 task를 per-run catalog로 컴파일”
@@ -479,6 +496,33 @@ type CycleJudgmentOutput = {
 | Short objective | CLI objective registry or generated runner | external objective behaves like top-level task | operator/scenario input becomes pressure/event; LifeGoal remains actor-owned |
 | Long objective | fixed phase ladder plus generated/builtin `run(ctx)` | “passed” can mean builtin/helper chain worked | separate evaluation harness from social runtime; builtin opt-in only |
 
+## Exploration And Propagation
+
+Exploration tasks such as mining coal or building a simple wooden or stone
+shelter are useful only when they stay behind runtime evidence gates.
+
+Accepted paths:
+
+- objective phase: a bounded objective asks for one current-run outcome and
+  passes only from world, inventory, container, position, or transcript evidence;
+- direct-generated trial: generated TypeScript attempts one objective, records
+  source, helper calls, timeout/error, verifier output, and actor memory writes;
+- social-cycle pressure: a `WorldEvent` may make coal or shelter relevant, but
+  the actor still chooses a CycleGoal from soul, life goal, memory, relationship,
+  and previous judgment context.
+
+Rejected paths:
+
+- LLM text saying the actor explored, mined coal, or built shelter without
+  current-run evidence;
+- helper chains that solve the dependency while the report credits actor
+  judgment;
+- builtin fallback counted as OpenAI-authored agency.
+
+Primitive implementations are allowed. A report can say “the shelter concept was
+proven by placing a minimal block outline” or “coal search stopped at a
+truthful blocker.” It must not call that a complete social-life capability.
+
 ## Primitive-Only Vs Action Skill Execution
 
 P0 should keep primitive execution available because it is observable and already
@@ -530,6 +574,11 @@ Good social runtime metrics:
 - `goal_churn`: actor does not randomly abandon goals without evidence.
 - `verified_social_value`: shared chest delta, chat request, handoff, or relationship event is backed by evidence.
 - `non_builtin_source_ratio`: % CycleGoals and actions not sourced from builtin fallback.
+- `action_attempt_coverage`: every action attempt has ActionIntent, runtime
+  result, verifier status, and evidence or blocker refs.
+- `no_progress_rejection`: synthetic no-progress, empty helper output, and
+  terminal memory notes cannot produce a pass.
+- `audit_ref_integrity`: report audit fails when required refs are missing.
 
 ## Minimum Experiments
 
@@ -552,6 +601,7 @@ Success:
 - CycleGoal source is `llm_planner` or `llm_authored_policy`;
 - CycleGoal cites soul + observation;
 - actor makes verified progress or writes truthful blocked CycleJudgment;
+- every action attempt is recorded, including wait or no-progress attempts;
 - no `builtin` or fixed ladder is counted as goal authority.
 
 ### Experiment 2 - Social Obligation Handoff
@@ -686,6 +736,8 @@ Success criteria:
 - Counting `probe passed` as LLM autonomy.
 - Silent builtin fallback.
 - `ensureItem` chains that solve dependency planning while reports credit the actor.
+- Synthetic no-progress reports that pass without current-run evidence.
+- Missing refs hidden by friendly summary text.
 - Dialogue-only social simulation with no obligation, inventory, memory, or relationship evidence.
 - Writing memory but not retrieving it before the next CycleGoal.
 - Random goal churn without previous CycleJudgment or world-state reason.

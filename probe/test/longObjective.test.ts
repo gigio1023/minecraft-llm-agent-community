@@ -6,6 +6,10 @@ import { buildLongObjectiveReviewerTasks } from "../src/objectives/longObjective
 import { verifyInventoryPhase, verifyDiamondOreObservation } from "../src/objectives/longObjective/verifiers.js";
 import { classifyGeminiError, GeminiPlannerError } from "../src/provider/gemini/errors.js";
 import { getLongPhaseDefinition } from "../src/objectives/longObjective/ladder.js";
+import {
+  classifyPlannerResolutionStopReason,
+  getLongObjectiveStatusForStopReason
+} from "../src/objectives/longObjective/runner.js";
 
 test("stone pickaxe ladder includes sanity and target phases", () => {
   const ladder = getLongObjectivePhaseLadder("craft_current_run_stone_pickaxe_1");
@@ -110,4 +114,22 @@ test("gemini error classifier marks quota and rate limits retryable", () => {
   );
   assert.equal(error.kind, "rate_limited");
   assert.equal(error.retryable, true);
+});
+
+test("long objective stop status does not disguise provider blockers as gameplay failure", () => {
+  assert.equal(getLongObjectiveStatusForStopReason("provider_blocked"), "blocked");
+  assert.equal(getLongObjectiveStatusForStopReason("unsafe_or_rejected_source"), "failed");
+  assert.equal(getLongObjectiveStatusForStopReason("phase_failed"), "failed");
+});
+
+test("planner resolution maps blocked and rejected source to distinct stop reasons", () => {
+  assert.equal(
+    classifyPlannerResolutionStopReason({ resolutionStatus: "provider_blocked" }),
+    "provider_blocked"
+  );
+  assert.equal(
+    classifyPlannerResolutionStopReason({ resolutionStatus: "unsafe_or_rejected_source" }),
+    "unsafe_or_rejected_source"
+  );
+  assert.equal(classifyPlannerResolutionStopReason({ resolutionStatus: "ready" }), undefined);
 });

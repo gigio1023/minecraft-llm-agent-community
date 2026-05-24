@@ -31,11 +31,18 @@ write CycleJudgment, memory writes, and report metrics
 run a second cycle that can cite the previous judgment
 ```
 
-The target provider is OpenAI API `gpt-5.4-mini` through the repo-local
-`OPENAI_API_KEY` path, not the existing `openai-codex` ChatGPT backend auth
-store. Keep `OPENAI_MODEL` configurable and default to `gpt-5.4-mini`. If the
-model is unavailable in the local account, the implementation must fail with a
-clear provider setup error and support `OPENAI_MODEL=gpt-5-mini` as a fallback.
+The near-term proof is a bounded social-life simulation seed. One actor should
+act in Minecraft, reason from `ActorSoul`, `LifeGoal`, and `WorldEvent`
+pressure, store or refine memory from evidence, and use prior judgment or memory
+in later cycles. It is not full human-like personhood, long-run autonomy, or a
+Voyager clone.
+
+The target provider is OpenAI API `gpt-5.4-mini` through `OPENAI_API_KEY` in the
+repo-root `.env`, not the existing `openai-codex` ChatGPT backend auth store.
+Keep `OPENAI_MODEL` configurable and default to `gpt-5.4-mini` because eligible
+accounts may have free-tier mini model access. If the model is unavailable in
+the local account, the implementation must fail with a clear provider setup
+error and support `OPENAI_MODEL=gpt-5-mini` as an explicit fallback.
 
 Official reference notes:
 
@@ -95,6 +102,7 @@ probe/src/runtime/goals/cycleJudgmentStore.ts
 probe/src/runtime/goals/worldEventStore.ts
 probe/src/runtime/goals/cycleContextAssembler.ts
 probe/src/runtime/goals/cycleReport.ts
+probe/src/runtime/goals/socialCycleReportAuditCli.ts
 probe/src/provider/openaiApiJsonProvider.ts
 probe/src/provider/socialGoalMindProvider.ts
 probe/src/provider/socialActionPlannerProvider.ts
@@ -327,6 +335,7 @@ Use OpenAI API with the official `openai` npm package already present in
 Config:
 
 ```text
+# repo-root .env
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-5.4-mini
 SOCIAL_CYCLE_PROVIDER=openai-api
@@ -468,6 +477,34 @@ If action skill execution as a unit is too large, write ActionIntent with
 `kind: "use_primitive"` and record the intended action skill candidate. The
 report must mark `action_skill_execution_unit: false`.
 
+## Exploration And Propagation Semantics
+
+Mining coal, scouting for a safer route, or building a simple wooden or stone
+shelter are allowed as exploration/propagation concepts only when they are
+represented as objective phases or direct-generated trials behind runtime
+evidence gates.
+
+Implementation rules:
+
+- An objective phase asks for one bounded current-run outcome and passes only
+  from verifier-backed world, inventory, container, position, or transcript
+  evidence.
+- A direct-generated trial records generated source, helper calls, action
+  attempts, timeout/error, verifier output, and memory writes before any cleanup
+  into an action skill candidate.
+- A social-cycle `WorldEvent` may create pressure to mine coal or prepare
+  shelter, but the actor must still choose a CycleGoal from ActorSoul, LifeGoal,
+  memory, relationship context, and previous CycleJudgment.
+- Primitive proofs are acceptable when the artifact says what was primitive.
+  Example: a report may state that shelter proof placed a minimal block outline
+  but did not solve navigation, roof coverage, mob safety, or long-term reuse.
+
+Reject:
+
+- optimistic LLM text without current-run evidence;
+- helper expansion credited as actor judgment;
+- builtin fallback counted as OpenAI-authored agency.
+
 ## Report Schema
 
 Write one report per run:
@@ -502,6 +539,7 @@ type SocialCycleRunReport = {
     cycle_id: string;
     cycle_goal_ref: string;
     action_intent_ref: string;
+    action_attempt_refs: string[];
     provider_input_refs: string[];
     provider_output_refs: string[];
     evidence_refs: string[];
@@ -537,6 +575,12 @@ Test requirements:
   `cycle_goal_source: "runtime_rule"`.
 - OpenAI provider errors write provider output artifacts and do not fake
   `runtime_status: "passed"`.
+- Synthetic no-progress cannot pass from a terminal memory note, empty helper
+  output, provider text, or missing verifier evidence.
+- Every action attempt is present in the report, including wait, remember,
+  blocked, provider-error, and no-progress attempts.
+- Builtin fallback is explicitly marked and never counted as OpenAI-authored
+  agency.
 
 ## Real Implementation Testing Plan
 
@@ -561,6 +605,9 @@ Required checks:
 - A second cycle can cite the first CycleJudgment.
 - Stale `expected_goal_id` cannot overwrite a newer goal.
 - Provider errors write provider output artifacts and never fake pass.
+- Synthetic no-progress fixtures fail the report pass condition.
+- Action attempt coverage includes blocked and no-progress attempts.
+- Builtin fallback cannot masquerade as LLM agency in report fields.
 
 Command:
 
@@ -596,6 +643,7 @@ Pass criteria:
 
 - report has two cycles;
 - every cycle has `cycle_goal_ref`, `action_intent_ref`, `judgment_ref`;
+- every attempted action is recorded with runtime result and verifier status;
 - second provider/context packet cites first `CycleJudgment`;
 - `agency_status.cycle_goal_source` is `runtime_rule`;
 - `agency_status.builtin_goal_authority` is true or otherwise clearly marked;
@@ -659,6 +707,10 @@ Pass criteria:
 - if inventory/chest/world state changes, evidence refs prove it;
 - if no world progress happens, CycleJudgment explains the blocker and next
   pressure;
+- synthetic no-progress, provider text, or a terminal memory note cannot produce
+  `runtime_status: "passed"`;
+- objective-phase/direct-generated exploration, such as coal or shelter, is
+  labeled as trial evidence and does not masquerade as social-life completion;
 - report separates `runtime_status` from `agency_status`;
 - no deterministic curriculum task appears as goal authority.
 
@@ -685,9 +737,14 @@ The audit must fail non-zero if:
 - any LLM provider input is missing ActorSoul or LifeGoal;
 - a cycle has no CycleGoal, ActionIntent, or CycleJudgment artifact;
 - cycle 2 does not cite cycle 1 judgment in context;
+- any action attempt lacks runtime result, verifier status, or evidence/blocker
+  refs;
 - runtime pass is claimed without evidence refs;
+- synthetic no-progress is labeled as pass;
 - provider error is reported as pass;
 - deterministic curriculum is used as goal authority in an OpenAI social run;
+- builtin fallback is not explicitly marked or is counted as OpenAI agency;
+- any artifact refs are missing, malformed, or point outside the actor workspace;
 - WorldEvent is copied as LifeGoal.
 
 ## Real Validation Commands
@@ -756,10 +813,17 @@ The implementation is done when:
 - at least one StrategicGoal or CycleGoal is model-authored by OpenAI API;
 - Action Planner returns a schema-valid ActionIntent;
 - runtime gate executes or truthfully blocks the action;
+- every action attempt is recorded;
 - verifier result is written;
 - CycleJudgment is written;
 - second cycle can reference first CycleJudgment;
+- memory written from evidence is retrieved or cited in a later cycle;
 - report separates `runtime_status` from `agency_status`;
+- synthetic no-progress cannot pass;
+- report audit catches missing refs and provider-error pass claims;
+- builtin fallback never masquerades as LLM agency;
+- objective-phase/direct-generated exploration artifacts state limitations
+  honestly;
 - deterministic curriculum is not used as social runtime goal authority;
 - `bun run typecheck` and targeted tests pass.
 

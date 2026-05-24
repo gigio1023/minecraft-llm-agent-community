@@ -1,4 +1,4 @@
-export type RoleId = "gatherer" | "crafter" | "quartermaster";
+export type RoleId = "gatherer" | "crafter" | "quartermaster" | "settler";
 
 export type RoleContract = {
   roleId: RoleId;
@@ -40,6 +40,58 @@ const roleContracts: Record<RoleId, RoleContract> = {
       bread: 2
     },
     priorityList: ["collect resources", "deposit shared materials"]
+  },
+  settler: {
+    roleId: "settler",
+    allowedTools: [
+      "observe",
+      "move_to",
+      "collect_logs",
+      "mine_block",
+      "craft_item",
+      "craft_with_table",
+      "inspect_chest",
+      "deposit_shared",
+      "withdraw_shared",
+      "say",
+      "wait",
+      "remember"
+    ],
+    depositAllowedItemNames: ["*"],
+    withdrawAllowedItemNames: [
+      "oak_log",
+      "birch_log",
+      "spruce_log",
+      "jungle_log",
+      "acacia_log",
+      "dark_oak_log",
+      "mangrove_log",
+      "cherry_log",
+      "pale_oak_log",
+      "oak_planks",
+      "birch_planks",
+      "spruce_planks",
+      "jungle_planks",
+      "acacia_planks",
+      "dark_oak_planks",
+      "mangrove_planks",
+      "cherry_planks",
+      "pale_oak_planks",
+      "stick",
+      "crafting_table",
+      "wooden_pickaxe",
+      "cobblestone"
+    ],
+    keepItems: {
+      bread: 2,
+      wooden_pickaxe: 1,
+      stone_pickaxe: 1
+    },
+    priorityList: [
+      "survive",
+      "build a small settlement base",
+      "broaden progress after one resource is stocked"
+    ]
   },
   crafter: {
     roleId: "crafter",

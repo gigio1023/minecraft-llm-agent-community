@@ -1,7 +1,5 @@
-import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import type { Bot } from "mineflayer";
 import { Vec3 } from "vec3";
@@ -33,6 +31,7 @@ import {
   ensureLiveSmokeServer
 } from "../server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
+import { execDockerCompose } from "../server/composeCommand.js";
 import { collectLogs } from "../tools/collectLogs.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
@@ -109,7 +108,6 @@ export type DirectGeneratedObjectiveRunOptions = {
   timeoutMs?: number;
 };
 
-const execFileAsync = promisify(execFile);
 const sourceEndpoint = "https://chatgpt.com/backend-api/codex/responses";
 
 function toJsonValue(value: unknown): JsonValue {
@@ -306,13 +304,9 @@ function extractOutputText(payload: unknown) {
 
 async function createRconRunner(rcon: RconContext): Promise<RconRunner> {
   return async (args: string[]) => {
-    await execFileAsync(
-      "docker",
-      ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
-      {
-        cwd: rcon.composeDir,
-        env: rcon.env
-      }
+    await execDockerCompose(
+      ["-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
+      { cwd: rcon.composeDir, env: rcon.env }
     );
   };
 }

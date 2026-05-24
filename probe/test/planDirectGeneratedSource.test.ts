@@ -40,11 +40,12 @@ test("planDirectGeneratedSource keeps valid LLM source", async () => {
   });
 
   assert.equal(resolved.sourceKind, "llm-generated-ts");
+  assert.equal(resolved.resolutionStatus, "ready");
   assert.equal(resolved.usedBuiltinFallback, false);
   assert.match(resolved.source, /export async function run/);
 });
 
-test("planDirectGeneratedSource falls back when LLM source is empty", async () => {
+test("planDirectGeneratedSource marks empty LLM source as provider blocked", async () => {
   const resolved = await planDirectGeneratedSource({
     planner: stubPlanner({
       sourceKind: "llm-generated-ts",
@@ -56,12 +57,14 @@ test("planDirectGeneratedSource falls back when LLM source is empty", async () =
     request: baseRequest
   });
 
-  assert.equal(resolved.sourceKind, "builtin-phase-source");
-  assert.equal(resolved.usedBuiltinFallback, true);
+  assert.equal(resolved.resolutionStatus, "provider_blocked");
+  assert.equal(resolved.sourceKind, "llm-generated-ts");
+  assert.equal(resolved.source, "");
+  assert.equal(resolved.usedBuiltinFallback, false);
   assert.ok(resolved.fallbackReason?.match(/empty_response|no source/));
 });
 
-test("planDirectGeneratedSource falls back when planner is blocked", async () => {
+test("planDirectGeneratedSource marks blocked planner as provider blocked", async () => {
   const resolved = await planDirectGeneratedSource({
     planner: stubPlanner({
       sourceKind: "llm-generated-ts",
@@ -73,11 +76,13 @@ test("planDirectGeneratedSource falls back when planner is blocked", async () =>
     request: baseRequest
   });
 
-  assert.equal(resolved.sourceKind, "builtin-phase-source");
-  assert.equal(resolved.usedBuiltinFallback, true);
+  assert.equal(resolved.resolutionStatus, "provider_blocked");
+  assert.equal(resolved.sourceKind, "llm-generated-ts");
+  assert.equal(resolved.source, "");
+  assert.equal(resolved.usedBuiltinFallback, false);
 });
 
-test("planDirectGeneratedSource falls back when sandbox rejects LLM source", async () => {
+test("planDirectGeneratedSource marks sandbox-rejected LLM source unsafe", async () => {
   const resolved = await planDirectGeneratedSource({
     planner: stubPlanner({
       sourceKind: "llm-generated-ts",
@@ -88,8 +93,9 @@ test("planDirectGeneratedSource falls back when sandbox rejects LLM source", asy
     request: baseRequest
   });
 
-  assert.equal(resolved.sourceKind, "builtin-phase-source");
-  assert.equal(resolved.usedBuiltinFallback, true);
+  assert.equal(resolved.resolutionStatus, "unsafe_or_rejected_source");
+  assert.equal(resolved.sourceKind, "llm-generated-ts");
+  assert.equal(resolved.usedBuiltinFallback, false);
   assert.ok(resolved.fallbackReason?.match(/sandbox/i));
 });
 
@@ -105,8 +111,9 @@ test("planDirectGeneratedSource uses explicit builtin planner", async () => {
   });
 
   assert.equal(resolved.plannerId, "builtin-planner");
+  assert.equal(resolved.resolutionStatus, "ready");
   assert.equal(resolved.sourceKind, "builtin-phase-source");
-  assert.equal(resolved.usedBuiltinFallback, true);
+  assert.equal(resolved.usedBuiltinFallback, false);
   assert.match(resolved.source, /craftWithTable\("stone_axe"/);
 });
 

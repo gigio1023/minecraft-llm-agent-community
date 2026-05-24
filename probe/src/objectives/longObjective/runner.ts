@@ -1,13 +1,14 @@
-import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import type { Bot } from "mineflayer";
 
 import { loadProbeConfig, type ProbeConfig } from "../../config.js";
 import { runDirectGeneratedActionSkill } from "../../generatedActionSkills/directExecutor.js";
-import type { GeneratedActionSkillHelperEvent } from "../../generatedActionSkills/directExecutor.js";
+import type {
+  DirectGeneratedActionSkillRunResult,
+  GeneratedActionSkillHelperEvent
+} from "../../generatedActionSkills/directExecutor.js";
 import { retrieveActorMemoryForObjective } from "../../memory/actorMemory.js";
 import { scanNearbyBlocks as scanNearbyBlocksHelper } from "../../tools/longObjectiveHelpers.js";
 import {
@@ -15,8 +16,10 @@ import {
   normalizeObjectivePhasePlannerId
 } from "../../provider/planner/createObjectivePhasePlanner.js";
 import type { ObjectivePlannerPathId } from "../../provider/planner/types.js";
-import { getBuiltinPhaseSource } from "../../provider/planner/builtinPhaseSources.js";
-import { planDirectGeneratedSource } from "../../provider/planner/planDirectGeneratedSource.js";
+import {
+  planDirectGeneratedSource,
+  type ResolvedDirectGeneratedSource
+} from "../../provider/planner/planDirectGeneratedSource.js";
 import type { JsonValue } from "../../provider/inputSnapshot.js";
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "../../runtime/actorWorkspacePaths.js";
 import { writeJson } from "../../runtime/actorWorkspaceStore.js";
@@ -24,6 +27,7 @@ import { enqueueActorReviewJob, snapshotActiveActionSkills } from "../../reviewe
 import { listActiveActorActionSkillRecords } from "../../runtime/actorWorkspace.js";
 import { closeBots, createBots } from "../../runtime/createBots.js";
 import { buildLiveSmokeServerContext } from "../../server/liveSmokeServer.js";
+import { execDockerCompose } from "../../server/composeCommand.js";
 import {
   createDirectContext,
   prepareStoneAxeFixture,
@@ -35,8 +39,6 @@ import { writeLongObjectiveMemoryIndex, writeLongObjectivePhaseMemory } from "./
 import { buildLongObjectiveReviewerTasks } from "./reviewer.js";
 import type { LongObjectivePhaseReport, LongObjectiveReport, LongObjectiveStopReason } from "./types.js";
 import { verifyPhaseEvidence } from "./verifiers.js";
-
-const execFileAsync = promisify(execFile);
 
 export type LongObjectiveRunOptions = {
   objectiveId: string;
@@ -77,6 +79,36 @@ function toJsonValue(value: unknown): JsonValue {
   return null;
 }
 
+function countInventory(inventory: ReturnType<typeof readInventory>, itemName: string) {
+  return inventory
+    .filter((item) => item.name === itemName)
+    .reduce((sum, item) => sum + item.count, 0);
+}
+
+export function getLongObjectiveStatusForStopReason(
+  stopReason: LongObjectiveStopReason
+): LongObjectiveReport["status"] {
+  if (stopReason === "objective_passed") {
+    return "passed";
+  }
+  if (stopReason === "provider_blocked" || stopReason === "environment_blocked") {
+    return "blocked";
+  }
+  return "failed";
+}
+
+export function classifyPlannerResolutionStopReason(
+  resolved: Pick<ResolvedDirectGeneratedSource, "resolutionStatus">
+): LongObjectiveStopReason | undefined {
+  if (resolved.resolutionStatus === "provider_blocked") {
+    return "provider_blocked";
+  }
+  if (resolved.resolutionStatus === "unsafe_or_rejected_source") {
+    return "unsafe_or_rejected_source";
+  }
+  return undefined;
+}
+
 function buildPhasePrompt(input: {
   objectiveId: string;
   phase: LongPhaseDefinition;
@@ -114,13 +146,9 @@ function buildPhasePrompt(input: {
 
 async function createRconRunner(rcon: RconContext): Promise<RconRunner> {
   return async (args: string[]) => {
-    await execFileAsync(
-      "docker",
-      ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
-      {
-        cwd: rcon.composeDir,
-        env: rcon.env
-      }
+    await execDockerCompose(
+      ["-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
+      { cwd: rcon.composeDir, env: rcon.env }
     );
   };
 }
@@ -156,6 +184,75 @@ function classifyHelperBlock(helperEvents: GeneratedActionSkillHelperEvent[]) {
     return "missing_helper" as const;
   }
   return "phase_failed" as const;
+}
+
+function createSkippedExecution(input: {
+  actorId: string;
+  phaseId: string;
+  helperEvents: GeneratedActionSkillHelperEvent[];
+  timeoutMs: number;
+  reason: string;
+}): DirectGeneratedActionSkillRunResult {
+  return {
+    status: "rejected",
+    actorId: input.actorId,
+    skillName: input.phaseId,
+    helperEvents: input.helperEvents,
+    errorMessage: `execution skipped before gameplay: ${input.reason}`,
+    durationMs: 0,
+    timeoutMs: input.timeoutMs
+  };
+}
+
+function createPlannerSkippedPhaseReport(input: {
+  actorId: string;
+  phase: LongPhaseDefinition;
+  resolved: ResolvedDirectGeneratedSource;
+  stopReason: LongObjectiveStopReason;
+  preInventory: ReturnType<typeof readInventory>;
+  postInventory: ReturnType<typeof readInventory>;
+  helperEvents: GeneratedActionSkillHelperEvent[];
+  timeoutMs: number;
+}): LongObjectivePhaseReport {
+  const reason =
+    input.resolved.fallbackReason ??
+    input.resolved.errorKind ??
+    input.resolved.resolutionStatus;
+  const beforeCount = countInventory(input.preInventory, input.phase.targetItemName);
+  const afterCount = countInventory(input.postInventory, input.phase.targetItemName);
+
+  return {
+    phaseId: input.phase.phaseId,
+    summary: input.phase.summary,
+    status: input.stopReason === "provider_blocked" ? "skipped" : "failed",
+    verifierStatus: "missing",
+    verifierReason: `phase execution skipped before gameplay: ${reason}`,
+    generated: {
+      providerId: input.resolved.plannerId,
+      sourceKind: input.resolved.sourceKind,
+      model: input.resolved.model,
+      providerInputRef: input.resolved.providerInputRef,
+      providerOutputRef: input.resolved.providerOutputRef,
+      fallbackReason: reason,
+      execution: createSkippedExecution({
+        actorId: input.actorId,
+        phaseId: input.phase.phaseId,
+        helperEvents: input.helperEvents,
+        timeoutMs: input.timeoutMs,
+        reason
+      })
+    },
+    evidence: {
+      preInventory: input.preInventory,
+      postInventory: input.postInventory,
+      itemName: input.phase.targetItemName,
+      beforeCount,
+      afterCount,
+      delta: afterCount - beforeCount,
+      blockObservations: []
+    },
+    helperEvents: input.helperEvents
+  };
 }
 
 export async function runLongObjective(options: LongObjectiveRunOptions): Promise<LongObjectiveReport> {
@@ -244,16 +341,41 @@ export async function runLongObjective(options: LongObjectiveRunOptions): Promis
         }
       });
 
-      let source = resolved.source;
-      let plannerMeta = {
+      const plannerStopReason = classifyPlannerResolutionStopReason(resolved);
+      if (plannerStopReason) {
+        const postInventory = readInventory(bot);
+        const phaseReport = createPlannerSkippedPhaseReport({
+          actorId,
+          phase,
+          resolved,
+          stopReason: plannerStopReason,
+          preInventory,
+          postInventory,
+          helperEvents,
+          timeoutMs: options.timeoutMs ?? 90_000
+        });
+        const memoryPaths = await writeLongObjectivePhaseMemory({
+          actorWorkspaceRootDir: config.actorWorkspace.rootDir,
+          actorId,
+          runId,
+          objectiveId,
+          phase: phaseReport,
+          artifactDir
+        });
+        phaseReport.memoryPaths = memoryPaths;
+        phases.push(phaseReport);
+        stopReason = plannerStopReason;
+        nextRecommendedPhase = phase.phaseId;
+        break;
+      }
+
+      const plannerMeta = {
         providerId: resolved.plannerId,
         sourceKind: resolved.sourceKind,
         model: resolved.model,
         inputRef: resolved.providerInputRef,
         outputRef: resolved.providerOutputRef,
-        fallbackReason: resolved.usedBuiltinFallback
-          ? resolved.fallbackReason ?? "used builtin phase source"
-          : resolved.fallbackReason
+        fallbackReason: resolved.fallbackReason
       };
 
       const runPhaseSkill = async (skillSource: string) =>
@@ -274,19 +396,7 @@ export async function runLongObjective(options: LongObjectiveRunOptions): Promis
           }
         });
 
-      let execution = await runPhaseSkill(source);
-      if (execution.status === "rejected" && plannerMeta.sourceKind !== "builtin-phase-source") {
-        const fallbackSource = getBuiltinPhaseSource(phase.phaseId);
-        plannerMeta = {
-          ...plannerMeta,
-          providerId: "builtin-planner",
-          sourceKind: "builtin-phase-source" as const,
-          model: "builtin-phase-program",
-          fallbackReason: `rejected generated source; retried builtin phase source (${execution.errorMessage ?? "policy"})`
-        };
-        source = fallbackSource;
-        execution = await runPhaseSkill(fallbackSource);
-      }
+      const execution = await runPhaseSkill(resolved.source);
 
       const postInventory = readInventory(bot);
       const blockObservations = scanNearbyBlocksHelper(bot, 24);
@@ -363,15 +473,14 @@ export async function runLongObjective(options: LongObjectiveRunOptions): Promis
       stopReason = "objective_passed";
     }
 
-    if (stopReason !== "objective_passed" && phases.length >= maxPhases) {
+    if (stopReason === "budget_exhausted_without_progress" && phases.length >= maxPhases) {
       stopReason = hadProgress
         ? "budget_exhausted_with_progress"
         : "budget_exhausted_without_progress";
       nextRecommendedPhase = nextRecommendedPhase ?? phases.at(-1)?.phaseId;
     }
 
-    const status: LongObjectiveReport["status"] =
-      stopReason === "objective_passed" ? "passed" : "failed";
+    const status = getLongObjectiveStatusForStopReason(stopReason);
 
     const report: LongObjectiveReport = {
       schema: "long-objective-report/v1",
@@ -430,6 +539,9 @@ export async function runLongObjective(options: LongObjectiveRunOptions): Promis
     return report;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const stopReason: LongObjectiveStopReason = /docker|server|connect|auth/i.test(message)
+      ? "environment_blocked"
+      : "phase_failed";
     const report: LongObjectiveReport = {
       schema: "long-objective-report/v1",
       runId,
@@ -437,16 +549,18 @@ export async function runLongObjective(options: LongObjectiveRunOptions): Promis
       actorId,
       providerId,
       evidenceScope: "current_run",
-      status: "blocked",
-      stopReason: /docker|server|connect|auth/i.test(message)
-        ? "environment_blocked"
-        : "phase_failed",
+      status: getLongObjectiveStatusForStopReason(stopReason),
+      stopReason,
       phases,
       artifactRefs: {
         actorWorkspaceTrialPath: path.join(artifactDir, "report.json"),
         ...(options.reportPath ? { requestedReportPath: options.reportPath } : {})
       },
-      nextImplementationTasks: [`Fix environment blocker: ${message}`]
+      nextImplementationTasks: [
+        stopReason === "environment_blocked"
+          ? `Fix environment blocker: ${message}`
+          : `Inspect long objective runner failure: ${message}`
+      ]
     };
     await writeJson(path.join(artifactDir, "report.json"), toJsonValue(report));
     if (options.reportPath) {

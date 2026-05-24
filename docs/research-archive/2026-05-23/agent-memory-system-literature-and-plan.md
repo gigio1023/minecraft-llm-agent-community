@@ -4,6 +4,23 @@ Date: 2026-05-23
 
 Search token: `AGENT_MEMORY_SYSTEM_LITERATURE_PLAN`.
 
+## 2026-05-24 HF CLI Refresh
+
+Queried with:
+
+- `hf papers search "agent memory" --limit 5`
+- `hf papers search "Minecraft agent memory" --limit 5`
+
+Additional signals:
+
+| Reference | Memory Signal | Fit For This Repo |
+| --- | --- | --- |
+| [PREPING: Building Agent Memory without Tasks](https://huggingface.co/papers/2605.13880) | Synthetic practice only helps when a proposer and validator control feasibility, redundancy, and memory insertion. | Settlement experiments should store only verifier-backed lessons and avoid letting repeated log collection become redundant memory. |
+| [Beyond RAG for Agent Memory: Retrieval by Decoupling and Aggregation](https://huggingface.co/papers/2602.02007) | Agent memory is a coherent, correlated stream; fixed top-k retrieval can return redundant context and lose prerequisites. | Retrieve bounded, diverse context: current inventory/resource facts, blockers, and action outcomes rather than many similar collection episodes. |
+| [GEMS: Agent-Native Multimodal Generation with Memory and Skills](https://huggingface.co/papers/2603.28088) | Combines trajectory-level memory, compressed experiential summaries, and skill loading. | Keep raw evidence, then let action skills and summaries load on demand instead of stuffing all history into every cycle. |
+| [Hindsight is 20/20: Building Agent Memory that Retains, Recalls, and Reflects](https://huggingface.co/papers/2512.12818) | Separates world facts, experiences, entity summaries, and beliefs with retain/recall/reflect operations. | Keep settlement facts, tool experiences, actor summaries, and inferred beliefs separate and evidence-linked. |
+| [JARVIS-1](https://huggingface.co/papers/2311.05997) | Minecraft planning improves from memory of actual survival experiences. | Survival/settlement runs should use embodied experience traces, not only generic Minecraft knowledge. |
+
 ## Principle
 
 The intended direction is:

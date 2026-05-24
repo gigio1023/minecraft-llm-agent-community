@@ -72,6 +72,19 @@ test("assigns visible active seed action skill ownership per actor role", () => 
   );
 });
 
+test("settler owns gather, craft, mining, and storage seed skills", () => {
+  const ownership = assignSeedActionSkillOwnership(["npc_b"], { npc_b: "settler" });
+  const activeSkillIds = new Set(ownership.map((record) => record.skill_id));
+
+  assert.ok(activeSkillIds.has("collectLogs"));
+  assert.ok(activeSkillIds.has("craftPlanksAndSticks"));
+  assert.ok(activeSkillIds.has("craftCraftingTable"));
+  assert.ok(activeSkillIds.has("craftWoodenPickaxe"));
+  assert.ok(activeSkillIds.has("mineCobblestone"));
+  assert.ok(activeSkillIds.has("inspectSharedChest"));
+  assert.ok(activeSkillIds.has("depositSharedItems"));
+});
+
 test("creates a two-actor session artifact boundary with action skill ownership", () => {
   const actorIds = ["npc_a", "npc_b"];
   const actorRoles = defaultActorRoles(actorIds);

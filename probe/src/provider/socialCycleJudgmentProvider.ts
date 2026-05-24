@@ -99,10 +99,15 @@ export async function runSocialCycleJudgmentProvider(input: {
   verifierStatus: CycleJudgment["verifier_status"];
   runId?: string;
   openAi?: OpenAiJsonProviderConfig;
+  turnId?: string;
+  actionIndex?: number;
 }): Promise<CycleJudgmentProviderResult> {
-  const snapshotId = `cycle-judgment-${input.cycleId}-${randomUUID()}`;
+  const turnId = input.turnId ?? input.cycleId;
+  const snapshotId = `cycle-judgment-${turnId}-${randomUUID()}`;
   const providerInput = {
     stage: "cycle_judgment",
+    turn_id: turnId,
+    action_index: input.actionIndex,
     ActorSoul: input.context.ActorSoul,
     ActorLifeGoal: input.context.ActorLifeGoal,
     cycle_goal: input.cycleGoal,
@@ -117,7 +122,7 @@ export async function runSocialCycleJudgmentProvider(input: {
     schema: "provider-input-snapshot/v1",
     snapshot_id: snapshotId,
     actor_id: input.actorId,
-    turn_id: input.cycleId,
+    turn_id: turnId,
     provider_id: input.providerId,
     model: input.openAi?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
@@ -173,7 +178,7 @@ observe-only cycles are no_progress, not verified_progress. ActorSoul and ActorL
         schema: "provider-output-snapshot/v1",
         snapshot_id: `${snapshotId}-out`,
         actor_id: input.actorId,
-        turn_id: input.cycleId,
+        turn_id: turnId,
         provider_id: input.providerId,
         model: result.model,
         created_at: new Date().toISOString(),
@@ -228,14 +233,15 @@ observe-only cycles are no_progress, not verified_progress. ActorSoul and ActorL
   const { ref: judgmentRef } = await writeCycleJudgment(
     input.actorWorkspaceRootDir,
     input.actorId,
-    validated.judgment
+    validated.judgment,
+    turnId
   );
 
   const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-output-snapshot/v1",
     snapshot_id: `${snapshotId}-out`,
     actor_id: input.actorId,
-    turn_id: input.cycleId,
+    turn_id: turnId,
     provider_id: input.providerId,
     model: input.openAi?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),

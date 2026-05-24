@@ -34,6 +34,9 @@ Provider-backed paths are useful for:
 - next action proposal;
 - later trace inspection.
 
+The social-cycle provider path is separate from the `openai-codex` gameplay and
+reviewer providers. It uses the OpenAI API key in the repo-root `.env`.
+
 ## Gameplay Provider Switch
 
 Phase-one gameplay uses the deterministic provider by default.
@@ -97,25 +100,25 @@ diagnosing it.
 Use `--no-dashboard` to disable the server or `--dashboard-port <port>` to move
 it off the default port.
 
-## Gemini Native Audio Dialog (Default Planner)
+## Gemini Planner For Long Objectives
 
-For long-objective and direct-generated planner calls, this repo defaults to
-**Gemini 2.5 Flash Native Audio Dialog** over Live API (`v1alpha`):
+For long-objective and direct-generated planner calls, use REST `text-genai`
+with Gemini 2.5 Flash as the current primary path:
 
 ```text
 GEMINI_API_KEY=...                         # ignored local only
-GEMINI_PLANNER_PRIMARY=native-audio-dialog
-GEMINI_LIVE_API_VERSION=v1alpha
-GEMINI_NATIVE_AUDIO_DIALOG_MODEL=gemini-2.5-flash-native-audio-latest
-PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=live-transcription,text-genai
+GEMINI_PLANNER_PRIMARY=text-genai
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription
 ```
 
 Behavior:
 
-- user sends **text** turns;
-- model may return audio internally;
-- runtime keeps only **output transcription text**;
-- `text-genai` is fallback on Live/session failure.
+- long-objective and direct-generated calls remain evaluation or propagation
+  tracks, not the social-life runtime;
+- objective reports must distinguish LLM output from builtin fallback and helper
+  expansion;
+- Native Audio Dialog remains dialog/smoke only. It is not the primary path for
+  generating `export async function run(ctx)` code.
 
 Real validation command (preferred over smoke-only checks):
 
@@ -126,6 +129,7 @@ bun run probe:long-objective -- \
   --objective craft_current_run_stone_pickaxe_1 \
   --actor npc_b \
   --provider gemini-live-planner \
+  --force-path text-genai \
   --report ../tmp/long-stone-pickaxe-gemini.json
 ```
 
@@ -167,14 +171,18 @@ replacement for them.
 ## Social Cycle Provider (OpenAI API)
 
 The Soul/LifeGoal/CycleGoal vertical slice uses the OpenAI API directly, not the
-Codex auth store.
+Codex auth store. The key must live in the repo-root `.env`.
 
 ```text
+# repo-root .env
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-5.4-mini
 SOCIAL_CYCLE_REASONING=low
 SOCIAL_CYCLE_MAX_COMPLETION_TOKENS=1600
 ```
+
+`gpt-5.4-mini` is the default because eligible accounts may have free-tier mini
+model access. Do not treat that eligibility as guaranteed.
 
 Run:
 
@@ -190,4 +198,8 @@ OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
 ```
 
 Use `deterministic-social` only for tests and baseline implementation reports.
+It must mark builtin goal authority so it cannot be confused with OpenAI agency.
 If `gpt-5.4-mini` is unavailable, retry with `OPENAI_MODEL=gpt-5-mini`.
+
+Do not use `openai-codex` or `build/provider-auth/openai-codex-auth.json` for
+`probe:social-cycle --provider openai-api`.

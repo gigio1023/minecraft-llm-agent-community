@@ -12,18 +12,40 @@ export function isMeaningfulGameplayPrimitive(primitiveId: string): boolean {
   return !SOCIAL_OBSERVATION_ONLY_PRIMITIVES.has(primitiveId);
 }
 
+export type SocialPrimitiveAttemptStatus = {
+  tool: string;
+  status: string;
+};
+
 export function deriveProgressVerifierStatus(input: {
-  executedTools: string[];
-  lastToolStatus: string;
+  toolAttempts?: readonly SocialPrimitiveAttemptStatus[];
+  executedTools?: readonly string[];
+  lastToolStatus?: string;
+  toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
 }): "passed" | "failed" | "not_applicable" {
-  const meaningful = input.executedTools.filter(isMeaningfulGameplayPrimitive);
+  const statusRows =
+    input.toolAttempts ??
+    input.toolStatuses ??
+    (input.executedTools && input.lastToolStatus
+      ? [{ tool: input.executedTools[input.executedTools.length - 1] ?? "unknown", status: input.lastToolStatus }]
+      : []);
+  const executedTools = input.executedTools ?? statusRows.map((entry) => entry.tool);
+  const meaningful = executedTools.filter(isMeaningfulGameplayPrimitive);
   if (meaningful.length === 0) {
     return "not_applicable";
   }
-  const lastMeaningful = meaningful[meaningful.length - 1]!;
-  const lastIndex = input.executedTools.lastIndexOf(lastMeaningful);
-  const status = lastIndex >= 0 ? input.lastToolStatus : "unknown";
-  return status === "ok" || status === "waited" || status === "remembered" ? "passed" : "failed";
+
+  const lastMeaningfulStatus = [...statusRows]
+    .reverse()
+    .find((entry) => isMeaningfulGameplayPrimitive(entry.tool));
+
+  if (!lastMeaningfulStatus) {
+    return "failed";
+  }
+
+  return isSuccessfulMeaningfulToolStatus(lastMeaningfulStatus.tool, lastMeaningfulStatus.status)
+    ? "passed"
+    : "failed";
 }
 
 export function isMeaningfulProgressVerifier(
@@ -72,4 +94,26 @@ export function deterministicJudgmentOutcome(input: {
     return "blocked";
   }
   return "no_progress";
+}
+
+export function isSuccessfulMeaningfulToolStatus(tool: string, status: string): boolean {
+  switch (tool) {
+    case "collect_logs":
+      return status === "collected";
+    case "mine_block":
+      return status === "mined";
+    case "craft_item":
+    case "craft_with_table":
+      return status === "crafted";
+    case "inspect_chest":
+      return status === "inspected";
+    case "deposit_shared":
+      return status === "deposited";
+    case "withdraw_shared":
+      return status === "withdrawn";
+    case "move_to":
+      return status === "arrived" || status === "moved";
+    default:
+      return false;
+  }
 }

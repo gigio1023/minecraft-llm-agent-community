@@ -7,7 +7,11 @@ import { fileURLToPath } from "node:url";
 import { ensureActorSoul, readActorSoul } from "../src/runtime/goals/actorSoulStore.js";
 import { ensureActiveLifeGoal, readActiveLifeGoal } from "../src/runtime/goals/lifeGoalStore.js";
 import { writeCycleGoal, readCycleGoal, buildDeterministicCycleGoal } from "../src/runtime/goals/cycleGoalStore.js";
-import { writeCycleJudgment, readLatestCycleJudgment } from "../src/runtime/goals/cycleJudgmentStore.js";
+import {
+  readCycleJudgmentByCycleId,
+  readLatestCycleJudgment,
+  writeCycleJudgment
+} from "../src/runtime/goals/cycleJudgmentStore.js";
 import { createWorldEvent, listWorldEvents, writeWorldEvent } from "../src/runtime/goals/worldEventStore.js";
 import { getActorWorkspacePaths } from "../src/runtime/actorWorkspacePaths.js";
 
@@ -85,4 +89,34 @@ test("stale expected_goal_id cannot overwrite a different cycle goal id", async 
 
   const second = { ...first, goal_id: "cycle-goal-other" };
   await assert.rejects(() => writeCycleGoal(rootDir, actorId, second, first.goal_id));
+});
+
+test("cycle judgment lookup falls back to latest action-attempt judgment", async () => {
+  const actorId = "npc_b";
+  const judgment = {
+    schema: "cycle-judgment/v1" as const,
+    actor_id: actorId,
+    cycle_id: "cycle-0099",
+    cycle_goal_id: "cycle-goal-0099",
+    outcome: "no_progress" as const,
+    what_happened: "Attempt judgment",
+    why_it_mattered_for_life_goal: "Preserve prior-cycle context for multi-action cycles",
+    verifier_status: "not_applicable" as const,
+    evidence_refs: [],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    next_goal_pressure: []
+  };
+  await writeCycleJudgment(rootDir, actorId, judgment, "cycle-0099-action-01");
+  await writeCycleJudgment(
+    rootDir,
+    actorId,
+    { ...judgment, what_happened: "Latest attempt judgment" },
+    "cycle-0099-action-02"
+  );
+
+  const found = await readCycleJudgmentByCycleId(rootDir, actorId, "cycle-0099");
+
+  assert.equal(found?.judgment.what_happened, "Latest attempt judgment");
+  assert.ok(found?.ref.includes("cycle-0099-action-02-judgment.json"));
 });

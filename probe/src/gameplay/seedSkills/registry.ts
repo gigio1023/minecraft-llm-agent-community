@@ -61,7 +61,7 @@ const runtimeControlActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "Baseline control bundle. It keeps sensing, explicit wait, and terminal/status memory notes inside actor workspace ownership.",
     intentKinds: ["wait_or_defer", "inspect_settlement_state"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: [],
     primitiveIds: ["observe", "wait", "remember"]
   }
@@ -78,7 +78,7 @@ const coreActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "Uses Mineflayer block search, pathfinder movement, dig, dropped-item pickup, and inventory-increase evidence.",
     intentKinds: ["bootstrap_progress", "resupply_shared_storage", "recover_basic_tools"],
-    validRoles: ["gatherer"],
+    validRoles: ["gatherer", "settler"],
     preconditions: [],
     primitiveIds: ["observe", "collect_logs", "wait"]
   },
@@ -88,7 +88,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses inventory crafting recipes that do not require a crafting table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
-    validRoles: ["crafter"],
+    validRoles: ["crafter", "settler"],
     preconditions: ["inventory has logs"],
     primitiveIds: ["observe", "craft_item", "wait"]
   },
@@ -98,7 +98,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses inventory crafting; crafting table itself does not require an existing table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
-    validRoles: ["crafter"],
+    validRoles: ["crafter", "settler"],
     preconditions: ["inventory has planks"],
     primitiveIds: ["observe", "craft_item", "wait"]
   },
@@ -109,7 +109,7 @@ const coreActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "Uses a nearby observed crafting table block and verifies wooden_pickaxe inventory increase.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
-    validRoles: ["crafter"],
+    validRoles: ["crafter", "settler"],
     preconditions: ["inventory has planks", "inventory has sticks", "crafting_table nearby"],
     primitiveIds: ["observe", "craft_with_table", "wait"]
   },
@@ -120,7 +120,7 @@ const coreActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "Uses the bounded mine_block primitive for nearby stone and verifies cobblestone inventory increase.",
     intentKinds: ["bootstrap_progress"],
-    validRoles: ["gatherer"],
+    validRoles: ["gatherer", "settler"],
     preconditions: ["inventory has wooden_pickaxe or stone_pickaxe"],
     primitiveIds: ["observe", "mine_block", "wait"]
   },
@@ -130,7 +130,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "planned",
     implementationNotes: "Requires crafting-table support and cobblestone acquisition first.",
     intentKinds: ["bootstrap_progress"],
-    validRoles: ["crafter"],
+    validRoles: ["crafter", "settler"],
     preconditions: ["inventory has cobblestone", "inventory has sticks", "crafting_table nearby"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["use_crafting_table"]
@@ -141,7 +141,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "planned",
     implementationNotes: "Requires cobblestone acquisition and crafting-table support.",
     intentKinds: ["bootstrap_progress"],
-    validRoles: ["crafter"],
+    validRoles: ["crafter", "settler"],
     preconditions: ["inventory has cobblestone >= 8", "crafting_table nearby"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["mine_block", "use_crafting_table"]
@@ -152,7 +152,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "planned",
     implementationNotes: "Requires a mine_block primitive, ore targeting, and pickaxe/tool gating.",
     intentKinds: ["bootstrap_progress", "resupply_shared_storage"],
-    validRoles: ["gatherer"],
+    validRoles: ["gatherer", "settler"],
     preconditions: ["inventory has pickaxe"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["mine_block"]
@@ -163,7 +163,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "planned",
     implementationNotes: "Requires furnace interaction, fuel/input/output handling, and smelting verification.",
     intentKinds: ["bootstrap_progress"],
-    validRoles: ["crafter"],
+    validRoles: ["crafter", "settler"],
     preconditions: ["inventory has raw_iron", "inventory has coal", "furnace nearby"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["use_furnace"]
@@ -174,7 +174,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses the shared chest accessor and ledger-backed storage observation.",
     intentKinds: ["inspect_settlement_state", "resupply_shared_storage"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["shared chest nearby"],
     primitiveIds: ["observe", "inspect_chest", "wait"]
   },
@@ -184,7 +184,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses shared storage ledger rules and role-specific deposit permissions.",
     intentKinds: ["resupply_shared_storage", "fulfill_obligation", "bootstrap_progress"],
-    validRoles: ["gatherer", "quartermaster"],
+    validRoles: ["gatherer", "quartermaster", "settler"],
     preconditions: ["shared chest nearby", "inventory has depositable items"],
     primitiveIds: ["observe", "inspect_chest", "deposit_shared", "wait"]
   },
@@ -194,7 +194,7 @@ const coreActionSkills: SeedActionSkill[] = [
     runtimeStatus: "planned",
     implementationNotes: "move_to alone is not enough; this needs dropped-item targeting and pickup verification.",
     intentKinds: ["claim_nearby_opportunity", "recover_basic_tools"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["dropped items visible"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["collect_dropped_item"]
@@ -212,7 +212,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References Voyager exploreUntil and yearn_for_mines reposition/status loops. Needs bounded exploration, observation diffs, and abortable pathing before it can be active.",
     intentKinds: ["claim_nearby_opportunity", "bootstrap_progress"],
-    validRoles: ["gatherer"],
+    validRoles: ["gatherer", "settler"],
     preconditions: ["current area lacks the needed block or item"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["explore_until", "world_diff"]
@@ -224,7 +224,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References Voyager placeItem and mindcraft-ce craftRecipe table handling. Current runtime can craft a table item but cannot place, find, or bind a table to craft_item.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
-    validRoles: ["crafter", "quartermaster"],
+    validRoles: ["crafter", "quartermaster", "settler"],
     preconditions: ["inventory has crafting_table or enough planks to craft one"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["place_block", "use_crafting_table"]
@@ -236,7 +236,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References mindcraft-ce equip and mineflayer-chatgpt craft_gear. Needs inventory tool ranking and verification that the held item changed.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools", "avoid_or_retreat"],
-    validRoles: ["gatherer", "crafter"],
+    validRoles: ["gatherer", "crafter", "settler"],
     preconditions: ["inventory has a usable tool"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["equip_item", "held_item_observation"]
@@ -248,7 +248,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References mineflayer-chatgpt light_area and Voyager torch workflows. Needs block placement, light-level observation, and torch inventory verification.",
     intentKinds: ["bootstrap_progress", "avoid_or_retreat", "claim_nearby_opportunity"],
-    validRoles: ["gatherer", "quartermaster"],
+    validRoles: ["gatherer", "quartermaster", "settler"],
     preconditions: ["inventory has torches", "area is dark or route is unsafe"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["place_block", "light_level_observation"]
@@ -260,7 +260,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References Voyager hunger-aware eating, mindcraft-ce consume, and yearn_for_mines interact:eat. Needs vitals observation and consume verification.",
     intentKinds: ["avoid_or_retreat", "recover_basic_tools"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["food below safe threshold", "inventory has edible item"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["consume_item", "vitals_observation"]
@@ -272,7 +272,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References mineflayer-chatgpt sleep and mindcraft-ce goToBed. Needs time-of-day observation, bed targeting, and sleep/wake verification.",
     intentKinds: ["avoid_or_retreat", "wait_or_defer"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["nighttime", "bed nearby or bed in inventory/placeable"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["use_bed", "time_observation"]
@@ -284,7 +284,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References mindcraft-ce avoidEnemies and yearn_for_mines combat/flee separation. Needs hostile observation, bounded flee target selection, and distance verification.",
     intentKinds: ["avoid_or_retreat"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["hostile mob or hazard within danger range"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["observe_hostiles", "flee_from_entity"]
@@ -296,7 +296,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     implementationNotes:
       "References mineflayer-chatgpt setup_stash and mindcraft-ce chest helpers. Current storage ledger can model a chest, but runtime cannot place/open a real chest as setup.",
     intentKinds: ["resupply_shared_storage", "inspect_settlement_state", "bootstrap_progress"],
-    validRoles: ["quartermaster", "crafter"],
+    validRoles: ["quartermaster", "crafter", "settler"],
     preconditions: ["inventory has chest or enough planks", "flat safe placement nearby"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["place_block", "open_container", "register_shared_chest"]
@@ -313,7 +313,7 @@ const socialActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses move_to and say; success still depends on distance and dialogue-state verification.",
     intentKinds: ["request_or_handoff", "unblock_teammate"],
-    validRoles: ["crafter", "quartermaster"],
+    validRoles: ["crafter", "quartermaster", "settler"],
     preconditions: ["target actor visible", "target actor not busy"],
     primitiveIds: ["observe", "move_to", "say", "wait"]
   },
@@ -323,7 +323,7 @@ const socialActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses say plus remember; resource-location grounding is still minimal.",
     intentKinds: ["claim_nearby_opportunity", "inspect_settlement_state"],
-    validRoles: ["gatherer", "crafter", "quartermaster"],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["resource found"],
     primitiveIds: ["observe", "say", "remember"]
   },
@@ -333,7 +333,7 @@ const socialActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses shared chest deposit and say; item transfer is ledger-backed.",
     intentKinds: ["fulfill_obligation", "unblock_teammate"],
-    validRoles: ["gatherer", "quartermaster"],
+    validRoles: ["gatherer", "quartermaster", "settler"],
     preconditions: ["shared chest nearby", "obligation pending"],
     primitiveIds: ["observe", "inspect_chest", "deposit_shared", "say", "wait"]
   },
@@ -343,7 +343,7 @@ const socialActionSkills: SeedActionSkill[] = [
     runtimeStatus: "implemented",
     implementationNotes: "Uses wait and say around runtime-owned busy state.",
     intentKinds: ["wait_or_defer", "request_or_handoff"],
-    validRoles: ["gatherer", "quartermaster"],
+    validRoles: ["gatherer", "quartermaster", "settler"],
     preconditions: ["target actor busy"],
     primitiveIds: ["observe", "wait", "say"]
   }

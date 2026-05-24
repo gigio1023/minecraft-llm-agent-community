@@ -1,6 +1,6 @@
 import { goals } from "mineflayer-pathfinder";
 
-const LOG_BLOCK_NAMES = [
+export const LOG_BLOCK_NAMES = [
   "oak_log",
   "birch_log",
   "spruce_log",
@@ -8,8 +8,11 @@ const LOG_BLOCK_NAMES = [
   "acacia_log",
   "dark_oak_log",
   "mangrove_log",
-  "cherry_log"
+  "cherry_log",
+  "pale_oak_log"
 ] as const;
+
+const COLLECT_LOG_SEARCH_RADIUS = 24;
 
 type Positioned = { x: number; y: number; z: number };
 
@@ -47,6 +50,14 @@ type CollectLogsResult = {
   status: "collected" | "progressing" | "blocked";
   block?: string;
   target?: Positioned;
+  nearbyLogHints?: Array<{
+    block: string;
+    position: Positioned;
+    distance: number;
+    yDelta: number;
+    direction: string;
+    reachableLow: boolean;
+  }>;
   attemptedBlocks?: Array<{
     block: string;
     position: Positioned;
@@ -253,7 +264,7 @@ async function moveOntoBlock(
   );
 }
 
-function isLogName(name: string) {
+export function isLogName(name: string) {
   return LOG_BLOCK_NAMES.includes(name as (typeof LOG_BLOCK_NAMES)[number]);
 }
 
@@ -440,7 +451,7 @@ function findReachableLogs(bot: MiningBot) {
   // doubles, but it should not be the only evidence path in live runs.
   const fromBlocks = bot.findBlocks?.({
     matching: (candidate) => isLogName(candidate.name),
-    maxDistance: 12,
+    maxDistance: COLLECT_LOG_SEARCH_RADIUS,
     count: 16
   })
     .map((position) => {
@@ -457,7 +468,7 @@ function findReachableLogs(bot: MiningBot) {
       ? [
           bot.findBlock({
             matching: (candidate) => isLogName(candidate.name),
-            maxDistance: 12
+            maxDistance: COLLECT_LOG_SEARCH_RADIUS
           })
         ].filter((entry): entry is { name: string; position: Positioned } => entry !== null)
       : [];
@@ -476,6 +487,55 @@ function findReachableLogs(bot: MiningBot) {
 
       return left.position.y - right.position.y;
     });
+}
+
+function round(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function directionFrom(origin: Positioned, target: Positioned) {
+  const dx = target.x - origin.x;
+  const dz = target.z - origin.z;
+  if (Math.abs(dx) >= Math.abs(dz)) {
+    return dx >= 0 ? "east" : "west";
+  }
+  return dz >= 0 ? "south" : "north";
+}
+
+function scanNearbyLogHints(bot: MiningBot) {
+  const origin = bot.entity.position;
+  const positions = bot.findBlocks?.({
+    matching: (candidate) => isLogName(candidate.name),
+    maxDistance: 32,
+    count: 24
+  }) ?? [];
+
+  const seen = new Set<string>();
+  const hints = positions
+    .map((position) => {
+      const block = bot.blockAt?.(position);
+      return block && isLogName(block.name) ? block : null;
+    })
+    .filter((entry): entry is { name: string; position: Positioned } => entry !== null)
+    .filter((block) => {
+      const key = uniqueCandidateKey(block);
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .map((block) => ({
+      block: block.name,
+      position: block.position,
+      distance: round(distance(origin, block.position)),
+      yDelta: round(block.position.y - origin.y),
+      direction: directionFrom(origin, block.position),
+      reachableLow: Math.abs(block.position.y - origin.y) <= 3
+    }))
+    .sort((left, right) => left.distance - right.distance);
+
+  return hints.slice(0, 8);
 }
 
 function uniqueCandidateKey(candidate: { position: Positioned }) {
@@ -571,6 +631,7 @@ export async function collectLogs({
         status: targetNotMetAfterProgress ? "progressing" : "blocked",
         block: lastBlock?.name,
         target: lastBlock?.position,
+        nearbyLogHints: scanNearbyLogHints(bot),
         attemptedBlocks,
         beforeLogCount,
         afterLogCount,
@@ -580,7 +641,7 @@ export async function collectLogs({
           ? `collect_logs increased log inventory by ${inventoryDelta}, but exhausted reachable candidates before target ${targetLogCount}.`
           : dugWithoutPickup
             ? "collect_logs dug a log, but log inventory did not increase."
-            : "collect_logs found no reachable low log block within 12 blocks."
+            : `collect_logs found no reachable low log block within ${COLLECT_LOG_SEARCH_RADIUS} blocks.`
       };
     }
 
@@ -616,6 +677,7 @@ export async function collectLogs({
         status: "blocked",
         block: block.name,
         target: block.position,
+        nearbyLogHints: scanNearbyLogHints(bot),
         attemptedBlocks,
         beforeLogCount,
         afterLogCount,
@@ -751,6 +813,7 @@ export async function collectLogs({
     status: "blocked",
     block: lastBlock?.name,
     target: lastBlock?.position,
+    nearbyLogHints: scanNearbyLogHints(bot),
     attemptedBlocks,
     beforeLogCount,
     afterLogCount,

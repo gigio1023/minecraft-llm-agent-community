@@ -11,6 +11,25 @@ import { readJsonIfExists } from "../src/runtime/goals/goalJsonStore.js";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "test-artifacts", `social-runner-${process.pid}-${Date.now()}`);
 
+type ReportActionAttempt = {
+  attempt_id: string;
+  action_index: number;
+  turn_id: string;
+  action_intent_ref: string;
+  provider_input_refs: string[];
+  provider_output_refs: string[];
+  evidence_refs: string[];
+  judgment_ref: string;
+  verifier_status: string;
+  executed_tools: string[];
+  runtime_status: string;
+};
+
+function readActionAttempts(cycle: unknown): ReportActionAttempt[] {
+  const attempts = (cycle as { action_attempts?: unknown }).action_attempts;
+  return Array.isArray(attempts) ? attempts as ReportActionAttempt[] : [];
+}
+
 test("deterministic-social run writes two cycles and cites prior judgment", async () => {
   const reportPath = path.join(rootDir, "deterministic-report.json");
   const result = await runSocialCycle({
@@ -30,6 +49,8 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.equal(result.report.agency_status.cycle_goal_source, "runtime_rule");
   assert.equal(result.report.agency_status.builtin_goal_authority, true);
   assert.equal(result.report.agency_status.used_previous_judgment, true);
+  assert.equal(result.report.runtime_status, "blocked");
+  assert.equal(result.report.agency_status.gameplay_progress_verified, false);
 
   const actorDir = path.join(rootDir, "actors", "npc_b");
   const cycle2GoalMindInput = result.report.cycles[1]?.provider_input_refs[0];
@@ -42,6 +63,37 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.ok(prior && prior.length > 0);
   assert.equal(prior.length, 1);
   assert.equal((prior[0] as { cycle_id?: string }).cycle_id, "cycle-0001");
+});
+
+test("deterministic-social maxActionsPerCycle=2 report keeps observe and wait attempts", async () => {
+  const isolatedRoot = path.join(rootDir, `multi-action-${Date.now()}`);
+  const reportPath = path.join(isolatedRoot, "deterministic-report.json");
+  const result = await runSocialCycle({
+    actorId: "npc_b",
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 1,
+    maxActionsPerCycle: 2,
+    reportPath,
+    connectToWorld: false,
+    actorWorkspaceRootDir: path.join(isolatedRoot, "actors")
+  });
+
+  const cycle = result.report.cycles[0];
+  assert.ok(cycle);
+  const attempts = readActionAttempts(cycle);
+  assert.equal(attempts.length, 2);
+  assert.deepEqual(attempts.map((attempt) => attempt.action_index), [0, 1]);
+  assert.deepEqual(attempts.map((attempt) => attempt.turn_id), [
+    "cycle-0001-action-01",
+    "cycle-0001-action-02"
+  ]);
+  assert.deepEqual(attempts.map((attempt) => attempt.executed_tools), [["observe"], ["wait"]]);
+  assert.deepEqual(attempts.map((attempt) => attempt.runtime_status), ["blocked", "blocked"]);
+  assert.notEqual(attempts[0]?.action_intent_ref, attempts[1]?.action_intent_ref);
+  assert.ok(attempts[0]?.action_intent_ref.includes("cycle-0001-action-01"));
+  assert.ok(attempts[1]?.action_intent_ref.includes("cycle-0001-action-02"));
+  assert.notEqual(attempts[0]?.judgment_ref, attempts[1]?.judgment_ref);
 });
 
 test("stale alphabetically later judgment is not used as previous context", async () => {

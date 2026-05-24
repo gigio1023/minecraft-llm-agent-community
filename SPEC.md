@@ -70,12 +70,12 @@ to carry the whole architecture:
    - OpenAI API `gpt-5.4-mini` provider plan with configurable fallback;
    - Goal Mind, Action Planner, Cycle Judgment contracts and validation commands.
 14. `docs/docs/Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`
-   - next active handoff for single-actor long-term objectives;
+   - evaluation handoff for single-actor long-term objectives;
    - diamond objective ladder;
-   - Gemini Live planner integration plan;
+   - Gemini planner integration plan;
    - truthful phase reports and stop reasons.
 15. `docs/docs/Architecture/Social-Simulation-Next-Goal-Handoff.md`
-   - next bounded social simulation slice;
+   - follow-on bounded social simulation slice;
    - social objective ladder;
    - Cursor Composer handoff prompt;
    - test gates for shared-resource social exchange.
@@ -197,9 +197,13 @@ action skill lifecycle, provider snapshots, or per-NPC review.
 
 ## 3. Product Direction
 
-The short-term product is a tiny, headless, bounded Minecraft runtime that can
-make real end-to-end progress on boring gameplay tasks and leave enough evidence
-to explain success, failure, stall, and fake progress.
+The near-term proof is a bounded social-life simulation seed.
+
+One actor should act in Minecraft, reason from `ActorSoul`, `LifeGoal`, and
+`WorldEvent` pressure, store or refine memory from runtime evidence, and use
+prior judgment or memory in later cycles. This is still a small headless runtime:
+success means truthful in-game action plus durable artifacts, not a claim of
+human-like personhood.
 
 The long-term north star is a social simulation seed:
 
@@ -211,6 +215,7 @@ The long-term north star is a social simulation seed:
 - later human-in-the-loop social play.
 
 This is not a Voyager-style long-horizon single-agent autonomy project.
+It is also not full human-like personhood or open-ended long-run autonomy.
 Voyager can wait a long time for planning, critic, generated code, retries, and
 skill-library growth. This project needs speed-bounded actor turns because
 social simulation requires NPCs to remain observable and responsive. Slow critic,
@@ -219,41 +224,56 @@ must not block the current actor turn.
 
 ## 4. Immediate Implementation Priority
 
-The actor-workspace and social-feedback slices are now implemented enough to be
-the active runtime baseline. The next implementation should use real run
-evidence to harden boring gameplay competence without expanding into a larger
-society prematurely.
+The actor-workspace and social-feedback slices are now implemented enough to
+support the active near-term target: a bounded social-life cycle for one actor.
+The implementation should keep Minecraft competence boring and observable while
+proving that social-life context affects later action.
 
 Priority order:
 
-1. Validate `collect_logs` and adjacent boring tasks against live Minecraft
-   evidence, not optimistic transcript labels.
-2. Add autonomous micro-objective reports that ask for one tiny outcome and
-   accept only current-run world-state evidence.
-3. Use the per-action-skill live harness before returning to broad multi-NPC
-   runs.
-4. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
-   verifier, target-selection, and action-skill gaps.
-5. Harden reviewer prompts/scoring only from immutable run evidence.
-6. Let direct generated TypeScript action skills attempt small objectives, then
-   use reviewer cleanup to turn stable attempts into smaller recipes or active
-   action skill records.
-7. Convert direct objective reports into typed actor memory and retrieve that
-   memory by objective, item, action skill, verifier status, and diagnosis.
-8. Use the same single actor to attempt longer Minecraft dependency chains:
-   stone pickaxe, iron ingot, iron pickaxe, diamond ore location, and diamond
-   acquisition. Accept a truthful stop reason and next implementation task when
-   diamond is not reached yet.
-9. Keep the gameplay hot path bounded and free of blocking critic/reviewer
-   work.
+1. Run `probe:social-cycle` for one actor with `openai-api`, loading
+   `OPENAI_API_KEY` from the repo-root `.env` and defaulting `OPENAI_MODEL` to
+   `gpt-5.4-mini` when the account supports that free-tier mini model.
+2. Keep `openai-api` social-cycle auth separate from `openai-codex` gameplay
+   auth in `build/provider-auth/openai-codex-auth.json`.
+3. Require every Goal Mind, Action Planner, and Cycle Judgment input to include
+   `ActorSoul`, active `LifeGoal`, relevant `WorldEvent` pressure, retrieved
+   memory, previous judgment refs, and owned action skill summaries.
+4. Execute or truthfully block at least one runtime-gated Minecraft action, and
+   record every action attempt, including wait, remember, provider failure, and
+   blocked attempts.
+5. Write CycleJudgment and memory records from evidence, then prove a later
+   cycle uses previous judgment or memory instead of starting fresh.
+6. Keep exploration and propagation tasks, such as mining coal or building a
+   simple wooden or stone shelter, as objective phases or direct-generated
+   trials behind runtime evidence gates. The artifact may prove the concept with
+   primitive implementation, but it must state limitations honestly.
+7. Reject synthetic no-progress passes, optimistic LLM text, helper-only success,
+   missing evidence refs, and stale historical proof as social-life success.
+8. Mark deterministic or builtin fallback as fallback. It must never masquerade
+   as OpenAI-authored agency.
+9. Keep the gameplay hot path bounded and free of blocking critic/reviewer work.
 10. Keep the managed local server path easy to start, inspect, and stop.
 
-The next implementation planning handoff is
-`docs/docs/Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`. Treat
-relationship/social-loop proof as the next layer after one actor can make
-truthful progress through longer dependency chains.
+The active social-life implementation handoff is
+`docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
+Long-objective and direct-generated tracks remain useful evaluation paths, but
+they are not the social-life runtime.
 
-Current objective command:
+Current social-cycle command:
+
+```bash
+cd probe
+OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+  --actor npc_b \
+  --provider openai-api \
+  --cycles 2 \
+  --max-actions-per-cycle 3 \
+  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --no-dashboard
+```
+
+Supporting objective command:
 
 ```bash
 cd probe
@@ -574,7 +594,39 @@ current-run proof.
 - A global reviewer may summarize cross-actor patterns only. It must not own
   actor memory, actor action skill lifecycle, or actor-specific repair proposals.
 
-## 6. Done Criteria For The Actor-Workspace Slice
+## 6. Done Criteria For The Social-Life Seed Slice
+
+The social-life seed slice is done when:
+
+1. `probe:social-cycle` can run with `--provider openai-api` using
+   `OPENAI_API_KEY` from the repo-root `.env`, with `OPENAI_MODEL` defaulting to
+   `gpt-5.4-mini` and falling back only by explicit configuration;
+2. the social-cycle provider path never reads or implies
+   `build/provider-auth/openai-codex-auth.json`;
+3. at least two cycles run for one actor and every provider input includes
+   `ActorSoul`, active `LifeGoal`, relevant `WorldEvent` pressure, memory refs,
+   previous judgment refs when available, and owned action skill summaries;
+4. every action attempt is recorded with `ActionIntent`, provider input/output
+   refs when applicable, runtime result, verifier status, and evidence or
+   truthful blocker refs;
+5. synthetic no-progress, empty helper output, optimistic model text, or a
+   terminal memory note cannot produce `runtime_status: "passed"`;
+6. CycleJudgment writes memory from evidence and a later cycle retrieves prior
+   judgment or memory;
+7. the report audit fails non-zero on missing refs, missing cycle artifacts,
+   provider errors labeled as pass, WorldEvent copied as LifeGoal, or runtime
+   pass without evidence;
+8. deterministic or builtin fallback sets explicit fallback fields such as
+   `builtin_goal_authority` or `builtin_execution_source` and is never counted as
+   OpenAI-authored agency;
+9. exploration or propagation trials for coal, shelter, or similar objectives
+   are labeled as objective phases/direct-generated trials, gated by current-run
+   evidence, and honest about primitive limitations;
+10. targeted tests, typecheck, deterministic implementation run, OpenAI provider
+   contract run, real world-action run, and report audit are documented with
+   pass/fail artifacts.
+
+## 7. Done Criteria For The Actor-Workspace Slice
 
 The actor-workspace slice is done when:
 
@@ -604,7 +656,7 @@ The actor-workspace slice is done when:
 12. deterministic mode still performs zero network calls;
 13. docs and index routes point to the split spec documents.
 
-## 7. Done Criteria For The Social Feedback Slice
+## 8. Done Criteria For The Social Feedback Slice
 
 The social feedback slice is done when:
 
@@ -632,7 +684,7 @@ The social feedback slice is done when:
 10. docs and the static architecture page explain the completed social feedback
     loop accurately.
 
-## 8. Read Next
+## 9. Read Next
 
 For implementation, read in this order:
 

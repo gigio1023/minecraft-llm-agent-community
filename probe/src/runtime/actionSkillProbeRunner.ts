@@ -41,6 +41,7 @@ import {
   ensureLiveSmokeServer
 } from "../server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
+import { execDockerCompose } from "../server/composeCommand.js";
 
 export type ActionSkillProbeConfig = {
   actorId: string;
@@ -256,18 +257,10 @@ async function ensureProbeServer(config: ProbeConfig): Promise<{
 }
 
 async function createRconRunner(rcon: RconContext): Promise<RconRunner> {
-  const { execFile } = await import("node:child_process");
-  const util = await import("node:util");
-  const execFileAsync = util.promisify(execFile);
-
   return async (args: string[]) => {
-    await execFileAsync(
-      "docker",
-      ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
-      {
-        cwd: rcon.composeDir,
-        env: rcon.env
-      }
+    await execDockerCompose(
+      ["-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
+      { cwd: rcon.composeDir, env: rcon.env }
     );
   };
 }

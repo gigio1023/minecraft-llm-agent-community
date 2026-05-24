@@ -53,9 +53,6 @@ export function finalizeRuntimeStatus(
   if (input.completedCycles < input.expectedCycles) {
     return "blocked";
   }
-  if (input.fixtureDependency) {
-    return "passed";
-  }
   if (input.anyMeaningfulProgress) {
     return "passed";
   }

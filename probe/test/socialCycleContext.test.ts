@@ -7,6 +7,7 @@ import { assembleSocialCycleContext, contextCitesPreviousJudgment } from "../src
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
 import type { CycleJudgment } from "../src/runtime/goals/types.js";
 import { buildNpcBActionSkillRecord } from "./helpers/socialCycleTestHelpers.js";
+import { writeActorMemoryRecords } from "../src/memory/actorMemory.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "test-artifacts", `social-context-${process.pid}`);
@@ -28,6 +29,34 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
     memory_refs: [],
     relationship_refs: []
   };
+  await writeActorMemoryRecords(rootDir, [
+    {
+      schema: "actor-memory-record/v1",
+      memory_id: "social-cycle-blocker",
+      actor_id: "npc_b",
+      layer: "episodic",
+      status: "active",
+      confidence: "observed",
+      scope: { kind: "actor_private", actor_id: "npc_b" },
+      created_at: "2026-05-23T00:00:00.000Z",
+      updated_at: "2026-05-23T00:00:00.000Z",
+      summary: "collect_logs was blocked near spawn after no low logs were reachable.",
+      evidence_refs: ["evidence/cycle-0001-collect_logs.json"],
+      tags: ["social_cycle"],
+      index: {
+        objective_ids: [],
+        objective_categories: ["social_cycle"],
+        item_names: ["oak_log"],
+        block_names: [],
+        tool_names: ["collect_logs"],
+        action_skill_ids: ["collectLogs"],
+        diagnoses: ["blocked"],
+        verifier_statuses: ["failed"],
+        causal_refs: ["cycle-0001"]
+      },
+      content: { cycle_id: "cycle-0001", outcome: "blocked" }
+    }
+  ]);
 
   const judgment: CycleJudgment = {
     schema: "cycle-judgment/v1",
@@ -74,4 +103,6 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   assert.equal(context.ActorLifeGoal.objective, soul.life_goal);
   assert.notEqual(context.ActorLifeGoal.objective, "Need logs");
   assert.equal(contextCitesPreviousJudgment(context, "cycle-0001"), true);
+  assert.equal(context.memory_packet.retrieved_episodic[0]?.memory_id, "social-cycle-blocker");
+  assert.equal(context.memory_packet.retrieval_policy.objective_category, "social_cycle");
 });

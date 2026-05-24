@@ -1,7 +1,10 @@
 import type { ObserveResult } from "../../tools/observe.js";
 import type { ActorActionSkillRecord } from "../actorWorkspaceStore.js";
 import { buildActorProviderContext } from "../../provider/actorProviderContext.js";
-import { retrieveActorMemoryForObjective } from "../../memory/actorMemory.js";
+import {
+  retrieveActorMemoryForObjective,
+  type ActorMemoryRetrievalPacket
+} from "../../memory/actorMemory.js";
 import type {
   ActorCycleGoal,
   ActorLifeGoal,
@@ -36,7 +39,7 @@ export type SocialCycleContextPacket = {
   }>;
   allowed_primitive_ids: string[];
   relationship_context: unknown;
-  memory_packet: unknown;
+  memory_packet: ActorMemoryRetrievalPacket;
   limits: {
     max_actions_per_cycle: number;
     cycle_index: number;
@@ -47,6 +50,50 @@ export type SocialCycleContextPacket = {
     runtime_verifies_success: true;
   };
 };
+
+const memoryRelevantItemNames = [
+  "oak_log",
+  "birch_log",
+  "spruce_log",
+  "jungle_log",
+  "acacia_log",
+  "dark_oak_log",
+  "mangrove_log",
+  "cherry_log",
+  "oak_planks",
+  "birch_planks",
+  "spruce_planks",
+  "jungle_planks",
+  "stick",
+  "crafting_table",
+  "wooden_pickaxe",
+  "stone_pickaxe",
+  "cobblestone",
+  "coal"
+] as const;
+
+function memoryItemNamesFromObservation(observation: ObserveResult | Record<string, unknown>) {
+  const inventory = (observation as { inventory?: unknown }).inventory;
+  if (!Array.isArray(inventory)) {
+    return [];
+  }
+
+  return inventory
+    .map((item) =>
+      typeof item === "object" && item !== null && typeof (item as { name?: unknown }).name === "string"
+        ? (item as { name: string }).name
+        : null
+    )
+    .filter((name): name is string => Boolean(name));
+}
+
+function memoryItemNamesFromWorldEvents(worldEvents: readonly WorldEvent[]) {
+  const summaries = worldEvents.map((event) => event.summary.toLowerCase()).join("\n");
+  return memoryRelevantItemNames.filter((itemName) => {
+    const spaced = itemName.replaceAll("_", " ");
+    return summaries.includes(itemName) || summaries.includes(spaced);
+  });
+}
 
 export async function assembleSocialCycleContext(input: {
   actorWorkspaceRootDir: string;
@@ -62,10 +109,20 @@ export async function assembleSocialCycleContext(input: {
   maxActionsPerCycle: number;
   cycleIndex: number;
 }): Promise<SocialCycleContextPacket> {
+  const actionSkillIds = input.activeActionSkills.map((record) => record.skill_id);
+  const itemNames = [
+    ...memoryItemNamesFromObservation(input.observation),
+    ...memoryItemNamesFromWorldEvents(input.worldEvents)
+  ];
   const memoryPacket = await retrieveActorMemoryForObjective(
     input.actorWorkspaceRootDir,
     input.actorId,
-    { limit: 8 }
+    {
+      objectiveCategory: "social_cycle",
+      itemNames,
+      actionSkillIds,
+      limit: 8
+    }
   );
 
   const providerContext = await buildActorProviderContext({

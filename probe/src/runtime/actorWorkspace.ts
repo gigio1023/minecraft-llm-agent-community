@@ -154,5 +154,26 @@ export async function initializeActorWorkspaces(
 }
 
 export async function listActiveActorActionSkillRecords(rootDir: string, actorId: string) {
-  return listActorActionSkillRecords(rootDir, actorId, "active");
+  const records = await listActorActionSkillRecords(rootDir, actorId, "active");
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+
+  try {
+    const index = JSON.parse(await fs.readFile(paths.actionSkills.indexFile, "utf8")) as {
+      active?: unknown;
+    };
+    if (!Array.isArray(index.active)) {
+      return records;
+    }
+
+    const indexedActiveIds = new Set(
+      index.active.filter((skillId): skillId is string => typeof skillId === "string")
+    );
+    return records.filter((record) => indexedActiveIds.has(record.skill_id));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return records;
+    }
+
+    throw error;
+  }
 }

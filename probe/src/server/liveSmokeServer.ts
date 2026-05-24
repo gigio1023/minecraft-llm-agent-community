@@ -158,22 +158,50 @@ function runCommand(
   });
 }
 
+function shouldRetryWithStandaloneCompose(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("unknown shorthand flag: 'f' in -f") ||
+    message.includes("is not a docker command") ||
+    message.includes("No such file or directory")
+  );
+}
+
+async function runComposeCommand(
+  context: LiveSmokeServerContext,
+  args: readonly string[],
+  timeoutMs: number
+) {
+  try {
+    return await runCommand("docker", ["compose", ...args], {
+      cwd: context.composeDir,
+      env: context.env,
+      timeoutMs
+    });
+  } catch (error) {
+    if (!shouldRetryWithStandaloneCompose(error)) {
+      throw error;
+    }
+
+    return runCommand("docker-compose", args, {
+      cwd: context.composeDir,
+      env: context.env,
+      timeoutMs
+    });
+  }
+}
+
 async function readPublishedEndpoint(context: LiveSmokeServerContext) {
-  const output = await runCommand(
-    "docker",
+  const output = await runComposeCommand(
+    context,
     [
-      "compose",
       "-f",
       context.composeFile,
       "port",
       "mc",
       String(context.containerPort)
     ],
-    {
-      cwd: context.composeDir,
-      env: context.env,
-      timeoutMs: LIVE_SMOKE_MANAGEMENT_TIMEOUT_MS
-    }
+    LIVE_SMOKE_MANAGEMENT_TIMEOUT_MS
   );
 
   return parsePublishedEndpoint(output, context.host);
@@ -245,11 +273,7 @@ export async function ensureLiveSmokeServer(
   }
 
   await mkdir(context.dataDir, { recursive: true });
-  await runCommand("docker", ["compose", "-f", context.composeFile, "up", "-d"], {
-    cwd: context.composeDir,
-    env: context.env,
-    timeoutMs: context.pingTimeoutMs
-  });
+  await runComposeCommand(context, ["-f", context.composeFile, "up", "-d"], context.pingTimeoutMs);
 
   const endpoint = await readPublishedEndpoint(context);
   await waitForServerReady(
@@ -267,11 +291,7 @@ export async function stopLiveSmokeServer(
 ): Promise<LiveSmokeServerReport> {
   const context = buildLiveSmokeServerContext(config);
 
-  await runCommand("docker", ["compose", "-f", context.composeFile, "down"], {
-    cwd: context.composeDir,
-    env: context.env,
-    timeoutMs: LIVE_SMOKE_MANAGEMENT_TIMEOUT_MS
-  });
+  await runComposeCommand(context, ["-f", context.composeFile, "down"], LIVE_SMOKE_MANAGEMENT_TIMEOUT_MS);
 
   return buildReport(context, "stopped", "stopped");
 }
