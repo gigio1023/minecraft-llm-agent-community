@@ -205,6 +205,9 @@ OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-5.4-mini
 ```
 
+Use `.env.example` as the secret-free template. Do not commit `.env` or provider
+auth stores.
+
 Gameplay paths that use `openai-codex` are separate. They use an ignored local
 auth store such as:
 
@@ -230,6 +233,12 @@ OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
 This is the social-life runtime. Long-objective and direct-generated objective
 commands are evaluation or propagation tracks, and their reports must state when
 they use builtin fallback or primitive helper expansion.
+
+The CLI exits non-zero for every status except `passed`. `blocked`,
+`environment_blocked`, and `failed` are useful evidence states, but automation
+must not treat them as success. By default, CLI social-cycle runs use a
+run-scoped actor workspace under `data/actors/social-runs/<run_id>/`; reuse a
+workspace only when that is the explicit experiment.
 
 ### Run the probe
 

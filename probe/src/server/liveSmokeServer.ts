@@ -11,6 +11,7 @@ import {
   parsePublishedEndpoint,
   waitForServerReady
 } from "./dockerServer.js";
+import { shouldRetryWithStandaloneCompose } from "./composeCommand.js";
 
 export const LIVE_SMOKE_PROJECT_NAME = "minecraft-agent-live-smoke";
 const LIVE_SMOKE_MANAGEMENT_TIMEOUT_MS = 10_000;
@@ -156,15 +157,6 @@ function runCommand(
       );
     });
   });
-}
-
-function shouldRetryWithStandaloneCompose(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("unknown shorthand flag: 'f' in -f") ||
-    message.includes("is not a docker command") ||
-    message.includes("No such file or directory")
-  );
 }
 
 async function runComposeCommand(
