@@ -213,6 +213,42 @@ test("collectLogs blocks when movement drifts away from the selected log", async
   assert.match(result.reason, /movement drifted away/);
 });
 
+test("collectLogs returns nearby log hints when no low log is immediately reachable", async () => {
+  const highLog = { name: "oak_log", position: { x: 14, y: 8, z: 0 } };
+  const bot = {
+    entity: {
+      position: { x: 0, y: 0, z: 0 }
+    },
+    inventory: {
+      items() {
+        return [{ name: "oak_log", count: 0 }];
+      }
+    },
+    findBlocks() {
+      return [highLog.position];
+    },
+    blockAt(position: { x: number; y: number; z: number }) {
+      return position.x === highLog.position.x &&
+        position.y === highLog.position.y &&
+        position.z === highLog.position.z
+        ? highLog
+        : { name: "air", position };
+    },
+    async dig() {
+      throw new Error("dig should not run when no low log is reachable");
+    },
+    async lookAt() {},
+    setControlState() {}
+  };
+
+  const result = await collectLogs({ bot });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.nearbyLogHints?.[0]?.block, "oak_log");
+  assert.equal(result.nearbyLogHints?.[0]?.reachableLow, false);
+  assert.equal(result.nearbyLogHints?.[0]?.direction, "east");
+});
+
 test("collectLogs stops pathfinder work when the action is aborted", async () => {
   const block = { name: "oak_log", position: { x: 2, y: 0, z: 0 } };
   const controller = new AbortController();

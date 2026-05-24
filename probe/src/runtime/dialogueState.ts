@@ -10,7 +10,7 @@ type TalkResult =
   | { status: "unavailable"; reason: string };
 
 /**
- * Owns deterministic dialogue availability for the single-bot probe.
+ * Owns deterministic dialogue availability for the single-actor probe.
  *
  * Busy replies are runtime state, not provider text, so tests can prove waiting
  * and retry behavior without needing a live model.

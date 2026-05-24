@@ -1,6 +1,6 @@
 # Minecraft Java Edition Encyclopedia Index
 
-This encyclopedia serves as the canonical knowledge base for the headless Minecraft agent-loop runtime and async reviewer sidecars. It outlines block IDs, item registries, craft recipes, mob stats, Mineflayer API boundaries, and action skill verification specs.
+This encyclopedia serves as the canonical knowledge base for the headless Minecraft runtime loop and async reviewer sidecars. It outlines block IDs, item registries, craft recipes, mob stats, Mineflayer API boundaries, and action skill verification specs.
 
 ---
 

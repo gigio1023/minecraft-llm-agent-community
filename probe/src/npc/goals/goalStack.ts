@@ -89,6 +89,10 @@ function taskTargetItem(task: DeterministicTask) {
   }
 }
 
+/**
+ * Curriculum-backed goal frames for probe/v0 loops only.
+ * Social-cycle runtime (`probe:social-cycle`) must not treat this stack as goal authority.
+ */
 export function buildActorGoalStack(input: {
   actorProfile: ActorProfile;
   currentTask?: DeterministicTask | null;

@@ -17,7 +17,7 @@ export type ValidatedProposal = {
 /**
  * Validates provider proposals against runtime primitive ids.
  *
- * This is the first single-bot guardrail: unsupported tools fail before any
+ * This is the first single-actor guardrail: unsupported tools fail before any
  * Mineflayer operation can run.
  */
 export function validateProposal(proposal: ToolProposal): ValidatedProposal {

@@ -87,6 +87,10 @@ async function listJson(dir: string, limit = 8): Promise<JsonEntry[]> {
   }
 }
 
+async function listLongObjectiveReports(dir: string, limit = 6): Promise<JsonEntry[]> {
+  return listDirectTrialReports(dir, limit);
+}
+
 async function listDirectTrialReports(dir: string, limit = 8): Promise<JsonEntry[]> {
   try {
     const entries = (
@@ -362,6 +366,10 @@ async function readActor(actorId: string) {
   const activeSkills = await listJson(path.join(actorDir, "action-skills/active"), 40);
   const candidates = await listJson(path.join(actorDir, "action-skills/candidates"), 8);
   const directTrials = await listDirectTrialReports(path.join(actorDir, "action-skills/direct-trials"), 8);
+  const longObjectives = await listLongObjectiveReports(
+    path.join(actorDir, "action-skills/direct-trials/long-objectives"),
+    6
+  );
   const memory = await listJsonRecursive(path.join(actorDir, "memory"), 16);
   const latestInput = latestJson(providerInputs);
   const latestOutput = latestJson(providerOutputs);
@@ -412,7 +420,8 @@ async function readActor(actorId: string) {
         json: compactActionSkill(entry.json)
       })),
       candidates,
-      direct_trials: directTrials
+      direct_trials: directTrials,
+      long_objectives: longObjectives
     }
   };
 }
@@ -659,6 +668,7 @@ function html() {
       gatherer: "oak_log",
       crafter: "crafting_table",
       quartermaster: "chest",
+      settler: "chest",
       collect_logs: "oak_log",
       mine_block: "cobblestone",
       craft_item: "crafting_table",
@@ -692,6 +702,23 @@ function html() {
         const json = skill.json ?? {};
         const primitives = (json.required_primitives ?? []).map((p) => chip(p)).join('');
         return '<div class="skill-slot"><div class="skill-name">' + icon((json.required_primitives ?? [])[0] ?? json.skill_id, json.skill_id) + '<strong>' + esc(json.skill_id) + '</strong></div><div class="sub">' + esc(json.notes ?? json.success_verifier ?? "") + '</div><div class="primitive-row">' + primitives + '</div></div>';
+      }).join('') + '</div>';
+    }
+    function longObjectiveList(runs) {
+      if (!runs?.length) return '<div class="sub">long objective run 없음</div>';
+      return '<div class="timeline">' + runs.slice(-4).reverse().map((run) => {
+        const json = run.json ?? {};
+        const phases = Array.isArray(json.phases) ? json.phases : [];
+        const phaseRows = phases.map((phase) =>
+          '<div class="event"><strong>' + esc(phase.phaseId ?? 'phase') + '</strong>' +
+          '<div class="primitive-row"><span class="pill ' + statusClass(phase.status) + '">' + esc(phase.status ?? 'unknown') + '</span><span class="pill">' + esc(json.stopReason ?? '') + '</span></div>' +
+          '<div class="sub">' + esc(phase.verifierReason ?? '') + '</div></div>'
+        ).join('');
+        return '<div class="skill-slot"><div class="skill-name"><strong>' + esc(json.objectiveId ?? run.file) + '</strong></div>' +
+          '<div class="primitive-row"><span class="pill ' + statusClass(json.status) + '">' + esc(json.status ?? 'unknown') + '</span><span class="pill">' + esc(json.stopReason ?? '') + '</span></div>' +
+          '<div class="sub">next: ' + esc(json.nextRecommendedPhase ?? json.nextImplementationTasks?.[0] ?? 'none') + '</div>' +
+          phaseRows +
+          '<details><summary>long objective raw</summary><pre>' + esc(fmt(json)) + '</pre></details></div>';
       }).join('') + '</div>';
     }
     function directTrialList(trials) {
@@ -735,7 +762,7 @@ function html() {
     }
     function runtimeEventList(events) {
       const rows = (events ?? []).slice(-12).reverse();
-      if (!rows.length) return '<h3>Runtime Events</h3><div class="sub">agent loop 이벤트 대기 중</div>';
+      if (!rows.length) return '<h3>Runtime Events</h3><div class="sub">runtime loop 이벤트 대기 중</div>';
       return '<h3>Runtime Events</h3><div class="runtime-events">' + rows.map((event) => {
         const detail = [event.turnId, event.tool, event.status].filter(Boolean).join(' / ');
         return '<div class="runtime-event"><strong>' + esc(event.actorId) + ' · ' + esc(event.type) + '</strong><div class="sub">' + esc(detail || event.at) + '</div><div class="primitive-row">' + (event.tool ? chip(event.tool) : '') + (event.taskId ? '<span class="chip">' + esc(event.taskId) + '</span>' : '') + '</div></div>';
@@ -765,6 +792,7 @@ function html() {
           '<section class="panel"><h3>Relationships</h3>' + relationshipList(actor.relationships) + '</section>' +
           '<section class="panel wide"><h3>Active Action Skills</h3>' + actionSkillList(actor.action_skills.active) + '</section>' +
           '<section class="panel wide"><h3>Direct Generated Trials</h3>' + directTrialList(actor.action_skills.direct_trials) + '</section>' +
+          '<section class="panel wide"><h3>Long Objective Timeline</h3>' + longObjectiveList(actor.action_skills.long_objectives) + '</section>' +
           '<section class="panel wide"><h3>Memory</h3>' + memoryList(actor.memory) + '</section>' +
         '</div>' +
         '<details><summary>Raw LLM input</summary><pre>' + esc(fmt(latestInput)) + '</pre></details>' +

@@ -10,6 +10,7 @@ import {
   buildProbePreconditionRconCommands,
   buildSkillProbeActionSkillRecords,
   classifyActionSkillProbeOutcome,
+  defaultBuildAnchor,
   getActionSkillProbePreconditionMode,
   hasDeterministicActionSkillProbeDriver,
   loadSkillProbeContract,
@@ -82,6 +83,19 @@ test("actionSkillProbeRunner does not duplicate runtimeObserveAndRemember when p
   const records = buildSkillProbeActionSkillRecords(config);
   assert.equal(records.length, 1);
   assert.equal(records[0].skill_id, "runtimeObserveAndRemember");
+});
+
+test("actionSkillProbeRunner anchors shelter probes from the live actor position", () => {
+  const actor = {
+    entity: {
+      position: { x: 13.8, y: 72, z: -17.2 }
+    }
+  };
+
+  assert.deepEqual(
+    defaultBuildAnchor(actor as Parameters<typeof defaultBuildAnchor>[0]),
+    { x: 15, y: 72, z: -16 }
+  );
 });
 
 test("actionSkillProbeRunner throws for planned unimplemented skills", () => {

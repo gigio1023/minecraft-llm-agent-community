@@ -41,6 +41,7 @@ import {
   ensureLiveSmokeServer
 } from "./server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "./server/manualMinecraftPort.js";
+import { execDockerCompose } from "./server/composeCommand.js";
 
 export type ProbeRunResult = {
   transcriptPath: string;
@@ -244,21 +245,14 @@ async function teleportBotsToRequestedSpawn(
     return;
   }
 
-  const { execFile } = await import("child_process");
-  const util = await import("util");
-  const execFileAsync = util.promisify(execFile);
   const runRcon = async (args: string[]) => {
     if (!rcon) {
       throw new Error("RCON context unavailable");
     }
 
-    await execFileAsync(
-      "docker",
-      ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
-      {
-        cwd: rcon.composeDir,
-        env: rcon.env
-      }
+    await execDockerCompose(
+      ["-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
+      { cwd: rcon.composeDir, env: rcon.env }
     );
   };
   const actorIds = Object.keys(bots);

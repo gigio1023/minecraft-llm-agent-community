@@ -26,14 +26,14 @@ export const canonicalActorProfiles = {
   },
   npc_b: {
     actor_id: "npc_b",
-    gameplay_role: "gatherer",
+    gameplay_role: "settler",
     display_name: "Jun",
-    social_archetype: "distracted gatherer",
-    public_responsibility: "collect logs and deposit usable materials",
-    private_goal: "finish the current resource task before taking on social coordination",
+    social_archetype: "practical settlement founder",
+    public_responsibility: "survive, gather essentials, craft basic tools, and build a small settlement base",
+    private_goal: "turn immediate resources into a safer shared home instead of hoarding one material",
     learning_bias: "learns from task results and direct world observations",
-    risk_posture: "moderate risk; moves quickly but pauses when a task is blocked",
-    speech_style: "quick and slightly distracted"
+    risk_posture: "moderate risk; explores when nearby work is exhausted and pauses when a task is blocked",
+    speech_style: "brief and practical"
   },
   npc_c: {
     actor_id: "npc_c",

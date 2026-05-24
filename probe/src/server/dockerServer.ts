@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import * as mc from "minecraft-protocol";
 
 import { buildServerEnv, type ProbeConfig } from "../config.js";
+import { shouldRetryWithStandaloneCompose } from "./composeCommand.js";
 
 const SERVER_READY_POLL_MS = 1_000;
 const COMPOSE_MANAGEMENT_TIMEOUT_MS = 10_000;
@@ -14,6 +15,7 @@ const MIN_COMPOSE_STARTUP_TIMEOUT_MS = 60_000;
 export type ServerHandle = {
   host: string;
   port: number;
+  runRcon?(args: string[]): Promise<string>;
   stop(): Promise<void>;
 };
 
@@ -167,6 +169,21 @@ function runCommand(
   });
 }
 
+async function runComposeCommand(
+  args: readonly string[],
+  options: CommandOptions = {}
+) {
+  try {
+    return await runCommand("docker", ["compose", ...args], options);
+  } catch (error) {
+    if (!shouldRetryWithStandaloneCompose(error)) {
+      throw error;
+    }
+
+    return runCommand("docker-compose", args, options);
+  }
+}
+
 function parsePublishedPort(value: string, line: string) {
   if (!/^\d+$/.test(value)) {
     throw new Error(`Unable to parse published port: ${line}`);
@@ -286,7 +303,7 @@ export async function waitForServerReady(
 }
 
 async function stopComposeProject(composeFile: string, env: NodeJS.ProcessEnv) {
-  await runCommand("docker", ["compose", "-f", composeFile, "down", "-v"], {
+  await runComposeCommand(["-f", composeFile, "down", "-v"], {
     cwd: path.dirname(composeFile),
     env,
     timeoutMs: COMPOSE_MANAGEMENT_TIMEOUT_MS
@@ -365,17 +382,22 @@ export async function startDockerServer(
   const stop = async () => {
     await cleanup();
   };
+  const runRcon = (args: string[]) =>
+    runComposeCommand(["-f", config.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args], {
+      cwd: composeDir,
+      env,
+      timeoutMs: commandTimeouts.managementMs
+    });
 
   try {
-    await runCommand("docker", ["compose", "-f", config.composeFile, "up", "-d"], {
+    await runComposeCommand(["-f", config.composeFile, "up", "-d"], {
       cwd: composeDir,
       env,
       timeoutMs: commandTimeouts.startupMs
     });
 
-    const portOutput = await runCommand(
-      "docker",
-      ["compose", "-f", config.composeFile, "port", "mc", String(config.server.containerPort)],
+    const portOutput = await runComposeCommand(
+      ["-f", config.composeFile, "port", "mc", String(config.server.containerPort)],
       {
         cwd: composeDir,
         env,
@@ -390,6 +412,7 @@ export async function startDockerServer(
     return {
       host,
       port,
+      runRcon,
       stop
     };
   } catch (error) {

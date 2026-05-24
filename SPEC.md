@@ -1,618 +1,229 @@
 # SPEC
 
-Updated: 2026-05-23
-
-## 1. What This Is
-
-This is the canonical gateway spec for the current bounded Minecraft
-agent-loop runtime.
-
-The detailed contracts are intentionally split so no single Markdown file has
-to carry the whole architecture:
-
-1. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
-   - product direction;
-   - Voyager distinction;
-   - speed-bounded social simulation contract;
-   - hot-path rules;
-   - runtime verification;
-   - non-goals.
-2. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-   - transcript and canonical artifact contract;
-   - actor evidence files;
-   - provider input snapshots;
-   - reviewer input evidence.
-3. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-   - actor workspace source-of-truth model;
-   - typed Minecraft memory substrate;
-   - action skill lifecycle;
-   - recipe and validator requirements;
-   - non-destructive initialization.
-4. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
-   - per-NPC reviewer ownership;
-   - reviewer inputs and outputs;
-   - cross-actor summarizer limits.
-5. `docs/docs/Architecture/Implementation-Workstreams.md`
-   - immediate implementation slices;
-   - parallel subagent ownership;
-   - dependency graph;
-   - validation plan;
-   - deferred work.
-6. `docs/docs/Architecture/Bounded-Action-Skill-Creation.md`
-   - detailed future action skill proposal and recipe model.
-7. `docs/docs/Architecture/LLM-Context-And-Actor-Workspace.md`
-   - route to the visual HTML architecture page.
-8. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-   - enum-first actor profiles, goal stack, and relationship state model.
-9. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
-   - current handoff;
-   - landed implementation surfaces;
-   - verified commands;
-   - next improvement order.
-10. `docs/docs/Architecture/Autonomous-Objective-Evaluation.md`
-   - bounded objective grammar;
-   - current-run objective oracles;
-   - reference-project lessons without reintroducing Voyager-style eval;
-   - path from single action-skill probes to small autonomous tasks.
-11. `docs/docs/Architecture/Direct-Generated-Action-Skills.md`
-   - raw TypeScript action skill execution as a first-class propagation path;
-   - light execution guards;
-   - helper-call evidence;
-   - reviewer cleanup into stable action skills and recipes.
-
-Treat this file as the source of truth for priority and scope. Treat the split
-docs as the source of truth for detailed implementation contracts.
-
-## 2. Architecture Concepts Reflected In Code
-
-The current implementation is important because it encodes the right boundaries,
-not because it has a long feature checklist.
-
-### Runtime-Owned Truth
-
-`runAgentLoop` starts each turn from Mineflayer-observed state, gives the
-provider a bounded context packet, validates the proposal against the actor's
-active action-skill gate, executes one primitive, observes again, and verifies
-progress from world, inventory, position, container, or transcript evidence.
-
-Providers propose. Runtime verification decides. Reviewers explain. Neither
-provider nor reviewer can turn optimistic text into success.
-
-### Actor-Local Ownership
-
-`data/actors/<actor_id>/` is the source of truth for actor-owned state:
-profile, memory, evidence, provider inputs, reviews, relationship edges, and
-active/candidate/retired/rejected action skill records.
-
-Action skill evolution follows two compatible paths.
-
-Fast propagation path:
-
-```text
-objective -> generated TypeScript action skill -> direct execution
--> current-run objective verifier -> candidate or active storage with evidence
--> background reviewer cleanup
-```
-
-Stable recipe path:
-
-```text
-proposal -> bounded recipe -> role/primitive validation -> timed trial evidence
--> promotion, supersession, retirement, or rejection
-```
-
-Loose legacy generated TypeScript under `build/generated-skills` is still not
-the source of truth. New generated TypeScript belongs to actor-owned direct
-trial artifacts with helper-call evidence and objective verifier results.
-
-Memory is now a typed actor-owned substrate, not a loose text tail. The schema
-is explicit enough for indexing, retrieval, and review, but the `content` field
-remains open so stronger LLMs can generate new plans and new observations
-without waiting for every possible Minecraft tactic to be pre-modeled.
-
-Current memory path:
-
-```text
-direct objective/action attempt
--> immutable episodic memory
--> procedural candidate or guardrail candidate
--> objective-scoped retrieval into future provider context
-```
-
-Memory can guide generated action code. It cannot satisfy objectives, mutate
-active action skill state, or replace current-run verifier evidence.
-
-### Replayable Evidence
-
-The runtime persists the packet a provider saw, the turn record, tool attempt,
-pre/post observations, verifier reason, fake-progress rejection, and review refs.
-The goal is that a failed run can be audited from artifacts without immediately
-reproducing the world.
-
-### Bounded Social Pressure
-
-Actor profile, goal stack, relationship edge, and relationship-derived pressure
-are structured provider context. They influence intent selection only.
-
-Relationship pressure carries explicit boundaries:
-
-- action boundary: intent pressure only;
-- active action skill still required;
-- role contract unchanged;
-- relationship state must come from durable evidence refs.
-
-### Async Repair
-
-Per-NPC reviewers read immutable actor artifacts after the turn and write
-findings, candidate proposals, or relationship event proposals. Runtime-owned
-guards apply relationship events and action skill lifecycle transitions.
-
-The hot path must stay small: observe, choose, gate, execute, verify, record,
-release.
-
-Future extensions outside the current bounded delivery scope:
-
-- production hardening of LLM-backed reviewer prompts and scoring beyond the
-  current opt-in bounded reviewer adapter;
-- provider input snapshots for future LLM-backed gameplay paths outside
-  phase-one gameplay and live dialogue;
-- actor-scoped evidence coverage for future gameplay paths outside phase-one
-  `runAgentLoop` and mutual dispatchers;
-- migration of the legacy skill-village path from loose generated TypeScript
-  proposals into actor-owned direct generated action skill trials, if that path
-  remains needed.
-
-Deferred unless the user re-approves:
-
-- full arbitrary checkpoint resume;
-- deep single-bot reconnect refactor;
-- generated TypeScript action skill hot-loop execution;
-- long-term memory compaction workers;
-- a global critic that owns actor repair decisions.
-
-Reconnect/session lifecycle remains a runtime-owned concern when implemented.
-For future slices, do only the reconnect work required to keep hot-path
-evidence honest. Do not let a deep reconnect refactor displace actor workspace,
-action skill lifecycle, provider snapshots, or per-NPC review.
-
-## 3. Product Direction
-
-The short-term product is a tiny, headless, bounded Minecraft runtime that can
-make real end-to-end progress on boring gameplay tasks and leave enough evidence
-to explain success, failure, stall, and fake progress.
-
-The long-term north star is a social simulation seed:
-
-- role pressure;
-- action skill ownership;
-- shared and private memory;
-- bounded action skill evolution;
-- per-NPC review and repair loops;
-- later human-in-the-loop social play.
-
-This is not a Voyager-style long-horizon single-agent autonomy project.
-Voyager can wait a long time for planning, critic, generated code, retries, and
-skill-library growth. This project needs speed-bounded actor turns because
-social simulation requires NPCs to remain observable and responsive. Slow critic,
-reflection, and repair loops must run asynchronously from immutable evidence and
-must not block the current actor turn.
-
-## 4. Immediate Implementation Priority
-
-The actor-workspace and social-feedback slices are now implemented enough to be
-the active runtime baseline. The next implementation should use real run
-evidence to harden boring gameplay competence without expanding into a larger
-society prematurely.
-
-Priority order:
-
-1. Validate `collect_logs` and adjacent boring tasks against live Minecraft
-   evidence, not optimistic transcript labels.
-2. Add autonomous micro-objective reports that ask for one tiny outcome and
-   accept only current-run world-state evidence.
-3. Use the per-action-skill live harness before returning to broad multi-NPC
-   runs.
-4. Use actor-scoped evidence and provider input snapshots to diagnose primitive,
-   verifier, target-selection, and action-skill gaps.
-5. Harden reviewer prompts/scoring only from immutable run evidence.
-6. Let direct generated TypeScript action skills attempt small objectives, then
-   use reviewer cleanup to turn stable attempts into smaller recipes or active
-   action skill records.
-7. Convert direct objective reports into typed actor memory and retrieve that
-   memory by objective, item, action skill, verifier status, and diagnosis.
-8. Keep the gameplay hot path bounded and free of blocking critic/reviewer
-   work.
-9. Keep the managed local server path easy to start, inspect, and stop.
-
-Current objective command:
-
-```bash
-cd probe
-bun run probe:objective -- --objective collect_current_run_oak_log_1 --provider openai-codex --actor npc_b --max-actions 8
-```
-
-The objective command can also audit a saved transcript:
-
-```bash
-cd probe
-bun run probe:objective -- --objective collect_current_run_oak_log_1 --transcript ../data/evidence/agent_loop_probe_v0-<timestamp>.json
-```
-
-Objective reports are not historical proof by default. They evaluate one
-current transcript and mark success only when the objective oracle finds runtime
-verification and world/inventory deltas in that transcript.
-
-Current direct generated action skill policy:
-
-- direct generated TypeScript is allowed for objective-scoped propagation;
-- the LLM may choose its own TypeScript action plan; prompts and objectives
-  must not force a hidden, hand-scripted Minecraft walkthrough;
-- Mineflayer helpers should absorb known early-game mechanics such as log to
-  planks, sticks, crafting table placement, wooden pickaxe, cobblestone, and
-  stone axe crafting, so reasonable generated calls like
-  `craftItem("crafting_table", 1)` can still produce real prerequisite
-  evidence;
-- generated source, helper calls, timeout/error, and objective verifier output
-  must be persisted together;
-- generated return values are never sufficient proof;
-- direct trial reports must become typed actor memory records:
-  - `episodic` for immutable current-run attempt evidence;
-  - `procedural` candidate when the current-run verifier passes;
-  - `guardrail` candidate when execution or verification fails;
-- background reviewers improve working generated code after the run, not before
-  the first attempt.
-
-Current direct generated objective proof:
-
-- command:
-  `bun run probe:objective -- --objective craft_current_run_stone_axe_1 --mode direct-generated --provider deterministic --actor npc_b --report ../tmp/objective-stone-axe-direct-current.json`;
-- result:
-  `objective_summary status=passed objective=craft_current_run_stone_axe_1 scope=current_run`;
-- evidence:
-  actor workspace direct trial report
-  `data/actors/npc_b/action-skills/direct-trials/craft_current_run_stone_axe_1-npc_b-1779464924961/report.json`
-  recorded generated source, helper events, current-run pre/post inventory,
-  `stone_axe` delta `1`, verifier status `passed`, and reviewer input refs;
-- dashboard:
-  actor state includes direct generated trial cards under
-  `action_skills.direct_trials`;
-- reviewer:
-  direct trials enqueue actor-scoped review jobs as immutable
-  `action_skill_direct_trial` refs. Reviewer output may propose cleanup into a
-  bounded action skill candidate, but still cannot mutate active records.
-- provider smoke:
-  `--provider openai-codex` also produced objective-specific generated
-  TypeScript and passed the same current-run verifier in actor workspace trial
-  `craft_current_run_stone_axe_1-npc_b-1779475080615` with model
-  `gpt-5.4-mini`, reasoning `low`.
-- memory-assisted retry:
-  the successful provider input included previous failed direct-trial
-  `episodic` and `guardrail` memories, but the pass still came only from
-  current-run `stone_axe` inventory evidence.
-- substrate proof:
-  the successful run accepted a model-generated plan that used free-form
-  helper composition, including substrate-assisted `ensureItem` and
-  `craftItem` calls for crafting-table access, sticks, wooden pickaxe,
-  cobblestone, and final table-bound `stone_axe` crafting. The mining and log
-  collection helpers keep `bot.dig(...)` atomic, but bound post-dig pickup and
-  pathfinder fallback work so a dropped item cannot stall the whole objective
-  until the outer generated-action timeout.
-
-Current harness command:
-
-```bash
-cd probe
-bun run probe:skill -- --actor npc_b --skill collectLogs --max-actions 20 --init-actor-workspace baseline
-```
-
-The single-skill harness runs Docker preflight before actor workspace
-initialization, dashboard startup, or Minecraft startup unless `MC_PORT` points
-at an already-running manual Minecraft server that passes a Minecraft protocol
-ping.
-Manual `MC_PORT` probes are allowed only for action skills whose precondition
-mode is `none`; fixture-backed probes require the managed server because their
-RCON setup is part of the evidence contract.
-Fixture-backed probes derive their setup from a pure RCON command planner, so
-crafting, storage, and social preconditions can be reviewed and tested without
-starting Minecraft. `none`-mode probes do not emit setup commands; they must not
-mutate the probe world merely because the managed server is available.
-When Docker is unavailable and no live manual server override exists, it reports
-`environment_blocked` with the Docker preflight command and exits without
-mutating actor workspace state.
-When the dashboard is enabled, the harness sends best-effort `agent-loop-event`
-runtime events to `/api/runtime-events` for turn observation, provider proposal,
-tool completion, and loop completion. These events are fire-and-forget:
-dashboard failure must not reject, delay, or relabel NPC action execution, and
-the dashboard still falls back to artifact polling.
-If the fixed dashboard port is already occupied, the CLI reuses it only when
-`/api/state` proves it is this repo's dashboard. A random stale listener is
-reported as a dashboard availability issue instead of being mislabeled as an
-active runtime dashboard. The health check is bounded by a short timeout so a
-stale listener cannot hang probe startup.
-
-Current matrix command:
-
-```bash
-cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline
-```
-
-Current matrix checklist command:
-
-```bash
-cd probe
-bun run probe:skills -- --dry-run
-```
-
-Current existing-evidence audit command:
-
-```bash
-cd probe
-bun run probe:skills -- --audit-existing-evidence
-```
-
-Optional matrix report artifact:
-
-```bash
-cd probe
-bun run probe:skills -- --dry-run --report ../tmp/action-skill-checklist.json
-```
-
-Use the matrix command after single-skill probes are stable. It enumerates
-implemented seed action skills from the registry, rejects planned action skills,
-runs each case through the same live harness, and reports
-`matrix_summary verdict=<verdict> passed=<n> failed=<n> error=<n> total=<run>/<planned>`.
-It also prints `matrix_status_counts`, which mirrors
-`summary.statusCounts` for quick terminal inspection.
-It prints `matrix_scope_counts`, which separates fresh current-run evidence from
-historical transcript evidence, missing evidence, and environment blockers.
-When unproven action skills remain, it prints `matrix_fresh_commands` with the
-first few single-skill probe commands needed to collect fresh live evidence.
-It also prints `matrix_next_actions`, a reviewer-friendly list of P0 follow-up
-actions that classifies each gap as environment restoration, fresh live proof,
-or failed-probe repair. Environment restoration is de-duplicated into one
-actionable command instead of repeating every blocked action-skill probe
-command; fixture-backed `MC_PORT` blockers tell the reviewer to unset
-`MC_PORT` before checking the managed Docker server.
-It also runs a Docker preflight before actor workspace initialization or
-Minecraft startup unless `MC_PORT` points at an already-running manual
-Minecraft server that passes a Minecraft protocol ping. When Docker is
-unavailable and no live manual server override exists, it reports
-`matrix_preflight status=environment_blocked` and exits without mutating the
-actor workspace or probe world.
-
-Use `--dry-run` when the Minecraft runtime is unavailable or before a live
-matrix run. It prints the implemented action skill checklist, including role,
-primitive ownership, gameplay preconditions, deterministic probe fixture mode,
-verification contract evidence, postcondition evidence, and planned RCON
-fixture commands, without Docker, actor workspace initialization, or world
-mutation. Every implemented action skill must have an explicit deterministic
-probe driver and fixture/precondition mode before it can appear in the matrix; a
-missing branch is a validation error, not a fallback terminal memory note.
-Use `--audit-existing-evidence` when Docker is unavailable but existing
-transcripts should be re-scored. It scans raw `action_skill_probe_*` evidence
-artifacts, skips canonical transcript projections, re-applies each action
-skill's postcondition rule, and reports which skills already have historical
-live proof versus which still need fresh runtime evidence. For each action
-skill, the audit reports the newest raw probe transcript instead of
-cherry-picking an older pass, so a recent regression cannot be hidden behind
-stale historical success.
-Use `--report <path>` to persist the same checklist or live matrix result as a
-JSON artifact with schema `action-skill-probe-matrix-report/v1`. The report
-includes a top-level `verdict`: `passed`, `failed`, `environment_blocked`, or
-`incomplete`, so later reviewers can distinguish live environment blockers from
-real action skill evidence failures. Each `cases[]` row includes
-`readinessItems` for the implemented registry entry, role, primitive ownership,
-verification contract, postcondition spec, deterministic probe driver, and
-fixture/precondition mode. The report also includes `skillStatuses`, one row per
-selected action skill, so dashboards and reviewers can render the current
-verification state without deriving it from mixed result and gap arrays. Each
-status row carries a `freshEvidenceCommand`, the exact single-skill probe
-command to run when that row still needs live Minecraft proof. Each status row also
-carries `evidenceScope`: `current_run`, `historical_transcript`, `missing`, or
-`environment_blocked`, so a historical audit pass is not confused with a fresh
-live matrix pass. `summary.statusCounts`
-aggregates the same rows into `passed`, `failed`, `error`,
-`pendingLiveEvidence`, and `environmentBlocked` counts. `summary.evidenceScopeCounts`
-aggregates the same rows into `currentRun`, `historicalTranscript`, `missing`,
-and `environmentBlocked` counts.
-`evidenceGaps` remains the focused list of non-passing or unrun action skills,
-with the missing contract and postcondition evidence needed before the action
-skill can be considered proven. Live and audited result rows also carry
-structured `terminalStatus`, `terminalWhy`, `postconditionStatus`,
-`postconditionFailure`, and `failureKind` fields when available. Reviewers and
-dashboards should read those fields instead of parsing the human `reason`
-string.
-The report also includes `nextActions`, derived from `evidenceGaps`, so
-dashboards and reviewer sidecars can show what to do next without inferring it:
-restore Docker/server environment, run the listed fresh probe command, or fix a
-failed probe before re-running it. When the environment is blocked,
-`nextActions` points at the Docker preflight check; per-skill fresh probe
-commands remain on `skillStatuses` and `evidenceGaps`. In
-`--audit-existing-evidence` mode, a historical pass also creates a
-`refresh_historical_evidence` next action because historical proof is not a
-fresh current-run proof after code changes.
-An evidence audit report must not return top-level `verdict: "passed"` from
-historical transcript rows alone. Even if every selected action skill has a
-historical pass, the report remains `incomplete` until the current run produces
-fresh `current_run` proof for every selected action skill.
-
-The per-action-skill postcondition is output-specific. Craft probes must prove
-the expected inventory outputs, not merely any passed verifier. Ordered social
-probes must prove the causal sequence, such as arrival before request, deposit
-before handoff chat, and busy response before wait before follow-up. Storage
-probes must prove named positive item movement or a non-empty item snapshot, not
-just an opened container or an unqualified moved count, and must keep the chest
-id in evidence. Wood probes should verify supported log/plank item families
-rather than overfitting to one wood species, and `collectLogs` must tie the
-passed verifier to `collect_logs` primitive-result evidence: positive
-`inventoryDelta`, target `afterLogCount`, and at least one dug log attempt.
-Inventory progress must be attached to the expected primitive rather than an
-unrelated successful step.
-Social probes must prove the delivered chat result itself carries target and
-text evidence that matches the action skill intent; generic delivered chat,
-untargeted chat, or intent text that appears only in provider args is not
-sufficient evidence.
-Runtime control probes must prove an observe snapshot happened before a terminal
-memory note. When a live probe writes a transcript, terminal status and
-postcondition evidence are classified separately so reviewers can see whether
-the failure was terminal-control flow, missing Minecraft evidence, or both.
-
-This command is intentionally narrower than `probe:v0` or `probe:live`: it runs
-one actor-owned action skill through the real runtime gate and exits non-zero
-when runtime evidence does not satisfy the contract.
-
-Current harness capabilities:
-
-- deterministic fixture setup through RCON for `collectLogs`,
-  `craftPlanksAndSticks`, `craftCraftingTable`, `inspectSharedChest`,
-  `depositSharedItems`, `handoffItemAtChest`, and social probes;
-- actor-relative live fixtures for log and stone block work, so probes do not
-  depend on stale absolute spawn-Y assumptions after a bot settles on terrain;
-- table-bound crafting fixture setup for `craftWoodenPickaxe`, including a
-  nearby `crafting_table` block and bounded `craft_with_table` primitive
-  evidence;
-- one action-skill-specific deterministic driver for each implemented seed
-  action skill; the action-skill probe harness does not switch to OpenAI auth or
-  an LLM provider based on `PROBE_GAMEPLAY_PROVIDER`;
-- transcript postcondition checks after the run, so a terminal `remember` note
-  cannot make the probe pass unless the action skill produced required state
-  evidence;
-- craft probes require a passed runtime verifier, not only a non-throwing
-  `bot.craft(...)`;
-- shared-storage probes require positive item movement into the shared chest
-  and transcript-visible actor/ledger identity for the storage contribution.
-- observation treats optional shared-chest inspection as non-fatal, while
-  storage action skills still require explicit open/deposit evidence.
-
-Current live action-skill matrix proof:
-
-- command:
-  `bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json`;
-- result:
-  `matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12`;
-- evidence scope:
-  `matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0`;
-- implemented action skills with fresh live proof:
-  `runtimeObserveAndRemember`, `collectLogs`, `craftPlanksAndSticks`,
-  `craftCraftingTable`, `craftWoodenPickaxe`, `mineCobblestone`,
-  `inspectSharedChest`, `depositSharedItems`, `approachAndRequestItem`,
-  `announceResourceDiscovery`, `handoffItemAtChest`, and
-  `waitForBusyCrafter`.
-
-The corresponding transcript artifacts under `data/evidence/` and the JSON
-matrix report under `tmp/` are intentionally ignored runtime evidence. Preserve
-the command and summary in docs, but do not commit those generated artifacts.
-
-Current deterministic 3-NPC product smoke:
-
-- command:
-  `bun run src/cli.ts --provider deterministic --npcs 3 --max-actions 20 --observe-ms 0 --no-dashboard`;
-- result:
-  `final.status=success`;
-- meaningful gameplay evidence:
-  `npc_b` ran `collect_logs`, reached `afterLogCount=4`, then deposited
-  `oak_log` into the shared chest with `movedCount=1`;
-- artifact:
-  `data/evidence/agent_loop_probe_v0-1779431536545.json`.
-
-Existing-evidence audits are still historical by design. Running
-`bun run probe:skills -- --audit-existing-evidence` after the live matrix
-re-scores the latest saved transcripts as 10 historical passes, but it returns
-top-level `verdict=incomplete` because a historical audit is not a fresh
-current-run proof.
-
-## 5. Non-Negotiable Rules
-
-- Runtime owns reality: validation, timeout, cancellation, verification,
-  transcript, artifacts, and lifecycle guards.
-- Providers propose. They do not decide success.
-- Progress must be backed by world, inventory, position, container, or transcript
-  evidence.
-- Do not confuse animation, partial motion, optimistic text, or provider claims
-  with success.
-- The hot path must not await critic, reflection, or slow summarization.
+Updated: 2026-05-24
+
+This is the canonical gateway spec for the current rebuild.
+
+The long-term product direction is a **Soul-grounded Minecraft social
+simulation seed**. Minecraft is the pressure/evidence substrate. The project is
+not a generic Minecraft LLM benchmark, a race-to-diamond agent, a fastest-tech
+tree contest, or a Voyager clone.
+
+## 1. Spec Authority And Governance
+
+`SPEC.md` and the documents under `docs/docs/Specification/` define the long-term
+project spec. Changing them changes the product direction.
+
+Rules for agents:
+
+- Do not silently edit this spec during unrelated implementation work.
+- Do not reinterpret external papers as product requirements.
+- Ask for explicit user approval before changing the long-term spec unless the
+  user has directly requested a spec update in the current task.
+- If implementation behavior and this spec disagree, report the mismatch before
+  normalizing either side.
+- Keep `SPEC.md` as the entrypoint. Put detailed contracts in split spec docs so
+  no single Markdown file becomes the whole architecture.
+
+Detailed governance lives in:
+
+- `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+
+## 2. Product Identity
+
+The actor is not just an LLM controller attached to Mineflayer.
+
+When `soul.md` or an ActorSoul artifact defines an actor, it is the actor's
+identity seed. Short-, mid-, and long-term goals are derived under the
+Soul/LifeGoal frame and constrained by world pressure, role pressure, memory,
+relationships, obligations, trust, conflict, shared/private inventory, and
+settlement state.
+
+Gameplay progress matters because it creates real pressure and evidence for
+social life. It is not the top-level objective by itself.
+
+Read the product identity spec:
+
+- `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+
+## 3. Complete Spec Reading Map
+
+Read these documents to understand the full spec:
+
+1. `SPEC.md`
+   - entrypoint, authority, project identity, non-negotiable rules.
+2. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+   - Soul/ActorSoul identity, LifeGoal continuity, social pressure, and what
+     counts as social simulation progress.
+3. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+   - runtime-owned truth, action skills, actor workspace, verifier evidence,
+     transcript artifacts, and action-skill lifecycle.
+4. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+   - spec change governance, implementation style, Detroit-style tests, live
+     runs, comments, file size, domain modeling, and documentation rules.
+5. `docs/docs/Specification/Reference-Adaptation-Guide.md`
+   - how to use external research without copying reference architectures.
+6. `docs/docs/Documentation-Map.md`
+   - documentation authority order, active/supporting/historical categories,
+     and cleanup rules.
+7. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+   - concrete Soul/LifeGoal/CycleGoal architecture.
+8. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+   - hot path, runtime verification, and bounded execution.
+9. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+   - transcript and artifact persistence contract.
+10. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+   - actor-owned memory and action-skill state.
+11. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+    - actor profiles, role pressure, and relationship state.
+12. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+    - current implementation state and next work.
+13. `docs/docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+    - latest architecture/implementation cross-check.
+14. `docs/docs/Agent-Search-Index.md`
+    - routing map and search tokens.
+15. `docs/docs/Terminology.md`
+    - canonical terms such as `agent skill` and `action skill`.
+
+Setup docs:
+
+- `docs/docs/Setup/Headless-Server.md`
+- `docs/docs/Setup/Provider-Setup.md`
+
+## 4. Non-Negotiable Direction
+
+- Soul/LifeGoal continuity is the top-level simulation frame.
+- WorldEvents are pressure, not direct replacement for LifeGoal.
+- Runtime owns physical truth: validation, timeout, cancellation, execution,
+  verification, transcript, artifacts, and lifecycle guards.
+- Providers propose goals and actions. They do not decide success.
+- Reviewers explain and propose repairs. They do not mutate actor truth directly.
 - Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
   agent skills.
-- Actor workspace is the only source of truth for actor-owned active,
-  candidate, retired, rejected, and superseded action skill records.
-- Generated TypeScript action skill bundles must be tied to actor-owned direct
-  trial artifacts before reuse.
-- `build/generated-skills` is a legacy exploratory output location only. It must
-  not be treated as an actor-owned action skill store.
-- Per-NPC reviewers write actor-scoped review notes and candidate proposals; they
-  never mutate active action skills directly.
-- A global reviewer may summarize cross-actor patterns only. It must not own
-  actor memory, actor action skill lifecycle, or actor-specific repair proposals.
+- Actor workspace is the source of truth for actor-owned memory, evidence,
+  active/candidate/retired action skills, goals, provider snapshots, reviews,
+  and relationships.
+- Progress must be backed by world, inventory, position, block, container, chat,
+  transcript, or verifier evidence.
+- Do not confuse animation, partial motion, optimistic text, reflection, or a
+  terminal memory note with success.
+- Social simulation must not be expected from persona text alone.
+- Social simulation must not be reduced to generic task completion.
 
-## 6. Done Criteria For The Actor-Workspace Slice
+## 5. Near-Term Proof
 
-The actor-workspace slice is done when:
+The first meaningful proof is small:
 
-1. `data/actors/<actor_id>/` has the intended source-of-truth layout:
-   `memory/`, `evidence/`, `reviews/`, `provider-inputs/`,
-   `action-skills/active`, `action-skills/candidates`,
-   `action-skills/retired`, and `action-skills/rejected`;
-2. current seed ownership records are materialized into actor workspace action
-   skill records without creating a competing schema;
-3. active seed action skills can be read from actor workspace;
-4. runtime provider proposals are blocked when their primitive is not backed by
-   the actor's active action skill records;
-5. candidate action skill recipes can be validated before trial;
-6. generated or candidate action skill proposals are stored under the actor
-   workspace lifecycle, not `build/generated-skills`;
-7. reviewer jobs and outputs can be written per actor without touching active
-   runtime state;
-8. provider-backed runs persist the exact provider input packet per actor turn;
-9. failed gameplay attempts leave actor-scoped evidence suitable for review,
-   including target, pre/post position, tool attempt, verifier reason, and
-   inventory/block/container delta when relevant;
-10. provider failures after an actor turn observes the world are recorded as
-    failed `provider_error` transcript steps and `provider_failed` events, with
-    the provider input snapshot ref attached when snapshots are enabled;
-11. fake progress such as "started swinging," "pathing started," or provider
-   confidence cannot satisfy a verifier without runtime evidence;
-12. deterministic mode still performs zero network calls;
-13. docs and index routes point to the split spec documents.
+- one bounded actor;
+- real Minecraft actions such as resource gathering, crafting, storage,
+  movement, shelter, or settlement maintenance;
+- action attempts recorded whether passed, blocked, failed, or no-progress;
+- CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, world pressure,
+  memory, relationships, and prior judgments;
+- CycleJudgment written from runtime evidence;
+- later cycles retrieve and use prior memory or judgment;
+- failures explainable from artifacts without immediate reproduction.
 
-## 7. Done Criteria For The Social Feedback Slice
+The proof is not:
 
-The social feedback slice is done when:
+- a large NPC village;
+- persona richness as content;
+- an unbounded long-run autonomy demo;
+- a generic "find diamonds fast" objective;
+- a model-written explanation treated as truth.
 
-1. reviewer `relationship_event_proposals` can be applied by an explicit
-   runtime-owned command/module, never by the reviewer itself;
-2. the applier rejects unknown actor workspaces, path-like actor ids, unknown
-   event kinds, missing evidence refs, self-targets, and evidence refs that are
-   not inside the relevant actor workspace;
-3. applied relationship events update
-   `data/actors/<from_actor_id>/relationships/<to_actor_id>.json`;
-4. applied events are idempotent by event id and a durable application marker,
-   so repeated reviewer runs do not duplicate social state after the compact
-   relationship event window rolls forward;
-5. actor provider context exposes relationship-derived pressure as categorical
-   goal/decision context, not as arbitrary `0..1` personality floats;
-6. runtime action selection may use relationship pressure to choose between
-   already-allowed bounded actions, but it cannot bypass active action-skill
-   gates or role contracts;
-7. provider input snapshots include actor profile, goal stack, active action
-   skills, relationship state, recent evidence, recent reviews, and memory;
-8. live gameplay/provider smoke setup can be run without printing secrets and
-   leaves a server endpoint the user can join; `MC_PORT` manual overrides are
-   validated before bypassing the managed server;
-9. deterministic test paths still perform zero network calls;
-10. docs and the static architecture page explain the completed social feedback
-    loop accurately.
+## 6. Architecture Summary
 
-## 8. Read Next
+The runtime shape is:
 
-For implementation, read in this order:
+```text
+ActorSoul + LifeGoal + world/social pressure + memory
+-> CycleGoal
+-> ActionIntent
+-> active action skill / primitive gate
+-> Mineflayer execution
+-> verifier evidence
+-> transcript + evidence + memory + CycleJudgment
+-> next cycle context
+```
 
-1. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
-2. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-3. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-4. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
-5. `docs/docs/Architecture/Implementation-Workstreams.md`
-6. `docs/docs/Architecture/Bounded-Action-Skill-Creation.md`
-7. `docs/docs/Architecture/LLM-Context-And-Actor-Workspace.md`
-8. `docs/docs/Agent-Search-Index.md`
-9. `docs/docs/Terminology.md`
+The hot path stays bounded:
+
+```text
+observe -> choose -> gate -> execute -> verify -> record
+```
+
+Slow reflection, repair, review, summarization, and action-skill cleanup happen
+from immutable artifacts outside the actor turn.
+
+## 7. Testing And Evidence
+
+This is not a production SaaS project where broad unit-test volume is the main
+measure of progress. Unit tests still matter, but they must be small,
+Detroit-style, and targeted at owned behavior.
+
+Primary evidence comes from real implementation runs:
+
+- live or managed Minecraft probes;
+- social-cycle reports;
+- action-skill matrix reports;
+- transcript and runtime artifacts;
+- provider input/output snapshots;
+- verifier output and actor workspace evidence.
+
+Test code should protect narrow invariants and regressions. If a test would pass
+after the real runtime behavior is broken, rewrite or delete it.
+
+Detailed testing rules live in:
+
+- `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+
+## 8. External References
+
+External research is used for mechanisms, not for product identity.
+
+Reference mechanisms must be translated into this project:
+
+- skill-library work -> actor-owned, evidence-backed action skill promotion;
+- curriculum work -> bounded Soul/LifeGoal-compatible pressure, not benchmark
+  optimization;
+- reasoning/action work -> CycleGoal, ActionIntent, evidence, CycleJudgment;
+- memory/reflection work -> artifact-grounded memory and review, not claimed
+  progress;
+- affordance/interface work -> better runtime primitives, gates, context
+  packets, and diagnostics.
+
+Detailed reference mapping with links lives in:
+
+- `docs/docs/Specification/Reference-Adaptation-Guide.md`
+
+Reference anchors include:
+
+- [Voyager](https://arxiv.org/abs/2305.16291)
+- [MineDojo](https://arxiv.org/abs/2206.08853)
+- [Generative Agents](https://arxiv.org/abs/2304.03442)
+- [ReAct](https://arxiv.org/abs/2210.03629)
+- [Reflexion](https://arxiv.org/abs/2303.11366)
+- [SayCan](https://arxiv.org/abs/2204.01691)
+- [Inner Monologue](https://arxiv.org/abs/2207.05608)
+- [SWE-agent](https://arxiv.org/abs/2405.15793)
+- [PsyMem](https://huggingface.co/papers/2505.12814)
+- [PersonaGym](https://huggingface.co/papers/2407.18416)
+- [Belief-Behavior Consistency](https://huggingface.co/papers/2507.02197)
+- [Persona-Environment Behavioral Alignment](https://huggingface.co/papers/2509.16457)
+- [Embodied Agent Interface](https://huggingface.co/papers/2410.07166)
+
+## 9. Current State Is Not The Spec
+
+Current implementation status, commands, and matrix results change often. Keep
+those details in handoff and audit docs, not as the long-term spec itself.
+
+Current-state references:
+
+- `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+- `docs/docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+
+As of this spec update, the current action-skill evidence baseline is described
+in the architecture audit, including the fresh 14/14 live matrix after the
+`buildBasicShelter` anchor fix. Future current-run results should update handoff
+or audit docs, not silently rewrite the long-term product direction.

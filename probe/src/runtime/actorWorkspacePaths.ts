@@ -18,10 +18,19 @@ export type ActorWorkspacePaths = {
     indexDir: string;
   };
   relationshipsDir: string;
+  settlementDir: string;
   evidenceDir: string;
   reviewsDir: string;
   providerInputsDir: string;
   providerOutputsDir: string;
+  soulMdFile: string;
+  soulJsonFile: string;
+  goalsDir: string;
+  lifeGoalActiveFile: string;
+  strategicGoalsDir: string;
+  cycleGoalsDir: string;
+  judgmentsDir: string;
+  worldEventsDir: string;
   actionSkills: {
     rootDir: string;
     indexFile: string;
@@ -77,10 +86,19 @@ export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorW
       indexDir: path.join(memoryRootDir, "index")
     },
     relationshipsDir: path.join(actorDir, "relationships"),
+    settlementDir: path.join(actorDir, "settlement"),
     evidenceDir: path.join(actorDir, "evidence"),
     reviewsDir: path.join(actorDir, "reviews"),
     providerInputsDir: path.join(actorDir, "provider-inputs"),
     providerOutputsDir: path.join(actorDir, "provider-outputs"),
+    soulMdFile: path.join(actorDir, "soul.md"),
+    soulJsonFile: path.join(actorDir, "soul.json"),
+    goalsDir: path.join(actorDir, "goals"),
+    lifeGoalActiveFile: path.join(actorDir, "goals", "life", "active.json"),
+    strategicGoalsDir: path.join(actorDir, "goals", "strategic"),
+    cycleGoalsDir: path.join(actorDir, "goals", "cycle"),
+    judgmentsDir: path.join(actorDir, "judgments"),
+    worldEventsDir: path.join(actorDir, "world-events"),
     actionSkills: {
       rootDir: actionSkillRootDir,
       indexFile: path.join(actionSkillRootDir, "index.json"),

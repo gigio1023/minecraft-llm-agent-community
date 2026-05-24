@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Actor Workspace And Action Skill Memory
 
-This document defines the source-of-truth model for per-NPC artifacts and action
+This document defines the source-of-truth model for per-actor artifacts and action
 skill lifecycle state.
 
 ## Terminology
@@ -20,7 +20,7 @@ For the full terminology contract, see `../Terminology.md`.
 
 ## Actor Workspace Purpose
 
-Actor workspace is the per-NPC filesystem home for runtime-owned actor artifacts:
+Actor workspace is the per-actor filesystem home for runtime-owned actor artifacts:
 
 - identity;
 - memory;
@@ -118,7 +118,7 @@ Current code also:
 - gates the phase-one `runAgentLoop` with actor-owned active record primitives;
 - gates mutual live/deterministic dispatchers when actor-owned active records
   are supplied;
-- queues deterministic per-NPC review jobs under actor workspace reviews when
+- queues deterministic per-actor review jobs under actor workspace reviews when
   runtime evidence fails verification;
 - writes reviewer-proposed draft candidate action skill records under actor
   workspace candidates without mutating active records;
@@ -261,8 +261,8 @@ actor workspace candidate recipe.
 
 ## Typed Actor Memory Record
 
-Typed memory exists to make freer LLM behavior reusable without scripting the
-LLM's future choices. The schema is stable at the indexing boundary and flexible
+Typed memory exists to make bounded actor behavior reusable without scripting
+future choices. The schema is stable at the indexing boundary and flexible
 inside `content`.
 
 ```ts
@@ -313,7 +313,8 @@ first: objective id, objective category, target items, action-skill ids, layer,
 and status. Embedding/vector retrieval can come later, but it must not replace
 objective and causality signals.
 
-Memory is never proof. It is a hint substrate for future autonomous LLM action.
+Memory is never proof. It is a hint substrate for future bounded actor action
+and direct-trial planning.
 
 ## Acceptance Checks
 

@@ -139,6 +139,8 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   mine_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_with_table?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  place_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  build_pattern?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   inspect_chest(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   deposit_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   withdraw_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -158,6 +160,7 @@ type AgentLoopArgs<TActor extends RuntimeActor> = {
   transcript: TranscriptRecorder;
   initialCompletedTaskIds?: string[];
   activeActionSkills: readonly ActorActionSkillRecord[];
+  stopAfterRuntimeTaskCompletion?: boolean;
   stepDelayMs?: number;
   maxActions?: number;
   artifacts?: {
@@ -295,6 +298,24 @@ async function executeTool<TActor extends RuntimeActor>(
             status: "blocked",
             message: "craft_with_table handler is not installed"
           };
+    case "place_block":
+      return tools.place_block
+        ? tools.place_block({ actor, target, args: validated.args })
+        : {
+            tool: "place_block",
+            ok: false,
+            status: "blocked",
+            message: "place_block handler is not installed"
+          };
+    case "build_pattern":
+      return tools.build_pattern
+        ? tools.build_pattern({ actor, target, args: validated.args })
+        : {
+            tool: "build_pattern",
+            ok: false,
+            status: "blocked",
+            message: "build_pattern handler is not installed"
+          };
     case "inspect_chest":
       return tools.inspect_chest({ actor, target, args: validated.args });
     case "deposit_shared":
@@ -318,6 +339,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
   transcript,
   initialCompletedTaskIds = [],
   activeActionSkills,
+  stopAfterRuntimeTaskCompletion = true,
   stepDelayMs = 1000,
   maxActions = DEFAULT_MAX_ACTIONS,
   artifacts,
@@ -366,7 +388,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     });
 
     // Pressure/intent context is recorded even while the provider remains
-    // deterministic so future agent-loop changes can explain why a primitive
+    // deterministic so future runtime-loop changes can explain why a primitive
     // was allowed, continued, or interrupted.
     const pressureContext = buildPressureIntentContext({
       actorId: actor.username,
@@ -379,7 +401,12 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
     previousIntent = pressureContext.currentIntent;
 
     const turnId = `turn-${String(step + 1).padStart(4, "0")}`;
-    if (!currentTask && completedTaskIds.has("deposit_shared_materials") && lastResult?.ok === true) {
+    if (
+      stopAfterRuntimeTaskCompletion &&
+      !currentTask &&
+      completedTaskIds.has("deposit_shared_materials") &&
+      lastResult?.ok === true
+    ) {
       const why = `completed runtime tasks: ${[...completedTaskIds].join(", ")}`;
       emitAgentLoopEvent(onEvent, {
         type: "loop_completed",

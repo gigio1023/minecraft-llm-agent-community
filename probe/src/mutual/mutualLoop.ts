@@ -295,7 +295,7 @@ async function runDeterministicMutualLoop<TActor extends DeterministicMutualRunt
     status,
     why:
       status === "success"
-        ? "both NPCs responded to each other's dialogue and world actions"
+        ? "both actors responded to each other's dialogue and world actions"
         : "one or more interaction categories did not reach acceptance",
     categories
   };

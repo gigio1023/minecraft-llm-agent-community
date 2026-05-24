@@ -1,7 +1,5 @@
-import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import type { Bot } from "mineflayer";
 import { Vec3 } from "vec3";
@@ -33,9 +31,19 @@ import {
   ensureLiveSmokeServer
 } from "../server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
+import { execDockerCompose } from "../server/composeCommand.js";
 import { collectLogs } from "../tools/collectLogs.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
+import {
+  branchMineStep,
+  descendToYLevel,
+  ensureFuel,
+  ensureFurnaceNearby,
+  mineOre,
+  scanNearbyBlocks as scanNearbyBlocksHelper,
+  smeltItem
+} from "../tools/longObjectiveHelpers.js";
 import { mineBlock } from "../tools/mineBlock.js";
 import { getObjectiveDefinition, type ObjectiveId } from "./registry.js";
 
@@ -100,7 +108,6 @@ export type DirectGeneratedObjectiveRunOptions = {
   timeoutMs?: number;
 };
 
-const execFileAsync = promisify(execFile);
 const sourceEndpoint = "https://chatgpt.com/backend-api/codex/responses";
 
 function toJsonValue(value: unknown): JsonValue {
@@ -134,7 +141,7 @@ function countInventory(inventory: readonly InventoryItem[], itemName: string) {
     .reduce((sum, item) => sum + item.count, 0);
 }
 
-function readInventory(bot: Bot): InventoryItem[] {
+export function readInventory(bot: Bot): InventoryItem[] {
   return bot.inventory.items().map((item) => ({
     name: item.name,
     count: item.count
@@ -170,7 +177,10 @@ const directSubstrateManagedItems = new Set([
   "crafting_table",
   "wooden_pickaxe",
   "cobblestone",
-  "stone_axe"
+  "stone_axe",
+  "stone_pickaxe",
+  "iron_ingot",
+  "iron_pickaxe"
 ]);
 
 function isDirectSubstrateManagedItem(itemName: string) {
@@ -191,7 +201,9 @@ export async function run(ctx) {
 
 const tableBoundSubstrateItems = new Set([
   "wooden_pickaxe",
-  "stone_axe"
+  "stone_axe",
+  "stone_pickaxe",
+  "iron_pickaxe"
 ]);
 
 function buildSourcePrompt(input: {
@@ -292,18 +304,14 @@ function extractOutputText(payload: unknown) {
 
 async function createRconRunner(rcon: RconContext): Promise<RconRunner> {
   return async (args: string[]) => {
-    await execFileAsync(
-      "docker",
-      ["compose", "-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
-      {
-        cwd: rcon.composeDir,
-        env: rcon.env
-      }
+    await execDockerCompose(
+      ["-f", rcon.composeFile, "exec", "-T", "mc", "rcon-cli", "--", ...args],
+      { cwd: rcon.composeDir, env: rcon.env }
     );
   };
 }
 
-async function prepareStoneAxeFixture(input: {
+export async function prepareStoneAxeFixture(input: {
   bot: Bot;
   spawn: ProbeConfig["spawn"];
   runRcon?: RconRunner;
@@ -330,7 +338,7 @@ async function prepareStoneAxeFixture(input: {
   await input.runRcon(["execute", "at", input.bot.username, "run", "setblock", "~1", "~0", "~2", "crafting_table"]);
 }
 
-async function ensureServer(config: ProbeConfig) {
+export async function ensureObjectiveServer(config: ProbeConfig) {
   const manualMinecraftPort = readManualMinecraftPort();
   if (manualMinecraftPort !== undefined) {
     return {
@@ -370,7 +378,7 @@ function normalizeHelperError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function createDirectContext(
+export function createDirectContext(
   bot: Bot,
   options: {
     signal?: AbortSignal;
@@ -607,6 +615,62 @@ function createDirectContext(
       return { status: "available", itemName, count: countInventory(readInventory(bot), itemName) };
     }
 
+    if (itemName === "stone_pickaxe") {
+      while (countInventory(readInventory(bot), "stone_pickaxe") < count) {
+        throwIfAborted();
+        await ensureItem("cobblestone", 3);
+        await ensureItem("stick", 2);
+        await recordInternal("ensureCraftingTableNearby", [], () =>
+          directContext.ensureCraftingTableNearby()
+        );
+        const result = await recordInternal("craftWithTable", ["stone_pickaxe", 1], () =>
+          craftWithTablePrimitive("stone_pickaxe", 1)
+        );
+        await sleep(250);
+        if (typeof result === "object" && result !== null && (result as { status?: unknown }).status === "blocked") {
+          return result;
+        }
+      }
+      return { status: "available", itemName, count: countInventory(readInventory(bot), itemName) };
+    }
+
+    if (itemName === "iron_ingot") {
+      while (countInventory(readInventory(bot), "iron_ingot") < count) {
+        throwIfAborted();
+        await ensureItem("stone_pickaxe", 1);
+        const smeltResult = await recordInternal("smeltItem", ["raw_iron", "iron_ingot", 1], () =>
+          smeltItem(bot, {
+            inputItemName: "raw_iron",
+            outputItemName: "iron_ingot",
+            count: 1
+          })
+        );
+        if (smeltResult.status === "blocked") {
+          return smeltResult;
+        }
+      }
+      return { status: "available", itemName, count: countInventory(readInventory(bot), itemName) };
+    }
+
+    if (itemName === "iron_pickaxe") {
+      while (countInventory(readInventory(bot), "iron_pickaxe") < count) {
+        throwIfAborted();
+        await ensureItem("iron_ingot", 3);
+        await ensureItem("stick", 2);
+        await recordInternal("ensureCraftingTableNearby", [], () =>
+          directContext.ensureCraftingTableNearby()
+        );
+        const result = await recordInternal("craftWithTable", ["iron_pickaxe", 1], () =>
+          craftWithTablePrimitive("iron_pickaxe", 1)
+        );
+        await sleep(250);
+        if (typeof result === "object" && result !== null && (result as { status?: unknown }).status === "blocked") {
+          return result;
+        }
+      }
+      return { status: "available", itemName, count: countInventory(readInventory(bot), itemName) };
+    }
+
     return { status: "unsupported_item", itemName, count };
   };
 
@@ -614,18 +678,29 @@ function createDirectContext(
     inspectInventory() {
       return readInventory(bot);
     },
-    scanNearbyBlocks() {
-      return bot.findBlocks({
-        matching: (block) => block.name !== "air" && block.name !== "void_air",
-        maxDistance: 16,
-        count: 32
-      }).map((position) => {
-        const block = bot.blockAt(position);
-        return {
-          name: block?.name ?? "unknown",
-          distance: Number(bot.entity.position.distanceTo(position).toFixed(1))
-        };
-      });
+    scanNearbyBlocks(maxDistance = 16) {
+      return scanNearbyBlocksHelper(bot, maxDistance);
+    },
+    craftStonePickaxe(count = 1) {
+      return ensureItem("stone_pickaxe", Math.max(1, Math.floor(count)));
+    },
+    ensureFurnaceNearby() {
+      return ensureFurnaceNearby(bot);
+    },
+    ensureFuel(minCount = 1) {
+      return ensureFuel(bot, minCount);
+    },
+    smeltItem(inputItemName: string, outputItemName: string, count = 1) {
+      return smeltItem(bot, { inputItemName, outputItemName, count });
+    },
+    mineOre(blockName: string, expectedItemName: string, count = 1) {
+      return mineOre(bot, { blockName, expectedItemName, count });
+    },
+    descendToYLevel(targetY: number) {
+      return descendToYLevel(bot, targetY);
+    },
+    branchMineStep() {
+      return branchMineStep(bot);
     },
     ensureItem,
     collectLogs(count = 1) {
@@ -888,7 +963,7 @@ export async function runDirectGeneratedObjective(
   let server: { host: string; port: number; stop(): Promise<void> } | null = null;
 
   try {
-    const serverContext = await ensureServer(config);
+    const serverContext = await ensureObjectiveServer(config);
     server = serverContext.server;
     console.log(`minecraft_direct_connect=${server.host}:${server.port}`);
     bots = await createBots(config, {

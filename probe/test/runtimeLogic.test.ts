@@ -1060,6 +1060,7 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(await observe({ actor, target, dialogueState, memory }), {
     status: "ok",
     observerId: "npc_a",
+    position: { x: 0, y: 0, z: 0 },
     visibleActors: [{ id: "npc_b", distance: 2, busy: true }],
     memory: ["saw npc_b near spawn"]
   });
@@ -1143,6 +1144,40 @@ test("observe keeps important station blocks even when many closer blocks exist"
     observation.nearbyBlocks?.some((block) => block.name === "crafting_table"),
     "crafting table must survive observe sampling because it gates table-bound crafting"
   );
+});
+
+test("observe exposes nearby log resource directions for planning", async () => {
+  const actor = createFakeBot("npc_a", 0) as ReturnType<typeof createFakeBot> & {
+    findBlocks(input: {
+      matching: (block: { name: string }) => boolean;
+      maxDistance: number;
+      count: number;
+    }): Array<{ x: number; y: number; z: number; distanceTo(other: unknown): number }>;
+    blockAt(position: { x: number; y: number; z: number }): { name: string };
+  };
+  const target = createFakeBot("npc_b", 2);
+  const memory = createMemory(4);
+  const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 1 });
+  const logPosition = {
+    x: 9,
+    y: 0,
+    z: 0,
+    distanceTo(other: { x: number; y: number; z: number }) {
+      return Math.hypot(this.x - other.x, this.y - other.y, this.z - other.z);
+    }
+  };
+
+  actor.findBlocks = ({ matching }) => matching({ name: "oak_log" }) ? [logPosition] : [];
+  actor.blockAt = () => ({ name: "oak_log" });
+
+  const observation = await observe({ actor: actor as any, target, dialogueState, memory });
+
+  assert.deepEqual(observation.nearbyResources?.logs[0], {
+    name: "oak_log",
+    distance: 9,
+    direction: "east",
+    position: { x: 9, y: 0, z: 0 }
+  });
 });
 
 test("converse sends directed speech, supports self-talk, and records heard messages", async () => {

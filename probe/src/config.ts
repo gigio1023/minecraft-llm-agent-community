@@ -92,6 +92,19 @@ export function parsePortEnv(value: string | undefined, defaultValue: number) {
   return port;
 }
 
+function parseNumberEnv(value: string | undefined, defaultValue: number) {
+  if (value === undefined || value.trim().length === 0) {
+    return defaultValue;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Expected numeric environment value, received: ${value}`);
+  }
+
+  return parsed;
+}
+
 function parseGameplayProviderId(value: string | undefined): ProbeConfig["gameplayProvider"]["providerId"] {
   if (!value || value.trim().length === 0) {
     return "deterministic";
@@ -123,13 +136,13 @@ export function loadProbeConfig(): ProbeConfig {
     evidenceDir: path.resolve(here, "../../data/evidence"),
     composeFile: path.resolve(here, "../compose.yaml"),
     world: {
-      seed: yamlConfig.world?.seed || "",
-      levelType: yamlConfig.world?.levelType || "default"
+      seed: process.env.PROBE_WORLD_SEED ?? process.env.MC_WORLD_SEED ?? yamlConfig.world?.seed ?? "",
+      levelType: process.env.PROBE_LEVEL_TYPE ?? yamlConfig.world?.levelType ?? "default"
     },
     spawn: {
-      x: yamlConfig.spawn?.x ?? 49.9,
-      y: yamlConfig.spawn?.y ?? -58.0,
-      z: yamlConfig.spawn?.z ?? -119.0
+      x: parseNumberEnv(process.env.PROBE_SPAWN_X, yamlConfig.spawn?.x ?? 49.9),
+      y: parseNumberEnv(process.env.PROBE_SPAWN_Y, yamlConfig.spawn?.y ?? -58.0),
+      z: parseNumberEnv(process.env.PROBE_SPAWN_Z, yamlConfig.spawn?.z ?? -119.0)
     },
     liveDialogue: {
       providerId: "openai-codex",

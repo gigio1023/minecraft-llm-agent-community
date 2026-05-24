@@ -4,7 +4,7 @@ export type DockerPreflight =
   | { status: "ready" }
   | { status: "environment_blocked"; reason: string };
 
-export const dockerPreflightCommand = "docker info --format '{{.ServerVersion}}'";
+export const dockerPreflightCommand = "docker info";
 
 function runPreflightCommand(command: string, args: readonly string[], timeoutMs: number) {
   return new Promise<{ code: number | null; stdout: string; stderr: string; signal: NodeJS.Signals | null }>(
@@ -86,7 +86,7 @@ function formatError(error: unknown): string {
 
 export async function checkDockerPreflight(): Promise<DockerPreflight> {
   try {
-    const result = await runPreflightCommand("docker", ["info", "--format", "{{.ServerVersion}}"], 5_000);
+    const result = await runPreflightCommand("docker", ["info"], 5_000);
     return normalizeDockerPreflightResult(result);
   } catch (error) {
     return {

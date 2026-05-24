@@ -6,13 +6,18 @@ sidebar_position: 11
 
 Search token: `DIRECT_GENERATED_ACTION_SKILLS`.
 
+Status: supporting actor-owned direct trial and propagation path. This document
+does not define product goal authority; direct generated code is useful only
+when runtime evidence, actor workspace ownership, and reviewer cleanup keep it
+bounded.
+
 Direct generated action skills are TypeScript action programs generated for a
 specific Minecraft objective and executed directly against the runtime helper
 surface.
 
-This is the main propagation path for new behavior. Bounded recipes remain
-valuable as a later cleanup and promotion format, but the runtime should not
-require every useful behavior to be hand-authored before it can be tried.
+This is a fast propagation path for new behavior. Bounded recipes remain
+valuable as a cleanup and promotion format, and the runtime should not require
+every useful behavior to be hand-authored before it can be tried.
 
 ## Why This Exists
 

@@ -459,6 +459,17 @@ function bucketRefs(refs: ActorMemoryRef[]) {
   };
 }
 
+export function listActorMemoryRefs(packet: ActorMemoryRetrievalPacket): ActorMemoryRef[] {
+  return [
+    ...packet.retrieved_episodic,
+    ...packet.retrieved_procedural,
+    ...packet.retrieved_semantic,
+    ...packet.retrieved_social,
+    ...packet.guardrails,
+    ...packet.beliefs
+  ];
+}
+
 export async function retrieveActorMemoryForObjective(
   rootDir: string,
   actorId: string,

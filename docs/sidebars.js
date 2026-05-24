@@ -4,7 +4,18 @@
 const sidebars = {
   tutorialSidebar: [
     'intro',
+    'Documentation-Map',
     'Agent-Search-Index',
+    {
+      type: 'category',
+      label: 'Specification',
+      items: [
+        'Specification/Soul-Grounded-Social-Simulation',
+        'Specification/Runtime-Evidence-And-Action-Skills',
+        'Specification/Engineering-Governance-And-Testing',
+        'Specification/Reference-Adaptation-Guide',
+      ],
+    },
     {
       type: 'category',
       label: 'Architecture & Design',
@@ -17,10 +28,22 @@ const sidebars = {
         'Architecture/Async-Reviewer-Sidecars',
         'Architecture/Implementation-Workstreams',
         'Architecture/Bounded-Action-Skill-Creation',
-        'Architecture/Autonomous-Objective-Evaluation',
-        'Architecture/Direct-Generated-Action-Skills',
+        'Architecture/Soul-Life-Goal-Runtime-Architecture',
+        'Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan',
         'Architecture/LLM-Context-And-Actor-Workspace',
         'Architecture/Social-Actor-Profiles-And-Relationships',
+        'Architecture/Social-Simulation-Next-Goal-Handoff',
+        'Architecture/Future-Works',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Evaluation & Propagation Tracks',
+      items: [
+        'Architecture/Autonomous-Objective-Evaluation',
+        'Architecture/Direct-Generated-Action-Skills',
+        'Architecture/Single-Actor-Long-Term-Diamond-Handoff',
+        'Architecture/composer-2.5-Single-Actor-Long-Term-Diamond-Plan',
       ],
     },
     {

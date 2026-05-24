@@ -73,6 +73,24 @@ function waitForSpawn(bot: Bot) {
   });
 }
 
+async function waitForInitialChunks(bot: Bot) {
+  const chunkAwareBot = bot as Bot & {
+    waitForChunksToLoad?: () => Promise<void>;
+  };
+
+  try {
+    await chunkAwareBot.waitForChunksToLoad?.();
+  } catch {
+    // Some server/client version combinations do not expose a reliable chunk
+    // wait boundary. Keep the fixed settle below so first observations are not
+    // taken against an empty block cache.
+  }
+
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 1_000);
+  });
+}
+
 async function closeBotList(bots: Array<Bot | null | undefined>) {
   await Promise.allSettled(
     bots.map(async (bot) => {
@@ -105,6 +123,7 @@ export async function createBots(
       // Spawn is the runtime session boundary: returning earlier would expose a
       // bot that exists as a socket but cannot yet execute movement primitives.
       await waitForSpawn(bot);
+      await waitForInitialChunks(bot);
     }
 
     return createdBots;

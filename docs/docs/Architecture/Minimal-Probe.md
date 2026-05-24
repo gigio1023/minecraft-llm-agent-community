@@ -52,9 +52,9 @@ The minimal probe is the substrate for later work on:
 
 - role pressure;
 - shared/private memory;
-- per-agent action skill ownership;
+- per-actor action skill ownership;
 - bounded action skill evolution;
-- multi-bot coordination;
+- multi-actor coordination;
 - human-in-the-loop social play.
 
 Those later layers should not be forced into the runtime before the runtime can
@@ -64,7 +64,7 @@ reliably handle boring competence.
 
 - persona richness as a content target;
 - long-run autonomy as a product target;
-- large society behavior before single-bot competence is trustworthy.
+- large society behavior before single-actor competence is trustworthy.
 
 ## Canonical Spec
 

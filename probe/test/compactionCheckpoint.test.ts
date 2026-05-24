@@ -21,7 +21,7 @@ function makeParts(count: number): CanonicalTranscriptPart[] {
 }
 
 const baseSummary: CompactionCheckpointSummary = {
-  overallMission: "Bootstrap NPC society",
+  overallMission: "Bootstrap actor society",
   agents: [
     {
       agentId: "npc_a",
@@ -57,7 +57,7 @@ test("compaction checkpoint preserves recent tail and compact summary", () => {
   assert.equal(checkpoint.createdAtTurn, 20);
   assert.equal(checkpoint.recentTail.length, 12, "should keep last 12 parts as tail");
   assert.equal(checkpoint.recentTail[0].turn, 9, "tail should start from part 9");
-  assert.equal(checkpoint.summary.overallMission, "Bootstrap NPC society");
+  assert.equal(checkpoint.summary.overallMission, "Bootstrap actor society");
 });
 
 test("compaction checkpoint produces a transcript part for canonical replay", () => {
@@ -83,11 +83,11 @@ test("reconstruction from checkpoint provides summary plus recent parts", () => 
   });
 
   const { checkpointSummary, recentParts } = reconstructFromCheckpoint(checkpoint);
-  assert.equal(checkpointSummary.overallMission, "Bootstrap NPC society");
+  assert.equal(checkpointSummary.overallMission, "Bootstrap actor society");
   assert.equal(recentParts.length, 12);
 
   // Mutation isolation
   checkpointSummary.overallMission = "mutated";
   const fresh = reconstructFromCheckpoint(checkpoint);
-  assert.equal(fresh.checkpointSummary.overallMission, "Bootstrap NPC society");
+  assert.equal(fresh.checkpointSummary.overallMission, "Bootstrap actor society");
 });

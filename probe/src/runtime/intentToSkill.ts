@@ -110,6 +110,7 @@ export function compileActionSkillCandidates({
     }));
 }
 
+/** Maps intent/lifecycle/role to primitive allowlist; reused by social-cycle context assembly. */
 export function compileAllowedPrimitiveIds({
   intentKind,
   roleId,

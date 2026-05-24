@@ -86,6 +86,26 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     liveProbe: "bun run probe:skill -- --actor npc_b --skill mineCobblestone --max-actions 8 --init-actor-workspace baseline --no-dashboard"
   },
   {
+    skillId: "placeCraftingTable",
+    primitiveIds: ["observe", "place_block", "wait"],
+    evidence: [
+      "crafting_table is selected from inventory when no explicit item is supplied",
+      "place_block equips the table item and calls Mineflayer placeBlock with an adjacent support block",
+      "target world block is re-read and verified as crafting_table"
+    ],
+    protectedBy: ["test/placeBlock.test.ts", "test/socialCycleExecution.test.ts"]
+  },
+  {
+    skillId: "buildBasicShelter",
+    primitiveIds: ["observe", "build_pattern", "remember"],
+    evidence: [
+      "starter shelter blueprint expands to bounded wall and roof coordinates",
+      "build_pattern records per-cell placement evidence",
+      "shelter verifier re-reads current world blocks for wall, roof, floor support, and clear interior evidence"
+    ],
+    protectedBy: ["test/buildPattern.test.ts", "test/socialCycleExecution.test.ts"]
+  },
+  {
     skillId: "inspectSharedChest",
     primitiveIds: ["observe", "inspect_chest", "wait"],
     evidence: [

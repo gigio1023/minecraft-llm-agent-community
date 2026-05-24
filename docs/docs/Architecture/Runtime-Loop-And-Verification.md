@@ -13,7 +13,7 @@ This project is not a Voyager-style single-agent marathon. It is a
 speed-bounded social simulation seed.
 
 Actors do not need hard realtime, but they must remain observable and responsive
-enough that one NPC's critic, reflection, action-skill generation, or repair loop
+enough that one actor's critic, reflection, action-skill generation, or repair loop
 does not block the shared world.
 
 ## Hot Path Contract

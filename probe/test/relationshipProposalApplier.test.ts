@@ -4,7 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { applyReviewerRelationshipEventProposals } from "../src/reviewer/relationshipProposalApplier.js";
+import {
+  applyCycleJudgmentRelationshipEventProposals,
+  applyReviewerRelationshipEventProposals
+} from "../src/reviewer/relationshipProposalApplier.js";
 import {
   readRelationshipEdge,
   writeRelationshipEdge
@@ -179,6 +182,56 @@ test("relationship proposal idempotence survives truncated recent event windows"
       0
     );
     assert.deepEqual(after.recent_events.map((event) => event.id), edge.recent_events.map((event) => event.id));
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("cycle judgment relationship proposals accept actor-relative evidence refs", async () => {
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `relationship-cycle-relative-${process.pid}-${Date.now()}`
+  );
+
+  try {
+    await writeActorFiles(rootDir, ["npc_a", "npc_b"]);
+    const evidencePath = await writeActorEvidenceRecord(rootDir, {
+      schema: "actor-evidence/v1",
+      evidence_id: "cycle-0001-say",
+      actor_id: "npc_b",
+      category: "tool_attempt",
+      created_at: "2026-05-21T00:00:00.000Z",
+      turn_id: "cycle-0001-action-01"
+    });
+    const actorRelativeEvidenceRef = path.relative(path.join(rootDir, "npc_b"), evidencePath);
+
+    const result = await applyCycleJudgmentRelationshipEventProposals(rootDir, {
+      schema: "cycle-judgment/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "g1",
+      outcome: "socially_resolved",
+      what_happened: "npc_b helped unblock npc_a",
+      why_it_mattered_for_life_goal: "Trust changed through runtime evidence",
+      verifier_status: "not_applicable",
+      evidence_refs: [actorRelativeEvidenceRef],
+      memory_writes: [],
+      relationship_event_proposals: [
+        {
+          target_actor_id: "npc_a",
+          kind: "helped",
+          evidence_refs: [actorRelativeEvidenceRef]
+        }
+      ],
+      next_goal_pressure: []
+    });
+
+    const edge = await readRelationshipEdge(rootDir, "npc_a", "npc_b");
+
+    assert.equal(result[0]?.status, "applied");
+    assert.equal(edge.recent_events[0]?.kind, "helped_unblock_task");
+    assert.deepEqual(edge.recent_events[0]?.evidence_refs, [evidencePath]);
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

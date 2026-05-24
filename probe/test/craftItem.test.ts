@@ -103,16 +103,24 @@ test("craftItem blocks when inventory evidence is unavailable", async () => {
   assert.deepEqual(bot.craftCalls, []);
 });
 
-test("craftItem rejects unknown item names before calling Mineflayer craft", async () => {
+test("craftItem blocks unknown item names before calling Mineflayer craft", async () => {
   const bot = createCraftBot();
 
-  await assert.rejects(() => craftItem({ bot, itemName: "diamond_saddle" }), /Unknown craft item/);
+  assert.deepEqual(await craftItem({ bot, itemName: "diamond_saddle" }), {
+    status: "blocked",
+    itemName: "diamond_saddle",
+    reason: "Unknown craft item: diamond_saddle"
+  });
   assert.deepEqual(bot.craftCalls, []);
 });
 
-test("craftItem rejects known items without available recipes", async () => {
+test("craftItem blocks known items without available recipes", async () => {
   const bot = createCraftBot({ recipeNames: [] });
 
-  await assert.rejects(() => craftItem({ bot, itemName: "crafting_table" }), /No craftable recipe/);
+  assert.deepEqual(await craftItem({ bot, itemName: "crafting_table" }), {
+    status: "blocked",
+    itemName: "crafting_table",
+    reason: "No craftable inventory recipe found for crafting_table"
+  });
   assert.deepEqual(bot.craftCalls, []);
 });

@@ -31,7 +31,7 @@ const DEFAULT_TIMEOUT_MS = 5_000;
  *
  * These are deliberately shorter than a full probe run. A primitive that cannot
  * finish or report cancellation inside its slot should leave an explicit timeout
- * artifact instead of making the whole agent loop look like it stalled.
+ * artifact instead of making the whole runtime loop look like it stalled.
  */
 const DEFAULT_TIMEOUT_POLICY: ActionTimeoutPolicy = {
   defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
@@ -45,6 +45,8 @@ const DEFAULT_TIMEOUT_POLICY: ActionTimeoutPolicy = {
     mine_block: 20_000,
     craft_item: 5_000,
     craft_with_table: 6_000,
+    place_block: 8_000,
+    build_pattern: 90_000,
     inspect_chest: 3_000,
     deposit_shared: 4_000,
     withdraw_shared: 4_000,

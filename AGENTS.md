@@ -2,8 +2,8 @@
 
 ## Current Direction
 
-This repository is a rebuild staging area for a headless Minecraft agent-loop
-runtime.
+This repository is a rebuild staging area for a headless Minecraft runtime
+loop.
 
 Do not revive the old Voyager-style architecture as the active path.
 
@@ -13,43 +13,96 @@ simulation seed.
 
 Immediate target:
 
-- one bot that can perform boring gameplay tasks end-to-end;
+- one actor, backed by one Mineflayer bot, that can perform boring gameplay
+  tasks end-to-end;
 - transcript and runtime artifacts that explain success, failure, stall, and reconnect;
 - reconnect/session lifecycle that stays truthful when explicitly in scope;
-- architecture support for per-agent action skill ownership and later bounded
+- architecture support for per-actor action skill ownership and later bounded
   action skill evolution.
 
 North star:
 
-- a social simulation seed with role pressure, action skill ownership, memory,
-  and later human-in-the-loop social play.
+- actors, represented by Mineflayer bots, with role pressure, action skill
+  ownership, memory, and later human-in-the-loop social play.
 
 Not current delivery targets:
 
 - persona richness as a content goal;
 - long-run autonomy as a product goal;
-- large multi-bot society behavior before single-bot competence is trustworthy.
+- large multi-actor society behavior before single-actor competence is trustworthy.
+
+## Project Identity vs External References
+
+External Minecraft-agent and LLM-agent papers are references, not product specs.
+Do not copy Voyager, MineDojo, ReAct, Reflexion, Generative Agents, SayCan,
+SWE-agent, or similar architectures as the active goal.
+
+This project is not a race-to-diamond, fastest-tech-tree, benchmark-maximization,
+or generic long-horizon autonomy project. Minecraft is the experimental substrate;
+the product direction is a Soul-grounded social simulation seed.
+
+When `soul.md` or an ActorSoul artifact defines an actor, treat it as the actor's
+identity seed. Short-, mid-, and long-term goals should be derived under that
+Soul/LifeGoal frame, with social pressure, memory, relationships, role pressure,
+shared/private inventory, obligations, trust, conflict, and settlement state in
+view. Gameplay progress matters because it creates real pressure and evidence
+for social life, not because the top-level objective is to optimize a Minecraft
+benchmark.
+
+Use external references by translating their mechanisms into this project:
+
+- skill-library papers imply evidence-backed, actor-owned action skill promotion,
+  not raw eval loops or global skill reuse detached from the actor;
+- curriculum papers imply bounded goal pressure and capability scaffolding, not a
+  universal benchmark objective;
+- reasoning/action papers imply CycleGoal -> ActionIntent -> evidence ->
+  CycleJudgment loops, not unconstrained chain-of-thought as authority;
+- memory/reflection papers imply artifact-grounded memory and review, not
+  reflection text that can claim world progress;
+- affordance/interface papers imply better runtime primitives, gates, and context
+  packets, not broader provider authority.
+
+When analyzing literature, always state both:
+
+1. what the reference teaches mechanically; and
+2. how that mechanism should be adapted to Soul-grounded Minecraft social
+   simulation in this repo.
+
+If a recommendation would make the actor ignore Soul/LifeGoal continuity,
+relationships, or social consequences in favor of generic task completion, reject
+or reframe it.
 
 ## Canonical Docs
 
 Read these first:
 
 1. `SPEC.md`
-2. `docs/docs/Agent-Search-Index.md`
-3. `docs/docs/Terminology.md`
-4. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
-5. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-6. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-7. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
-8. `docs/docs/Architecture/Implementation-Workstreams.md`
-9. `docs/docs/Architecture/Action-Skill-Verification.md`
-10. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
-11. `docs/docs/Architecture/Minimal-Probe.md`
-12. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-13. `docs/docs/Setup/Headless-Server.md`
-14. `docs/docs/Setup/Provider-Setup.md`
+2. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+3. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+4. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+5. `docs/docs/Specification/Reference-Adaptation-Guide.md`
+6. `docs/docs/Documentation-Map.md`
+7. `docs/docs/Agent-Search-Index.md`
+8. `docs/docs/Terminology.md`
+9. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+10. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+11. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+12. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+13. `docs/docs/Architecture/Implementation-Workstreams.md`
+14. `docs/docs/Architecture/Action-Skill-Verification.md`
+15. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+16. `docs/docs/Architecture/Minimal-Probe.md`
+17. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+18. `docs/docs/Setup/Headless-Server.md`
+19. `docs/docs/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
+
+`SPEC.md` and `docs/docs/Specification/*` are long-term spec files. Editing them
+changes product direction, so do not modify them during routine implementation
+work unless the user explicitly approves a spec update in the current turn. Put
+dated implementation status, command output, and volatile evidence in handoff or
+audit docs instead.
 
 ## Terminology
 
@@ -59,6 +112,68 @@ Treat `SPEC.md` as the canonical rebuild spec.
   validate, execute, verify, and record. Conversation-like actions are action
   skills when they run through the game runtime.
 - Do not use bare `skill` in active guidance when the meaning could be confused.
+- `docs/docs/Terminology.md` is normative. New docs, code comments, prompts,
+  report labels, and agent guides must follow it.
+- If existing code or docs conflict with `Terminology.md`, either update them or
+  add an explicit legacy-identifier mapping in `Terminology.md`. Do not spread
+  outdated wording into new surfaces.
+- Avoid AI-slop wording listed in `Terminology.md`, such as "AI brain",
+  "magic", "vibes", "smart NPC", broad "autonomous" claims, ambiguous "skill",
+  and "persona" as active architecture. Use concrete runtime, Minecraft, and
+  schema-backed terms instead.
+
+## Platform-Sensitive Execution
+
+This repo moves between Apple Silicon macOS and Linux ARM. Before running or
+changing platform-sensitive setup, server, dependency, or native-binary paths,
+check the current platform.
+
+Useful checks:
+
+```bash
+uname -s
+uname -m
+node -p "process.platform + '/' + process.arch"
+docker info
+```
+
+Platform-sensitive work includes Docker/Compose, Podman, Colima, OrbStack,
+`DOCKER_HOST`, native dependencies, binary downloads, Java/Minecraft server
+startup, file watchers, shell startup files, executable permissions, browser or
+device auth flows, exposed ports, and commands that assume `darwin`, `linux`,
+`arm64`, `aarch64`, `x64`, or `amd64`.
+
+Do not assume the host has the same Docker socket, package manager behavior, or
+native binary shape as the other ARM platform. If platform setup blocks a run,
+record it as an environment blocker with the exact command and platform, not as
+actor behavior or action skill failure.
+
+## User Communication Rules
+
+Default to kind, context-rich communication with the user.
+
+The user should be able to understand the agent's intent, work performed,
+reasoning, results, and remaining uncertainty without needing to infer hidden
+context. Do not hide assumptions, repo-specific implications, or important
+tradeoffs inside terse summaries.
+
+When reporting non-trivial work, include:
+
+- what you changed or inspected;
+- why that work was necessary;
+- what evidence or command output supports the result;
+- what remains blocked, risky, stale, or intentionally deferred;
+- what terminology or architecture rule shaped the decision.
+
+Avoid the anti-pattern of returning only a compressed final outcome when the
+user needs enough context to review, learn, challenge, or extend the work. Keep
+small answers small, but do not omit material context for architecture,
+debugging, testing, provider/auth, platform-sensitive setup, or documentation
+governance work.
+
+Use the user's language when practical. For this repo, Korean explanations are
+often appropriate, but keep code identifiers, commands, file paths, schema names,
+and canonical terminology exact.
 
 ## Search Index
 
@@ -69,6 +184,13 @@ Important search tokens:
 - `MINECRAFT_AGENT_LOOP_MIGRATION`
 - `HEADLESS_MINEFLAYER_PROBE`
 - `MINECRAFT_GAMEPLAY_MODEL`
+- `SPEC_GOVERNANCE`
+- `DOCUMENTATION_MAP`
+- `TERMINOLOGY`
+- `SOUL_GROUNDED_SOCIAL_SIMULATION`
+- `RUNTIME_EVIDENCE_ACTION_SKILLS`
+- `ENGINEERING_GOVERNANCE_TESTING`
+- `REFERENCE_ADAPTATION_GUIDE`
 - `SKILL_VILLAGE_FAILURE`
 - `NO_VOYAGER_EVAL_LOOP`
 - `NO_MANUAL_CLIENT_GATE`
@@ -83,7 +205,7 @@ Important search tokens:
 - `ACTION_SKILL_VERIFICATION`
 - `CURRENT_HANDOFF_NEXT_WORK`
 - `GENERATED_ACTION_SKILL_LEGACY_STORE`
-- `PER_NPC_ASYNC_REVIEWER`
+- `PER_ACTOR_ASYNC_REVIEWER`
 - `IMPLEMENTATION_WORKSTREAMS`
 - `ACTION_SKILL`
 - `AGENT_SKILL`
@@ -94,7 +216,14 @@ Important search tokens:
 - The first meaningful proof is not a big society. It is boring competence plus
   strong observability.
 - Keep implementation aggressively simple. Prefer small, named modules over large files.
+- Keep architecture extensible by making ownership boundaries explicit, not by
+  adding general-purpose abstractions early. Prefer small typed modules with
+  clear contracts that can grow later without turning the current runtime into a
+  framework.
 - If a TypeScript file becomes large, split it by responsibility before adding more behavior.
+- Split files before adding new behavior when a module starts mixing concerns
+  such as CLI parsing, provider calls, runtime orchestration, session lifecycle,
+  artifact persistence, and gameplay execution.
 - Keep functions small and single-purpose.
 - Avoid runner files that mix config, provider calls, reconnect, transcript,
   persistence, and gameplay execution in one place.
@@ -102,7 +231,7 @@ Important search tokens:
   - `gameplay/` for progression, curriculum, primitives, seed action skills,
     verification;
   - `runtime/` for loop, actions, session, and orchestration;
-  - `memory/` and `runtime/state/` for agent and runtime state;
+  - `memory/` and `runtime/state/` for actor and runtime state;
   - `skills/` for seed/generated action skill ownership and execution;
   - `provider/` for model calls and tracing;
   - `transcript/` for transcript and artifact persistence.
@@ -125,6 +254,10 @@ Important search tokens:
 - Actor workspace is the source of truth for actor-owned action skill state.
 - Treat `build/generated-skills` as legacy exploratory output, not as active or
   candidate actor-owned action skill memory.
+- Prefer structured domain models, typed records, discriminated unions, schemas,
+  and validators over ad hoc dictionary blobs. Runtime state, action evidence,
+  actor memory, provider packets, relationship pressure, and verifier results
+  should be machine-auditable and hard to misread.
 - Keep tests small and Detroit-style. Use them to protect real owned behavior,
   not to simulate a fake feeling of coverage.
 - Live transcript is the primary evidence of runtime value.
@@ -140,9 +273,9 @@ practice.
 - Use `/** ... */` documentation comments for exported APIs, cross-module
   contracts, and code a caller needs to understand. Use `//` comments for local
   implementation notes.
-- Comments should explain why a runtime boundary exists, what invariant is being
-  protected, what failure mode is being rejected, or what Minecraft/Mineflayer
-  behavior is non-obvious.
+- Comments should explain intent, background, why a runtime boundary exists,
+  what invariant is being protected, what failure mode is being rejected, or
+  what Minecraft/Mineflayer behavior is non-obvious.
 - For gameplay code, prioritize comments around verification, timeout,
   cancellation, reconnect/session freshness, fake-progress rejection, actor
   workspace initialization, action skill ownership, and transcript semantics.
@@ -161,6 +294,11 @@ practice.
 - Configuration comments should explain non-obvious defaults, auth boundaries,
   artifact locations, and destructive-vs-non-destructive behavior. Do not label
   obvious scalar defaults.
+- Prefer TSDoc `@remarks` for invariants that must survive refactors (for example,
+  “WorldEvent is pressure, not LifeGoal”). Use `@see` to link architecture docs
+  when a module implements a written contract.
+- Keep JSDoc tags sparse: `@param` only when the name is not self-explanatory;
+  avoid `@returns` on obvious `Promise<void>` helpers.
 
 Reference anchors:
 
@@ -178,20 +316,106 @@ Reference anchors:
 ## Testing Rules
 
 - Keep tests aggressively small, direct, and Detroit-style.
+- Tests should exercise real owned behavior through the smallest practical
+  public boundary, with minimal mocking and no broad harnesses that can pass
+  while the runtime contract is broken.
 - Prefer tests that prove one important owned behavior or regression.
 - Use tests to reject fake success and hidden dependencies.
 - Do not add broad mocks or snapshot-heavy suites.
 - If a test would still pass after the real logic was broken, rewrite or delete it.
 - Do not add elaborate tests for persona richness or long-run autonomy yet.
+- Unit tests protect narrow regressions, but live implementation runs with
+  truthful reports, helper events, verifier output, and actor artifacts are the
+  primary evidence for runtime value.
 
 ## Documentation Rules
 
-- Keep `SPEC.md`, `README.md`, `docs/docs/intro.md`, and
+- Keep `SPEC.md`, `README.md`, `docs/docs/intro.md`,
+  `docs/docs/Documentation-Map.md`, `docs/docs/Terminology.md`, and
   `docs/docs/Agent-Search-Index.md` aligned.
+- When adding or changing project vocabulary, update `docs/docs/Terminology.md`
+  first, then update affected docs/code comments/prompts to match it.
 - If a plan becomes historical rather than active, mark it clearly as archived or
   deprecated instead of leaving it ambiguous.
 - Prefer one canonical definition doc over several drifting ones.
 - Never use absolute local paths in committed docs.
+
+## Default LLM Planner (Codegen)
+
+For **Mineflayer TypeScript codegen** (long-objective / direct-generated planner),
+do **not** use Gemini Native Audio Dialog as the primary path. Recorded verdict:
+`docs/docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
+
+Use:
+
+- **REST `text-genai`** (`gemini-2.5-flash` via `@google/genai`) — current working
+  path; `--force-path text-genai` on long-objective CLI, or
+- **Gemini OpenAI-compatible Chat Completions** (OpenAI SDK + same `system`/`user`
+  message shape) — evaluate via `probe/scripts/experimentGeminiOpenAiCompatMatrix.ts`.
+
+Native Audio Dialog (`live-transcription`) remains in the repo for dialog/smoke
+only: text in, audio out, **transcription-only** readback. It is not reliable for
+`export async function run(ctx)` generation.
+
+Codegen-friendly defaults (override in ignored `.env`):
+
+```text
+GEMINI_PLANNER_PRIMARY=text-genai
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription
+```
+
+Implementation:
+
+- `probe/src/provider/gemini/nativeAudioDialog.ts`
+- `callGeminiLivePlanner()` prefers `live-transcription` first
+- Long-objective planning goes through `ObjectivePhasePlannerPort`
+  (`probe/src/provider/planner/`) — Gemini, OpenAI Codex, or explicit
+  `builtin-planner`
+- When LLM output is empty, blocked, or rejected, the runner falls back to
+  **builtin phase source**: repo-authored `export async function run(ctx)` templates
+  in `builtinPhaseSources.ts`. This is **not** loading an existing seed action skill
+  from the gameplay registry; it is the same *execution shape* as a generated
+  program, but checked in per phase.
+- CLI `--provider deterministic` is kept as an alias for `--provider builtin-planner`
+
+Do not treat optional Gemini smoke CLIs as the main validation loop. They are
+shallow wiring checks only.
+
+## Testing Priority
+
+Prefer **real implementation runs** with truthful artifacts over smoke-only
+proof:
+
+1. Run the actual command (`probe:long-objective`, `probe:objective`, etc.).
+2. Read the report JSON, actor workspace provider snapshots, helper events, and
+   verifier output.
+3. Feed failures back into substrate or prompt fixes.
+
+Smoke tests (`probe:gemini-live-smoke`, `probe:gemini-native-audio-dialog-smoke`)
+are allowed only as quick optional wiring checks. They do not replace Minecraft
+current-run verification.
+
+## Social Cycle Runtime (Soul / LifeGoal)
+
+Use `probe:social-cycle` for the Soul/LifeGoal/CycleGoal vertical slice. This path
+uses **OpenAI API** (`OPENAI_API_KEY` in repo-local `.env`), not
+`openai-codex` / `build/provider-auth/openai-codex-auth.json`.
+
+```bash
+cd probe
+OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+  --actor npc_b \
+  --provider openai-api \
+  --cycles 2 \
+  --max-actions-per-cycle 3 \
+  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --no-dashboard
+```
+
+`deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
+Do not use `probe:long-objective` as the social-life runtime.
+
+Canonical plan: `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
 
 ## Auth Rule
 
