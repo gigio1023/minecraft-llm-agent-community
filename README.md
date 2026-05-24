@@ -2,9 +2,10 @@
 
 <img src="assets/cover-image.png" alt="Cover Image" width="60%">
 
-Headless Minecraft agent-loop runtime research.
+Headless Minecraft runtime-loop research for a Soul-grounded social simulation
+seed.
 
-This repository is not currently trying to ship a full NPC society.
+This repository is not currently trying to ship a full multi-actor society.
 It is rebuilding a small, bounded, observable runtime whose near-term proof is a
 single-actor social-life simulation seed.
 
@@ -21,14 +22,15 @@ Short-term product:
 - real end-to-end progress on boring gameplay tasks;
 - strong observability through transcript and runtime artifacts;
 - truthful reconnect/session lifecycle evidence when reconnect is in scope;
-- architecture space for per-agent action skill ownership and later action
+- architecture space for per-actor action skill ownership and later action
   skill evolution.
 
 Long-term north star:
 
 - a social simulation seed in Minecraft;
-- bots with role pressure, memory, action skill ownership, and eventually richer
-  social interaction with each other and a human player.
+- actors, represented by Mineflayer bots, with role pressure, memory, action
+  skill ownership, and eventually richer social interaction with each other and
+  a human player.
 
 Not current goals:
 
@@ -37,6 +39,39 @@ Not current goals:
 - long-run autonomy as a product deliverable;
 - a Voyager clone;
 - pretending partial animation is the same thing as competence.
+
+## Current Runtime Shape
+
+```mermaid
+flowchart TD
+  Soul["ActorSoul / soul.md"]
+  LifeGoal["ActorLifeGoal"]
+  Pressure["WorldEvent, role, relationship, memory, inventory, settlement pressure"]
+  Context["social-cycle-context/v1"]
+  CycleGoal["CycleGoal"]
+  Intent["ActionIntent"]
+  Gate["runtime gate: actor-owned action skills + allowed primitives"]
+  Execute["Mineflayer primitive or action-skill bundle"]
+  Verify["runtime verifier + action-skill postcondition"]
+  Artifacts["transcript, evidence, provider snapshots, report"]
+  Memory["actor workspace memory and CycleJudgment"]
+
+  Soul --> Context
+  LifeGoal --> Context
+  Pressure --> Context
+  Context --> CycleGoal
+  CycleGoal --> Intent
+  Intent --> Gate
+  Gate --> Execute
+  Execute --> Verify
+  Verify --> Artifacts
+  Artifacts --> Memory
+  Memory --> Context
+```
+
+The provider proposes goals and actions. The runtime owns Minecraft truth:
+validation, execution, timeout, cancellation, verification, transcript, and
+artifact persistence.
 
 ## What Success Looks Like
 
@@ -55,6 +90,36 @@ It is this:
 - the runtime is small enough to refactor without guesswork;
 - later social simulation work can build on top without starting over again.
 
+## Current Evidence Baseline
+
+The current action-skill baseline is 14 implemented seed action skills with
+fresh current-run live matrix proof:
+
+```text
+matrix_summary verdict=passed passed=14 failed=0 error=0 total=14/14
+matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment_blocked=0
+```
+
+The active social-cycle implementation now carries a runtime-owned
+`settlement-state/v1` packet and `settlement-checklist/v1` report fields. Those
+fields summarize inventory, shared storage, known table/chest/shelter positions,
+recent blockers, available action skills, missing primitive blockers, memory
+reuse, and checklist progress. They are evidence packets, not provider claims.
+
+```mermaid
+flowchart LR
+  Matrix["14/14 action-skill matrix"]
+  Settlement["settlement-state/v1"]
+  Postconditions["action-skill postconditions"]
+  SocialReport["social-cycle report"]
+  Audit["report audit"]
+
+  Matrix --> Postconditions
+  Postconditions --> Settlement
+  Settlement --> SocialReport
+  SocialReport --> Audit
+```
+
 ## Core Principles
 
 - no raw JavaScript `eval` gameplay loop;
@@ -65,17 +130,41 @@ It is this:
 - live transcript is the primary behavior evidence;
 - social simulation should emerge from Minecraft task pressure, not persona text alone.
 
+## Docker And ARM Platform Notes
+
+This branch is actively used on Apple Silicon macOS and Linux ARM. Platform
+setup is part of the runtime evidence story because Docker socket state,
+container engine choice, native binaries, and Java/Minecraft server behavior can
+otherwise be misdiagnosed as agent failure.
+
+On the current Linux ARM setup, use official Docker Engine rather than Podman
+compatibility shims:
+
+```bash
+docker --version
+docker compose version
+docker info
+```
+
+If `docker info` fails from an existing shell after installation, refresh group
+membership with `newgrp docker` or reconnect the shell.
+
 ## Canonical Documents
 
 Read these first:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `docs/docs/Agent-Search-Index.md`
-4. `docs/docs/Terminology.md`
-5. `docs/docs/Architecture/Minimal-Probe.md`
-6. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-7. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+3. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+4. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+5. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+6. `docs/docs/Specification/Reference-Adaptation-Guide.md`
+7. `docs/docs/Documentation-Map.md`
+8. `docs/docs/Agent-Search-Index.md`
+9. `docs/docs/Terminology.md`
+10. `docs/docs/Architecture/Minimal-Probe.md`
+11. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+12. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 
 Historical plans and research still exist in `docs/docs/Plans/` and
 `docs/docs/Research/`, but not every older plan is still an active implementation
@@ -85,7 +174,7 @@ instruction.
 
 ### Requirements
 
-- Docker / Docker Compose
+- Docker Engine and Docker Compose plugin
 - Bun 1.3+
 - Node.js 22+ for docs builds
 
@@ -179,10 +268,34 @@ Primary evidence should come from:
 | `docs/` | Search index, architecture docs, setup guides, research, and plans. |
 | `build/provider-auth/` | Ignored local provider auth storage. |
 
+```mermaid
+flowchart TB
+  Spec["SPEC.md"]
+  Agents["AGENTS.md"]
+  DocsSpec["docs/docs/Specification/*"]
+  Arch["docs/docs/Architecture/*"]
+  Runtime["probe/src/runtime/*"]
+  Provider["probe/src/provider/*"]
+  Tools["probe/src/tools/*"]
+  Tests["probe/test/*"]
+
+  Spec --> DocsSpec
+  Spec --> Agents
+  DocsSpec --> Arch
+  Arch --> Runtime
+  Runtime --> Provider
+  Runtime --> Tools
+  Runtime --> Tests
+```
+
 ## Documentation Status
 
 - `SPEC.md` is the canonical rebuild spec.
 - `AGENTS.md` is the canonical repo guidance for agents.
+- `docs/docs/Documentation-Map.md` classifies docs as active spec, active
+  architecture, current state, supporting track, or historical context.
+- `docs/docs/Terminology.md` is the normative vocabulary for docs, comments,
+  prompts, and report labels.
 - `docs/docs/Architecture/Minimal-Probe.md` describes the active current-phase goal.
 - `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
   runtime success from actor soul, life goal, and cycle-goal authority.

@@ -9,7 +9,7 @@ the current runtime surface.
 
 The goal is still not to finish every historical plan. The active goal is to keep
 actor workspace, action skill lifecycle, hot-path evidence, provider snapshots,
-relationship pressure, and per-NPC async reviewers coherent without blocking
+relationship pressure, and per-actor async reviewers coherent without blocking
 gameplay turns.
 
 ## Delivered Runtime Surface
@@ -22,7 +22,7 @@ The current implementation now includes:
 4. shutdown and archive path for legacy `build/generated-skills` output;
 5. actor-scoped evidence files;
 6. provider input snapshots for LLM-backed gameplay and dialogue paths;
-7. per-NPC reviewer output schema, queue, store, CLI, and provider adapter;
+7. per-actor reviewer output schema, queue, store, CLI, and provider adapter;
 8. bounded recipe trial evidence, promotion, supersession, and retirement
    helpers;
 9. phase-one active action-skill gate for provider gameplay proposals;
@@ -54,7 +54,7 @@ As of the first implementation pass:
   turn/tool attempt plus failed verification and fake-progress rejection in the
   deterministic runtime loop.
 - Worker E landed the per-actor reviewer output schema, actor-scoped review
-  writer, immutable review job queue, deterministic per-NPC runner, and
+  writer, immutable review job queue, deterministic per-actor runner, and
   `review:actors` CLI. Deterministic fake-progress/verification-failure
   reviews write draft candidate proposals; an opt-in `openai-codex` reviewer
   adapter can provide bounded findings and proposal hints.
@@ -89,13 +89,13 @@ paths as they are added, harden reviewer prompts/scoring with real run data, and
 convert any still-needed skill-village generated-code behavior into bounded
 recipes.
 
-## Current Workstream: Autonomous Micro Objectives
+## Supporting Workstream: Autonomous Micro Objectives
 
 Search token: `AUTONOMOUS_OBJECTIVE_EVALUATION`.
 
-The next active slice is objective-level automated evaluation. It should reuse
-the existing action-skill probe and runtime transcript surfaces instead of
-creating a second Mineflayer runtime.
+This is a supporting objective-level evidence track. It should reuse the
+existing action-skill probe and runtime transcript surfaces instead of creating a
+second Mineflayer runtime. It does not replace Soul/LifeGoal cycle authority.
 
 Deliverables:
 
@@ -112,13 +112,13 @@ provider explanation, terminal `remember`, or historical actor workspace
 evidence. It may use historical transcripts only in an explicit audit mode, and
 that mode must not be labeled fresh current-run proof.
 
-## Current Workstream: Direct Generated Action Skills
+## Supporting Workstream: Direct Generated Action Skills
 
 Search token: `DIRECT_GENERATED_ACTION_SKILLS`.
 
-Direct generated TypeScript is now an accepted propagation path for objective
-work. The implementation should separate it from legacy `build/generated-skills`
-dumping:
+Direct generated TypeScript is an accepted supporting propagation path for
+objective work. The implementation should separate it from legacy
+`build/generated-skills` dumping:
 
 - generated code is tied to an objective and actor;
 - execution uses a light guard and timeout;
@@ -159,15 +159,15 @@ Implemented status:
 - direct trials enqueue per-actor reviewer jobs as immutable
   `action_skill_direct_trial` refs for later cleanup into bounded candidates.
 
-## Current Workstream: Typed Minecraft Memory Substrate
+## Supporting Workstream: Typed Minecraft Memory Substrate
 
 Search token: `MINECRAFT_MEMORY_CURRENT_LLM_RESEARCH`.
 
-This workstream supports freer LLM action, not a more scripted planner. The
-runtime gives the model a dense Mineflayer helper surface and lets direct
-generated TypeScript attempt a meaningful objective. The memory layer then
-records what actually happened in a shape that can be retrieved, reviewed, and
-promoted later.
+This workstream supports bounded actor-owned direct trials, not a more scripted
+planner and not unconstrained autonomy. The runtime gives the model a dense
+Mineflayer helper surface when a direct-trial path is selected. The memory layer
+then records what actually happened in a shape that can be retrieved, reviewed,
+and promoted later.
 
 Implemented status:
 
@@ -301,7 +301,7 @@ Deliverables:
 - no reviewer calls from hot path;
 - immutable evidence refs that Worker E can consume later.
 
-## Worker E: Per-NPC Async Reviewers
+## Worker E: Per-Actor Async Reviewers
 
 Exclusive ownership:
 
@@ -372,7 +372,7 @@ Do not implement these in this slice unless the user re-approves:
 - full arbitrary checkpoint resume;
 - long-term memory compaction workers;
 - global critic ownership;
-- broad multi-bot society mechanics;
+- broad multi-actor society mechanics;
 - deep reconnect refactor unless required by hot-path evidence work.
 
 Loose legacy `build/generated-skills` execution is still deferred. Direct

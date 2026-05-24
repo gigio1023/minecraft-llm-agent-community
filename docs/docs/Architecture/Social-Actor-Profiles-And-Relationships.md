@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Social Actor Profiles And Relationships
 
-This page defines the active design direction for NPC personas, goals, and
+This page defines the active design direction for actor profiles, goals, and
 relationships.
 
 The repo should not model relationships as vague `0..1` floats. Use explicit
@@ -30,7 +30,7 @@ evidence.
 
 ## Actor Profile
 
-Each NPC should have one canonical profile that feeds gameplay, dialogue, actor
+Each actor should have one canonical profile that feeds gameplay, dialogue, actor
 workspace initialization, and provider context.
 
 ```ts

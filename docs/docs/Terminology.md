@@ -4,28 +4,66 @@ sidebar_position: 3
 
 # Terminology
 
-Use these terms consistently across this repo.
+Search token: `TERMINOLOGY`.
 
-## Core Rule
+Status: normative vocabulary for docs, code comments, prompts, reports, and
+agent guides.
 
-Do not use bare **skill** in active repo guidance when the meaning could be
-confused. Prefer **agent skill** or **action skill**.
+Use these terms consistently across this repo. Prefer concrete engineering,
+Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
 
-Bare **skill** is allowed only when:
+## Core Rules
 
-- quoting an external repository or historical artifact name;
-- referring to a legacy path, file, JSON field, or project name that still
-  contains `skill`;
-- using a generic English phrase where it cannot be confused with the two
-  project-specific terms.
+1. Do not introduce a new project term when an existing term here fits.
+2. Do not use bare **skill** in active guidance when the meaning could be
+   confused. Use **agent skill** or **action skill**.
+3. Use **actor** for the runtime identity and **bot** only for the Mineflayer
+   client object.
+4. Use **provider** for model-facing code. Do not call it the actor's brain,
+   mind, consciousness, or intelligence.
+5. Use **ActorSoul**, **LifeGoal**, **WorldEvent**, **CycleGoal**,
+   **ActionIntent**, and **CycleJudgment** only for schema-backed social-cycle
+   records.
+6. If existing code, schemas, paths, or historical artifacts contain older
+   vocabulary, treat that wording as a legacy identifier. Do not copy it into
+   new prose unless you also name the canonical term.
+
+## Platform-Sensitive Work
+
+**Platform-sensitive work** is any command or code path whose behavior can differ
+between Apple Silicon macOS and Linux ARM.
+
+Check the current platform before platform-sensitive commands. Useful checks:
+
+```bash
+uname -s
+uname -m
+node -p "process.platform + '/' + process.arch"
+docker info
+```
+
+Platform-sensitive areas include:
+
+- Docker, Docker Compose, Podman, Colima, OrbStack, daemon sockets, and
+  `DOCKER_HOST`;
+- native package installs, binary downloads, CPU-specific dependencies, and
+  postinstall scripts;
+- file watchers, shell startup files, executable permissions, and absolute path
+  assumptions;
+- browser/device auth flows and ignored provider auth stores;
+- Minecraft server startup, Java runtime availability, exposed ports, and RCON;
+- commands that assume `darwin`, `linux`, `arm64`, `aarch64`, `x64`, or `amd64`.
+
+When a platform issue blocks a run, call it an **environment blocker** and record
+the exact command and platform. Do not report it as runtime behavior failure.
 
 ## Agent Skill
 
 An **agent skill** is a Codex/Claude-style capability under `.agents/skills/`.
-It is built or maintained with `skill-builder` and documented by a `SKILL.md`.
+It is documented by a `SKILL.md` file.
 
 Agent skills help coding agents work on this repository. They are not Minecraft
-runtime behavior and must not be described as bot gameplay abilities.
+runtime behavior and must not be described as actor gameplay abilities.
 
 Example:
 
@@ -36,50 +74,65 @@ Example:
 An **action skill** is a Minecraft/Mineflayer-based bundled behavior that the
 game runtime can validate, execute, verify, and record.
 
-Action skills include boring gameplay behaviors such as collecting logs, crafting
-steps, storage interaction, movement routines, and conversation-like actions.
-They are runtime capabilities, not Codex/Claude agent skills.
+Action skills include bounded gameplay behaviors such as collecting logs,
+crafting steps, storage interaction, movement routines, block placement, shelter
+building, and conversation-like actions when those actions run through the game
+runtime.
 
-Phase 1 action skills must stay bounded:
+Action skills must be:
 
-- composed from trusted runtime primitives;
+- composed from runtime primitives or reviewed helper surfaces;
 - validated before execution;
-- executed through the action runner;
-- verified from world, inventory, container, position, or transcript evidence;
-- recorded in live transcript and runtime artifacts.
+- bounded by runtime timeout/cancellation rules;
+- verified from world, inventory, container, position, chat, or transcript
+  evidence;
+- recorded in transcript and runtime artifacts.
 
 ### Seed Action Skill
 
 A **seed action skill** is a hand-authored action skill definition in the runtime
 registry. It can be `implemented` or `planned`.
 
-Only `implemented` seed action skills should be offered to the provider as active
+Only `implemented` seed action skills should be offered to providers as active
 runtime candidates.
 
 ### Candidate Action Skill
 
-A **candidate action skill** is a proposed action skill that has not yet been
-promoted. It should be represented as a bounded recipe over trusted runtime
-primitives, not arbitrary generated code.
+A **candidate action skill** is a proposed action skill that has not been
+promoted. It should be represented as a bounded recipe or reviewed trial record,
+not trusted as active runtime behavior.
+
+### Direct-Generated Action Skill Trial
+
+A **direct-generated action skill trial** is an opt-in generated TypeScript
+program for a bounded objective. It is a supporting propagation path, not product
+goal authority and not proof by itself.
+
+It can become useful only through helper-call evidence, verifier output, actor
+workspace ownership, and reviewer cleanup.
 
 ### Generated Action Skill Bundle
 
-A **generated action skill bundle** is a possible future implementation artifact.
-It is not a Phase 1 hot-loop behavior. If introduced later, it should be treated
-like a reviewed patch, not automatically imported runtime output.
+A **generated action skill bundle** is a generated code artifact. In this repo,
+generated bundles must be treated as trial or candidate material unless they are
+explicitly promoted through runtime-owned gates.
+
+Anything still emitted under `build/generated-skills` is legacy exploratory
+output, not active actor-owned action skill memory.
 
 ## Runtime Primitive
 
 A **runtime primitive** is a small, trusted game operation such as `observe`,
-`collect_logs`, `craft_item`, `move_to`, `say`, or `wait`.
+`collect_logs`, `craft_item`, `move_to`, `say`, `wait`, `place_block`, or
+`build_pattern`.
 
 Runtime primitives are lower-level than action skills. Action skills compose
 runtime primitives.
 
 ## Tool Call
 
-A **tool call** is the provider's structured request to run one runtime primitive
-with validated arguments.
+A **tool call** is a provider's structured request to run one runtime primitive
+or action skill with validated arguments.
 
 The provider proposes tool calls. The runtime validates and executes them.
 
@@ -93,11 +146,17 @@ runtime primitives and action skills.
 
 Use these terms with this distinction:
 
+- **actor**: the runtime identity that owns role, ActorSoul, LifeGoal, memory,
+  action skill records, evidence, relationships, and transcript records;
 - **bot**: the Mineflayer client object connected to Minecraft;
-- **actor**: the runtime identity that owns role, memory, action skill metadata,
-  and transcript records;
 - **NPC**: the user-facing game character concept represented by an actor and a
   bot.
+
+Prefer **actor** in architecture docs, runtime records, code comments, and tests
+when discussing ownership or decisions. Use **bot** when discussing Mineflayer
+connection state, entity position, inventory API, pathfinder, or socket
+lifecycle. Use **NPC** for user-facing game presentation or broad product
+language.
 
 ## Actor Workspace
 
@@ -105,7 +164,8 @@ An **actor workspace** is the per-actor filesystem home for runtime-owned actor
 state.
 
 It is where one actor's memory artifacts, runtime evidence, action skill
-library, candidate action skills, and retired action skills are organized.
+library, candidate action skills, retired action skills, provider snapshots,
+reviews, goals, and relationship artifacts are organized.
 
 Initializing an actor workspace means restoring the expected initial structure
 and baseline index files. It does not mean deleting actor artifacts. Existing
@@ -114,9 +174,25 @@ survive initialization unless a separate explicit cleanup operation is requested
 
 ## Provider
 
-A **provider** is the model-facing component that proposes the next valid tool
-call or short utterance. The provider does not own reality, verification,
-timeouts, or action skill promotion.
+A **provider** is the model-facing component that proposes a CycleGoal,
+ActionIntent, CycleJudgment, tool call, or short utterance.
+
+The provider does not own reality, verification, timeouts, runtime permissions,
+or action skill promotion.
+
+Preferred terms:
+
+- **cycle goal provider** for the component that proposes StrategicGoal and
+  CycleGoal records;
+- **action planner provider** for the component that proposes ActionIntent
+  records;
+- **cycle judgment provider** for the component that summarizes evidence into a
+  CycleJudgment.
+
+Legacy identifiers such as `goal_mind`, `GoalMind`, and
+`socialGoalMindProvider` may appear in existing schemas, file names, and
+compatibility code. New prose should say **cycle goal provider** and mention the
+legacy identifier only when needed for migration or file lookup.
 
 ## Transcript
 
@@ -127,13 +203,14 @@ runtime marked progress, failure, timeout, or stall.
 ## Runtime Artifact
 
 A **runtime artifact** is a structured file written by a run, such as canonical
-evidence JSON, checkpoint-ready state, debug timeline, or final status summary.
+evidence JSON, checkpoint-ready state, debug timeline, provider snapshot, report,
+or final status summary.
 
 ## Evidence
 
 **Evidence** means observed game/runtime facts, not optimistic text. Valid
 evidence includes inventory deltas, block deltas, position distance, container
-state, transcript records, runtime artifacts, Langfuse traces, and
+state, chat records, transcript records, runtime artifacts, Langfuse traces, and
 human-visible behavior notes.
 
 ## Human-Visible Behavior Note
@@ -146,19 +223,149 @@ space". Treat it as first-class evidence, especially when artifacts are thin.
 
 A **Langfuse trace** is provider-observability evidence. It can explain model
 inputs/outputs and timing, but it does not prove Minecraft progress unless it
-matches world, inventory, position, container, or transcript evidence.
+matches world, inventory, position, container, chat, transcript, or artifact
+evidence.
+
+## Actor Profile
+
+An **actor profile** is structured public/static actor metadata such as display
+name, role, responsibility, risk posture, and speech style.
+
+Do not use **persona** as the primary active architecture term. Persona is
+allowed only for:
+
+- external paper names or claims;
+- legacy mutual-dialogue files and tests that already use `persona`;
+- explicit warnings such as "persona text alone is not social simulation".
+
+## ActorSoul
+
+**ActorSoul** is the schema-backed identity seed compiled from `soul.md` or an
+actor profile. It is not decorative flavor text.
+
+ActorSoul should influence what the actor notices, how obligations are weighed,
+which memories are salient, and how LifeGoal/CycleGoal records are framed.
+
+## LifeGoal
+
+A **LifeGoal** is a durable actor-owned direction derived under ActorSoul. It is
+not replaced directly by a user request or WorldEvent.
+
+## WorldEvent
+
+A **WorldEvent** is external world/social pressure recorded for an actor. It can
+influence CycleGoal selection, but it is not the actor's LifeGoal.
+
+## StrategicGoal
+
+A **StrategicGoal** is a medium-horizon interpretation of ActorSoul, LifeGoal,
+memory, world state, and social pressure.
+
+## CycleGoal
+
+A **CycleGoal** is the bounded current-cycle objective. It must be specific
+enough for action selection and verification.
+
+## ActionIntent
+
+An **ActionIntent** is one proposed action for the current CycleGoal. It can
+target a runtime primitive or an owned action skill, subject to runtime gates.
+
+## CycleJudgment
+
+A **CycleJudgment** is the evidence-backed interpretation of what happened in a
+cycle. It should cite runtime evidence and describe what matters for the next
+cycle.
+
+## Role
+
+A **role** is a runtime permission and pressure contract, such as `gatherer`,
+`crafter`, `settler`, or `quartermaster`.
+
+Roles are not persona flavor. They gate which primitives and action skills an
+actor can use.
+
+## Relationship
+
+A **relationship** is structured actor-to-actor state derived from evidence,
+review, and guarded runtime updates. Do not model relationship pressure as vague
+personality floats when an enum or typed relationship event is available.
+
+## Shared Storage
+
+**Shared storage** is the runtime-visible resource store, currently represented
+by chest access and ledger artifacts. Shared storage is social state because it
+changes what other actors can observe and use.
+
+## Settlement State
+
+**Settlement state** is structured world/social context such as shared stations,
+storage contents, shelter/safety status, known resource locations, pending
+obligations, and remembered blockers.
 
 ## Agent Guide
 
 An **agent guide** is repo guidance for coding agents, such as `AGENTS.md`,
 `GEMINI.md`, or an agent skill reference. Agent guides must point back to this
-terminology when discussing action skills or agent skills.
+terminology when discussing action skills, agent skills, actor state, or
+platform-sensitive work.
+
+## Agent Loop
+
+The **agent loop** or **runtime loop** is the engineering loop that observes
+state, requests a provider proposal, validates it, executes through runtime
+gates, verifies evidence, and writes artifacts.
+
+Use **runtime loop** in new architecture prose unless you are referring to an
+existing file, schema, CLI, or historical phrase that says `agent-loop`.
+
+## Environment Blocker
+
+An **environment blocker** is a setup/runtime host problem that prevents a test
+or run from reaching the behavior under evaluation.
+
+Examples:
+
+- Docker daemon unavailable;
+- Colima/OrbStack/Podman socket mismatch;
+- Linux ARM package missing;
+- macOS-only command on Linux;
+- provider auth store missing;
+- Minecraft server port unavailable.
+
+Do not classify environment blockers as actor failure or action skill failure.
+
+## Avoid These Expressions
+
+These expressions are vague, AI-slop-prone, or misleading in this repo. Use the
+replacement terms instead.
+
+| Avoid | Use Instead |
+|-------|-------------|
+| AI brain, LLM brain, agent mind | provider, cycle goal provider, action planner provider |
+| Goal Mind in new prose | cycle goal provider |
+| magic, magical, just works | runtime contract, helper, preflight, verifier |
+| vibes, feels right, believable vibes | evidence, artifact, transcript, role pressure |
+| smart NPC, intelligent NPC | actor, provider-backed actor, Mineflayer bot |
+| autonomous as a broad claim | bounded runtime execution, current-run objective, social-cycle run |
+| learned skill | promoted action skill, candidate action skill, direct-generated action skill trial |
+| skill when ambiguous | agent skill or action skill |
+| persona as active architecture | ActorSoul, actor profile, LifeGoal |
+| hallucinated progress | unsupported provider claim or success without evidence |
+| stuck | stalled, blocked, timed out, repeated no-progress attempt |
+| gotcha/gatch | edge case, failure mode, invariant, guardrail |
+| NPC did X when discussing runtime state | actor proposed X, bot executed X, runtime verified X |
+
+Historical quotes and external paper names may keep original wording, but active
+repo guidance should translate them into the canonical terms above.
 
 ## Current Runtime Direction
 
 The active path is:
 
 - headless Mineflayer runtime;
-- no Voyager-style eval loop;
-- bounded action loop;
-- live transcript first.
+- Soul/LifeGoal-grounded actor continuity;
+- bounded runtime loop;
+- actor-owned action skill state;
+- runtime-owned verification;
+- live transcript and runtime artifacts first.

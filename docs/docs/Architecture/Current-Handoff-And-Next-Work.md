@@ -92,7 +92,7 @@ Important files:
 - `probe/test/actionSkillProposalLifecycle.test.ts`;
 - `probe/test/generatedActionSkillPolicy.test.ts`.
 
-### Per-NPC Async Reviewer
+### Per-Actor Async Reviewer
 
 Reviewer work is actor-scoped and asynchronous. Reviewers can propose findings,
 candidate action skill repairs, and guarded relationship events, but they do not
@@ -124,6 +124,9 @@ Implemented surfaces:
 - actor-provider-context builder;
 - active action skills, candidates, recent evidence, reviews, memory, profile,
   goals, and relationship pressure in provider-facing context;
+- social-cycle context now includes a runtime-owned `settlement_state` packet
+  with inventory counts, checklist progress, blocker histogram, active action
+  skill ids, shared storage summary, and known table/chest/shelter status;
 - provider input snapshots with credential-shaped key rejection;
 - provider output store added for dashboard/review visibility;
 - opt-in `openai-codex` gameplay provider path.
@@ -153,6 +156,9 @@ Implemented surfaces:
 - directional relationship ledger;
 - relationship-derived pressure injected into provider context without granting
   new tools.
+- social-cycle `relationship_event_proposals` now route through a guarded
+  applier path and are recorded as applied, already applied, or rejected instead
+  of mutating relationship edges directly from provider text.
 
 Important files:
 
@@ -173,9 +179,9 @@ Implemented surfaces:
 
 - fixed Minecraft host port support;
 - managed local live-smoke server readiness;
-- spawn height offset to avoid burying NPCs;
+- spawn height offset to avoid burying Mineflayer bots;
 - seed/spawn configuration updates;
-- CLI options for NPC count, bot ids, max actions, observation window, actor
+- CLI options for actor count, bot ids, max actions, observation window, actor
   workspace initialization, and dashboard port;
 - Bun/Elysia dashboard server that starts with the CLI by default;
 - dashboard assets and Minecraft-style item icons;
@@ -215,6 +221,13 @@ Implemented surfaces:
 - shared chest deposit rejects zero-item transfers before ledger writes;
 - implemented seed action skills must declare primitive ownership, evidence,
   and test coverage.
+- the social-cycle executor now records action-skill postcondition results for
+  owned action skill bundles, so `placeCraftingTable`, `buildBasicShelter`,
+  storage, crafting, gathering, and social handoff bundles cannot rely on
+  primitive status alone when a checklist-facing verifier is available.
+- the `move_to` social-cycle exception is represented as a bounded movement
+  policy with a 12-block cap and measured movement evidence instead of an
+  invisible active-action-skill gate bypass.
 
 Important files:
 
@@ -222,6 +235,8 @@ Important files:
 - `probe/src/tools/moveTo.ts`;
 - `probe/src/tools/craftItem.ts`;
 - `probe/src/tools/sharedChest.ts`;
+- `probe/src/runtime/settlement/settlementState.ts`;
+- `probe/src/runtime/socialCycleExecution.ts`;
 - `probe/src/gameplay/seedSkills/verificationContracts.ts`;
 - `probe/test/actionSkillVerificationContracts.test.ts`;
 - `probe/test/collectLogs.test.ts`;
@@ -274,7 +289,7 @@ warning. It does not fail the build.
 
 ## Important Live Evidence So Far
 
-The 3-NPC smoke run with `--max-actions 20` produced a partial result:
+The 3-actor/3-bot smoke run with `--max-actions 20` produced a partial result:
 
 - `npc_a` and `npc_c` succeeded;
 - `npc_b` failed `collect_4_logs`;
@@ -516,20 +531,31 @@ Checked-in protection:
 
 Latest live matrix:
 
-After OrbStack/Docker was restored on 2026-05-22, the current implemented
-action-skill matrix passed:
+The previously recorded 2026-05-22 live matrix covered 12 action skills. That
+baseline is now stale because the implemented surface has grown to 14 action
+skills. The current baseline was refreshed on 2026-05-24:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json
+bun run probe:skills -- \
+  --actor npc_b \
+  --max-actions 8 \
+  --init-actor-workspace baseline \
+  --continue-on-failure \
+  --report ../tmp/action-skill-live-matrix-docker-engine-before-commit.json
 ```
 
 ```text
-matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12
-matrix_status_counts passed=12 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0
+matrix_summary verdict=passed passed=14 failed=0 error=0 total=14/14
+matrix_status_counts passed=14 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
+
+This latest matrix was rerun after replacing the Podman compatibility path with
+official Docker Engine on Ubuntu 24.04 arm64. The managed Minecraft server path,
+RCON fixtures, runtime loop, and all 14 action-skill postconditions passed under
+that Docker Engine setup.
 
 Fresh current-run transcripts were produced for:
 
@@ -537,8 +563,10 @@ Fresh current-run transcripts were produced for:
 - `collectLogs`;
 - `craftPlanksAndSticks`;
 - `craftCraftingTable`;
+- `placeCraftingTable`;
 - `craftWoodenPickaxe`;
 - `mineCobblestone`;
+- `buildBasicShelter`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;
@@ -562,7 +590,7 @@ Implementation notes from this pass:
   observation, while storage probes clear nearby stale chests before placing the
   managed fixture.
 
-Latest deterministic 3-NPC smoke:
+Latest deterministic 3-actor/3-bot smoke:
 
 ```bash
 cd probe
@@ -611,15 +639,17 @@ bun run probe:skills -- --audit-existing-evidence --report ../tmp/action-skill-e
 Current result:
 
 ```text
-matrix_summary verdict=incomplete passed=12 failed=0 error=0 total=12/12
-matrix_status_counts passed=12 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=0 historical_transcript=12 missing=0 environment_blocked=0
+matrix_summary verdict=incomplete passed=14 failed=0 error=0 total=14/14
+matrix_status_counts passed=14 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=0 historical_transcript=14 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
 This is intentionally still `incomplete`: existing-evidence audit mode only
 re-scores saved raw transcripts as historical proof. It must not replace a
-fresh live matrix after code changes.
+fresh live matrix after code changes. The command can exit non-zero because
+`incomplete` is the correct verdict for historical-only evidence, even when all
+14 historical transcripts re-score as passed.
 
 ### P0: Live `collect_logs` Validation
 
@@ -820,8 +850,8 @@ Check:
 4. Feed live failures into actor evidence and reviewer queue.
 5. Add crafting-table primitive.
 6. Expand mining only after the narrow `mineCobblestone` proof remains stable.
-7. Only then re-run broader 3-NPC LLM gameplay as a product smoke, not as a
+7. Only then re-run broader 3-actor/3-bot LLM gameplay as a product smoke, not as a
    substitute for per-action-skill proof.
 
 This keeps the project focused on real action skill competence before scaling
-back to broader NPC behavior.
+back to broader actor behavior.

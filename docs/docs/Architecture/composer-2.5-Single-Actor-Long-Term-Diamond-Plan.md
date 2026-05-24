@@ -10,10 +10,14 @@ Implementation plan derived from
 [Single-Actor-Long-Term-Diamond-Handoff](./Single-Actor-Long-Term-Diamond-Handoff.md).
 Execution agent: Cursor Composer 2.5.
 
+Status: supporting evaluation plan. This is not the active social-life runtime,
+and it must not be used to make diamond acquisition the project goal.
+
 ## Goal
 
-Prove one actor can **complete or truthfully progress** through a dependency ladder
-with **current-run Minecraft evidence**, not provider text.
+When this harness is explicitly selected, prove one actor can **complete or
+truthfully progress** through a dependency ladder with **current-run Minecraft
+evidence**, not provider text.
 
 Target ladder (phases, not one opaque objective):
 
@@ -126,7 +130,9 @@ cd docs && npm run build
 
 ## Non-goals (this PR)
 
-- NPC relationship proof
+- Replacing the Soul/LifeGoal social-cycle runtime
+- Making diamond acquisition the top-level product metric
+- actor relationship proof
 - Multi-actor scheduling
 - Committing `build/provider-auth/*`, `tmp/*`, or evidence
 

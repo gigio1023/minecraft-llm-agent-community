@@ -325,16 +325,16 @@ type CycleJudgment = {
 ```mermaid
 flowchart TB
   Soul["ActorSoul / soul.md<br/>identity, role, values, needs, boundaries"] --> LifeGoal["Persistent LifeGoal<br/>social-life direction, not a task"]
-  LifeGoal --> GoalMind["LLM Goal Mind<br/>choose StrategicGoal and CycleGoal"]
+  LifeGoal --> CycleGoalProvider["LLM CycleGoal Provider<br/>choose StrategicGoal and CycleGoal"]
   World["World State<br/>position, time, danger, resources, inventory"] --> Context["Context Assembler<br/>always inject Soul + LifeGoal"]
   Events["WorldEvents<br/>environment, actor request, scenario, operator"] --> Context
   Memory["Actor memory<br/>episodic, social, procedural, beliefs"] --> Context
   Relations["Relationship ledger<br/>trust, obligation, friction, dependency"] --> Context
   Prev["Previous CycleJudgment<br/>last reason, result, blocker"] --> Context
   Skills["Owned Action Skills<br/>verified actor capabilities"] --> Context
-  Context --> GoalMind
-  GoalMind --> StrategicGoal["StrategicGoal<br/>multi-cycle direction such as diamond readiness"]
-  GoalMind --> CycleGoal["CycleGoal<br/>current cycle target"]
+  Context --> CycleGoalProvider
+  CycleGoalProvider --> StrategicGoal["StrategicGoal<br/>multi-cycle direction such as diamond readiness"]
+  CycleGoalProvider --> CycleGoal["CycleGoal<br/>current cycle target"]
   StrategicGoal --> CycleGoal
   CycleGoal --> ActionPlanner["LLM Action Planner<br/>lower goal into ActionIntent"]
   ActionPlanner --> Intent["ActionIntent<br/>action skill or primitive proposal"]
@@ -378,13 +378,13 @@ StrategicGoal이다.
 
 ## LLM Stage Inputs And Outputs
 
-### Stage 1 - Goal Mind
+### Stage 1 - CycleGoal Provider
 
-Goal Mind는 매 cycle ActorSoul과 LifeGoal을 항상 받는다. 이 stage의 output은
-실행 명령이 아니라 목표 판단이다.
+CycleGoal provider는 매 cycle ActorSoul과 LifeGoal을 항상 받는다. 이 stage의
+output은 실행 명령이 아니라 목표 판단이다.
 
 ```ts
-type GoalMindInput = {
+type CycleGoalProviderInput = {
   actor_soul: ActorSoul;
   life_goal: ActorLifeGoal;
   active_strategic_goals: StrategicGoal[];
@@ -401,7 +401,7 @@ type GoalMindInput = {
   };
 };
 
-type GoalMindOutput = {
+type CycleGoalProviderOutput = {
   strategic_goal_updates: StrategicGoalUpdate[];
   selected_cycle_goal: {
     summary: string;
@@ -492,7 +492,7 @@ type CycleJudgmentOutput = {
 
 | Path | Current authority | Why it misses the intent | Target authority |
 |---|---|---|---|
-| Live agent loop | `selectDeterministicTask()` chooses task; provider chooses primitive | actor is following repo ladder, not living from soul/memory | CycleGoalPlanner chooses current goal from soul, life goal, state, memory, relationships |
+| Live runtime loop | `selectDeterministicTask()` chooses task; provider chooses primitive | actor is following repo ladder, not living from soul/memory | CycleGoal provider chooses current goal from soul, life goal, state, memory, relationships |
 | Short objective | CLI objective registry or generated runner | external objective behaves like top-level task | operator/scenario input becomes pressure/event; LifeGoal remains actor-owned |
 | Long objective | fixed phase ladder plus generated/builtin `run(ctx)` | “passed” can mean builtin/helper chain worked | separate evaluation harness from social runtime; builtin opt-in only |
 
@@ -749,7 +749,7 @@ Success criteria:
 | Soul text becomes decorative persona | high | compile to structured ActorSoul and require fields in CycleGoal rationale |
 | CycleGoal planner over-calls LLM | medium | allow LLM-authored policy/rule selector after first plan |
 | Action skill execution hides agency | medium | require CycleGoal id, action skill id, verifier contract, helper metrics |
-| Social simulation outruns single-bot competence | high | keep first experiments boring and evidence-backed |
+| Social simulation outruns single-actor competence | high | keep first experiments boring and evidence-backed |
 | Memory pollution | medium | CycleJudgment schema separates observed, inferred, and failed outcomes |
 | Long objective path confuses the team | medium | label as evaluation harness and disable builtin in agency experiments |
 

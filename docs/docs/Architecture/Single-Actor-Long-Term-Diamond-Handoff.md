@@ -6,18 +6,22 @@ sidebar_position: 12
 
 Search token: `SINGLE_ACTOR_LONG_TERM_DIAMOND_HANDOFF`.
 
-This page replaces the previous next-step emphasis on relationship proof. The
-next implementation session should first answer a simpler and more important
-question:
+Status: supporting evaluation harness, not the active product direction.
+
+This page is retained as an opt-in dependency-chain evidence harness. It must
+not override `SPEC.md`, the Soul/LifeGoal social runtime, or the current
+single-actor social-cycle direction.
+
+When this harness is explicitly in scope, it answers a substrate question:
 
 ```text
 Can one actor repeatedly complete increasingly long Minecraft objectives with
 real current-run evidence?
 ```
 
-Social simulation comes after this. A society built from actors that cannot
-finish individual dependency chains will only produce noisy dialogue and
-misleading relationship events.
+That question is useful because social simulation needs real gameplay pressure,
+but it is not the product goal by itself. Diamond is a stress test for long
+dependency chains, not a north-star achievement.
 
 ## Target
 
@@ -43,15 +47,16 @@ The harness should support a progression ladder:
 Do not start from diamond as one huge opaque objective. Start with the ladder,
 then let the same architecture run longer.
 
-## Product Principle
+## Evaluation Principle
 
-The LLM should be freer. The runtime should be denser.
+Actor-owned direct trials may be expressive. The runtime must be denser.
 
 That means:
 
 - use direct generated TypeScript action skills as the fast action language;
 - expose high-level Mineflayer helpers that create evidence;
-- let the model plan, retry, and generate new code;
+- let the model plan, retry, and generate bounded trial code when this
+  evaluation path is deliberately selected;
 - keep Minecraft mechanics, action boundaries, timeouts, inventory checks,
   block checks, and verifier truth in runtime-owned helpers;
 - persist every attempt as actor workspace evidence and memory.
@@ -443,7 +448,7 @@ First acceptable result:
 
 ## Non-Goals
 
-- no NPC relationship proof yet;
+- no actor relationship proof yet;
 - no multi-actor scheduling yet;
 - no social dashboard before single-actor long objective dashboard;
 - no success from provider text;
@@ -461,7 +466,7 @@ You are working in /Users/naem1023/git/minecraft-llm-agent-community.
 Read AGENTS.md, SPEC.md, docs/docs/Agent-Search-Index.md, and especially
 docs/docs/Architecture/Single-Actor-Long-Term-Diamond-Handoff.md.
 
-The next priority is NOT NPC relationship proof. First prove one actor can
+The next priority is NOT actor relationship proof. First prove one actor can
 complete or truthfully progress through increasingly long Minecraft dependency
 chains. The target ladder is:
 1. craft_current_run_stone_axe_1

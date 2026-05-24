@@ -13,15 +13,22 @@ The canonical rebuild spec lives in the repo root at:
 Use that file as the source of truth for:
 
 - current product direction;
+- long-term spec governance;
+- Soul-grounded social simulation identity;
 - current rebuild scope;
 - non-negotiable runtime rules;
 - immediate implementation priority;
 - split architecture doc routing.
 
+Detailed long-term spec pages live under `../Specification/`.
+
 ## Current Architecture Summary
 
 The active architecture is defined by boundaries more than feature count:
 
+- **Soul-grounded social simulation**: Minecraft is the pressure/evidence
+  substrate for actors whose goals are derived from ActorSoul, LifeGoal, memory,
+  relationships, obligations, and settlement state.
 - **Runtime-owned truth**: model proposals are gated, executed, verified, and
   recorded by runtime code.
 - **Actor-local ownership**: each NPC owns its action skills, memory, evidence,
@@ -39,6 +46,8 @@ The active architecture is defined by boundaries more than feature count:
 ## Important Constraints
 
 - do not reintroduce raw gameplay `eval` loops;
+- do not reduce the project to race-to-diamond, fastest-tech-tree, or generic
+  Minecraft LLM benchmarking;
 - do not optimize for persona richness before competence exists;
 - do not optimize for long-run autonomy before short-run boring tasks are reliable;
 - do not put critic, reflection, or action-skill generation in the gameplay hot
@@ -62,18 +71,23 @@ driver of the next slice.
 ## Read Next
 
 1. `../../../../SPEC.md`
-2. `Runtime-Loop-And-Verification.md`
-3. `Transcript-And-Runtime-Artifacts.md`
-4. `Actor-Workspace-And-Action-Skill-Memory.md`
-5. `Async-Reviewer-Sidecars.md`
-6. `Implementation-Workstreams.md`
-7. `Bounded-Action-Skill-Creation.md`
-8. `Soul-Life-Goal-Runtime-Architecture.md`
-9. `composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
-10. `LLM-Context-And-Actor-Workspace.md`
-11. `Social-Actor-Profiles-And-Relationships.md`
-12. `../Setup/Headless-Server.md`
-13. `../Setup/Provider-Setup.md`
+2. `../Specification/Soul-Grounded-Social-Simulation.md`
+3. `../Specification/Runtime-Evidence-And-Action-Skills.md`
+4. `../Specification/Engineering-Governance-And-Testing.md`
+5. `../Specification/Reference-Adaptation-Guide.md`
+6. `../Documentation-Map.md`
+7. `Runtime-Loop-And-Verification.md`
+8. `Transcript-And-Runtime-Artifacts.md`
+9. `Actor-Workspace-And-Action-Skill-Memory.md`
+10. `Async-Reviewer-Sidecars.md`
+11. `Implementation-Workstreams.md`
+12. `Bounded-Action-Skill-Creation.md`
+13. `Soul-Life-Goal-Runtime-Architecture.md`
+14. `composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+15. `LLM-Context-And-Actor-Workspace.md`
+16. `Social-Actor-Profiles-And-Relationships.md`
+17. `../Setup/Headless-Server.md`
+18. `../Setup/Provider-Setup.md`
 
 ## Historical Note
 

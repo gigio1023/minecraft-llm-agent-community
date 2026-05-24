@@ -3,7 +3,7 @@
 Search token: `REAL_SERVER_SIMULATION_TEST_PLAN`
 
 This plan tests the runtime as a real Minecraft simulation: a managed server is
-running, Mineflayer bot actors connect to that server, actions mutate world
+running, Mineflayer bots connect to that server, actions mutate world
 state, and artifacts prove or reject progress.
 
 ## Goal
@@ -74,7 +74,7 @@ bun run server:stop
 | ID | Test | Provider | Actors | Required Proof |
 |----|------|----------|--------|----------------|
 | T0 | Tooling and server preflight | none | none | Docker ready, managed server ready |
-| T1 | Fresh live action skill contracts | deterministic | one bot | implemented action skills pass with current-run evidence |
+| T1 | Fresh live action skill contracts | deterministic | one actor/bot | implemented action skills pass with current-run evidence |
 | T2 | Live OpenAI social cycle | OpenAI API `gpt-5.4-mini` | one actor | real action attempt, evidence, judgment, memory, later-cycle context |
 | T3 | Multi-actor connection smoke | deterministic | two actors | both actors connect and produce causal transcript artifacts |
 | T4 | Live OpenAI social cycle under resource pressure | OpenAI API `gpt-5.4-mini` | one actor | attempts resource progression without fake pass |

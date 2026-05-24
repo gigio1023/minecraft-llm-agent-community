@@ -6,6 +6,11 @@ sidebar_position: 10
 
 Search token: `AUTONOMOUS_OBJECTIVE_EVALUATION`.
 
+Status: supporting evaluation/evidence-gate track. "Autonomous" here means a
+bounded current-run objective can execute without manual proof-reading. It does
+not mean open-ended agency, benchmark chasing, or a replacement for Soul/LifeGoal
+goal authority.
+
 Autonomous objective evaluation is the bridge between per-action-skill probes
 and larger social simulation. It asks a small Minecraft goal of the runtime and
 then checks whether the current run produced real world-state evidence.

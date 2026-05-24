@@ -231,18 +231,24 @@ be treated as delivered speech without runtime confirmation.
 Implemented seed action skills are indexed in
 `probe/src/gameplay/seedSkills/verificationContracts.ts`.
 
-Latest fresh live matrix proof was collected on 2026-05-22 after
-OrbStack/Docker was restored:
+Latest fresh live matrix proof was refreshed on 2026-05-24 after adding
+`placeCraftingTable` and `buildBasicShelter` to the implemented action-skill
+surface:
 
 ```bash
 cd probe
-bun run probe:skills -- --max-actions 8 --init-actor-workspace baseline --continue-on-failure --report ../tmp/action-skill-live-matrix-current-mine-cobblestone.json
+bun run probe:skills -- \
+  --actor npc_b \
+  --max-actions 8 \
+  --init-actor-workspace baseline \
+  --continue-on-failure \
+  --report ../tmp/action-skill-live-matrix-14-architecture-audit-after-fix.json
 ```
 
 ```text
-matrix_summary verdict=passed passed=12 failed=0 error=0 total=12/12
-matrix_status_counts passed=12 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
-matrix_scope_counts current_run=12 historical_transcript=0 missing=0 environment_blocked=0
+matrix_summary verdict=passed passed=14 failed=0 error=0 total=14/14
+matrix_status_counts passed=14 failed=0 error=0 pending_live_evidence=0 environment_blocked=0
+matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment_blocked=0
 matrix_evidence_gaps count=0
 ```
 
@@ -253,8 +259,10 @@ Mineflayer harness and their postcondition checks:
 - `collectLogs`;
 - `craftPlanksAndSticks`;
 - `craftCraftingTable`;
+- `placeCraftingTable`;
 - `craftWoodenPickaxe`;
 - `mineCobblestone`;
+- `buildBasicShelter`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;

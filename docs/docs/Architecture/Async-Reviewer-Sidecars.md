@@ -4,16 +4,16 @@ sidebar_position: 5
 
 # Async Reviewer Sidecars
 
-This document defines per-NPC reviewer sidecars.
+This document defines per-actor reviewer sidecars.
 
 ## Core Decision
 
-Every NPC should have its own asynchronous reviewer sidecar.
+Every actor should have its own asynchronous reviewer sidecar.
 
 A global reviewer can summarize cross-actor patterns, but it must not own actor
 memory, actor action-skill lifecycle, or actor-specific repair proposals.
 
-## Why Per-NPC
+## Why Per-Actor
 
 This project is a social simulation seed. Actor identity and actor memory matter.
 
@@ -24,7 +24,7 @@ between:
 - `npc_b` failed because its role pressure selected the wrong task;
 - all actors are failing because the shared seed primitive is wrong.
 
-Per-NPC reviewers keep repair ownership local while still allowing a later global
+Per-actor reviewers keep repair ownership local while still allowing a later global
 summary to detect shared patterns.
 
 ## Reviewer Input

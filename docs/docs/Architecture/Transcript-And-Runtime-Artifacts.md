@@ -17,7 +17,7 @@ Artifacts should answer:
 - what the runtime attempted;
 - what changed in the world, inventory, position, or container state;
 - why verification passed, failed, timed out, or stalled;
-- what a per-NPC reviewer should inspect next.
+- what a per-actor reviewer should inspect next.
 
 ## Primary Artifacts
 
@@ -27,7 +27,7 @@ Primary artifacts are:
 - canonical transcript parts;
 - actor workspace evidence files;
 - provider input snapshots;
-- per-NPC review notes;
+- per-actor review notes;
 - Langfuse traces when provider-backed paths are used.
 
 Screenshots or viewer evidence can supplement these, but they are not the source
@@ -112,7 +112,7 @@ Runtime transcript and actor evidence remain authoritative for Minecraft state.
 
 ## Reviewer Inputs
 
-Per-NPC reviewers should consume immutable artifacts only:
+Per-actor reviewers should consume immutable artifacts only:
 
 - transcript slices for the actor;
 - canonical transcript parts for the actor;

@@ -12,8 +12,15 @@ research without confusing archived plans for the active implementation path.
 | `MINECRAFT_AGENT_LOOP_MIGRATION` | Current bounded-runtime rebuild direction and non-negotiable scope | `SPEC.md`, `Architecture/Runtime-Loop-And-Verification.md`, `AGENTS.md` |
 | `HEADLESS_MINEFLAYER_PROBE` | Headless Mineflayer runtime on a local server; use `bun run --cwd probe server:ready` for a user-joinable Docker endpoint | `Setup/Headless-Server.md`, `Architecture/Minimal-Probe.md`, `Architecture/Runtime-Loop-And-Verification.md` |
 | `MINECRAFT_GAMEPLAY_MODEL` | Real boring gameplay competence before larger social goals | `Architecture/Runtime-Loop-And-Verification.md`, `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md` |
+| `SPEC_GOVERNANCE` | `SPEC.md` and split specification docs are long-term product contracts; edits require explicit user approval unless directly requested | `SPEC.md`, `Specification/Engineering-Governance-And-Testing.md`, `AGENTS.md` |
+| `DOCUMENTATION_MAP` | Authority order and active/supporting/historical classification for repo docs | `Documentation-Map.md`, `Agent-Search-Index.md`, `SPEC.md` |
+| `TERMINOLOGY` | Normative vocabulary for actor/bot/NPC, action skill/agent skill, social-cycle records, platform-sensitive work, and AI-slop wording to avoid | `Terminology.md`, `AGENTS.md`, `Documentation-Map.md` |
+| `SOUL_GROUNDED_SOCIAL_SIMULATION` | Minecraft is the pressure/evidence substrate for Soul/ActorSoul-grounded social simulation, not a generic benchmark objective | `SPEC.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
+| `RUNTIME_EVIDENCE_ACTION_SKILLS` | Runtime-owned truth, actor-owned action skills, verifier evidence, transcript artifacts, and settlement pressure state | `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Action-Skill-Verification.md` |
+| `ENGINEERING_GOVERNANCE_TESTING` | Small typed modules, structured domain models, high-signal comments, Detroit-style tests, and live-run evidence priority | `Specification/Engineering-Governance-And-Testing.md`, `AGENTS.md` |
+| `REFERENCE_ADAPTATION_GUIDE` | How to translate external papers into this repo without copying Voyager/benchmark/product goals | `Specification/Reference-Adaptation-Guide.md`, `SPEC.md`, `AGENTS.md` |
 | `HF_PAPER_SWEEP_VOYAGER_SUCCESSORS` | Hugging Face paper sweep over Voyager successors, Minecraft skill libraries, objective curricula, reviewer loops, and social simulation fit | `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`, `Architecture/Direct-Generated-Action-Skills.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
-| `AGENT_MEMORY_SYSTEM_LITERATURE_PLAN` | Literature-backed memory system plan for dense Mineflayer substrate with freer LLM autonomy | `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Direct-Generated-Action-Skills.md` |
+| `AGENT_MEMORY_SYSTEM_LITERATURE_PLAN` | Literature-backed memory system plan for dense Mineflayer substrate and bounded actor-owned action continuity | `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Direct-Generated-Action-Skills.md` |
 | `MINECRAFT_MEMORY_CURRENT_LLM_RESEARCH` | 2026-focused Minecraft and agent-memory research refresh read through the lens of current LLM capability | `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`, `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`, `Architecture/Direct-Generated-Action-Skills.md` |
 | `TYPED_ACTOR_MEMORY` | Actor-owned Minecraft memory schema, direct objective capture, symbolic retrieval, and provider context injection | `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md`, `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md` |
 | `SKILL_VILLAGE_FAILURE` | Why the prior village-style direction failed | `Research/2026-05-19-skill-village-failure-report.md` |
@@ -27,12 +34,12 @@ research without confusing archived plans for the active implementation path.
 | `SOCIAL_ACTOR_PROFILES` | Canonical actor profile, goal stack, and relationship enums for evidence-backed social behavior | `Architecture/Social-Actor-Profiles-And-Relationships.md`, `Architecture/LLM-Context-And-Actor-Workspace.md` |
 | `LIVE_TRANSCRIPT_FIRST` | Live transcript is the primary runtime evidence | `Architecture/Transcript-And-Runtime-Artifacts.md`, `AGENTS.md` |
 | `CHECKPOINT_READY_RUNTIME` | Phase 1 should be checkpoint-ready even before full arbitrary resume | `Architecture/Transcript-And-Runtime-Artifacts.md`, `SPEC.md` |
-| `MINIMAL_ACTION_SKILL_MEMORY_HOOK` | Add per-agent action skill ownership hook now, not full autonomous evolution | `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Terminology.md` |
+| `MINIMAL_ACTION_SKILL_MEMORY_HOOK` | Add per-actor action skill ownership hook now, not full autonomous evolution | `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Terminology.md` |
 | `BOUNDED_ACTION_SKILL_CREATION` | Evidence-backed cleanup path for generated or proposed action skills | `Architecture/Bounded-Action-Skill-Creation.md`, `SPEC.md`, `Terminology.md` |
 | `ACTIVE_ACTION_SKILL_GATE` | Runtime provider proposals execute only when backed by actor-owned active action skill records | `SPEC.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md` |
 | `ACTION_SKILL_VERIFICATION` | Implemented action skills must have Mineflayer boundary evidence and checked-in protection tests | `Architecture/Action-Skill-Verification.md`, `Architecture/Runtime-Loop-And-Verification.md`, `AGENTS.md` |
-| `AUTONOMOUS_OBJECTIVE_EVALUATION` | Small objective-level automated checks over current-run Minecraft evidence | `Architecture/Autonomous-Objective-Evaluation.md`, `SPEC.md`, `Architecture/Action-Skill-Verification.md` |
-| `DIRECT_GENERATED_ACTION_SKILLS` | TypeScript action skills generated for objectives and executed directly with light guards and current-run evidence | `Architecture/Direct-Generated-Action-Skills.md`, `SPEC.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
+| `AUTONOMOUS_OBJECTIVE_EVALUATION` | Supporting bounded objective evidence gates; evaluation track, not the top-level product direction | `Architecture/Autonomous-Objective-Evaluation.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Action-Skill-Verification.md` |
+| `DIRECT_GENERATED_ACTION_SKILLS` | Supporting actor-owned direct trial/propagation path; not goal authority and not proof without current-run evidence | `Architecture/Direct-Generated-Action-Skills.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
 | `SOUL_LIFE_GOAL_RUNTIME` | Actor soul, persistent life goal, cycle goal, and cycle judgment as the continuity layer for social simulation | `Architecture/Soul-Life-Goal-Runtime-Architecture.md`, `Architecture/Social-Actor-Profiles-And-Relationships.md`, `Architecture/Runtime-Loop-And-Verification.md` |
 | `ACTOR_SOUL_GOAL_LEDGER` | Durable actor-owned soul/life/cycle goal artifacts under actor workspace, inspired by Codex goal lifecycle but scoped to Minecraft actors | `Architecture/Soul-Life-Goal-Runtime-Architecture.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md` |
 | `SOCIAL_LIFE_CYCLE_GOAL` | Per-cycle goal selection from soul, memory, relationships, world state, and previous cycle judgment | `Architecture/Soul-Life-Goal-Runtime-Architecture.md`, `probe/src/npc/goals/goalStack.ts`, `probe/src/runtime/pressureIntent.ts` |
@@ -44,19 +51,20 @@ research without confusing archived plans for the active implementation path.
 | `OPENAI_API_GPT54_MINI_SOCIAL_RUNTIME` | Use OpenAI API from repo-root `.env` with default `gpt-5.4-mini` or explicit fallback for social CycleGoal/ActionIntent/CycleJudgment providers | `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`, `Setup/Provider-Setup.md`, `Setup/OpenAI-Tier3-Free-Usage.md` |
 | `OBJECTIVE_PHASE_EVIDENCE_GATES` | Coal, shelter, and similar exploration/propagation concepts run as objective phases or direct-generated trials behind runtime evidence gates | `SPEC.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md`, `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`, `Architecture/Direct-Generated-Action-Skills.md` |
 | `REAL_SERVER_SIMULATION_TEST_PLAN` | Live-server simulation test protocol for connected Mineflayer actors, OpenAI social cycles, action-skill evidence, and coal/shelter readiness gates | `Architecture/Real-Server-Simulation-Test-Plan.md`, `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`, `Setup/Headless-Server.md` |
+| `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT` | Current architecture explanation, implementation cross-check, external research synthesis, and next settlement-cycle gates | `Architecture/Current-Architecture-And-Implementation-Audit.md`, `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
 | `MINECRAFT_ENCYCLOPEDIA_RESEARCH_BRIEF` | Handoff prompt for building a versioned repo-local Minecraft knowledge layer instead of relying on stale LLM memory | `Knowledge/Minecraft-Encyclopedia-Research-Brief.md` |
 | `MINECRAFT_ACTION_SKILL_KNOWLEDGE` | Minecraft mechanics and data mapped into action skills, runtime primitives, and verifier evidence | `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`, `Architecture/Action-Skill-Verification.md`, `probe/src/gameplay/seedSkills/registry.ts` |
 | `VANILLA_MECHANICS_TO_VERIFIERS` | Converts vanilla item/block/recipe/tool mechanics into runtime-observable evidence contracts | `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`, `Architecture/Runtime-Loop-And-Verification.md` |
-| `SINGLE_ACTOR_LONG_TERM_DIAMOND_HANDOFF` | Evaluation handoff for proving one actor can complete or truthfully progress through long Minecraft dependency chains up to diamond | `Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`, `Architecture/composer-2.5-Single-Actor-Long-Term-Diamond-Plan.md`, `Architecture/Direct-Generated-Action-Skills.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
-| `COMPOSER_25_SINGLE_ACTOR_LONG_TERM_DIAMOND_PLAN` | Composer 2.5 implementation plan for long-objective harness, Gemini planner, and ladder gates | `Architecture/composer-2.5-Single-Actor-Long-Term-Diamond-Plan.md` |
+| `SINGLE_ACTOR_LONG_TERM_DIAMOND_HANDOFF` | Supporting opt-in dependency-chain evidence harness; diamond is not the active product goal | `Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`, `Architecture/composer-2.5-Single-Actor-Long-Term-Diamond-Plan.md`, `Architecture/Direct-Generated-Action-Skills.md`, `Architecture/Autonomous-Objective-Evaluation.md` |
+| `COMPOSER_25_SINGLE_ACTOR_LONG_TERM_DIAMOND_PLAN` | Supporting Composer 2.5 plan for the long-objective evaluation harness; not the social-life runtime | `Architecture/composer-2.5-Single-Actor-Long-Term-Diamond-Plan.md` |
 | `GEMINI_NATIVE_AUDIO_DIALOG_DEFAULT` | Native Audio Dialog legacy token; dialog/smoke only, not primary codegen | `docs/docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`, `Setup/Provider-Setup.md` |
 | `GEMINI_OPENAI_COMPAT_PLANNER` | OpenAI SDK → Gemini OpenAI-compat chat.completions for planner/codegen experiments | `probe/scripts/experimentGeminiOpenAiCompatMatrix.ts` |
 | `PLANNER_PROVIDER_MATRIX` | genai + OpenAI SDK + json_schema structured output matrix | `probe/scripts/experimentPlannerProviderMatrix.ts`, `tmp/planner-provider-matrix-report.json` |
 | `OPENAI_TIER3_FREE_USAGE` | OpenAI API (not Codex) free daily token pools for gpt-5.4-mini etc. | `docs/docs/Setup/OpenAI-Tier3-Free-Usage.md` |
-| `SOCIAL_SIMULATION_NEXT_GOAL_HANDOFF` | Next bounded implementation handoff for moving from single-actor competence to a tiny evidence-backed social exchange loop | `Architecture/Social-Simulation-Next-Goal-Handoff.md`, `SPEC.md`, `Architecture/Social-Actor-Profiles-And-Relationships.md` |
+| `SOCIAL_SIMULATION_NEXT_GOAL_HANDOFF` | Future multi-actor expansion handoff for moving from single-actor Soul/LifeGoal evidence to a tiny social exchange loop | `Architecture/Social-Simulation-Next-Goal-Handoff.md`, `SPEC.md`, `Architecture/Social-Actor-Profiles-And-Relationships.md` |
 | `CURRENT_HANDOFF_NEXT_WORK` | Current rebuild handoff, landed work, verified commands, live evidence, and next improvement order | `Architecture/Current-Handoff-And-Next-Work.md`, `SPEC.md`, `Architecture/Implementation-Workstreams.md` |
 | `GENERATED_ACTION_SKILL_LEGACY_STORE` | `build/generated-skills` is legacy debug output, not actor-owned candidate or active action skill memory | `SPEC.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`, `Architecture/Implementation-Workstreams.md` |
-| `PER_NPC_ASYNC_REVIEWER` | One async reviewer sidecar per NPC; global reviewer may summarize only | `Architecture/Async-Reviewer-Sidecars.md`, `Architecture/LLM-Context-And-Actor-Workspace.md`, `Architecture/Implementation-Workstreams.md` |
+| `PER_ACTOR_ASYNC_REVIEWER` | One async reviewer sidecar per actor; global reviewer may summarize only | `Architecture/Async-Reviewer-Sidecars.md`, `Architecture/LLM-Context-And-Actor-Workspace.md`, `Architecture/Implementation-Workstreams.md` |
 | `REVIEW_ACTORS_CLI` | Runs queued deterministic per-actor reviewer jobs without blocking runtime turns | `Architecture/Async-Reviewer-Sidecars.md`, `SPEC.md` |
 | `REVIEW_RELATIONSHIP_APPLIER` | Explicitly applies reviewer relationship event proposals through runtime-owned guards | `Architecture/Async-Reviewer-Sidecars.md`, `Architecture/Social-Actor-Profiles-And-Relationships.md`, `SPEC.md` |
 | `RELATIONSHIP_ACTION_PRESSURE` | Enum-derived relationship pressure exposed to provider context without granting tools | `Architecture/Social-Actor-Profiles-And-Relationships.md`, `Architecture/LLM-Context-And-Actor-Workspace.md`, `SPEC.md` |
@@ -75,35 +83,37 @@ For any onboarding developer or agent, read in this order:
 
 1. `SPEC.md`
 2. `../../AGENTS.md`
-3. `Terminology.md`
-4. `intro.md`
-5. `Architecture/Minimal-Probe.md`
-6. `Architecture/Runtime-Loop-And-Verification.md`
-7. `Architecture/Transcript-And-Runtime-Artifacts.md`
-8. `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-9. `Architecture/Async-Reviewer-Sidecars.md`
-10. `Architecture/Implementation-Workstreams.md`
-11. `Architecture/Action-Skill-Verification.md`
-12. `Architecture/Current-Handoff-And-Next-Work.md`
-13. `Architecture/Bounded-Action-Skill-Creation.md`
-14. `Architecture/Autonomous-Objective-Evaluation.md`
-15. `Architecture/Direct-Generated-Action-Skills.md`
-16. `Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-17. `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
-18. `Architecture/Real-Server-Simulation-Test-Plan.md`
-19. `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`
-20. `Architecture/LLM-Context-And-Actor-Workspace.md`
-21. `Architecture/Social-Actor-Profiles-And-Relationships.md`
-22. `Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`
-23. `Architecture/Social-Simulation-Next-Goal-Handoff.md`
-24. `Setup/Headless-Server.md`
-25. `Setup/Provider-Setup.md`
-26. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
-27. `Research/2026-05-19-skill-village-failure-report.md`
-28. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
-29. `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`
-30. `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`
-31. `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`
+3. `Specification/Soul-Grounded-Social-Simulation.md`
+4. `Specification/Runtime-Evidence-And-Action-Skills.md`
+5. `Specification/Engineering-Governance-And-Testing.md`
+6. `Specification/Reference-Adaptation-Guide.md`
+7. `Documentation-Map.md`
+8. `Terminology.md`
+9. `intro.md`
+10. `Architecture/Minimal-Probe.md`
+11. `Architecture/Runtime-Loop-And-Verification.md`
+12. `Architecture/Transcript-And-Runtime-Artifacts.md`
+13. `Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+14. `Architecture/Async-Reviewer-Sidecars.md`
+15. `Architecture/Implementation-Workstreams.md`
+16. `Architecture/Action-Skill-Verification.md`
+17. `Architecture/Current-Handoff-And-Next-Work.md`
+18. `Architecture/Bounded-Action-Skill-Creation.md`
+19. `Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+20. `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+21. `Architecture/Real-Server-Simulation-Test-Plan.md`
+22. `Architecture/Current-Architecture-And-Implementation-Audit.md`
+23. `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`
+24. `Architecture/LLM-Context-And-Actor-Workspace.md`
+25. `Architecture/Social-Actor-Profiles-And-Relationships.md`
+26. `Setup/Headless-Server.md`
+27. `Setup/Provider-Setup.md`
+28. `Research/2026-05-19-local-minecraft-agent-repo-analysis.md`
+29. `Research/2026-05-19-skill-village-failure-report.md`
+30. `Research/2026-05-19-minecraft-gameplay-and-voyager-seed-skills.md`
+31. `docs/research-archive/2026-05-23/hf-paper-sweep-voyager-successors.md`
+32. `docs/research-archive/2026-05-23/agent-memory-system-literature-and-plan.md`
+33. `docs/research-archive/2026-05-23/minecraft-memory-current-llm-research.md`
 
 ## Active vs Historical Docs
 
@@ -111,6 +121,11 @@ Treat these as active, project-defining documents:
 
 - `SPEC.md`
 - `AGENTS.md`
+- `Specification/Soul-Grounded-Social-Simulation.md`
+- `Specification/Runtime-Evidence-And-Action-Skills.md`
+- `Specification/Engineering-Governance-And-Testing.md`
+- `Specification/Reference-Adaptation-Guide.md`
+- `Documentation-Map.md`
 - `Terminology.md`
 - `intro.md`
 - `Architecture/Minimal-Probe.md`
@@ -122,18 +137,24 @@ Treat these as active, project-defining documents:
 - `Architecture/Action-Skill-Verification.md`
 - `Architecture/Current-Handoff-And-Next-Work.md`
 - `Architecture/Bounded-Action-Skill-Creation.md`
-- `Architecture/Autonomous-Objective-Evaluation.md`
-- `Architecture/Direct-Generated-Action-Skills.md`
 - `Architecture/Soul-Life-Goal-Runtime-Architecture.md`
 - `Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 - `Architecture/Real-Server-Simulation-Test-Plan.md`
+- `Architecture/Current-Architecture-And-Implementation-Audit.md`
 - `Knowledge/Minecraft-Encyclopedia-Research-Brief.md`
 - `Architecture/LLM-Context-And-Actor-Workspace.md`
 - `Architecture/Social-Actor-Profiles-And-Relationships.md`
-- `Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`
-- `Architecture/Social-Simulation-Next-Goal-Handoff.md`
 - `Setup/Headless-Server.md`
 - `Setup/Provider-Setup.md`
+
+Treat these as supporting evaluation, propagation, or handoff tracks subordinate
+to the Soul/LifeGoal social runtime:
+
+- `Architecture/Autonomous-Objective-Evaluation.md`
+- `Architecture/Direct-Generated-Action-Skills.md`
+- `Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`
+- `Architecture/composer-2.5-Single-Actor-Long-Term-Diamond-Plan.md`
+- `Architecture/Social-Simulation-Next-Goal-Handoff.md`
 
 Treat these as supporting research or historical context:
 

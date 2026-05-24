@@ -17,7 +17,7 @@ Status: handoff plan, 2026-05-23.
 
 Implement the first complete vertical slice of the Soul/LifeGoal/CycleGoal
 runtime. Do not implement a thin P0 that only writes files. Build the smallest
-end-to-end loop where an NPC can:
+end-to-end loop where an actor can:
 
 ```text
 load ActorSoul + LifeGoal
@@ -69,8 +69,8 @@ flowchart TB
   Prev["Previous CycleJudgment<br/>last decision and result"] --> Context
   Skills["Owned Action Skills<br/>verified actor capabilities"] --> Context
   LifeGoal --> Context
-  Context --> GoalMind["OpenAI Goal Mind<br/>StrategicGoal + CycleGoal JSON"]
-  GoalMind --> CycleGoal["Persist ActorCycleGoal"]
+  Context --> CycleGoalProvider["OpenAI CycleGoal Provider<br/>StrategicGoal + CycleGoal JSON"]
+  CycleGoalProvider --> CycleGoal["Persist ActorCycleGoal"]
   CycleGoal --> ActionPlanner["OpenAI Action Planner<br/>ActionIntent JSON"]
   ActionPlanner --> Gate["Runtime Gate<br/>owned action skill + primitive allowlist"]
   Gate --> Runtime["Existing Mineflayer Runtime"]
@@ -361,7 +361,7 @@ for this slice.
 
 ## LLM Stage Contracts
 
-### Stage 1 - Goal Mind
+### Stage 1 - CycleGoal Provider
 
 Input must always contain:
 
@@ -567,7 +567,7 @@ bun run typecheck
 
 Test requirements:
 
-- `ActorSoul` and LifeGoal are always present in Goal Mind input.
+- `ActorSoul` and LifeGoal are always present in cycle goal provider input.
 - WorldEvent is represented as pressure, not objective replacement.
 - A second cycle can cite the first CycleJudgment.
 - Stale `expected_goal_id` cannot overwrite a newer goal.
@@ -600,7 +600,7 @@ Purpose: prove the data model and stores cannot lie.
 
 Required checks:
 
-- `ActorSoul` and LifeGoal are always present in Goal Mind input.
+- `ActorSoul` and LifeGoal are always present in cycle goal provider input.
 - WorldEvent is pressure, not objective replacement.
 - A second cycle can cite the first CycleJudgment.
 - Stale `expected_goal_id` cannot overwrite a newer goal.
@@ -651,8 +651,8 @@ Pass criteria:
 
 ### Gate 3 - OpenAI Provider Contract Run
 
-Purpose: prove `gpt-5.4-mini` can produce schema-valid Goal Mind, Action Planner,
-and Cycle Judgment outputs against real actor context.
+Purpose: prove `gpt-5.4-mini` can produce schema-valid CycleGoal provider,
+Action Planner, and Cycle Judgment outputs against real actor context.
 
 This gate may use `observe`, `wait`, or `remember`; it checks provider contract
 and continuity, not resource success.
@@ -673,7 +673,7 @@ Pass criteria:
 - OpenAI provider outputs are schema-valid for all three stages;
 - provider inputs include ActorSoul and LifeGoal on every LLM call;
 - first cycle writes CycleJudgment;
-- second Goal Mind input cites previous CycleJudgment;
+- second cycle goal provider input cites previous CycleJudgment;
 - `agency_status.used_soul = true`;
 - `agency_status.used_life_goal = true`;
 - `agency_status.used_previous_judgment = true`;
@@ -809,7 +809,7 @@ The implementation is done when:
 
 - `soul.md` / compiled `ActorSoul` exists for `npc_b`;
 - active LifeGoal exists and is loaded every cycle;
-- Goal Mind provider input includes ActorSoul and LifeGoal every time;
+- cycle goal provider input includes ActorSoul and LifeGoal every time;
 - at least one StrategicGoal or CycleGoal is model-authored by OpenAI API;
 - Action Planner returns a schema-valid ActionIntent;
 - runtime gate executes or truthfully blocks the action;

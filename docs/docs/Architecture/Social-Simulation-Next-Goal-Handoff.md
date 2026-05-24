@@ -6,26 +6,27 @@ sidebar_position: 12
 
 Search token: `SOCIAL_SIMULATION_NEXT_GOAL_HANDOFF`.
 
-This page is a near-future social simulation handoff, but it is not the next
-implementation priority as of 2026-05-23. First complete the single-actor
-long-term objective work in
-`docs/docs/Architecture/Single-Actor-Long-Term-Diamond-Handoff.md`.
+Status: future multi-actor expansion handoff under the active Soul/LifeGoal
+direction.
 
-Use this page after one actor can make truthful progress through longer
-Minecraft dependency chains such as stone pickaxe, iron ingot, iron pickaxe, and
-diamond attempts.
+This page is not gated on the long-term diamond harness. Use it after the
+single-actor Soul/LifeGoal social cycle can reliably produce current-run
+Minecraft evidence, write CycleJudgment/memory, and reuse that judgment in a
+later cycle. Longer dependency-chain harnesses can inform this work, but they do
+not decide whether social simulation is allowed to proceed.
 
 ## Session Intent
 
 The current repo already has enough substrate to stop doing broad speculative
-architecture. The next work should prove that the system can move from a single
-autonomous Minecraft objective into a tiny social simulation loop without losing
-the core discipline:
+architecture. This future work should prove that the system can move from a
+single actor with Soul/LifeGoal continuity into a tiny social simulation loop
+without losing the core discipline:
 
-- LLMs can act freely through generated TypeScript action skills.
+- LLMs can attempt bounded actor-owned action trials when the runtime grants the
+  relevant action surface.
 - Mineflayer helpers and verifiers remain the dense runtime substrate.
 - Success is accepted only from current-run Minecraft evidence.
-- NPC social behavior comes from role pressure, shared resources, relationship
+- Actor social behavior comes from role pressure, shared resources, relationship
   events, and memory, not persona text alone.
 - Review and repair run asynchronously after actor turns.
 
@@ -77,7 +78,7 @@ not enough for this slice.
 
 ## Why This Is The Right Next Work
 
-The project's final goal is NPC social simulation. The current implementation
+The project's final goal is actor social simulation. The current implementation
 has strong pieces, but they are still mostly evaluated as individual action
 skills or single-actor objectives. The next useful proof is therefore not
 another isolated primitive. It is a minimal loop where one actor's verified
