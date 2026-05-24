@@ -14,13 +14,13 @@ import {
 
 test("seed action skill registry provides roadmap action skills covering core, survival utility, social, and hostile categories", () => {
   const all = listSeedActionSkills();
-  assert.equal(all.length, 29);
+  assert.equal(all.length, 30);
 
   const coreIds = listCoreActionSkillIds();
   assert.equal(coreIds.length, 12);
 
   const survivalUtilityIds = listSurvivalUtilityActionSkillIds();
-  assert.equal(survivalUtilityIds.length, 8);
+  assert.equal(survivalUtilityIds.length, 9);
 
   const socialIds = listSocialActionSkillIds();
   assert.equal(socialIds.length, 4);
@@ -55,6 +55,8 @@ test("seed action skill registry separates implemented action skills from planne
   assert.ok(implementedIds.includes("collectLogs"));
   assert.ok(implementedIds.includes("craftCraftingTable"));
   assert.ok(implementedIds.includes("mineCobblestone"));
+  assert.ok(implementedIds.includes("placeCraftingTable"));
+  assert.ok(implementedIds.includes("buildBasicShelter"));
   assert.ok(plannedIds.includes("mineCoal"));
   assert.ok(plannedIds.includes("smeltRawIron"));
   assert.ok(plannedIds.includes("eatFoodWhenHungry"));
@@ -70,7 +72,6 @@ test("seed action skill registry separates implemented action skills from planne
 test("reference-derived initial abilities stay planned until their primitives exist", () => {
   const plannedRuntimeSkills = [
     ["exploreForMaterials", ["explore_until", "world_diff"]],
-    ["placeCraftingTable", ["place_block", "use_crafting_table"]],
     ["equipBestTool", ["equip_item", "held_item_observation"]],
     ["placeTorchLightArea", ["place_block", "light_level_observation"]],
     ["eatFoodWhenHungry", ["consume_item", "vitals_observation"]],

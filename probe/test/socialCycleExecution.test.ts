@@ -43,6 +43,8 @@ test("settler social affordances expose settlement survival body", () => {
   assert.ok(allowed.includes("collect_logs"));
   assert.ok(allowed.includes("craft_item"));
   assert.ok(allowed.includes("craft_with_table"));
+  assert.ok(allowed.includes("place_block"));
+  assert.ok(allowed.includes("build_pattern"));
   assert.ok(allowed.includes("mine_block"));
   assert.ok(allowed.includes("inspect_chest"));
   assert.ok(allowed.includes("deposit_shared"));
@@ -97,6 +99,8 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
     ["mine_block", "mined"],
     ["craft_item", "crafted"],
     ["craft_with_table", "crafted"],
+    ["place_block", "placed"],
+    ["build_pattern", "built"],
     ["deposit_shared", "deposited"],
     ["inspect_chest", "inspected"],
     ["move_to", "arrived"],
@@ -110,6 +114,13 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
       `${tool}=${status} should count as verified progress`
     );
   }
+});
+
+test("deriveProgressVerifierStatus does not verify partial build patterns", () => {
+  assert.equal(
+    deriveProgressVerifierStatus({ toolAttempts: [{ tool: "build_pattern", status: "progressing" }] }),
+    "failed"
+  );
 });
 
 test("clampCycleJudgmentOutcome rejects verified_progress without meaningful tools", () => {

@@ -24,6 +24,7 @@ export type SeedActionSkillId =
   // Survival / utility roadmap (8)
   | "exploreForMaterials"
   | "placeCraftingTable"
+  | "buildBasicShelter"
   | "equipBestTool"
   | "placeTorchLightArea"
   | "eatFoodWhenHungry"
@@ -220,14 +221,24 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
   {
     id: "placeCraftingTable",
     summary: "Place or approach a crafting table so table recipes become available",
-    runtimeStatus: "planned",
+    runtimeStatus: "implemented",
     implementationNotes:
-      "References Voyager placeItem and mindcraft-ce craftRecipe table handling. Current runtime can craft a table item but cannot place, find, or bind a table to craft_item.",
+      "Uses place_block to put a crafting_table into the world and verifies the target block afterward. Table-bound recipe use remains handled by craft_with_table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter", "quartermaster", "settler"],
-    preconditions: ["inventory has crafting_table or enough planks to craft one"],
-    primitiveIds: ["observe", "wait"],
-    missingPrimitives: ["place_block", "use_crafting_table"]
+    preconditions: ["inventory has crafting_table"],
+    primitiveIds: ["observe", "place_block", "wait"]
+  },
+  {
+    id: "buildBasicShelter",
+    summary: "Build and verify a small starter shelter shell near the settlement base",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses build_pattern to expand a bounded starter-shelter blueprint into verified place_block operations and a world-state shelter scan.",
+    intentKinds: ["bootstrap_progress", "inspect_settlement_state"],
+    validRoles: ["settler"],
+    preconditions: ["inventory has solid build material such as planks, logs, dirt, or cobblestone", "safe build site nearby"],
+    primitiveIds: ["observe", "build_pattern", "remember"]
   },
   {
     id: "equipBestTool",

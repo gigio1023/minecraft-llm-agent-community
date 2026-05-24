@@ -139,6 +139,8 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   mine_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_with_table?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  place_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  build_pattern?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   inspect_chest(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   deposit_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   withdraw_shared(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -294,6 +296,24 @@ async function executeTool<TActor extends RuntimeActor>(
             ok: false,
             status: "blocked",
             message: "craft_with_table handler is not installed"
+          };
+    case "place_block":
+      return tools.place_block
+        ? tools.place_block({ actor, target, args: validated.args })
+        : {
+            tool: "place_block",
+            ok: false,
+            status: "blocked",
+            message: "place_block handler is not installed"
+          };
+    case "build_pattern":
+      return tools.build_pattern
+        ? tools.build_pattern({ actor, target, args: validated.args })
+        : {
+            tool: "build_pattern",
+            ok: false,
+            status: "blocked",
+            message: "build_pattern handler is not installed"
           };
     case "inspect_chest":
       return tools.inspect_chest({ actor, target, args: validated.args });

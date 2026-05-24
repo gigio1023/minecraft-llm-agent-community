@@ -47,6 +47,18 @@ export type ObserveResult = {
       direction: string;
       position: { x: number; y: number; z: number };
     }>;
+    stone: Array<{
+      name: string;
+      distance: number;
+      direction: string;
+      position: { x: number; y: number; z: number };
+    }>;
+    coal: Array<{
+      name: string;
+      distance: number;
+      direction: string;
+      position: { x: number; y: number; z: number };
+    }>;
   };
   sharedChest?: {
     chestId: string;
@@ -132,46 +144,76 @@ function scanNearbyBlocks(actor: PositionedActor) {
   return [...selected.values()].sort((left, right) => left.distance - right.distance);
 }
 
-function scanNearbyResources(actor: PositionedActor): ObserveResult["nearbyResources"] | undefined {
-  if (!actor.findBlocks || !actor.blockAt) {
-    return undefined;
-  }
-
+function scanResourceBlocks(input: {
+  actor: PositionedActor;
+  matches(blockName: string): boolean;
+  maxDistance: number;
+  count: number;
+  limit: number;
+}) {
   const seen = new Set<string>();
-  const logs = actor
-    .findBlocks({
-      matching: (block) => isLogName(block.name),
-      maxDistance: 32,
-      count: 24
+  return input.actor
+    .findBlocks?.({
+      matching: (block) => input.matches(block.name),
+      maxDistance: input.maxDistance,
+      count: input.count
     })
     .map((position) => {
-      const block = actor.blockAt?.(position);
-      return block && isLogName(block.name)
+      const block = input.actor.blockAt?.(position);
+      return block && input.matches(block.name)
         ? {
             name: block.name,
-            distance: roundDistance(actor.entity.position.distanceTo(position)),
-            direction: directionFrom(actor.entity.position, position),
+            distance: roundDistance(input.actor.entity.position.distanceTo(position)),
+            direction: directionFrom(input.actor.entity.position, position),
             position: roundPosition(position)
           }
         : null;
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
     .filter((entry) => {
-      const key = `${entry.name}:${Math.floor(entry.position.x)}:${Math.floor(entry.position.y)}:${Math.floor(entry.position.z)}`;
-      if (seen.has(key)) {
+      const entryKey = `${entry.name}:${Math.floor(entry.position.x)}:${Math.floor(entry.position.y)}:${Math.floor(entry.position.z)}`;
+      if (seen.has(entryKey)) {
         return false;
       }
-      seen.add(key);
+      seen.add(entryKey);
       return true;
     })
     .sort((left, right) => left.distance - right.distance)
-    .slice(0, 8);
+    .slice(0, input.limit) ?? [];
+}
 
-  if (logs.length === 0) {
+function scanNearbyResources(actor: PositionedActor): ObserveResult["nearbyResources"] | undefined {
+  if (!actor.findBlocks || !actor.blockAt) {
     return undefined;
   }
 
-  return { logs };
+  const logs = scanResourceBlocks({
+    actor,
+    matches: isLogName,
+    maxDistance: 32,
+    count: 24,
+    limit: 8
+  });
+  const stone = scanResourceBlocks({
+    actor,
+    matches: (blockName) => blockName === "stone" || blockName === "cobblestone",
+    maxDistance: 32,
+    count: 24,
+    limit: 8
+  });
+  const coal = scanResourceBlocks({
+    actor,
+    matches: (blockName) => blockName === "coal_ore" || blockName === "deepslate_coal_ore",
+    maxDistance: 32,
+    count: 16,
+    limit: 6
+  });
+
+  if (logs.length === 0 && stone.length === 0 && coal.length === 0) {
+    return undefined;
+  }
+
+  return { logs, stone, coal };
 }
 
 export async function observe({

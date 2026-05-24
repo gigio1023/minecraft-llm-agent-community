@@ -23,6 +23,8 @@ import { collectLogs } from "../tools/collectLogs.js";
 import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
+import { placeBlock } from "../tools/placeBlock.js";
+import { buildPattern } from "../tools/buildPattern.js";
 import { createMineflayerSharedChestAccessor } from "../tools/liveSharedChest.js";
 import { depositToSharedChest, inspectChest, withdrawFromSharedChest } from "../tools/sharedChest.js";
 import { say } from "../tools/say.js";
@@ -51,6 +53,8 @@ export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "mine_block",
   "craft_item",
   "craft_with_table",
+  "place_block",
+  "build_pattern",
   "inspect_chest",
   "deposit_shared",
   "withdraw_shared",
@@ -352,6 +356,57 @@ function readPositionedObject(value: unknown): Positioned | null {
   return null;
 }
 
+function readStringArray(args: Record<string, unknown>, key: string) {
+  const raw = args[key];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+}
+
+function choosePlaceBlockItemName(input: {
+  bot: Bot;
+  args: Record<string, unknown>;
+}) {
+  const explicit = readOptionalString(input.args, "itemName") ?? readOptionalString(input.args, "blockName");
+  if (explicit) {
+    return normalizeCraftItemName(input.bot, explicit);
+  }
+  const actionSkillId = readOptionalString(input.args, "actionSkillId");
+  if (actionSkillId === "placeCraftingTable") {
+    return "crafting_table";
+  }
+  return undefined;
+}
+
+function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positioned {
+  return (
+    readPositionedObject(args.targetPosition) ??
+    readPositionedObject(args.target_position) ??
+    readPositionedObject(args.position) ??
+    readPositionedObject(args) ??
+    {
+      x: Math.floor(bot.entity.position.x) + 1,
+      y: Math.floor(bot.entity.position.y),
+      z: Math.floor(bot.entity.position.z)
+    }
+  );
+}
+
+function readBuildAnchor(bot: Bot, args: Record<string, unknown>): Positioned {
+  return (
+    readPositionedObject(args.anchor) ??
+    readPositionedObject(args.targetPosition) ??
+    readPositionedObject(args.position) ??
+    readPositionedObject(args) ??
+    {
+      x: Math.floor(bot.entity.position.x) + 2,
+      y: Math.floor(bot.entity.position.y),
+      z: Math.floor(bot.entity.position.z) + 2
+    }
+  );
+}
+
 function readScoutDistance(args: Record<string, unknown>) {
   const raw = typeof args.distance === "number" ? args.distance : 8;
   return Math.max(2, Math.min(12, Math.floor(raw)));
@@ -551,7 +606,10 @@ async function runSocialPrimitive(input: {
       return (await mineBlock({
         bot: input.bot,
         blockName: readString(proposal.args, "blockName", "stone"),
-        targetCount: readOptionalCount(proposal.args)
+        targetCount: readOptionalCount(proposal.args),
+        searchDistance: typeof proposal.args.searchDistance === "number"
+          ? Math.max(4, Math.min(48, Math.floor(proposal.args.searchDistance)))
+          : undefined
       })) as unknown as JsonValue;
     case "craft_item": {
       const itemName = chooseCraftItemName({ bot: input.bot, args: proposal.args });
@@ -567,6 +625,36 @@ async function runSocialPrimitive(input: {
       }
       return (await craftWithTable({ bot: input.bot, itemName })) as unknown as JsonValue;
     }
+    case "place_block": {
+      const itemName = choosePlaceBlockItemName({ bot: input.bot, args: proposal.args });
+      if (!itemName) {
+        return { status: "blocked", reason: "place_block requires explicit itemName or a station-placement action skill" };
+      }
+      if (roleId !== "settler" && itemName !== "crafting_table") {
+        return {
+          status: "blocked",
+          reason: `${roleId} may only use place_block for verified crafting_table placement`
+        };
+      }
+      return (await placeBlock({
+        bot: input.bot,
+        itemName,
+        targetPosition: readPlacementTarget(input.bot, proposal.args)
+      })) as unknown as JsonValue;
+    }
+    case "build_pattern":
+      return (await buildPattern({
+        bot: input.bot,
+        anchor: readBuildAnchor(input.bot, proposal.args),
+        preferredMaterials: [
+          ...readStringArray(proposal.args, "preferredMaterials"),
+          ...readStringArray(proposal.args, "preferred_materials"),
+          ...readStringArray(proposal.args, "materials")
+        ],
+        maxPlacements: typeof proposal.args.maxPlacements === "number"
+          ? Math.max(1, Math.floor(proposal.args.maxPlacements))
+          : 64
+      })) as unknown as JsonValue;
     case "inspect_chest": {
       const chest = createMineflayerSharedChestAccessor(input.bot);
       const ledger = createSharedStorageLedger();

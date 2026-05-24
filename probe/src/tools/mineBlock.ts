@@ -166,12 +166,12 @@ async function equipPickaxeIfAvailable(bot: MineBlockBot) {
   return pickaxe.name;
 }
 
-function findCandidateBlocks(bot: MineBlockBot, blockName: string) {
-  const minimumY = Math.floor(bot.entity.position.y) - 1;
+function findCandidateBlocks(bot: MineBlockBot, blockName: string, searchDistance: number) {
+  const minimumY = Math.floor(bot.entity.position.y) - 16;
   const fromBlocks = bot.findBlocks?.({
     matching: (block) => block.name === blockName,
-    maxDistance: 12,
-    count: 96
+    maxDistance: searchDistance,
+    count: 192
   })
     .map((position) => {
       const block = bot.blockAt?.(position);
@@ -189,7 +189,7 @@ function findCandidateBlocks(bot: MineBlockBot, blockName: string) {
 
   const block = bot.findBlock?.({
     matching: (candidate) => candidate.name === blockName,
-    maxDistance: 12
+    maxDistance: searchDistance
   });
 
   return block && block.position.y >= minimumY ? [block] : [];
@@ -296,7 +296,8 @@ export async function mineBlock({
   signal,
   pickupWaitMs = 1_500,
   moveToBlockTimeoutMs = 6_000,
-  pickupMoveTimeoutMs = 3_000
+  pickupMoveTimeoutMs = 3_000,
+  searchDistance = 24
 }: {
   bot: MineBlockBot;
   blockName: string;
@@ -306,6 +307,7 @@ export async function mineBlock({
   pickupWaitMs?: number;
   moveToBlockTimeoutMs?: number;
   pickupMoveTimeoutMs?: number;
+  searchDistance?: number;
 }): Promise<MineBlockResult> {
   if (!itemName) {
     throw new Error(`mine_block has no expected drop mapping for ${blockName}`);
@@ -337,7 +339,7 @@ export async function mineBlock({
 
   try {
     signal?.addEventListener("abort", onAbort, { once: true });
-    for (const block of findCandidateBlocks(bot, blockName)) {
+    for (const block of findCandidateBlocks(bot, blockName, searchDistance)) {
       throwIfAborted(signal);
 
       if (afterCount !== undefined && afterCount >= targetTotal) {
@@ -360,6 +362,15 @@ export async function mineBlock({
 
       const attemptBeforeCount = afterCount;
       try {
+        if (bot.canDigBlock && !bot.canDigBlock(block)) {
+          attemptedBlocks.push({
+            block: block.name,
+            position: block.position,
+            outcome: "dig_blocked",
+            reason: "canDigBlock returned false"
+          });
+          continue;
+        }
         await bot.dig(block, true);
       } catch (error) {
         attemptedBlocks.push({
@@ -460,6 +471,6 @@ export async function mineBlock({
     equippedTool,
     reason: attemptedBlocks.some((attempt) => attempt.outcome === "dug")
       ? `mine_block dug ${blockName}, but ${itemName} inventory did not increase.`
-      : `mine_block found no reachable ${blockName} block within 12 blocks.`
+      : `mine_block found no reachable ${blockName} block within ${searchDistance} blocks.`
   };
 }

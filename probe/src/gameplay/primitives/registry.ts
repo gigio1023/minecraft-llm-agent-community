@@ -8,6 +8,8 @@ export const runtimePrimitives = [
   { id: "mine_block", category: "gathering" },
   { id: "craft_item", category: "crafting" },
   { id: "craft_with_table", category: "crafting" },
+  { id: "place_block", category: "building" },
+  { id: "build_pattern", category: "building" },
   { id: "inspect_chest", category: "storage" },
   { id: "deposit_shared", category: "storage" },
   { id: "withdraw_shared", category: "storage" },

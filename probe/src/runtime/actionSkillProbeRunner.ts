@@ -26,6 +26,8 @@ import { collectLogs } from "../tools/collectLogs.js";
 import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
+import { placeBlock, type Positioned } from "../tools/placeBlock.js";
+import { buildPattern } from "../tools/buildPattern.js";
 import { getRoleContract } from "../npc/roles/contracts.js";
 import { createSharedStorageLedger } from "../gameplay/storage/sharedStorageLedger.js";
 import { createTeamBulletin } from "../npc/social/teamBulletin.js";
@@ -102,6 +104,8 @@ const deterministicProbeDriverSkillIds = [
   "craftCraftingTable",
   "craftWoodenPickaxe",
   "mineCobblestone",
+  "placeCraftingTable",
+  "buildBasicShelter",
   "inspectSharedChest",
   "depositSharedItems",
   "approachAndRequestItem",
@@ -123,6 +127,8 @@ export type ActionSkillProbePreconditionMode =
   | "inventory_logs"
   | "inventory_planks_and_sticks"
   | "table_craft_inputs"
+  | "placeable_crafting_table"
+  | "shelter_build_materials"
   | "placed_stone_with_pickaxe"
   | "inspectable_shared_chest"
   | "depositable_shared_chest"
@@ -135,6 +141,8 @@ const actionSkillProbePreconditionModes = {
   craftCraftingTable: "inventory_planks_and_sticks",
   craftWoodenPickaxe: "table_craft_inputs",
   mineCobblestone: "placed_stone_with_pickaxe",
+  placeCraftingTable: "placeable_crafting_table",
+  buildBasicShelter: "shelter_build_materials",
   inspectSharedChest: "inspectable_shared_chest",
   depositSharedItems: "depositable_shared_chest",
   approachAndRequestItem: "social_bootstrap_inventory",
@@ -199,6 +207,35 @@ function readOptionalPositiveIntegerArg(args: Record<string, unknown>, name: str
   }
 
   return value;
+}
+
+function optionalPositionArg(args: Record<string, unknown>, name: string): Positioned | undefined {
+  const value = args[name];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  return typeof record.x === "number" &&
+    typeof record.y === "number" &&
+    typeof record.z === "number"
+    ? { x: record.x, y: record.y, z: record.z }
+    : undefined;
+}
+
+function defaultPlaceTarget(actor: import("mineflayer").Bot): Positioned {
+  return {
+    x: Math.floor(actor.entity.position.x) + 1,
+    y: Math.floor(actor.entity.position.y),
+    z: Math.floor(actor.entity.position.z)
+  };
+}
+
+function defaultBuildAnchor(actor: import("mineflayer").Bot): Positioned {
+  return {
+    x: Math.floor(actor.entity.position.x) + 2,
+    y: Math.floor(actor.entity.position.y),
+    z: Math.floor(actor.entity.position.z) + 2
+  };
 }
 
 function assertTarget(targetId: string, expectedTargetId: string) {
@@ -398,6 +435,22 @@ export function buildProbePreconditionRconCommands(input: {
     give("stick", 2);
   }
 
+  if (preconditionMode === "placeable_crafting_table") {
+    commands.push(
+      ["execute", "at", input.actorUsername, "run", "fill", "~-2", "~-1", "~-2", "~4", "~-1", "~2", "stone"],
+      ["execute", "at", input.actorUsername, "run", "fill", "~-2", "~0", "~-2", "~4", "~3", "~2", "air"]
+    );
+    give("crafting_table", 1);
+  }
+
+  if (preconditionMode === "shelter_build_materials") {
+    commands.push(
+      ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~-1", "~-3", "~8", "~-1", "~8", "stone"],
+      ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~0", "~-3", "~8", "~4", "~8", "air"]
+    );
+    give("dirt", 64);
+  }
+
   if (preconditionMode === "inspectable_shared_chest") {
     give("crafting_table", 1);
     placeChestFixture('{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}');
@@ -460,7 +513,11 @@ async function setupProbePreconditions(input: {
   await new Promise((resolve) => setTimeout(resolve, skillId === "collectLogs" ? 3000 : 1500));
 }
 
-function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorId: string) {
+function createActionSkillProbeProvider(
+  skillId: SeedActionSkillId,
+  targetActorId: string,
+  buildAnchor?: Positioned
+) {
   if (!hasDeterministicActionSkillProbeDriver(skillId)) {
     throw new Error(`Missing deterministic action skill probe driver for implemented skill: ${skillId}`);
   }
@@ -582,6 +639,30 @@ function createActionSkillProbeProvider(skillId: SeedActionSkillId, targetActorI
         }
 
         return { tool: "mine_block", args: { blockName: "stone", itemName: "cobblestone", targetCount: 1 } };
+      }
+
+      if (skillId === "placeCraftingTable") {
+        if (input.lastResult.tool === "place_block" && input.lastResult.status === "placed") {
+          return { tool: "remember", args: { note: "placeCraftingTable placed and verified a crafting table block" } };
+        }
+
+        return { tool: "place_block", args: { itemName: "crafting_table" } };
+      }
+
+      if (skillId === "buildBasicShelter") {
+        if (input.lastResult.tool === "build_pattern" && input.lastResult.status === "built") {
+          return { tool: "remember", args: { note: "buildBasicShelter completed a verified starter shelter shell" } };
+        }
+
+        return {
+          tool: "build_pattern",
+          args: {
+            patternId: "starter_shelter_2x2_v1",
+            ...(buildAnchor ? { anchor: buildAnchor } : {}),
+            preferredMaterials: ["dirt"],
+            maxPlacements: 64
+          }
+        };
       }
 
       if (skillId === "collectLogs") {
@@ -1101,6 +1182,81 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         : "mineCobblestone never produced passed cobblestone inventory target evidence in transcript";
     }
   },
+  placeCraftingTable: {
+    skillId: "placeCraftingTable",
+    evidenceSummary: [
+      "place_block selected crafting_table from inventory",
+      "place_block verified crafting_table at the target world position"
+    ],
+    minimumPassingTranscript: {
+      steps: [{
+        tool: "place_block",
+        result: {
+          status: "placed",
+          itemName: "crafting_table",
+          afterBlockName: "crafting_table",
+          targetPosition: { x: 1, y: 64, z: 0 },
+          inventoryDelta: -1
+        }
+      }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "place_block", (result) => {
+        const targetPosition = asRecord(result.targetPosition);
+        return result.status === "placed" &&
+          result.itemName === "crafting_table" &&
+          result.afterBlockName === "crafting_table" &&
+          typeof targetPosition.x === "number" &&
+          typeof targetPosition.y === "number" &&
+          typeof targetPosition.z === "number" &&
+          (numberField(result, "inventoryDelta") ?? 0) < 0;
+      })
+        ? null
+        : "placeCraftingTable did not record a verified crafting_table placement with target coordinates and inventory delta";
+    }
+  },
+  buildBasicShelter: {
+    skillId: "buildBasicShelter",
+    evidenceSummary: [
+      "build_pattern result reached built status",
+      "shelter verification passed with wall/roof coverage, clear interior, and new shell blocks"
+    ],
+    minimumPassingTranscript: {
+      steps: [{
+        tool: "build_pattern",
+        result: {
+          status: "built",
+          patternId: "starter_shelter_2x2_v1",
+          placementLedger: [{ status: "placed" }],
+          verification: {
+            status: "passed",
+            wallCoverage: 1,
+            roofCoverage: 1,
+            interiorClear: true,
+            floorSupported: true,
+            placedShellBlocks: 20,
+            missingCells: []
+          }
+        }
+      }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "build_pattern", (result) => {
+        const verification = asRecord(result.verification);
+        return result.status === "built" &&
+          result.patternId === "starter_shelter_2x2_v1" &&
+          verification.status === "passed" &&
+          (numberField(verification, "wallCoverage") ?? 0) >= 1 &&
+          (numberField(verification, "roofCoverage") ?? 0) >= 1 &&
+          verification.interiorClear === true &&
+          verification.floorSupported === true &&
+          (numberField(verification, "placedShellBlocks") ?? 0) >= 20 &&
+          arrayField(verification, "missingCells").length === 0;
+      })
+        ? null
+        : "buildBasicShelter did not record a built starter shelter with passing world-state verifier evidence";
+    }
+  },
   inspectSharedChest: {
     skillId: "inspectSharedChest",
     evidenceSummary: ["shared chest inspection returned a ledger-backed chest id and non-empty positive item snapshot"],
@@ -1503,7 +1659,15 @@ export async function runLiveActionSkillProbe(
     const dialogueState = createDialogueState({
       busyRepliesBeforeAvailable: config.dialogue.busyRepliesBeforeAvailable
     });
-    const provider = createActionSkillProbeProvider(input.skillId, target.username);
+    const provider = createActionSkillProbeProvider(
+      input.skillId,
+      target.username,
+      {
+        x: Math.floor(config.spawn.x) + 2,
+        y: Math.floor(config.spawn.y),
+        z: Math.floor(config.spawn.z) + 2
+      }
+    );
     const sharedStorageLedger = createSharedStorageLedger();
     const teamBulletin = createTeamBulletin();
     const sharedSettlementState = createSharedSettlementState();
@@ -1601,6 +1765,31 @@ export async function runLiveActionSkillProbe(
           withActionWrapper(
             () => craftWithTable({ bot: actor, itemName: readStringArg(args, "itemName") }),
             { tool: "craft_with_table" }
+          ),
+        place_block: ({ actor, args }) =>
+          withActionWrapper(
+            (signal) => placeBlock({
+              bot: actor,
+              itemName: readStringArg(args, "itemName"),
+              targetPosition: optionalPositionArg(args, "targetPosition") ?? defaultPlaceTarget(actor),
+              signal
+            }),
+            { tool: "place_block" }
+          ),
+        build_pattern: ({ actor, args }) =>
+          withActionWrapper(
+            (signal) => buildPattern({
+              bot: actor,
+              anchor: optionalPositionArg(args, "anchor") ?? defaultBuildAnchor(actor),
+              preferredMaterials: Array.isArray(args.preferredMaterials)
+                ? args.preferredMaterials.filter((entry): entry is string => typeof entry === "string")
+                : [],
+              maxPlacements: typeof args.maxPlacements === "number"
+                ? Math.max(1, Math.floor(args.maxPlacements))
+                : 64,
+              signal
+            }),
+            { tool: "build_pattern" }
           ),
         inspect_chest: () =>
           withActionWrapper(

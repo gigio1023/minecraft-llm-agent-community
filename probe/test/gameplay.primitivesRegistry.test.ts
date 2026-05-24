@@ -11,6 +11,8 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
     "mine_block",
     "craft_item",
     "craft_with_table",
+    "place_block",
+    "build_pattern",
     "inspect_chest",
     "deposit_shared",
     "withdraw_shared",
@@ -25,6 +27,10 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
   assert.deepEqual(getRuntimePrimitive("mine_block"), {
     id: "mine_block",
     category: "gathering"
+  });
+  assert.deepEqual(getRuntimePrimitive("build_pattern"), {
+    id: "build_pattern",
+    category: "building"
   });
   assert.throws(() => getRuntimePrimitive("teleport_anywhere"), /Unknown runtime primitive/);
 });

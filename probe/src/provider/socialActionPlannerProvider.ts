@@ -105,6 +105,8 @@ function runtimeAffordanceDescriptions(primitiveIds: readonly string[]) {
     mine_block: "Mine a specific blockName such as stone when tool prerequisites exist; success requires inventory increase.",
     craft_item: "Craft an inventory recipe by itemName when ingredients exist.",
     craft_with_table: "Craft a table-bound recipe by itemName when a crafting table is nearby.",
+    place_block: "Place an explicit inventory itemName at targetPosition, position, or top-level x/y/z; success requires the block to exist in the world afterward.",
+    build_pattern: "Build and verify a bounded starter shelter pattern from available solid materials; success requires placed-block ledger plus world-state shelter verification.",
     inspect_chest: "Inspect a nearby shared chest when settlement inventory matters.",
     deposit_shared: "Deposit a chosen itemName/count, or let runtime choose a useful surplus item, into a nearby shared chest.",
     withdraw_shared: "Withdraw a specific itemName/count from a nearby shared chest when that enables the next survival or settlement task.",
@@ -198,6 +200,7 @@ ActorSoul and ActorLifeGoal are fixed context. The actor cares about social cons
 Choose freely from runtime_affordances based on live observation, nearbyResources, memory, previous judgments, and recent attempts. If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different plausible affordance such as movement toward an observed resource hint, observation, another resource action, speech, or memory.
 For a survival/settlement LifeGoal, repeated surplus of one material is weaker than broadening into tools, stone, storage, safer positioning, or scouting once inventory evidence shows the material is already stocked.
 If craft_with_table is blocked because a crafting_table is far away or tablePosition is reported, move_to that position or observe current position before retrying table crafting. Do not retry the same table craft repeatedly from outside interaction range.
+For settlement shelter goals, build_pattern can use wood/dirt/cobblestone; do not require stone before attempting a verified starter shelter if solid materials are already available.
 use_action_skill executes every required_primitive in order as one bundle; prefer use_primitive when a single runtime affordance is enough.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
       user: JSON.stringify(providerInput)

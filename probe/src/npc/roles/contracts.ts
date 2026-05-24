@@ -50,6 +50,8 @@ const roleContracts: Record<RoleId, RoleContract> = {
       "mine_block",
       "craft_item",
       "craft_with_table",
+      "place_block",
+      "build_pattern",
       "inspect_chest",
       "deposit_shared",
       "withdraw_shared",
@@ -95,7 +97,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   crafter: {
     roleId: "crafter",
-    allowedTools: ["observe", "move_to", "craft_item", "craft_with_table", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "craft_item", "craft_with_table", "place_block", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_planks",
       "birch_planks",
@@ -135,7 +137,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   quartermaster: {
     roleId: "quartermaster",
-    allowedTools: ["observe", "move_to", "inspect_chest", "deposit_shared", "withdraw_shared", "say", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "place_block", "inspect_chest", "deposit_shared", "withdraw_shared", "say", "wait", "remember"],
     depositAllowedItemNames: ["*"],
     withdrawAllowedItemNames: ["*"],
     keepItems: {
