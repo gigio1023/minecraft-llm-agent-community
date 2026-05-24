@@ -149,6 +149,9 @@ export async function runSocialActionPlannerProvider(input: {
     owned_action_skills: ownedActionSkills,
     allowed_primitive_ids: plannerCycleGoal.allowed_primitive_ids,
     runtime_affordances: runtimeAffordanceDescriptions(plannerCycleGoal.allowed_primitive_ids),
+    settlement_state: input.context.settlement_state,
+    settlement_checklist: input.context.settlement_state.checklist,
+    blocker_histogram: input.context.settlement_state.blocker_histogram,
     previous_cycle_judgments: input.context.previous_cycle_judgments,
     recent_action_attempts: input.recentActionAttempts ?? []
   } as JsonValue;
@@ -197,11 +200,13 @@ export async function runSocialActionPlannerProvider(input: {
       schema: actionPlannerSchema,
       system: `You plan one bounded ActionIntent for the active CycleGoal.
 ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
-Choose freely from runtime_affordances based on live observation, nearbyResources, memory, previous judgments, and recent attempts. If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different plausible affordance such as movement toward an observed resource hint, observation, another resource action, speech, or memory.
+Select from runtime_affordances based on live observation, nearbyResources, memory, previous judgments, and recent attempts. If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different plausible affordance such as movement toward an observed resource hint, observation, another resource action, speech, or memory.
 For a survival/settlement LifeGoal, repeated surplus of one material is weaker than broadening into tools, stone, storage, safer positioning, or scouting once inventory evidence shows the material is already stocked.
+Use settlement_state, settlement_checklist, and blocker_histogram before choosing an action. Do not spend a turn rediscovering a checklist item that runtime evidence already says is satisfied.
+If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
 If craft_with_table is blocked because a crafting_table is far away or tablePosition is reported, move_to that position or observe current position before retrying table crafting. Do not retry the same table craft repeatedly from outside interaction range.
 For settlement shelter goals, build_pattern can use wood/dirt/cobblestone; do not require stone before attempting a verified starter shelter if solid materials are already available.
-use_action_skill executes every required_primitive in order as one bundle; prefer use_primitive when a single runtime affordance is enough.
+use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
       user: JSON.stringify(providerInput)
     });

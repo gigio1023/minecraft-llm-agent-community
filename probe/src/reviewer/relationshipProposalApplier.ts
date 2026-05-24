@@ -4,7 +4,8 @@ import path from "node:path";
 import {
   applyRelationshipEvent,
   createRelationshipEventRef,
-  RELATIONSHIP_EVENT_KINDS
+  RELATIONSHIP_EVENT_KINDS,
+  type RelationshipEventKind
 } from "../npc/relationships/relationshipLedger.js";
 import {
   readRelationshipEdge,
@@ -15,6 +16,7 @@ import {
   sanitizeWorkspaceFileId
 } from "../runtime/actorWorkspacePaths.js";
 import { writeJson } from "../runtime/actorWorkspaceStore.js";
+import type { CycleJudgment } from "../runtime/goals/types.js";
 import type { ActorReviewOutput } from "./reviewerStore.js";
 
 export type RelationshipProposalApplication = {
@@ -29,6 +31,23 @@ export type RelationshipProposalApplication = {
 type RelationshipEventProposal = NonNullable<
   ActorReviewOutput["relationship_event_proposals"]
 >[number];
+
+function cycleRelationshipKindToLedgerKind(kind: string): RelationshipEventKind {
+  switch (kind) {
+    case "fulfilled":
+      return "resource_delivered";
+    case "blocked":
+    case "failed_obligation":
+      return "verification_failed";
+    case "helped":
+      return "helped_unblock_task";
+    case "request_made":
+    case "request_accepted":
+      return kind;
+    default:
+      throw new Error(`Unsupported relationship event kind: ${kind}`);
+  }
+}
 
 function isInside(parent: string, child: string) {
   const relative = path.relative(parent, child);
@@ -211,4 +230,57 @@ export async function applyReviewerRelationshipEventProposals(
   }
 
   return applications;
+}
+
+export type CycleJudgmentRelationshipApplication =
+  | RelationshipProposalApplication
+  | {
+      event_id: string;
+      from_actor_id: string;
+      to_actor_id: string;
+      kind: string;
+      status: "rejected";
+      reason: string;
+    };
+
+export async function applyCycleJudgmentRelationshipEventProposals(
+  rootDir: string,
+  judgment: CycleJudgment
+): Promise<CycleJudgmentRelationshipApplication[]> {
+  if (judgment.relationship_event_proposals.length === 0) {
+    return [];
+  }
+
+  const review: ActorReviewOutput = {
+    schema: "actor-review/v1",
+    review_id: `cycle-judgment-${sanitizeWorkspaceFileId(judgment.cycle_id)}`,
+    actor_id: judgment.actor_id,
+    created_at: new Date().toISOString(),
+    input_refs: [...judgment.evidence_refs],
+    findings: [],
+    candidate_proposals: [],
+    relationship_event_proposals: judgment.relationship_event_proposals.map((proposal) => ({
+      kind: cycleRelationshipKindToLedgerKind(proposal.kind),
+      target_actor_id: proposal.target_actor_id,
+      summary: `${proposal.kind} proposed by ${judgment.cycle_id}: ${judgment.what_happened}`,
+      evidence_refs: [...proposal.evidence_refs]
+    })),
+    active_mutation: "forbidden"
+  };
+
+  try {
+    return await applyReviewerRelationshipEventProposals(rootDir, review);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return judgment.relationship_event_proposals.map((proposal, index) => ({
+      event_id: sanitizeWorkspaceFileId(
+        `${review.review_id}-${index}-${proposal.kind}-${proposal.target_actor_id}-to-${judgment.actor_id}`
+      ),
+      from_actor_id: proposal.target_actor_id,
+      to_actor_id: judgment.actor_id,
+      kind: proposal.kind,
+      status: "rejected",
+      reason
+    }));
+  }
 }

@@ -80,10 +80,10 @@ export async function buildSocialCycleReviewSummary(
           : (intent?.kind ?? "?");
     primitive_counts[primitiveOrSkill] = (primitive_counts[primitiveOrSkill] ?? 0) + 1;
 
-    const goalMindInput = await readJsonIfExists<{
+    const cycleGoalProviderInput = await readJsonIfExists<{
       input?: { previous_cycle_judgments?: unknown[] };
     }>(path.join(actorDir, cycle.provider_input_refs[0] ?? ""));
-    const citesPrior = (goalMindInput?.input?.previous_cycle_judgments?.length ?? 0) > 0;
+    const citesPrior = (cycleGoalProviderInput?.input?.previous_cycle_judgments?.length ?? 0) > 0;
     if (citesPrior) {
       cycles_with_prior_judgment_context += 1;
     }
@@ -125,7 +125,7 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
     `- model: \`${summary.provider_model}\``,
     `- runtime_status: **${summary.runtime_status}**`,
     `- cycles in report: **${summary.total_cycles}**`,
-    `- cycles citing prior judgment in Goal Mind: **${summary.cycles_with_prior_judgment_context}**`,
+    `- cycles citing prior judgment in CycleGoal provider: **${summary.cycles_with_prior_judgment_context}**`,
     "",
     "## Outcome distribution",
     "",

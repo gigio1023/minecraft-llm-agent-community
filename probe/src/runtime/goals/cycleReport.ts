@@ -33,7 +33,14 @@ export function createEmptySocialCycleReport(input: {
       helper_expansion_count: 0,
       gameplay_progress_verified: false
     },
-    cycles: []
+    cycles: [],
+    postcondition_results: [],
+    relationship_application_results: [],
+    memory_reuse: {
+      retrieved_memory_refs: 0,
+      memory_writes: 0,
+      used_previous_judgment: false
+    }
   };
 }
 

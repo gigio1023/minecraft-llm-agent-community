@@ -1,5 +1,11 @@
 /** Soul/LifeGoal/CycleGoal social runtime record schemas and small validators. */
 
+import type {
+  ActionSkillPostconditionResult,
+  SettlementChecklist,
+  SettlementState
+} from "../settlement/settlementState.js";
+
 export type ActorSoul = {
   schema: "actor-soul/v1";
   actor_id: string;
@@ -261,10 +267,28 @@ export type SocialCycleRunReport = {
       tool_statuses: Array<{ tool: string; status: string }>;
       runtime_result?: unknown;
       runtime_status: string;
+      postcondition_results?: ActionSkillPostconditionResult[];
     }>;
   }>;
   provider_error?: string;
   action_skill_execution_unit?: boolean;
+  settlement_state?: SettlementState;
+  settlement_checklist?: SettlementChecklist;
+  postcondition_results?: ActionSkillPostconditionResult[];
+  relationship_application_results?: Array<{
+    event_id: string;
+    from_actor_id: string;
+    to_actor_id: string;
+    kind: string;
+    status: "applied" | "already_applied" | "rejected";
+    reason?: string;
+    relationship_path?: string;
+  }>;
+  memory_reuse?: {
+    retrieved_memory_refs: number;
+    memory_writes: number;
+    used_previous_judgment: boolean;
+  };
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -371,11 +395,16 @@ export function validateCycleJudgment(
   return { ok: true, judgment: value as CycleJudgment };
 }
 
-export function goalMindInputIncludesSoulAndLifeGoal(input: unknown): boolean {
+export function cycleGoalProviderInputIncludesSoulAndLifeGoal(input: unknown): boolean {
   if (!isRecord(input)) {
     return false;
   }
   const soul = input.ActorSoul ?? input.actor_soul;
   const lifeGoal = input.ActorLifeGoal ?? input.actor_life_goal;
   return validateActorSoul(soul).ok && validateActorLifeGoal(lifeGoal).ok;
+}
+
+/** @deprecated Use cycleGoalProviderInputIncludesSoulAndLifeGoal for new code. */
+export function goalMindInputIncludesSoulAndLifeGoal(input: unknown): boolean {
+  return cycleGoalProviderInputIncludesSoulAndLifeGoal(input);
 }

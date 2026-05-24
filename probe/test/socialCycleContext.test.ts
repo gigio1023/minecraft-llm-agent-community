@@ -93,7 +93,15 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
     ],
     previousJudgments: [{ ref: "judgments/cycle-0001-judgment.json", judgment }],
     activeActionSkills: [buildNpcBActionSkillRecord()],
-    observation: { status: "ok", observerId: "npc_b", visibleActors: [], memory: [] },
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 1, y: 64, z: 1 },
+      visibleActors: [],
+      memory: [],
+      inventory: [{ name: "oak_log", count: 2 }],
+      nearbyBlocks: [{ name: "crafting_table", distance: 2 }]
+    },
     allowedPrimitiveIds: ["observe"],
     maxActionsPerCycle: 1,
     cycleIndex: 1
@@ -105,4 +113,11 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   assert.equal(contextCitesPreviousJudgment(context, "cycle-0001"), true);
   assert.equal(context.memory_packet.retrieved_episodic[0]?.memory_id, "social-cycle-blocker");
   assert.equal(context.memory_packet.retrieval_policy.objective_category, "social_cycle");
+  assert.equal(context.settlement_state.inventory_counts.oak_log, 2);
+  assert.equal(context.settlement_state.progress.has_crafting_table, true);
+  assert.equal(
+    context.settlement_state.checklist.items.find((item) => item.id === "crafting_table_known_or_placed")?.status,
+    "satisfied"
+  );
+  assert.equal(context.settlement_state.blocker_histogram.length, 1);
 });

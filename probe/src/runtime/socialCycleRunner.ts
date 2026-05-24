@@ -22,7 +22,7 @@ import type {
   WorldEventKind
 } from "./goals/types.js";
 import { createWorldEvent, listWorldEvents, writeWorldEvent } from "./goals/worldEventStore.js";
-import { runSocialGoalMindProvider } from "../provider/socialGoalMindProvider.js";
+import { runSocialCycleGoalProvider } from "../provider/socialGoalMindProvider.js";
 import { runSocialActionPlannerProvider } from "../provider/socialActionPlannerProvider.js";
 import { runSocialCycleJudgmentProvider } from "../provider/socialCycleJudgmentProvider.js";
 import type { OpenAiJsonProviderConfig } from "../provider/openaiApiJsonProvider.js";
@@ -44,6 +44,12 @@ import { createBots, closeBots } from "./createBots.js";
 import { ensureLiveSmokeServer } from "../server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
 import { startDockerServer } from "../server/dockerServer.js";
+import {
+  buildSettlementState,
+  type ActionSkillPostconditionResult,
+  type ToolResultRecord
+} from "./settlement/settlementState.js";
+import { applyCycleJudgmentRelationshipEventProposals } from "../reviewer/relationshipProposalApplier.js";
 
 type ServerEndpoint = {
   host: string;
@@ -67,6 +73,7 @@ type SocialCycleActionAttemptReport = {
   tool_statuses: SocialPrimitiveAttemptStatus[];
   runtime_result: JsonValue;
   runtime_status: string;
+  postcondition_results: ActionSkillPostconditionResult[];
 };
 
 type SocialCycleReportCycleWithAttempts = SocialCycleRunReport["cycles"][number] & {
@@ -330,6 +337,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     ref: string;
     judgment: CycleJudgment;
   } | null = null;
+  const recentToolResults: ToolResultRecord[] = [];
+  const allPostconditionResults: ActionSkillPostconditionResult[] = [];
+  let memoryWriteCount = 0;
 
   try {
     const activeSkills = await listActiveActorActionSkillRecords(rootDir, input.actorId);
@@ -364,7 +374,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         observation,
         allowedPrimitiveIds: allowedPrimitives,
         maxActionsPerCycle: input.maxActionsPerCycle,
-        cycleIndex
+        cycleIndex,
+        recentToolResults
       });
 
       report.agency_status.used_world_event_refs = worldEvents.length;
@@ -372,8 +383,15 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.agency_status.used_memory_refs,
         listActorMemoryRefs(context.memory_packet).length
       );
+      if (report.memory_reuse) {
+        report.memory_reuse.retrieved_memory_refs = Math.max(
+          report.memory_reuse.retrieved_memory_refs,
+          listActorMemoryRefs(context.memory_packet).length
+        );
+        report.memory_reuse.used_previous_judgment = report.agency_status.used_previous_judgment;
+      }
 
-      const goalMind = await runSocialGoalMindProvider({
+      const cycleGoalProvider = await runSocialCycleGoalProvider({
         providerId: input.providerId,
         actorWorkspaceRootDir: rootDir,
         actorId: input.actorId,
@@ -384,19 +402,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         allowedPrimitiveIds: allowedPrimitives
       });
 
-      if (!goalMind.ok) {
+      if (!cycleGoalProvider.ok) {
         providerFailed = true;
-        report.provider_error = goalMind.error;
+        report.provider_error = cycleGoalProvider.error;
         break;
       }
 
       report.agency_status.strategic_goal_source =
-        goalMind.source === "llm_planner" ? "llm_planner" : "runtime_rule";
-      report.agency_status.cycle_goal_source = goalMind.cycleGoal.source;
+        cycleGoalProvider.source === "llm_planner" ? "llm_planner" : "runtime_rule";
+      report.agency_status.cycle_goal_source = cycleGoalProvider.cycleGoal.source;
       report.agency_status.builtin_goal_authority = input.providerId === "deterministic-social";
 
       const paths = getActorWorkspacePaths(rootDir, input.actorId);
-      const cycleGoalRef = path.join("goals", "cycle", `${goalMind.cycleGoal.goal_id}.json`);
+      const cycleGoalRef = path.join("goals", "cycle", `${cycleGoalProvider.cycleGoal.goal_id}.json`);
 
       let lastIntentRef = "";
       let lastVerifier: "passed" | "failed" | "not_applicable" = "not_applicable";
@@ -424,7 +442,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleId,
           turnId: actionTurnId,
           actionIndex,
-          cycleGoal: goalMind.cycleGoal,
+          cycleGoal: cycleGoalProvider.cycleGoal,
           context: actionContext,
           openAi,
           defaultPrimitive: actionIndex === 0 ? "observe" : "wait",
@@ -453,7 +471,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           actorId: input.actorId,
           cycleId,
           turnId: actionTurnId,
-          cycleGoal: goalMind.cycleGoal,
+          cycleGoal: cycleGoalProvider.cycleGoal,
           intent: planner.intent,
           activeActionSkills: executableActiveSkills,
           bot
@@ -466,6 +484,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         ) {
           anyMeaningfulProgress = true;
         }
+        allPostconditionResults.push(...execution.postconditionResults);
+        recentToolResults.push(...execution.toolResults);
+        if (recentToolResults.length > 20) {
+          recentToolResults.splice(0, recentToolResults.length - 20);
+        }
 
         const judgmentResult = await runSocialCycleJudgmentProvider({
           providerId: input.providerId,
@@ -474,7 +497,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleId,
           turnId: actionTurnId,
           actionIndex,
-          cycleGoal: goalMind.cycleGoal,
+          cycleGoal: cycleGoalProvider.cycleGoal,
           actionIntent: planner.intent,
           context: actionContext,
           runtimeResult: execution.runtimeResult,
@@ -519,16 +542,26 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             ? "blocked"
             : execution.verifierStatus === "failed"
               ? "failed"
-              : "completed"
+              : "completed",
+          postcondition_results: execution.postconditionResults
         });
 
-        await persistJudgmentMemoryWrites(
+        const memoryWrites = await persistJudgmentMemoryWrites(
           rootDir,
           input.actorId,
           judgmentResult.judgment,
           planner.intent,
           execution.executedTools
         );
+        memoryWriteCount += memoryWrites;
+        if (report.memory_reuse) {
+          report.memory_reuse.memory_writes = memoryWriteCount;
+        }
+        const relationshipApplications = await applyCycleJudgmentRelationshipEventProposals(
+          rootDir,
+          judgmentResult.judgment
+        );
+        report.relationship_application_results?.push(...relationshipApplications);
         await bumpLifeGoalCounters(rootDir, input.actorId, { actions: 1 });
 
         if (execution.verifierStatus === "passed" || execution.verifierStatus === "failed") {
@@ -545,11 +578,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         cycle_goal_ref: cycleGoalRef,
         action_intent_ref: lastIntentRef,
         provider_input_refs: [
-          path.relative(paths.actorDir, goalMind.inputRef),
+          path.relative(paths.actorDir, cycleGoalProvider.inputRef),
           ...actionAttempts.flatMap((attempt) => attempt.provider_input_refs)
         ].filter(Boolean),
         provider_output_refs: [
-          path.relative(paths.actorDir, goalMind.outputRef),
+          path.relative(paths.actorDir, cycleGoalProvider.outputRef),
           ...actionAttempts.flatMap((attempt) => attempt.provider_output_refs)
         ].filter(Boolean),
         evidence_refs: actionAttempts.flatMap((attempt) => attempt.evidence_refs),
@@ -561,6 +594,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       previousCycleJudgment = lastJudgment;
       await bumpLifeGoalCounters(rootDir, input.actorId, { cycles: 1 });
       report.action_skill_execution_unit = actionSkillExecutionUnit;
+      report.postcondition_results = allPostconditionResults;
+      report.settlement_state = buildSettlementState({
+        actorId: input.actorId,
+        observation: await observeActorWorld({ actorId: input.actorId, bot }),
+        activeActionSkills: executableActiveSkills,
+        previousJudgments: previousCycleJudgment ? [previousCycleJudgment] : [],
+        recentToolResults,
+        postconditionResults: allPostconditionResults,
+        evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
+        judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+        memoryWriteCount
+      });
+      report.settlement_checklist = report.settlement_state.checklist;
 
       // Long runs flush after each cycle so partial progress stays reviewable on failure.
       await writeJson(input.reportPath, report);

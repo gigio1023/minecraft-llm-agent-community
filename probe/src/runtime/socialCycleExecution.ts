@@ -43,6 +43,11 @@ import {
   deriveProgressVerifierStatus,
   type SocialPrimitiveAttemptStatus
 } from "./socialCycleProgress.js";
+import {
+  evaluateSocialActionSkillPostcondition,
+  type ActionSkillPostconditionResult,
+  type ToolResultRecord
+} from "./settlement/settlementState.js";
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "observe",
@@ -83,6 +88,20 @@ export type SocialCycleExecutionResult = {
   verifierStatus: "passed" | "failed" | "not_applicable";
   gateBlocked: boolean;
   actionSkillExecutionUnit: boolean;
+  postconditionResults: ActionSkillPostconditionResult[];
+  toolResults: ToolResultRecord[];
+};
+
+export type SocialMovementPolicy = {
+  maxDistanceBlocks: number;
+  allowedTargets: string[];
+  requiresMeasuredMovementEvidence: boolean;
+};
+
+export const DEFAULT_SOCIAL_MOVEMENT_POLICY: SocialMovementPolicy = {
+  maxDistanceBlocks: 12,
+  allowedTargets: ["bounded_scout_waypoint", "observed_resource", "known_settlement_position", "visible_actor"],
+  requiresMeasuredMovementEvidence: true
 };
 
 function syntheticObservation(actorId: string): ObserveResult {
@@ -499,10 +518,25 @@ async function manualMoveToward(input: {
 async function runSocialMoveTo(input: {
   bot: Bot;
   args: Record<string, unknown>;
+  movementPolicy?: SocialMovementPolicy;
 }): Promise<JsonValue> {
   const before = positionOf(input.bot);
   const requestedTarget = readScoutTarget(input.args, before);
   const target = resolveSurfaceTarget(input.bot, requestedTarget, before);
+  const movementPolicy = input.movementPolicy ?? DEFAULT_SOCIAL_MOVEMENT_POLICY;
+  const requestedDistance = distance(before, target);
+  if (requestedDistance > movementPolicy.maxDistanceBlocks + 0.5) {
+    return {
+      status: "blocked",
+      requestedTarget,
+      target,
+      beforePosition: before,
+      distanceMoved: 0,
+      distanceToTarget: round(requestedDistance),
+      movementPolicy,
+      reason: `move_to target is ${round(requestedDistance)} blocks away, above bounded social movement limit ${movementPolicy.maxDistanceBlocks}.`
+    } as JsonValue;
+  }
   const timeoutMs = typeof input.args.timeoutMs === "number" ? input.args.timeoutMs : 8_000;
   const manualDurationMs =
     typeof input.args.durationMs === "number" ? input.args.durationMs : 1_200;
@@ -556,6 +590,7 @@ async function runSocialMoveTo(input: {
     distanceToTarget,
     pathfinderFailureReason,
     manualFallbackUsed,
+    movementPolicy,
     reason: arrived
       ? "move_to reached the bounded scouting waypoint."
       : moved
@@ -588,7 +623,8 @@ async function runSocialPrimitive(input: {
     case "move_to":
       return runSocialMoveTo({
         bot: input.bot,
-        args: proposal.args
+        args: proposal.args,
+        movementPolicy: DEFAULT_SOCIAL_MOVEMENT_POLICY
       });
     case "wait":
       return (await wait({ ticks: readTicks(proposal.args) })) as unknown as JsonValue;
@@ -877,7 +913,9 @@ export async function executeSocialActionIntent(input: {
         toolStatuses,
         verifierStatus: "not_applicable",
         gateBlocked: false,
-        actionSkillExecutionUnit: false
+        actionSkillExecutionUnit: false,
+        postconditionResults: [],
+        toolResults: []
       };
     }
 
@@ -911,7 +949,9 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: false,
-      actionSkillExecutionUnit: false
+      actionSkillExecutionUnit: false,
+      postconditionResults: [],
+      toolResults: []
     };
   }
 
@@ -928,7 +968,9 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
-      actionSkillExecutionUnit
+      actionSkillExecutionUnit,
+      postconditionResults: [],
+      toolResults: []
     };
   }
 
@@ -941,7 +983,9 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
-      actionSkillExecutionUnit
+      actionSkillExecutionUnit,
+      postconditionResults: [],
+      toolResults: []
     };
   }
 
@@ -958,7 +1002,9 @@ export async function executeSocialActionIntent(input: {
         toolStatuses,
         verifierStatus: "not_applicable",
         gateBlocked: true,
-        actionSkillExecutionUnit
+        actionSkillExecutionUnit,
+        postconditionResults: [],
+        toolResults: []
       };
     }
   }
@@ -981,11 +1027,14 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
-      actionSkillExecutionUnit
+      actionSkillExecutionUnit,
+      postconditionResults: [],
+      toolResults: []
     };
   }
 
   let lastToolResult: JsonValue = { status: "blocked", reason: "No primitives executed" };
+  const toolResults: ToolResultRecord[] = [];
 
   for (const primitive of primitivesToRun) {
     const step = await executePrimitiveWithEvidence({
@@ -1001,6 +1050,12 @@ export async function executeSocialActionIntent(input: {
     evidenceRefs.push(step.evidenceRef);
     executedTools.push(primitive);
     toolStatuses.push({ tool: primitive, status: step.status });
+    toolResults.push({
+      tool: primitive,
+      status: step.status,
+      result: step.toolResult,
+      evidence_ref: step.evidenceRef
+    });
     lastToolResult = step.toolResult;
 
     if (step.gateBlocked || step.status === "error" || step.status === "blocked") {
@@ -1009,9 +1064,22 @@ export async function executeSocialActionIntent(input: {
     }
   }
 
-  const verifierStatus = deriveProgressVerifierStatus({
+  const postconditionResults =
+    actionSkillExecutionUnit && input.intent.action_skill_id
+      ? [
+          evaluateSocialActionSkillPostcondition({
+            actionSkillId: input.intent.action_skill_id,
+            toolResults,
+            evidenceRefs
+          })
+        ]
+      : [];
+  const derivedVerifierStatus = deriveProgressVerifierStatus({
     toolAttempts: toolStatuses
   });
+  const verifierStatus = postconditionResults.some((result) => result.status === "failed")
+    ? "failed"
+    : derivedVerifierStatus;
 
   return {
     observation,
@@ -1019,14 +1087,17 @@ export async function executeSocialActionIntent(input: {
       action_skill_execution_unit: actionSkillExecutionUnit,
       executed_tools: executedTools,
       tool_statuses: toolStatuses as unknown as JsonValue,
-      last_tool_result: lastToolResult
+      last_tool_result: lastToolResult,
+      postcondition_results: postconditionResults as unknown as JsonValue
     },
     evidenceRefs,
     executedTools,
     toolStatuses,
     verifierStatus,
     gateBlocked,
-    actionSkillExecutionUnit
+    actionSkillExecutionUnit,
+    postconditionResults,
+    toolResults
   };
 }
 

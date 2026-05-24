@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { SocialCycleRunReport } from "./types.js";
-import { goalMindInputIncludesSoulAndLifeGoal } from "./types.js";
+import { cycleGoalProviderInputIncludesSoulAndLifeGoal } from "./types.js";
 import { readJsonIfExists } from "./goalJsonStore.js";
 import { loadProbeConfig } from "../../config.js";
 
@@ -309,7 +309,7 @@ async function auditProviderInputs(actorDir: string, inputRefs: string[]) {
     const stage = snapshot.input.stage;
     if (
       (stage === "goal_mind" || stage === "action_planner" || stage === "cycle_judgment") &&
-      !goalMindInputIncludesSoulAndLifeGoal(snapshot.input)
+      !cycleGoalProviderInputIncludesSoulAndLifeGoal(snapshot.input)
     ) {
       errors.push(`Provider input ${ref} missing ActorSoul or ActorLifeGoal`);
     }
@@ -332,6 +332,40 @@ function extractWorldEventSummaries(input: Record<string, unknown>) {
   return input.world_events
     .map((event) => isRecord(event) && typeof event.summary === "string" ? event.summary : null)
     .filter((summary): summary is string => typeof summary === "string" && summary.length > 0);
+}
+
+function auditSettlementEvidence(report: SocialCycleRunReport, errors: string[]) {
+  const contractOnly = readContractOnlyMode(report);
+  if (report.runtime_status === "passed" && !contractOnly) {
+    if (!report.settlement_state || !report.settlement_checklist) {
+      errors.push("Passed social-cycle report is missing settlement_state or settlement_checklist");
+    }
+  }
+
+  for (const result of report.postcondition_results ?? []) {
+    if (
+      result.status === "passed" &&
+      result.checklist_item_ids.length > 0 &&
+      result.evidence_refs.length === 0
+    ) {
+      errors.push(`Postcondition ${result.action_skill_id} passed without evidence refs`);
+    }
+  }
+
+  const physicalChecklistIds = new Set([
+    "crafting_table_known_or_placed",
+    "starter_shelter_verified",
+    "shared_storage_contribution"
+  ]);
+  for (const item of report.settlement_checklist?.items ?? []) {
+    if (
+      item.status === "satisfied" &&
+      physicalChecklistIds.has(item.id) &&
+      item.evidence_refs.length === 0
+    ) {
+      errors.push(`Settlement checklist item ${item.id} is satisfied without evidence refs`);
+    }
+  }
 }
 
 export async function auditSocialCycleReport(reportPath: string): Promise<string[]> {
@@ -444,6 +478,8 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
   ) {
     errors.push("runtime_status is passed without verifier-backed gameplay progress");
   }
+
+  auditSettlementEvidence(report, errors);
 
   if (actorDir) {
     const lifeGoal = await readJsonIfExists<{ objective?: string }>(

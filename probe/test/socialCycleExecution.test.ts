@@ -14,6 +14,7 @@ import {
 } from "../src/runtime/socialCycleProgress.js";
 import type { ActionIntent, CycleJudgment } from "../src/runtime/goals/types.js";
 import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
+import { evaluateSocialActionSkillPostcondition } from "../src/runtime/settlement/settlementState.js";
 
 test("gatherer social affordances expose the role-safe runtime body", () => {
   const allowed = compileSocialAllowedPrimitives("gatherer");
@@ -199,4 +200,49 @@ test("social action skill exposure keeps only executable primitive bundles", () 
     filterExecutableSocialActionSkills(activeSkills).map((record) => record.skill_id),
     ["collectLogs", "depositSharedItems"]
   );
+});
+
+test("social action skill postcondition accepts verified shelter evidence", () => {
+  const result = evaluateSocialActionSkillPostcondition({
+    actionSkillId: "buildBasicShelter",
+    evidenceRefs: ["evidence/cycle-0001-build_pattern.json"],
+    toolResults: [
+      {
+        tool: "build_pattern",
+        status: "built",
+        evidence_ref: "evidence/cycle-0001-build_pattern.json",
+        result: {
+          status: "built",
+          verification: {
+            status: "passed"
+          }
+        }
+      }
+    ]
+  });
+
+  assert.equal(result.status, "passed");
+  assert.deepEqual(result.checklist_item_ids, ["starter_shelter_verified"]);
+});
+
+test("social action skill postcondition rejects table placement without placed table evidence", () => {
+  const result = evaluateSocialActionSkillPostcondition({
+    actionSkillId: "placeCraftingTable",
+    evidenceRefs: ["evidence/cycle-0001-place_block.json"],
+    toolResults: [
+      {
+        tool: "place_block",
+        status: "blocked",
+        evidence_ref: "evidence/cycle-0001-place_block.json",
+        result: {
+          status: "blocked",
+          itemName: "crafting_table",
+          reason: "no adjacent support"
+        }
+      }
+    ]
+  });
+
+  assert.equal(result.status, "failed");
+  assert.deepEqual(result.checklist_item_ids, ["crafting_table_known_or_placed"]);
 });

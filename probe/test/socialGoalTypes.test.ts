@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  goalMindInputIncludesSoulAndLifeGoal,
+  cycleGoalProviderInputIncludesSoulAndLifeGoal,
   validateActorCycleGoal,
   validateActorLifeGoal,
   validateActorSoul
@@ -30,7 +30,7 @@ test("ActorSoul and LifeGoal validators accept canonical records", () => {
   assert.equal(validateActorSoul(soul).ok, true);
   assert.equal(validateActorLifeGoal(lifeGoal).ok, true);
   assert.equal(
-    goalMindInputIncludesSoulAndLifeGoal({ ActorSoul: soul, ActorLifeGoal: lifeGoal }),
+    cycleGoalProviderInputIncludesSoulAndLifeGoal({ ActorSoul: soul, ActorLifeGoal: lifeGoal }),
     true
   );
 });

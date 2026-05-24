@@ -233,3 +233,58 @@ test("rejects synthetic passed reports without verifier-backed gameplay progress
     )
   );
 });
+
+test("rejects satisfied settlement checklist items without evidence refs", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-settlement-evidence");
+  const report = baseReport();
+  report.runtime_status = "passed";
+  report.agency_status.gameplay_progress_verified = true;
+  report.cycles = report.cycles.map((cycle, index) => ({
+    ...cycle,
+    verifier_status: index === 0 ? "passed" : "not_applicable"
+  }));
+  report.settlement_checklist = {
+    schema: "settlement-checklist/v1",
+    satisfied_count: 1,
+    pending_count: 0,
+    blocked_count: 0,
+    items: [
+      {
+        id: "crafting_table_known_or_placed",
+        status: "satisfied",
+        evidence_refs: [],
+        reason: "fixture forgot evidence"
+      }
+    ]
+  };
+  report.settlement_state = {
+    schema: "settlement-state/v1",
+    actor_id: actorId,
+    updated_at: "2026-05-24T00:00:00.000Z",
+    inventory_counts: {},
+    shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+    known_positions: {},
+    blocker_histogram: [],
+    available_action_skill_ids: [],
+    missing_primitive_blockers: [],
+    progress: {
+      has_crafting_table: true,
+      has_verified_shelter: false,
+      has_shared_storage_contribution: false,
+      has_judgment_or_memory: true,
+      has_blocker_summary: false
+    },
+    checklist: report.settlement_checklist
+  };
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.ok(
+    errors.some((error) =>
+      error.includes("Settlement checklist item crafting_table_known_or_placed is satisfied without evidence refs")
+    )
+  );
+});

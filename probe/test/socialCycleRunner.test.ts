@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { runSocialCycle } from "../src/runtime/socialCycleRunner.js";
-import { goalMindInputIncludesSoulAndLifeGoal } from "../src/runtime/goals/types.js";
+import { cycleGoalProviderInputIncludesSoulAndLifeGoal } from "../src/runtime/goals/types.js";
 import { readJsonIfExists } from "../src/runtime/goals/goalJsonStore.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -51,14 +51,18 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.equal(result.report.agency_status.used_previous_judgment, true);
   assert.equal(result.report.runtime_status, "blocked");
   assert.equal(result.report.agency_status.gameplay_progress_verified, false);
+  assert.equal(result.report.settlement_state?.schema, "settlement-state/v1");
+  assert.equal(result.report.settlement_checklist?.schema, "settlement-checklist/v1");
+  assert.equal(result.report.memory_reuse?.used_previous_judgment, true);
+  assert.ok((result.report.memory_reuse?.memory_writes ?? 0) >= 2);
 
   const actorDir = path.join(rootDir, "actors", "npc_b");
-  const cycle2GoalMindInput = result.report.cycles[1]?.provider_input_refs[0];
-  assert.ok(cycle2GoalMindInput);
+  const cycle2CycleGoalProviderInput = result.report.cycles[1]?.provider_input_refs[0];
+  assert.ok(cycle2CycleGoalProviderInput);
   const snapshot = await readJsonIfExists<{ input?: unknown }>(
-    path.join(actorDir, cycle2GoalMindInput)
+    path.join(actorDir, cycle2CycleGoalProviderInput)
   );
-  assert.equal(goalMindInputIncludesSoulAndLifeGoal(snapshot?.input), true);
+  assert.equal(cycleGoalProviderInputIncludesSoulAndLifeGoal(snapshot?.input), true);
   const prior = (snapshot?.input as { previous_cycle_judgments?: unknown[] })?.previous_cycle_judgments;
   assert.ok(prior && prior.length > 0);
   assert.equal(prior.length, 1);
@@ -141,9 +145,9 @@ test("stale alphabetically later judgment is not used as previous context", asyn
   });
 
   const actorDir = path.join(isolatedRoot, actorId);
-  const cycle2GoalMindInput = result.report.cycles[1]?.provider_input_refs[0];
+  const cycle2CycleGoalProviderInput = result.report.cycles[1]?.provider_input_refs[0];
   const snapshot = await readJsonIfExists<{ input?: { previous_cycle_judgments?: Array<{ cycle_id?: string }> } }>(
-    path.join(actorDir, cycle2GoalMindInput ?? "")
+    path.join(actorDir, cycle2CycleGoalProviderInput ?? "")
   );
   const prior = snapshot?.input?.previous_cycle_judgments ?? [];
   assert.equal(prior.length, 1);

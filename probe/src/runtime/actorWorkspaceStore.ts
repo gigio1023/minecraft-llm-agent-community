@@ -156,6 +156,7 @@ export function getRequiredActorWorkspaceDirs(rootDir: string, actorId: string) 
     paths.memory.guardrailsDir,
     paths.memory.indexDir,
     paths.relationshipsDir,
+    paths.settlementDir,
     paths.evidenceDir,
     paths.reviewsDir,
     paths.providerInputsDir,

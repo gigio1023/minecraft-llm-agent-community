@@ -18,6 +18,7 @@ export type ActorWorkspacePaths = {
     indexDir: string;
   };
   relationshipsDir: string;
+  settlementDir: string;
   evidenceDir: string;
   reviewsDir: string;
   providerInputsDir: string;
@@ -85,6 +86,7 @@ export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorW
       indexDir: path.join(memoryRootDir, "index")
     },
     relationshipsDir: path.join(actorDir, "relationships"),
+    settlementDir: path.join(actorDir, "settlement"),
     evidenceDir: path.join(actorDir, "evidence"),
     reviewsDir: path.join(actorDir, "reviews"),
     providerInputsDir: path.join(actorDir, "provider-inputs"),

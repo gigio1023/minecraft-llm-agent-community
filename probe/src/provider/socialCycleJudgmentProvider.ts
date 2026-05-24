@@ -115,7 +115,9 @@ export async function runSocialCycleJudgmentProvider(input: {
     runtime_result: input.runtimeResult,
     evidence_refs: input.evidenceRefs,
     executed_tools: input.executedTools,
-    verifier_status: input.verifierStatus
+    verifier_status: input.verifierStatus,
+    settlement_state: input.context.settlement_state,
+    settlement_checklist: input.context.settlement_state.checklist
   } as JsonValue;
 
   const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
@@ -168,7 +170,7 @@ export async function runSocialCycleJudgmentProvider(input: {
       config: input.openAi!,
       schemaName: "social_cycle_judgment",
       schema: judgmentSchema,
-      system: `Write CycleJudgment from runtime evidence only. Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs.
+      system: `Write CycleJudgment from runtime evidence only. Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
 observe-only cycles are no_progress, not verified_progress. ActorSoul and ActorLifeGoal must inform why_it_mattered_for_life_goal. JSON only.`,
       user: JSON.stringify(providerInput)
     });

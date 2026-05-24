@@ -15,6 +15,8 @@ import type {
 } from "./types.js";
 import { lifeGoalRef } from "./lifeGoalStore.js";
 import { soulRef } from "./actorSoulStore.js";
+import { buildSettlementState, type SettlementState } from "../settlement/settlementState.js";
+import type { ToolResultRecord } from "../settlement/settlementState.js";
 
 export type SocialCycleContextPacket = {
   schema: "social-cycle-context/v1";
@@ -40,6 +42,7 @@ export type SocialCycleContextPacket = {
   allowed_primitive_ids: string[];
   relationship_context: unknown;
   memory_packet: ActorMemoryRetrievalPacket;
+  settlement_state: SettlementState;
   limits: {
     max_actions_per_cycle: number;
     cycle_index: number;
@@ -108,6 +111,7 @@ export async function assembleSocialCycleContext(input: {
   allowedPrimitiveIds: string[];
   maxActionsPerCycle: number;
   cycleIndex: number;
+  recentToolResults?: readonly ToolResultRecord[];
 }): Promise<SocialCycleContextPacket> {
   const actionSkillIds = input.activeActionSkills.map((record) => record.skill_id);
   const itemNames = [
@@ -124,6 +128,14 @@ export async function assembleSocialCycleContext(input: {
       limit: 8
     }
   );
+  const settlementState = buildSettlementState({
+    actorId: input.actorId,
+    observation: input.observation,
+    activeActionSkills: input.activeActionSkills,
+    previousJudgments: input.previousJudgments,
+    recentToolResults: input.recentToolResults,
+    judgmentRefs: input.previousJudgments.map((entry) => entry.ref)
+  });
 
   const providerContext = await buildActorProviderContext({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -161,6 +173,7 @@ export async function assembleSocialCycleContext(input: {
     allowed_primitive_ids: [...input.allowedPrimitiveIds],
     relationship_context: providerContext.relationships,
     memory_packet: memoryPacket,
+    settlement_state: settlementState,
     limits: {
       max_actions_per_cycle: input.maxActionsPerCycle,
       cycle_index: input.cycleIndex
@@ -180,7 +193,7 @@ export function contextCitesPreviousJudgment(
   return context.previous_cycle_judgments.some((entry) => entry.cycle_id === priorCycleId);
 }
 
-export type ParsedGoalMindOutput = {
+export type ParsedCycleGoalProviderOutput = {
   strategic_goal_updates: StrategicGoal[];
   cycle_goal: ActorCycleGoal;
 };

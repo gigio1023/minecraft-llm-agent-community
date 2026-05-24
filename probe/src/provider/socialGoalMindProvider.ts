@@ -20,7 +20,7 @@ import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import { listActorMemoryRefs } from "../memory/actorMemory.js";
 
-const goalMindSchema = {
+const cycleGoalProviderSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
@@ -64,7 +64,7 @@ const goalMindSchema = {
   required: ["strategic_goal_updates", "cycle_goal"]
 } as const;
 
-export type GoalMindProviderResult =
+export type CycleGoalProviderResult =
   | {
       ok: true;
       strategicGoals: StrategicGoal[];
@@ -94,7 +94,7 @@ function normalizeCycleGoalFields(
     rationale:
       typeof raw.rationale === "string" && raw.rationale.trim().length > 0
         ? raw.rationale.trim()
-        : "Goal Mind omitted rationale; filled minimal contract from LifeGoal.",
+        : "CycleGoal provider omitted rationale; filled minimal contract from LifeGoal.",
     success_verifier:
       typeof raw.success_verifier === "string" && raw.success_verifier.trim().length > 0
         ? raw.success_verifier.trim()
@@ -152,7 +152,7 @@ function cycleGoalFromLlm(input: {
   };
 }
 
-export async function runSocialGoalMindProvider(input: {
+export async function runSocialCycleGoalProvider(input: {
   providerId: "openai-api" | "deterministic-social";
   actorWorkspaceRootDir: string;
   actorId: string;
@@ -161,7 +161,7 @@ export async function runSocialGoalMindProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
-}): Promise<GoalMindProviderResult> {
+}): Promise<CycleGoalProviderResult> {
   const snapshotId = `goal-mind-${input.cycleId}-${randomUUID()}`;
   const turnId = input.cycleId;
   const providerInput = {
@@ -230,12 +230,14 @@ export async function runSocialGoalMindProvider(input: {
     };
   }
 
-  const system = `You are the Goal Mind for a Minecraft social simulation actor.
+  const system = `You are the cycle goal provider for a Minecraft social simulation actor.
 ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a WorldEvent summary.
-WorldEvents are pressure only. The word social means the actor has a persona and relationships; it does not mean every action must be chat or coordination.
+WorldEvents are pressure only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
 Choose an ordinary Minecraft CycleGoal when the situation calls for it. Collecting logs is just collecting logs unless observation, memory, or relationships make it socially relevant.
 The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
 For survival and settlement goals, value evidence of diversified progress: safe positioning, resource discovery, enough starter wood, crafting, stone/tool progression, and shared storage. Do not make surplus collection of one stocked material the continuing goal unless live evidence shows it is still the best need.
+Use settlement_state and settlement_checklist as runtime-owned evidence about what is already complete, blocked, or pending. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
 If observation includes nearbyResources or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose a different plausible next direction such as movement, observation, gathering, crafting, speech, or memory based on the live context. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
@@ -258,7 +260,7 @@ If observation includes nearbyResources or previous judgments include blocked ev
   }>({
     config: input.openAi!,
     schemaName: "social_goal_mind",
-    schema: goalMindSchema,
+    schema: cycleGoalProviderSchema,
     system,
     user
   });
@@ -308,7 +310,7 @@ If observation includes nearbyResources or previous judgments include blocked ev
     });
     return {
       ok: false,
-      error: "Goal Mind output missing cycle_goal",
+      error: "CycleGoal provider output missing cycle_goal",
       inputRef: inputPath,
       outputRef: outputPath
     };
@@ -328,7 +330,7 @@ If observation includes nearbyResources or previous judgments include blocked ev
     rationale:
       typeof update.rationale === "string" && update.rationale.trim().length > 0
         ? update.rationale.trim()
-        : "Goal Mind strategic update",
+        : "CycleGoal provider strategic update",
     derived_from: {
       soul_ref: soulRef(input.actorId),
       world_event_refs: input.context.world_events.map((e) => `world-events/${e.event_id}.json`),
@@ -404,4 +406,11 @@ If observation includes nearbyResources or previous judgments include blocked ev
     outputRef: outputPath,
     source: "llm_planner"
   };
+}
+
+/** @deprecated Use runSocialCycleGoalProvider for new code. */
+export async function runSocialGoalMindProvider(
+  input: Parameters<typeof runSocialCycleGoalProvider>[0]
+): Promise<CycleGoalProviderResult> {
+  return runSocialCycleGoalProvider(input);
 }
