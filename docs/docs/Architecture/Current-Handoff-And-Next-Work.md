@@ -290,6 +290,18 @@ npm run build
 The docs build still emits the known Docusaurus `localStorage` experimental
 warning. It does not fail the build.
 
+## Current Provider Cost Posture
+
+- `probe:social-cycle` defaults to `deterministic-social`; live provider calls
+  require `--provider`.
+- Current lightweight live provider target is `gemini-api` with
+  `gemma-4-31b-it`.
+- Provider-backed calls write usage records into provider output snapshots and
+  `build/provider-usage/provider-usage-ledger.jsonl`.
+- Use `PROVIDER_USAGE_BUDGETS_JSON` or
+  `build/provider-usage/free-tier-budgets.json` to encode user-provided
+  dashboard usage before long free-tier runs.
+
 ## Important Live Evidence So Far
 
 Latest fresh action-skill matrix:

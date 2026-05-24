@@ -13,6 +13,7 @@ import {
 } from "../runtime/goals/strategicGoalStore.js";
 import { soulRef } from "../runtime/goals/actorSoulStore.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
+import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
@@ -160,14 +161,16 @@ function cycleGoalFromLlm(input: {
  * action surface.
  */
 export async function runSocialCycleGoalProvider(input: {
-  providerId: "openai-api" | "deterministic-social";
+  providerId: "openai-api" | "gemini-api" | "deterministic-social";
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
+  gemini?: GeminiJsonProviderConfig;
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
+  runId?: string;
 }): Promise<CycleGoalProviderResult> {
   const snapshotId = `goal-mind-${input.cycleId}-${randomUUID()}`;
   const turnId = input.cycleId;
@@ -182,7 +185,7 @@ export async function runSocialCycleGoalProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     input: providerInput
   });
@@ -250,7 +253,38 @@ If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or 
 If observation includes nearbyResources or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose a different plausible next direction such as movement, observation, gathering, crafting, speech, or memory based on the live context. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
-  const result = await callOpenAiJsonSchema<{
+  const providerCall = {
+    schemaName: "social_goal_mind",
+    schema: cycleGoalProviderSchema,
+    system,
+    user,
+    usageContext: {
+      runId: input.runId,
+      actorId: input.actorId,
+      turnId,
+      stage: "goal_mind"
+    }
+  };
+  const result = input.providerId === "gemini-api" ? await callGeminiJsonSchema<{
+    strategic_goal_updates: Array<{
+      summary: string;
+      rationale: string;
+      success_direction: string;
+      current_blockers: string[];
+    }>;
+    cycle_goal: {
+      summary: string;
+      rationale: string;
+      success_verifier: string;
+      evidence_required: string[];
+      stop_conditions: string[];
+      allowed_action_skill_ids: string[];
+      allowed_primitive_ids: string[];
+    };
+  }>({
+    config: input.gemini!,
+    ...providerCall
+  }) : await callOpenAiJsonSchema<{
     strategic_goal_updates: Array<{
       summary: string;
       rationale: string;
@@ -268,10 +302,7 @@ If observation includes nearbyResources or previous judgments include blocked ev
     };
   }>({
     config: input.openAi!,
-    schemaName: "social_goal_mind",
-    schema: cycleGoalProviderSchema,
-    system,
-    user
+    ...providerCall
   });
 
   if (!result.ok) {
@@ -284,8 +315,13 @@ If observation includes nearbyResources or previous judgments include blocked ev
       model: result.model,
       created_at: new Date().toISOString(),
       raw_output_text: result.rawText ?? "",
-      parsed_output: { error: result.message, error_kind: result.errorKind },
-      proposal: { error: result.message }
+      parsed_output: {
+        error: result.message,
+        error_kind: result.errorKind,
+        budget_decision: result.budgetDecision as unknown as JsonValue
+      },
+      proposal: { error: result.message },
+      usage: result.usageRecord
     });
     return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
   }
@@ -315,7 +351,8 @@ If observation includes nearbyResources or previous judgments include blocked ev
       created_at: new Date().toISOString(),
       raw_output_text: result.rawText,
       parsed_output: result.parsed as unknown as JsonValue,
-      proposal: { error: "missing_cycle_goal" }
+      proposal: { error: "missing_cycle_goal" },
+      usage: result.usageRecord
     });
     return {
       ok: false,
@@ -379,7 +416,8 @@ If observation includes nearbyResources or previous judgments include blocked ev
       created_at: new Date().toISOString(),
       raw_output_text: result.rawText,
       parsed_output: { validation_errors: validated.errors },
-      proposal: { error: "invalid_cycle_goal" }
+      proposal: { error: "invalid_cycle_goal" },
+      usage: result.usageRecord
     });
     return {
       ok: false,
@@ -404,7 +442,8 @@ If observation includes nearbyResources or previous judgments include blocked ev
     created_at: new Date().toISOString(),
     raw_output_text: result.rawText,
     parsed_output: result.parsed as unknown as JsonValue,
-    proposal: { cycle_goal_ref: cycleGoalRef }
+    proposal: { cycle_goal_ref: cycleGoalRef },
+    usage: result.usageRecord
   });
 
   return {

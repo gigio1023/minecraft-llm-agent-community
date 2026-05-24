@@ -5,6 +5,7 @@ import type {
   SettlementChecklist,
   SettlementState
 } from "../settlement/settlementState.js";
+import type { ProviderUsageSummary } from "../../provider/providerUsageTracker.js";
 
 export type ActorSoul = {
   schema: "actor-soul/v1";
@@ -248,7 +249,7 @@ export type CycleJudgment = {
   next_goal_pressure: string[];
 };
 
-export type SocialCycleProviderId = "openai-api" | "deterministic-social";
+export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
 
 export type SocialCycleRunReport = {
   schema: "social-cycle-run-report/v1";
@@ -259,6 +260,7 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
+  provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";
   server?: {
     mode: "manual" | "live_smoke" | "fresh_world";

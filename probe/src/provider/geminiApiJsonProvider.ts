@@ -1,26 +1,27 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
+import { parseOpenAiJsonText } from "./openaiApiJsonProvider.js";
 import {
   appendProviderUsageRecord,
   buildEstimatedUsage,
   guardProviderUsageRequest,
-  normalizeOpenAiUsage,
+  normalizeGeminiUsage,
   ProviderUsageBudgetError,
   type ProviderUsageBudgetDecision,
   type ProviderUsageCallContext,
   type ProviderUsageRecord
 } from "./providerUsageTracker.js";
 
-export type OpenAiJsonProviderConfig = {
+export type GeminiJsonProviderConfig = {
   apiKey: string;
   model: string;
-  reasoning?: string;
-  maxCompletionTokens?: number;
+  maxOutputTokens?: number;
+  requestTimeoutMs?: number;
   repoRoot?: string;
   usageLedgerPath?: string;
 };
 
-export type OpenAiJsonCallResult<T> =
+export type GeminiJsonCallResult<T> =
   | {
       ok: true;
       parsed: T;
@@ -35,10 +36,9 @@ export type OpenAiJsonCallResult<T> =
       errorKind:
         | "missing_api_key"
         | "usage_budget_exceeded"
-        | "model_not_found"
         | "quota"
         | "rate_limit"
-        | "billing"
+        | "timeout"
         | "parse_error"
         | "empty_output"
         | "api_error";
@@ -50,102 +50,39 @@ export type OpenAiJsonCallResult<T> =
       budgetDecision?: ProviderUsageBudgetDecision;
     };
 
-type OpenAiErrorKind = Extract<OpenAiJsonCallResult<unknown>, { ok: false }>["errorKind"];
-
-function classifyOpenAiError(error: unknown): OpenAiErrorKind {
+function classifyGeminiJsonError(error: unknown): Extract<GeminiJsonCallResult<unknown>, { ok: false }>["errorKind"] {
   const message = error instanceof Error ? error.message : String(error);
+  const status = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
   const lower = message.toLowerCase();
-  if (lower.includes("model") && (lower.includes("not found") || lower.includes("does not exist"))) {
-    return "model_not_found";
-  }
-  if (lower.includes("rate limit")) {
+  if (status === 429 || lower.includes("rate limit")) {
     return "rate_limit";
   }
-  if (lower.includes("quota") || lower.includes("insufficient")) {
+  if (lower.includes("quota") || lower.includes("resource exhausted")) {
     return "quota";
   }
-  if (lower.includes("billing")) {
-    return "billing";
+  if (lower.includes("timeout") || lower.includes("deadline")) {
+    return "timeout";
   }
   return "api_error";
 }
 
-function extractFirstJsonValue(text: string) {
-  const start = text.search(/[\[{]/);
-  if (start < 0) {
-    return null;
-  }
-
-  const opening = text[start];
-  const closing = opening === "{" ? "}" : "]";
-  const stack: string[] = [];
-  let inString = false;
-  let escaped = false;
-
-  for (let index = start; index < text.length; index += 1) {
-    const char = text[index];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === "\"") {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === "\"") {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{" || char === "[") {
-      stack.push(char === "{" ? "}" : "]");
-      continue;
-    }
-
-    if (char === "}" || char === "]") {
-      if (stack.pop() !== char) {
-        return null;
-      }
-      if (stack.length === 0) {
-        return text.slice(start, index + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-export function parseOpenAiJsonText<T>(rawText: string): T {
-  try {
-    return JSON.parse(rawText) as T;
-  } catch (primaryError) {
-    const firstJson = extractFirstJsonValue(rawText);
-    if (!firstJson || firstJson.trim() === rawText.trim()) {
-      throw primaryError;
-    }
-    return JSON.parse(firstJson) as T;
-  }
-}
-
 /**
- * Calls OpenAI Chat Completions with JSON schema response format.
- * Never logs or returns the API key.
+ * Calls Gemini API for JSON-schema output and records provider usage.
+ *
+ * @remarks This is the social-cycle provider path for Gemma/Gemini. It does
+ * not use Gemini Native Audio Dialog and never reads or logs raw API keys.
  */
-export async function callOpenAiJsonSchema<T>(input: {
-  config: OpenAiJsonProviderConfig;
+export async function callGeminiJsonSchema<T>(input: {
+  config: GeminiJsonProviderConfig;
   schemaName: string;
   schema: Record<string, unknown>;
   system: string;
   user: string;
   usageContext?: ProviderUsageCallContext;
-}): Promise<OpenAiJsonCallResult<T>> {
+}): Promise<GeminiJsonCallResult<T>> {
   const started = Date.now();
   const model = input.config.model;
-  const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
+  const maxOutputTokens = input.config.maxOutputTokens ?? 1600;
   const usageContext = {
     repoRoot: input.config.repoRoot,
     ledgerPath: input.config.usageLedgerPath,
@@ -153,14 +90,14 @@ export async function callOpenAiJsonSchema<T>(input: {
   };
   const estimatedUsage = buildEstimatedUsage({
     inputText: `${input.system}\n${input.user}`,
-    maxOutputTokens: maxCompletionTokens
+    maxOutputTokens
   });
 
   if (!input.config.apiKey.trim()) {
     return {
       ok: false,
       errorKind: "missing_api_key",
-      message: "OPENAI_API_KEY is missing. Add it to the repo-local .env file.",
+      message: "GEMINI_API_KEY is missing. Add it to the repo-local .env file.",
       elapsedMs: Date.now() - started,
       model
     };
@@ -169,7 +106,7 @@ export async function callOpenAiJsonSchema<T>(input: {
   let budgetDecision: ProviderUsageBudgetDecision | undefined;
   try {
     budgetDecision = await guardProviderUsageRequest({
-      providerId: "openai-api",
+      providerId: "gemini-api",
       model,
       estimatedUsage,
       context: usageContext
@@ -188,30 +125,25 @@ export async function callOpenAiJsonSchema<T>(input: {
     throw error;
   }
 
-  const client = new OpenAI({ apiKey: input.config.apiKey });
+  const client = new GoogleGenAI({ apiKey: input.config.apiKey });
 
   try {
-    const response = await client.chat.completions.create({
+    const response = await client.models.generateContent({
       model,
-      max_completion_tokens: maxCompletionTokens,
-      messages: [
-        { role: "system", content: input.system },
-        { role: "user", content: input.user }
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: input.schemaName,
-          // Strict mode requires every object property in `required`; social
-          // ActionIntent args vary by primitive and are validated after parse.
-          strict: false,
-          schema: input.schema
+      contents: input.user,
+      config: {
+        systemInstruction: input.system,
+        maxOutputTokens,
+        responseMimeType: "application/json",
+        responseJsonSchema: input.schema,
+        httpOptions: {
+          timeout: input.config.requestTimeoutMs ?? 900_000
         }
       }
     });
-    const normalizedUsage = normalizeOpenAiUsage(response.usage, estimatedUsage);
+    const normalizedUsage = normalizeGeminiUsage(response.usageMetadata, estimatedUsage);
     const usageRecord = await appendProviderUsageRecord({
-      providerId: "openai-api",
+      providerId: "gemini-api",
       model,
       status: "succeeded",
       usage: normalizedUsage.usage,
@@ -221,13 +153,12 @@ export async function callOpenAiJsonSchema<T>(input: {
       rawUsage: normalizedUsage.rawUsage,
       budgetDecision
     });
-
-    const rawText = response.choices[0]?.message?.content ?? "";
-    if (!rawText.trim()) {
+    const rawText = response.text?.trim() ?? "";
+    if (!rawText) {
       return {
         ok: false,
         errorKind: "empty_output",
-        message: "OpenAI returned empty completion content",
+        message: "Gemini returned empty completion content",
         elapsedMs: Date.now() - started,
         model,
         rawText,
@@ -237,10 +168,9 @@ export async function callOpenAiJsonSchema<T>(input: {
     }
 
     try {
-      const parsed = parseOpenAiJsonText<T>(rawText);
       return {
         ok: true,
-        parsed,
+        parsed: parseOpenAiJsonText<T>(rawText),
         rawText,
         elapsedMs: Date.now() - started,
         model,
@@ -251,7 +181,7 @@ export async function callOpenAiJsonSchema<T>(input: {
       return {
         ok: false,
         errorKind: "parse_error",
-        message: "OpenAI output was not valid JSON",
+        message: "Gemini output was not valid JSON",
         elapsedMs: Date.now() - started,
         model,
         rawText,
@@ -261,7 +191,7 @@ export async function callOpenAiJsonSchema<T>(input: {
     }
   } catch (error) {
     const usageRecord = await appendProviderUsageRecord({
-      providerId: "openai-api",
+      providerId: "gemini-api",
       model,
       status: "failed",
       usage: estimatedUsage,
@@ -272,7 +202,7 @@ export async function callOpenAiJsonSchema<T>(input: {
     });
     return {
       ok: false,
-      errorKind: classifyOpenAiError(error),
+      errorKind: classifyGeminiJsonError(error),
       message: error instanceof Error ? error.message : String(error),
       elapsedMs: Date.now() - started,
       model,

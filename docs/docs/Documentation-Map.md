@@ -106,7 +106,8 @@ These documents are operational:
 
 - `docs/docs/Setup/Headless-Server.md`
 - `docs/docs/Setup/Provider-Setup.md`
-- `docs/docs/Setup/OpenAI-Tier3-Free-Usage.md`
+- `docs/docs/Setup/OpenAI-Tier3-Free-Usage.md` (supporting reference only;
+  use `Provider-Setup.md` for active provider usage guard commands)
 
 Update them when commands, auth boundaries, provider defaults, or server
 preflight behavior changes.

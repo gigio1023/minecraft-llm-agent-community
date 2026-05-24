@@ -232,19 +232,46 @@ The command prints `minecraft_direct_connect=127.0.0.1:25565` for a local
 Minecraft Java client. It starts the Docker server if needed or reports the
 existing managed endpoint. Stop it with `bun run --cwd probe server:stop`.
 
-### Provider auth
+### Provider auth and usage guard
 
-Social-cycle provider calls use the OpenAI API through `OPENAI_API_KEY` in the
-repo-root `.env`. The default social-cycle model is `gpt-5.4-mini` when the
-local account has access to that free-tier mini model.
+Social-cycle runs are deterministic by default. Live provider calls must be
+explicit so free-tier or paid usage does not happen by accident.
+
+Gemini API is the preferred lightweight live social-cycle path for current
+experiments. Gemma 4 31B uses the Gemini API model id `gemma-4-31b-it`.
+
+```text
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemma-4-31b-it
+```
+
+OpenAI API remains available when explicitly selected, but do not use it for
+cost-sensitive tests unless the local account budget has been checked.
 
 ```text
 OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.4-mini
+OPENAI_MODEL=...
 ```
 
 Use `.env.example` as the secret-free template. Do not commit `.env` or provider
 auth stores.
+
+Every provider-backed call writes usage metadata into provider output snapshots
+and the ignored JSONL ledger:
+
+```text
+build/provider-usage/provider-usage-ledger.jsonl
+```
+
+The usage guard checks configured free-tier budgets before a request. Built-in
+guardrails cover `gemini-api` + `gemma-4-31b-it` with the current operator
+reference budget, and local overrides can be supplied with:
+
+```text
+PROVIDER_USAGE_BUDGETS_PATH=build/provider-usage/free-tier-budgets.json
+PROVIDER_USAGE_BUDGETS_JSON='{"budgets":[...]}'
+PROVIDER_USAGE_ENFORCEMENT=enforce
+```
 
 Gameplay paths that use `openai-codex` are separate. They use an ignored local
 auth store such as:
@@ -259,13 +286,22 @@ Deterministic mode should remain usable without live provider access.
 
 ```bash
 cd probe
-OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+GEMINI_MODEL=gemma-4-31b-it bun run probe:social-cycle -- \
   --actor npc_b \
-  --provider openai-api \
+  --provider gemini-api \
   --cycles 2 \
   --max-actions-per-cycle 3 \
-  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --report ../tmp/social-cycle-npc-b-gemma31b.json \
   --no-dashboard
+```
+
+For a very small provider-only check before a real run:
+
+```bash
+cd probe
+bun run probe:gemini-json-smoke -- \
+  --model gemma-4-31b-it \
+  --report ../tmp/gemini-json-smoke.json
 ```
 
 This is the social-life runtime. Long-objective and direct-generated objective

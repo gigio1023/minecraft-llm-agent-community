@@ -27,6 +27,7 @@ Primary artifacts are:
 - canonical transcript parts;
 - actor workspace evidence files;
 - provider input snapshots;
+- provider output snapshots with provider usage records when available;
 - per-actor review notes;
 - Langfuse traces when provider-backed paths are used.
 
@@ -103,6 +104,26 @@ Provider input snapshots should include:
 
 Do not store raw auth tokens or provider credentials.
 
+## Provider Usage Records
+
+Provider-backed calls should leave enough cost/rate-limit evidence to review a
+run without guessing which model was used or how many requests were consumed.
+
+Runtime-owned usage artifacts are:
+
+- `usage` embedded in provider output snapshots;
+- `provider_usage` embedded in social-cycle run reports;
+- ignored JSONL rows under `build/provider-usage/provider-usage-ledger.jsonl`.
+
+Usage records include provider id, model, stage, actor id, turn id, request
+status, input/output/thinking/total token counts when the provider reports them,
+and an estimated fallback when provider metadata is missing. They must not
+include API keys, bearer tokens, refresh tokens, cookies, or raw auth stores.
+
+Budget decisions are evidence about runtime guardrails, not proof that an
+external provider's dashboard agrees exactly. For Gemini, active project limits
+remain provider-owned and should be checked in AI Studio before long live runs.
+
 ## Langfuse Relationship
 
 Langfuse traces are provider-observability evidence. They can explain model
@@ -129,6 +150,7 @@ Reviewers should never read mutable runtime state directly.
 - A "started swinging" or "pathing started" attempt cannot be mistaken for
   success in transcript or evidence files.
 - A provider-backed action can be traced back to the exact provider input packet.
+- Provider-backed calls have usage records or a clear provider setup blocker.
 - A reviewer can identify the actor, action skill, target, failure mode, and
   next repair proposal without rerunning the world.
 - Artifacts never contain provider auth tokens.

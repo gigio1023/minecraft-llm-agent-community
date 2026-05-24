@@ -5,11 +5,13 @@ import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAsse
 import type { ActionIntent, ActorCycleGoal } from "../runtime/goals/types.js";
 import { validateActionIntent } from "../runtime/goals/types.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
+import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
+import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import { writeActorGoalArtifact } from "../runtime/goals/goalJsonStore.js";
 import { isSocialExecutablePrimitive } from "../runtime/socialCycleExecution.js";
 
@@ -114,17 +116,19 @@ function validateExecutableIntent(
  * active action skill gates still decide what can execute.
  */
 export async function runSocialActionPlannerProvider(input: {
-  providerId: "openai-api" | "deterministic-social";
+  providerId: "openai-api" | "gemini-api" | "deterministic-social";
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
   cycleGoal: ActorCycleGoal;
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
+  gemini?: GeminiJsonProviderConfig;
   defaultPrimitive?: string;
   turnId?: string;
   actionIndex?: number;
   recentActionAttempts?: JsonValue;
+  runId?: string;
 }): Promise<ActionPlannerProviderResult> {
   const turnId = input.turnId ?? input.cycleId;
   const snapshotId = `action-planner-${turnId}-${randomUUID()}`;
@@ -168,12 +172,13 @@ export async function runSocialActionPlannerProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     input: providerInput
   });
 
   let intent: ActionIntent;
+  let usageRecord: ProviderUsageRecord | undefined;
 
   if (input.providerId === "deterministic-social") {
     const primitive = input.defaultPrimitive ?? "observe";
@@ -190,18 +195,7 @@ export async function runSocialActionPlannerProvider(input: {
       fallback_if_blocked: "remember blockage with evidence"
     };
   } else {
-    const result = await callOpenAiJsonSchema<{
-      action_intent: {
-        kind: ActionIntent["kind"];
-        action_skill_id?: string;
-        primitive_id?: string;
-        args: Record<string, unknown>;
-        why_this_action: string;
-        expected_evidence: string[];
-        fallback_if_blocked: string;
-      };
-    }>({
-      config: input.openAi!,
+    const providerCall = {
       schemaName: "social_action_planner",
       schema: actionPlannerSchema,
       system: `You plan one bounded ActionIntent for the active CycleGoal.
@@ -216,7 +210,40 @@ If craft_with_table is blocked because a crafting_table is far away or tablePosi
 Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvent pressure, or memory makes building relevant; never treat shelter/home as always-on architecture.
 use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
-      user: JSON.stringify(providerInput)
+      user: JSON.stringify(providerInput),
+      usageContext: {
+        runId: input.runId,
+        actorId: input.actorId,
+        turnId,
+        stage: "action_planner"
+      }
+    };
+    const result = input.providerId === "gemini-api" ? await callGeminiJsonSchema<{
+      action_intent: {
+        kind: ActionIntent["kind"];
+        action_skill_id?: string;
+        primitive_id?: string;
+        args: Record<string, unknown>;
+        why_this_action: string;
+        expected_evidence: string[];
+        fallback_if_blocked: string;
+      };
+    }>({
+      config: input.gemini!,
+      ...providerCall
+    }) : await callOpenAiJsonSchema<{
+      action_intent: {
+        kind: ActionIntent["kind"];
+        action_skill_id?: string;
+        primitive_id?: string;
+        args: Record<string, unknown>;
+        why_this_action: string;
+        expected_evidence: string[];
+        fallback_if_blocked: string;
+      };
+    }>({
+      config: input.openAi!,
+      ...providerCall
     });
 
     if (!result.ok) {
@@ -229,13 +256,19 @@ Do not claim success through text. Pick actions whose evidence can be verified b
         model: result.model,
         created_at: new Date().toISOString(),
         raw_output_text: result.rawText ?? "",
-        parsed_output: { error: result.message },
-        proposal: { error: result.message }
+        parsed_output: {
+          error: result.message,
+          error_kind: result.errorKind,
+          budget_decision: result.budgetDecision as unknown as JsonValue
+        },
+        proposal: { error: result.message },
+        usage: result.usageRecord
       });
       return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
     }
 
     const payload = normalizeOpenAiJsonPayload(result.parsed as Record<string, unknown>);
+    usageRecord = result.usageRecord;
     const actionIntent = payload.action_intent as {
       kind: ActionIntent["kind"];
       action_skill_id?: string;
@@ -294,11 +327,12 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     raw_output_text: JSON.stringify(validated.intent),
     parsed_output: validated.intent as unknown as JsonValue,
-    proposal: { action_intent_ref: intentRef }
+    proposal: { action_intent_ref: intentRef },
+    usage: usageRecord
   });
 
   return {

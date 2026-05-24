@@ -35,7 +35,111 @@ Provider-backed paths are useful for:
 - later trace inspection.
 
 The social-cycle provider path is separate from the `openai-codex` gameplay and
-reviewer providers. It uses the OpenAI API key in the repo-root `.env`.
+reviewer providers. It can use Gemini API (`gemini-api`) or OpenAI API
+(`openai-api`) from the repo-root `.env`.
+
+## Provider Usage Guard
+
+Search token: `PROVIDER_USAGE_GUARD`.
+
+Provider-backed calls must be auditable before and after a run:
+
+- before the request, the runtime checks a local free-tier budget when one
+  matches the provider/model;
+- after the request, the provider output snapshot stores the usage record;
+- the ignored global ledger appends one JSONL row per provider request;
+- the social-cycle report includes `provider_usage` totals for the run.
+
+Default ignored ledger path:
+
+```text
+build/provider-usage/provider-usage-ledger.jsonl
+```
+
+Budget overrides:
+
+```text
+PROVIDER_USAGE_BUDGETS_PATH=build/provider-usage/free-tier-budgets.json
+PROVIDER_USAGE_BUDGETS_JSON='{"budgets":[...]}'
+PROVIDER_USAGE_ENFORCEMENT=enforce
+```
+
+Budget JSON shape:
+
+```json
+{
+  "schema": "provider-usage-budgets/v1",
+  "budgets": [
+    {
+      "provider_id": "gemini-api",
+      "model": "gemma-4-31b-it",
+      "request_limit_per_minute": 15,
+      "request_limit_per_day": 1500,
+      "already_used": { "requests": 0 },
+      "mode": "enforce"
+    }
+  ]
+}
+```
+
+`already_used` is for user-provided current free-tier usage before starting a
+run. Use it when AI Studio or another provider dashboard says the project has
+already consumed part of the free-tier pool. This is intentionally local and
+ignored; do not commit personal usage state.
+
+The built-in `gemma-4-31b-it` budget is an operator guardrail, not an official
+quota guarantee. Google documents that Gemini API limits vary by project, tier,
+and model, and that active limits should be checked in AI Studio.
+
+## Social-Cycle Gemini API
+
+Gemini API is the current lightweight path for social-cycle provider tests:
+
+```text
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemma-4-31b-it
+```
+
+Small provider-only smoke:
+
+```bash
+cd probe
+bun run probe:gemini-json-smoke -- \
+  --model gemma-4-31b-it \
+  --report ../tmp/gemini-json-smoke.json
+```
+
+One-cycle social runtime check without connecting to Minecraft:
+
+```bash
+cd probe
+bun run probe:social-cycle -- \
+  --provider gemini-api \
+  --model gemma-4-31b-it \
+  --actor npc_b \
+  --cycles 1 \
+  --max-actions-per-cycle 1 \
+  --offline \
+  --report ../tmp/social-cycle-npc-b-gemma31b-offline.json \
+  --no-dashboard
+```
+
+Live social-cycle run:
+
+```bash
+cd probe
+bun run probe:social-cycle -- \
+  --provider gemini-api \
+  --model gemma-4-31b-it \
+  --actor npc_b \
+  --cycles 2 \
+  --max-actions-per-cycle 3 \
+  --report ../tmp/social-cycle-npc-b-gemma31b.json \
+  --no-dashboard
+```
+
+The CLI default provider is `deterministic-social`; pass `--provider gemini-api`
+or `SOCIAL_CYCLE_PROVIDER=gemini-api` to make live calls explicit.
 
 ## Gameplay Provider Switch
 
@@ -117,6 +221,7 @@ Behavior:
   tracks, not the social-life runtime;
 - objective reports must distinguish LLM output from builtin fallback and helper
   expansion;
+- text-genai calls also append provider usage ledger records;
 - Native Audio Dialog remains dialog/smoke only. It is not the primary path for
   generating `export async function run(ctx)` code.
 
@@ -170,27 +275,27 @@ replacement for them.
 
 ## Social Cycle Provider (OpenAI API)
 
-The Soul/LifeGoal/CycleGoal vertical slice uses the OpenAI API directly, not the
-Codex auth store. The key must live in the repo-root `.env`.
+OpenAI API remains an explicit opt-in path for the Soul/LifeGoal/CycleGoal
+vertical slice. It is not the default because cost-sensitive runs should not
+silently consume paid or exhausted free-tier usage. The key must live in the
+repo-root `.env`.
 
 ```text
 # repo-root .env
 OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.4-mini
+OPENAI_MODEL=...
 SOCIAL_CYCLE_REASONING=low
 SOCIAL_CYCLE_MAX_COMPLETION_TOKENS=1600
 ```
-
-`gpt-5.4-mini` is the default because eligible accounts may have free-tier mini
-model access. Do not treat that eligibility as guaranteed.
 
 Run:
 
 ```bash
 cd probe
-OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+bun run probe:social-cycle -- \
   --actor npc_b \
   --provider openai-api \
+  --model "$OPENAI_MODEL" \
   --cycles 2 \
   --max-actions-per-cycle 3 \
   --report ../tmp/social-cycle-openai-real-action.json \
@@ -199,7 +304,8 @@ OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
 
 Use `deterministic-social` only for tests and baseline implementation reports.
 It must mark builtin goal authority so it cannot be confused with OpenAI agency.
-If `gpt-5.4-mini` is unavailable, retry with `OPENAI_MODEL=gpt-5-mini`.
+Do not use OpenAI API for cost-sensitive tests until the local free-tier or paid
+budget is known.
 
 Do not use `openai-codex` or `build/provider-auth/openai-codex-auth.json` for
 `probe:social-cycle --provider openai-api`.

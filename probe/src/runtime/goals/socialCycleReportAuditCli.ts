@@ -463,10 +463,10 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
   }
 
   if (
-    report.provider.provider_id === "openai-api" &&
+    report.provider.provider_id !== "deterministic-social" &&
     report.agency_status.builtin_goal_authority
   ) {
-    errors.push("OpenAI social run used builtin goal authority");
+    errors.push("Live provider social run used builtin goal authority");
   }
 
   if (

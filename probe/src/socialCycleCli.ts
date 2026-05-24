@@ -76,15 +76,41 @@ function parseArgs(argv: string[]) {
   return options;
 }
 
+function normalizeSocialCycleProvider(value: string | undefined): SocialCycleProviderId | undefined {
+  if (value === "openai-api" || value === "gemini-api" || value === "deterministic-social") {
+    return value;
+  }
+  return undefined;
+}
+
+function defaultModelForProvider(providerId: SocialCycleProviderId) {
+  if (providerId === "gemini-api") {
+    return process.env.GEMINI_MODEL ?? "gemma-4-31b-it";
+  }
+  if (providerId === "openai-api") {
+    const openAiModel = process.env.OPENAI_MODEL?.trim();
+    if (!openAiModel) {
+      throw new Error("--model or OPENAI_MODEL is required for --provider openai-api");
+    }
+    return openAiModel;
+  }
+  return "deterministic-social";
+}
+
 async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../..");
-  loadRepoDotEnv(repoRoot, { overrideKeys: ["OPENAI_API_KEY", "OPENAI_MODEL"] });
+  loadRepoDotEnv(repoRoot, {
+    overrideKeys: ["OPENAI_API_KEY", "OPENAI_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL"]
+  });
 
   const parsed = parseArgs(process.argv.slice(2));
   const actorId = parsed.actor ?? "npc_b";
-  const providerId = parsed.provider ?? "openai-api";
-  const model = parsed.model ?? process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
+  const providerId =
+    parsed.provider ??
+    normalizeSocialCycleProvider(process.env.SOCIAL_CYCLE_PROVIDER) ??
+    "deterministic-social";
+  const model = parsed.model ?? process.env.SOCIAL_CYCLE_MODEL ?? defaultModelForProvider(providerId);
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const reportPath = parsed.report
@@ -107,7 +133,8 @@ async function main() {
     worldSeed: parsed.worldSeed,
     levelType: parsed.levelType,
     prepareSpawnAccess: parsed.prepareSpawnAccess,
-    reasoning: process.env.SOCIAL_CYCLE_REASONING
+    reasoning: process.env.SOCIAL_CYCLE_REASONING,
+    repoRoot
   });
 
   const reviewHint = path
@@ -120,6 +147,7 @@ async function main() {
       review_markdown_hint: reviewHint,
       runtime_status: result.report.runtime_status,
       agency_status: result.report.agency_status,
+      provider_usage: result.report.provider_usage ?? null,
       cycles: result.report.cycles.length,
       provider_error: result.report.provider_error ?? null
     })

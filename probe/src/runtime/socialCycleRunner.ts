@@ -26,6 +26,8 @@ import { runSocialCycleGoalProvider } from "../provider/socialGoalMindProvider.j
 import { runSocialActionPlannerProvider } from "../provider/socialActionPlannerProvider.js";
 import { runSocialCycleJudgmentProvider } from "../provider/socialCycleJudgmentProvider.js";
 import type { OpenAiJsonProviderConfig } from "../provider/openaiApiJsonProvider.js";
+import type { GeminiJsonProviderConfig } from "../provider/geminiApiJsonProvider.js";
+import { summarizeProviderUsage } from "../provider/providerUsageTracker.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import {
   compileSocialAllowedPrimitives,
@@ -151,6 +153,8 @@ export type SocialCycleRunOptions = {
   connectToWorld?: boolean;
   actorWorkspaceRootDir?: string;
   openAiApiKey?: string;
+  geminiApiKey?: string;
+  repoRoot?: string;
   /** Use a run-scoped actor workspace under social-runs/<run_id>/ to avoid stale artifacts. */
   isolateWorkspace?: boolean;
   /** Start a disposable Minecraft server/world for this run instead of reusing the live-smoke world. */
@@ -260,6 +264,7 @@ async function prepareSpawnAccessPoint(input: {
 }
 
 export async function runSocialCycle(input: SocialCycleRunOptions): Promise<SocialCycleRunResult> {
+  const repoRoot = input.repoRoot ?? path.resolve(process.cwd(), "..");
   const loadedConfig = loadProbeConfig();
   const config: ProbeConfig = {
     ...loadedConfig,
@@ -300,7 +305,18 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           apiKey: input.openAiApiKey ?? process.env.OPENAI_API_KEY ?? "",
           model: input.model,
           reasoning,
-          maxCompletionTokens: Number(process.env.SOCIAL_CYCLE_MAX_COMPLETION_TOKENS ?? 1600)
+          maxCompletionTokens: Number(process.env.SOCIAL_CYCLE_MAX_COMPLETION_TOKENS ?? 1600),
+          repoRoot
+        }
+      : undefined;
+  const gemini: GeminiJsonProviderConfig | undefined =
+    input.providerId === "gemini-api"
+      ? {
+          apiKey: input.geminiApiKey ?? process.env.GEMINI_API_KEY ?? "",
+          model: input.model,
+          maxOutputTokens: Number(process.env.SOCIAL_CYCLE_MAX_OUTPUT_TOKENS ?? 1600),
+          requestTimeoutMs: Number(process.env.GEMINI_TEXT_REQUEST_TIMEOUT_MS ?? 900_000),
+          repoRoot
         }
       : undefined;
 
@@ -448,8 +464,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         cycleId,
         context,
         openAi,
+        gemini,
         allowedActionSkillIds: allowedSkillIds,
-        allowedPrimitiveIds: allowedPrimitives
+        allowedPrimitiveIds: allowedPrimitives,
+        runId
       });
 
       if (!cycleGoalProvider.ok) {
@@ -495,6 +513,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleGoal: cycleGoalProvider.cycleGoal,
           context: actionContext,
           openAi,
+          gemini,
           defaultPrimitive: actionIndex === 0 ? "observe" : "wait",
           recentActionAttempts: actionAttempts.map((attempt) => ({
             action_index: attempt.action_index,
@@ -505,7 +524,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             runtime_result: attempt.runtime_result,
             evidence_refs: attempt.evidence_refs,
             judgment_ref: attempt.judgment_ref
-          }))
+          })),
+          runId
         });
 
         if (!planner.ok) {
@@ -559,7 +579,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           toolStatuses: execution.toolStatuses,
           verifierStatus: execution.verifierStatus,
           runId,
-          openAi
+          openAi,
+          gemini
         });
 
         if (!judgmentResult.ok) {
@@ -691,6 +712,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     report.runtime_status = "failed";
   }
 
+  report.provider_usage = await summarizeProviderUsage({ repoRoot, runId });
   await writeJson(input.reportPath, report);
   return { report, reportPath: input.reportPath };
 }

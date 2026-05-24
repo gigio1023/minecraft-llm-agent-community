@@ -110,7 +110,17 @@ export async function callGeminiLivePlanner(input: {
     try {
       const response =
         pathId === "text-genai"
-          ? await callGeminiTextGenai({ apiKey, config, prompt: input.prompt })
+          ? await callGeminiTextGenai({
+              apiKey,
+              config,
+              prompt: input.prompt,
+              usageContext: {
+                repoRoot,
+                actorId: input.actorId,
+                turnId: input.turnId,
+                stage: "gemini_text_genai"
+              }
+            })
           : await callGeminiLiveTranscription({ apiKey, config, prompt: input.prompt });
 
       const text = stripCodeFence(response.text);
@@ -139,7 +149,8 @@ export async function callGeminiLivePlanner(input: {
               }
             : {})
         },
-        proposal: { source_kind: "gemini_planner_text" }
+        proposal: { source_kind: "gemini_planner_text" },
+        usage: response.path === "text-genai" ? response.usageRecord : undefined
       });
 
       return {

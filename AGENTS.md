@@ -209,6 +209,8 @@ Important search tokens:
 - `OPENAI_CODEX_PROVIDER`
 - `GAME_RUNTIME_CODEX_AUTH`
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
+- `PROVIDER_USAGE_GUARD`
+- `GEMINI_API_SOCIAL_PROVIDER`
 - `SOCIAL_SIMULATION_SEED`
 - `SPEED_BOUNDED_SOCIAL_SIMULATION`
 - `LIVE_TRANSCRIPT_FIRST`
@@ -416,22 +418,60 @@ Smoke tests (`probe:gemini-live-smoke`, `probe:gemini-native-audio-dialog-smoke`
 are allowed only as quick optional wiring checks. They do not replace Minecraft
 current-run verification.
 
+## Provider Cost And Usage Guard
+
+Live provider calls must be explicit and auditable.
+
+- Do not run OpenAI API models for cost-sensitive tests unless the user has
+  explicitly selected that provider/model and the local free-tier or paid budget
+  is known.
+- Prefer `gemini-api` with `gemma-4-31b-it` for lightweight live provider checks
+  when `GEMINI_API_KEY` is available.
+- Run `probe:gemini-json-smoke` before longer Gemini/Gemma social-cycle tests.
+- Provider calls should write usage into provider output snapshots and
+  `build/provider-usage/provider-usage-ledger.jsonl`.
+- If the user provides provider dashboard usage, encode it in
+  `PROVIDER_USAGE_BUDGETS_JSON` or
+  `build/provider-usage/free-tier-budgets.json` as `already_used` before running
+  long or repeated live provider tests.
+- Treat a usage-budget block as a provider setup/budget blocker, not as actor
+  behavior or action-skill failure.
+
+Gemini/Gemma free-tier limits are provider/project/tier dependent and can
+change. Check current Google AI Studio active limits before long runs. The repo
+has a built-in operator guardrail for `gemini-api` + `gemma-4-31b-it`, but that
+guardrail is not an official quota guarantee.
+
 ## Social Cycle Runtime (Soul / LifeGoal)
 
-Use `probe:social-cycle` for the Soul/LifeGoal/CycleGoal vertical slice. This path
-uses **OpenAI API** (`OPENAI_API_KEY` in repo-local `.env`), not
-`openai-codex` / `build/provider-auth/openai-codex-auth.json`.
+Use `probe:social-cycle` for the Soul/LifeGoal/CycleGoal vertical slice. The CLI
+defaults to `deterministic-social`; live provider calls require an explicit
+provider.
+
+Preferred lightweight live path:
 
 ```bash
 cd probe
-OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+bun run probe:gemini-json-smoke -- \
+  --model gemma-4-31b-it \
+  --report ../tmp/gemini-json-smoke.json
+
+bun run probe:social-cycle -- \
   --actor npc_b \
-  --provider openai-api \
+  --provider gemini-api \
+  --model gemma-4-31b-it \
   --cycles 2 \
   --max-actions-per-cycle 3 \
-  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --report ../tmp/social-cycle-npc-b-gemma31b.json \
   --no-dashboard
 ```
+
+This path uses **Gemini API** (`GEMINI_API_KEY` in repo-local `.env`), not
+`openai-codex` / `build/provider-auth/openai-codex-auth.json`.
+
+OpenAI API (`OPENAI_API_KEY`) remains available with
+`--provider openai-api --model "$OPENAI_MODEL"` but should not be used for
+cost-sensitive tests until budget state is known.
 
 `deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
 Do not use `probe:long-objective` as the social-life runtime.
