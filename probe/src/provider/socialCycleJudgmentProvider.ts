@@ -116,6 +116,10 @@ export async function runSocialCycleJudgmentProvider(input: {
     evidence_refs: input.evidenceRefs,
     executed_tools: input.executedTools,
     verifier_status: input.verifierStatus,
+    world_events: input.context.world_events,
+    relationship_context: input.context.relationship_context,
+    memory_packet: input.context.memory_packet,
+    previous_cycle_judgments: input.context.previous_cycle_judgments,
     settlement_state: input.context.settlement_state,
     settlement_checklist: input.context.settlement_state.checklist
   } as JsonValue;
@@ -171,7 +175,7 @@ export async function runSocialCycleJudgmentProvider(input: {
       schemaName: "social_cycle_judgment",
       schema: judgmentSchema,
       system: `Write CycleJudgment from runtime evidence only. Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
-observe-only cycles are no_progress, not verified_progress. ActorSoul and ActorLifeGoal must inform why_it_mattered_for_life_goal. JSON only.`,
+observe-only cycles are no_progress, not verified_progress. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
       user: JSON.stringify(providerInput)
     });
 

@@ -15,8 +15,19 @@ import type {
 } from "./types.js";
 import { lifeGoalRef } from "./lifeGoalStore.js";
 import { soulRef } from "./actorSoulStore.js";
-import { buildSettlementState, type SettlementState } from "../settlement/settlementState.js";
+import {
+  buildSettlementState,
+  type ActionSkillPostconditionResult,
+  type SettlementState
+} from "../settlement/settlementState.js";
 import type { ToolResultRecord } from "../settlement/settlementState.js";
+
+export type SocialCycleRelationshipContext = {
+  relationships: unknown[];
+  incoming_relationships: unknown[];
+  relationship_pressures: unknown[];
+  incoming_relationship_pressures: unknown[];
+};
 
 export type SocialCycleContextPacket = {
   schema: "social-cycle-context/v1";
@@ -40,7 +51,7 @@ export type SocialCycleContextPacket = {
     success_verifier: string;
   }>;
   allowed_primitive_ids: string[];
-  relationship_context: unknown;
+  relationship_context: SocialCycleRelationshipContext;
   memory_packet: ActorMemoryRetrievalPacket;
   settlement_state: SettlementState;
   limits: {
@@ -112,6 +123,10 @@ export async function assembleSocialCycleContext(input: {
   maxActionsPerCycle: number;
   cycleIndex: number;
   recentToolResults?: readonly ToolResultRecord[];
+  postconditionResults?: readonly ActionSkillPostconditionResult[];
+  evidenceRefs?: readonly string[];
+  judgmentRefs?: readonly string[];
+  memoryWriteCount?: number;
 }): Promise<SocialCycleContextPacket> {
   const actionSkillIds = input.activeActionSkills.map((record) => record.skill_id);
   const itemNames = [
@@ -134,7 +149,13 @@ export async function assembleSocialCycleContext(input: {
     activeActionSkills: input.activeActionSkills,
     previousJudgments: input.previousJudgments,
     recentToolResults: input.recentToolResults,
-    judgmentRefs: input.previousJudgments.map((entry) => entry.ref)
+    postconditionResults: input.postconditionResults,
+    evidenceRefs: input.evidenceRefs,
+    judgmentRefs: [
+      ...input.previousJudgments.map((entry) => entry.ref),
+      ...(input.judgmentRefs ?? [])
+    ],
+    memoryWriteCount: input.memoryWriteCount
   });
 
   const providerContext = await buildActorProviderContext({
@@ -171,7 +192,20 @@ export async function assembleSocialCycleContext(input: {
       success_verifier: record.success_verifier
     })),
     allowed_primitive_ids: [...input.allowedPrimitiveIds],
-    relationship_context: providerContext.relationships,
+    relationship_context: {
+      relationships: Array.isArray(providerContext.relationships)
+        ? providerContext.relationships
+        : [],
+      incoming_relationships: Array.isArray(providerContext.incoming_relationships)
+        ? providerContext.incoming_relationships
+        : [],
+      relationship_pressures: Array.isArray(providerContext.relationship_pressures)
+        ? providerContext.relationship_pressures
+        : [],
+      incoming_relationship_pressures: Array.isArray(providerContext.incoming_relationship_pressures)
+        ? providerContext.incoming_relationship_pressures
+        : []
+    },
     memory_packet: memoryPacket,
     settlement_state: settlementState,
     limits: {

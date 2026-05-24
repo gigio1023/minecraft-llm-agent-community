@@ -153,6 +153,13 @@ export type ActionIntentKind =
   | "wait"
   | "remember";
 
+const actionIntentKinds: readonly ActionIntentKind[] = [
+  "use_action_skill",
+  "use_primitive",
+  "wait",
+  "remember"
+];
+
 export type ActionIntent = {
   schema: "action-intent/v1";
   actor_id: string;
@@ -173,6 +180,39 @@ export type CycleJudgmentOutcome =
   | "blocked"
   | "unsafe"
   | "socially_resolved";
+
+const cycleJudgmentOutcomes: readonly CycleJudgmentOutcome[] = [
+  "verified_progress",
+  "no_progress",
+  "blocked",
+  "unsafe",
+  "socially_resolved"
+];
+
+const cycleJudgmentVerifierStatuses = [
+  "passed",
+  "failed",
+  "not_applicable"
+] as const;
+
+const memoryWriteLayers = [
+  "episodic",
+  "procedural",
+  "social",
+  "belief",
+  "guardrail"
+] as const;
+
+const memoryWriteConfidences = ["observed", "inferred", "uncertain"] as const;
+
+const relationshipEventProposalKinds = [
+  "request_made",
+  "request_accepted",
+  "fulfilled",
+  "blocked",
+  "helped",
+  "failed_obligation"
+] as const;
 
 export type CycleJudgment = {
   schema: "cycle-judgment/v1";
@@ -216,7 +256,7 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
-  runtime_status: "passed" | "failed" | "blocked" | "timeout";
+  runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";
   server?: {
     mode: "manual" | "live_smoke" | "fresh_world";
     seed: string;
@@ -225,6 +265,8 @@ export type SocialCycleRunReport = {
     endpoint?: string;
     spawn_access_prepared?: boolean;
     spawn_access_position?: { x: number; y: number; z: number };
+    error_kind?: "environment_blocked";
+    error?: string;
   };
   /** Producer workspace root used to resolve actor-relative artifact refs during audit. */
   actor_workspace_root_dir?: string;
@@ -301,6 +343,23 @@ function assertString(record: Record<string, unknown>, key: string, errors: stri
   }
 }
 
+function assertStringArray(record: Record<string, unknown>, key: string, errors: string[]) {
+  const value = record[key];
+  if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string")) {
+    errors.push(`${key} must be a string array`);
+  }
+}
+
+function assertRecord(record: Record<string, unknown>, key: string, errors: string[]) {
+  if (!isRecord(record[key])) {
+    errors.push(`${key} must be an object`);
+  }
+}
+
+function includesString<T extends string>(values: readonly T[], value: unknown): value is T {
+  return typeof value === "string" && values.includes(value as T);
+}
+
 export function validateActorSoul(value: unknown): { ok: true; soul: ActorSoul } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(value)) {
@@ -347,9 +406,24 @@ export function validateActorCycleGoal(
   if (value.schema !== "actor-cycle-goal/v1") {
     errors.push("schema must be actor-cycle-goal/v1");
   }
+  assertString(value, "actor_id", errors);
   assertString(value, "goal_id", errors);
+  assertString(value, "life_goal_id", errors);
   assertString(value, "cycle_id", errors);
   assertString(value, "summary", errors);
+  assertString(value, "rationale", errors);
+  assertStringArray(value, "allowed_action_skill_ids", errors);
+  assertStringArray(value, "allowed_primitive_ids", errors);
+  assertStringArray(value, "stop_conditions", errors);
+  if (!isRecord(value.derived_from)) {
+    errors.push("derived_from must be an object");
+  }
+  if (!isRecord(value.success_condition)) {
+    errors.push("success_condition must be an object");
+  } else {
+    assertString(value.success_condition, "verifier", errors);
+    assertStringArray(value.success_condition, "evidence_required", errors);
+  }
   if (errors.length > 0) {
     return { ok: false, errors };
   }
@@ -366,10 +440,19 @@ export function validateActionIntent(
   if (value.schema !== "action-intent/v1") {
     errors.push("schema must be action-intent/v1");
   }
+  assertString(value, "actor_id", errors);
   assertString(value, "cycle_id", errors);
   assertString(value, "cycle_goal_id", errors);
-  if (typeof value.kind !== "string") {
-    errors.push("kind required");
+  assertString(value, "why_this_action", errors);
+  assertString(value, "fallback_if_blocked", errors);
+  assertStringArray(value, "expected_evidence", errors);
+  assertRecord(value, "args", errors);
+  if (!includesString(actionIntentKinds, value.kind)) {
+    errors.push("kind must be one of use_action_skill, use_primitive, wait, remember");
+  } else if (value.kind === "use_primitive") {
+    assertString(value, "primitive_id", errors);
+  } else if (value.kind === "use_action_skill") {
+    assertString(value, "action_skill_id", errors);
   }
   if (errors.length > 0) {
     return { ok: false, errors };
@@ -387,8 +470,51 @@ export function validateCycleJudgment(
   if (value.schema !== "cycle-judgment/v1") {
     errors.push("schema must be cycle-judgment/v1");
   }
+  assertString(value, "actor_id", errors);
   assertString(value, "cycle_id", errors);
+  assertString(value, "cycle_goal_id", errors);
   assertString(value, "what_happened", errors);
+  assertString(value, "why_it_mattered_for_life_goal", errors);
+  assertStringArray(value, "evidence_refs", errors);
+  assertStringArray(value, "next_goal_pressure", errors);
+  if (!includesString(cycleJudgmentOutcomes, value.outcome)) {
+    errors.push("outcome must be a known CycleJudgment outcome");
+  }
+  if (!includesString(cycleJudgmentVerifierStatuses, value.verifier_status)) {
+    errors.push("verifier_status must be passed, failed, or not_applicable");
+  }
+  if (!Array.isArray(value.memory_writes)) {
+    errors.push("memory_writes must be an array");
+  } else {
+    for (const [index, write] of value.memory_writes.entries()) {
+      if (!isRecord(write)) {
+        errors.push(`memory_writes[${index}] must be an object`);
+        continue;
+      }
+      if (!includesString(memoryWriteLayers, write.layer)) {
+        errors.push(`memory_writes[${index}].layer must be a known memory layer`);
+      }
+      assertString(write, "summary", errors);
+      if (!includesString(memoryWriteConfidences, write.confidence)) {
+        errors.push(`memory_writes[${index}].confidence must be observed, inferred, or uncertain`);
+      }
+    }
+  }
+  if (!Array.isArray(value.relationship_event_proposals)) {
+    errors.push("relationship_event_proposals must be an array");
+  } else {
+    for (const [index, proposal] of value.relationship_event_proposals.entries()) {
+      if (!isRecord(proposal)) {
+        errors.push(`relationship_event_proposals[${index}] must be an object`);
+        continue;
+      }
+      assertString(proposal, "target_actor_id", errors);
+      if (!includesString(relationshipEventProposalKinds, proposal.kind)) {
+        errors.push(`relationship_event_proposals[${index}].kind must be a known proposal kind`);
+      }
+      assertStringArray(proposal, "evidence_refs", errors);
+    }
+  }
   if (errors.length > 0) {
     return { ok: false, errors };
   }

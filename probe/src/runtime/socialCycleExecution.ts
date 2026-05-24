@@ -48,6 +48,7 @@ import {
   type ActionSkillPostconditionResult,
   type ToolResultRecord
 } from "./settlement/settlementState.js";
+import { runAction } from "./actions/actionRunner.js";
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "observe",
@@ -607,6 +608,7 @@ async function runSocialPrimitive(input: {
   args: Record<string, unknown>;
   bot: Bot;
   targetBot?: Bot;
+  signal?: AbortSignal;
 }): Promise<JsonValue> {
   const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 0 });
   const memory = createMemory(8);
@@ -636,7 +638,8 @@ async function runSocialPrimitive(input: {
     case "collect_logs":
       return (await collectLogs({
         bot: input.bot,
-        targetCount: readOptionalCount(proposal.args)
+        targetCount: readOptionalCount(proposal.args),
+        signal: input.signal
       })) as unknown as JsonValue;
     case "mine_block":
       return (await mineBlock({
@@ -645,7 +648,8 @@ async function runSocialPrimitive(input: {
         targetCount: readOptionalCount(proposal.args),
         searchDistance: typeof proposal.args.searchDistance === "number"
           ? Math.max(4, Math.min(48, Math.floor(proposal.args.searchDistance)))
-          : undefined
+          : undefined,
+        signal: input.signal
       })) as unknown as JsonValue;
     case "craft_item": {
       const itemName = chooseCraftItemName({ bot: input.bot, args: proposal.args });
@@ -675,7 +679,8 @@ async function runSocialPrimitive(input: {
       return (await placeBlock({
         bot: input.bot,
         itemName,
-        targetPosition: readPlacementTarget(input.bot, proposal.args)
+        targetPosition: readPlacementTarget(input.bot, proposal.args),
+        signal: input.signal
       })) as unknown as JsonValue;
     }
     case "build_pattern":
@@ -689,7 +694,8 @@ async function runSocialPrimitive(input: {
         ],
         maxPlacements: typeof proposal.args.maxPlacements === "number"
           ? Math.max(1, Math.floor(proposal.args.maxPlacements))
-          : 64
+          : 64,
+        signal: input.signal
       })) as unknown as JsonValue;
     case "inspect_chest": {
       const chest = createMineflayerSharedChestAccessor(input.bot);
@@ -798,10 +804,7 @@ async function executePrimitiveWithEvidence(input: {
   gateBlocked: boolean;
   status: string;
 }> {
-  const permission =
-    input.tool === "move_to"
-      ? ({ allowed: true } as const)
-      : checkActiveActionSkillPermission(input.gate, input.tool);
+  const permission = checkActiveActionSkillPermission(input.gate, input.tool);
   if (!permission.allowed) {
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -835,21 +838,28 @@ async function executePrimitiveWithEvidence(input: {
     };
   }
 
-  let toolResult: JsonValue;
-  try {
-    toolResult = await runSocialPrimitive({
-      actorId: input.actorId,
-      tool: input.tool,
-      args: input.args,
-      bot: input.bot,
-      targetBot: input.targetBot
-    });
-  } catch (error) {
-    toolResult = {
-      status: "error",
-      why: error instanceof Error ? error.message : String(error)
-    };
-  }
+  const actionResult = await runAction({
+    tool: input.tool,
+    action: (signal) =>
+      runSocialPrimitive({
+        actorId: input.actorId,
+        tool: input.tool,
+        args: input.args,
+        bot: input.bot!,
+        targetBot: input.targetBot,
+        signal
+      })
+  });
+  const toolResult = actionResult.ok
+    ? (actionResult.value as JsonValue)
+    : ({
+        status: actionResult.status,
+        reason: actionResult.message ?? `Primitive ${input.tool} did not complete`,
+        timedOut: actionResult.timedOut,
+        cancelled: actionResult.cancelled,
+        durationMs: actionResult.durationMs,
+        timeoutMs: actionResult.timeoutMs
+      } as JsonValue);
 
   const status = readToolStatus(toolResult);
   const ref = await writeToolEvidence({
@@ -1058,7 +1068,14 @@ export async function executeSocialActionIntent(input: {
     });
     lastToolResult = step.toolResult;
 
-    if (step.gateBlocked || step.status === "error" || step.status === "blocked") {
+    if (
+      step.gateBlocked ||
+      step.status === "error" ||
+      step.status === "blocked" ||
+      step.status === "failed" ||
+      step.status === "timeout" ||
+      step.status === "cancelled"
+    ) {
       gateBlocked = step.gateBlocked;
       break;
     }

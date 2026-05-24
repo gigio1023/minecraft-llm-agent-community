@@ -43,27 +43,46 @@ function ownedSeedActionSkills(
   return ownership.filter((record) => record.owner_actor_id === actorId);
 }
 
-async function clearDirectoryContents(dir: string) {
-  let entries: string[];
+type ExistingActionSkillIndex = {
+  candidates: string[];
+  retired: string[];
+  rejected: string[];
+};
+
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+async function readExistingActionSkillIndex(indexFile: string): Promise<ExistingActionSkillIndex> {
   try {
-    entries = await fs.readdir(dir);
+    const index = JSON.parse(await fs.readFile(indexFile, "utf8")) as Record<string, unknown>;
+    return {
+      candidates: stringArray(index.candidates),
+      retired: stringArray(index.retired),
+      rejected: stringArray(index.rejected)
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return;
+      return {
+        candidates: [],
+        retired: [],
+        rejected: []
+      };
     }
 
     throw error;
   }
-
-  await Promise.all(entries.map((entry) => fs.rm(path.join(dir, entry), { recursive: true, force: true })));
 }
 
 /**
  * Restores the actor workspace baseline without deleting actor-owned artifacts.
  *
  * Candidate action skills, retired action skills, memory, and relationships can
- * carry review value across runs. Runtime evidence and provider packets are
- * volatile: keeping them in a fresh run lets stale failures steer the provider.
+ * carry review value across runs. Runtime evidence and provider packets also
+ * remain intact because audit and replay need to distinguish stale refs from
+ * current-run refs instead of losing evidence during initialization.
  */
 export async function initializeActorWorkspaces(
   options: ActorWorkspaceInitOptions
@@ -83,12 +102,6 @@ export async function initializeActorWorkspaces(
     await Promise.all(
       workspaceDirs.map((workspaceDir) => fs.mkdir(workspaceDir, { recursive: true }))
     );
-
-    await Promise.all([
-      clearDirectoryContents(paths.evidenceDir),
-      clearDirectoryContents(paths.providerInputsDir),
-      clearDirectoryContents(paths.providerOutputsDir)
-    ]);
 
     // actor.json is the per-run baseline contract. It can be rewritten because
     // durable action skill and relationship artifacts live under child dirs.
@@ -111,14 +124,15 @@ export async function initializeActorWorkspaces(
       activeRecords.map((record) => writeActorActionSkillRecord(options.rootDir, record))
     );
 
+    const existingIndex = await readExistingActionSkillIndex(paths.actionSkills.indexFile);
     await writeJson(paths.actionSkills.indexFile, {
       schema: "action-skill-library/v1",
       owner_actor_id: actor.actor_id,
       initialized_at: initializedAt,
       active: activeRecords.map((record) => record.skill_id),
-      candidates: [],
-      retired: [],
-      rejected: []
+      candidates: existingIndex.candidates,
+      retired: existingIndex.retired,
+      rejected: existingIndex.rejected
     });
 
     actorRecords.push({

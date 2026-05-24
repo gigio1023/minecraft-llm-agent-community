@@ -166,10 +166,57 @@ function sharedChestFromObservation(observation: ObserveResult | Record<string, 
   };
 }
 
-function hasNearbyBlock(observation: ObserveResult | Record<string, unknown>, blockName: string) {
+function sharedChestFromToolResults(results: readonly ToolResultRecord[] = []): SharedStorageSummary {
+  const chestTools = results.filter((entry) =>
+    entry.tool === "inspect_chest" || entry.tool === "deposit_shared"
+  );
+  const deposited = [...chestTools].reverse().find((entry) => entry.status === "deposited");
+  const inspected = [...chestTools].reverse().find((entry) => entry.status === "inspected");
+  const source = deposited ?? inspected;
+
+  if (!source || !isRecord(source.result)) {
+    return { status: "unknown", items: [], evidence_refs: [] };
+  }
+
+  const items = Array.isArray(source.result.items)
+    ? source.result.items
+        .map((item) =>
+          isRecord(item) && typeof item.name === "string" && typeof item.count === "number"
+            ? { name: item.name, count: item.count }
+            : null
+        )
+        .filter((item): item is { name: string; count: number } => item !== null)
+    : typeof source.result.itemName === "string" && typeof source.result.movedCount === "number"
+      ? [{ name: source.result.itemName, count: source.result.movedCount }]
+      : [];
+
+  return {
+    status: deposited ? "contributed" : "known",
+    chest_id: typeof source.result.chestId === "string" ? source.result.chestId : undefined,
+    items,
+    evidence_refs: source.evidence_ref ? [source.evidence_ref] : []
+  };
+}
+
+function findNearbyBlock(observation: ObserveResult | Record<string, unknown>, blockName: string) {
   const nearbyBlocks = (observation as { nearbyBlocks?: unknown }).nearbyBlocks;
-  return Array.isArray(nearbyBlocks) && nearbyBlocks.some((block) =>
+  if (!Array.isArray(nearbyBlocks)) {
+    return null;
+  }
+
+  return nearbyBlocks.find((block) =>
     isRecord(block) && block.name === blockName
+  ) ?? null;
+}
+
+function positionFromNearbyBlock(block: unknown) {
+  if (!isRecord(block)) {
+    return undefined;
+  }
+
+  return (
+    readPosition(block.position) ??
+    readPosition(block)
   );
 }
 
@@ -399,7 +446,10 @@ export function buildSettlementState(input: {
   now?: string;
 }): SettlementState {
   const inventory = inventoryCounts(input.observation);
-  const sharedStorage = sharedChestFromObservation(input.observation);
+  const observationSharedStorage = sharedChestFromObservation(input.observation);
+  const toolSharedStorage = sharedChestFromToolResults(input.recentToolResults);
+  const sharedStorage =
+    toolSharedStorage.status !== "unknown" ? toolSharedStorage : observationSharedStorage;
   const evidenceRefs = [...(input.evidenceRefs ?? [])];
   const postconditions = input.postconditionResults ?? [];
   const craftingTablePostcondition = postconditions.find((entry) =>
@@ -419,11 +469,16 @@ export function buildSettlementState(input: {
     recentToolResults: input.recentToolResults
   });
   const actorPosition = readPosition((input.observation as { position?: unknown }).position);
-  const tableNearby = hasNearbyBlock(input.observation, "crafting_table");
+  const nearbyCraftingTable = findNearbyBlock(input.observation, "crafting_table");
+  const tableNearby = Boolean(nearbyCraftingTable);
+  const tableEvidenceRefs =
+    craftingTablePostcondition?.evidence_refs ??
+    (tableNearby ? evidenceRefs : []);
   const progress: SettlementProgressVector = {
     has_crafting_table: tableNearby || Boolean(craftingTablePostcondition),
     has_verified_shelter: Boolean(shelterPostcondition),
-    has_shared_storage_contribution: Boolean(storagePostcondition),
+    has_shared_storage_contribution:
+      Boolean(storagePostcondition) || toolSharedStorage.status === "contributed",
     has_judgment_or_memory:
       (input.judgmentRefs?.length ?? 0) > 0 ||
       (input.memoryWriteCount ?? 0) > 0 ||
@@ -435,12 +490,16 @@ export function buildSettlementState(input: {
   for (const item of checklist.items) {
     if (item.id === "crafting_table_known_or_placed" && craftingTablePostcondition) {
       item.evidence_refs = [...craftingTablePostcondition.evidence_refs];
+    } else if (item.id === "crafting_table_known_or_placed" && tableNearby) {
+      item.evidence_refs = [...tableEvidenceRefs];
     }
     if (item.id === "starter_shelter_verified" && shelterPostcondition) {
       item.evidence_refs = [...shelterPostcondition.evidence_refs];
     }
     if (item.id === "shared_storage_contribution" && storagePostcondition) {
       item.evidence_refs = [...storagePostcondition.evidence_refs];
+    } else if (item.id === "shared_storage_contribution" && toolSharedStorage.status === "contributed") {
+      item.evidence_refs = [...toolSharedStorage.evidence_refs];
     }
     if (item.id === "memory_or_judgment_persisted") {
       item.evidence_refs = [...(input.judgmentRefs ?? [])];
@@ -453,6 +512,9 @@ export function buildSettlementState(input: {
   if (storagePostcondition) {
     sharedStorage.status = "contributed";
     sharedStorage.evidence_refs = [...storagePostcondition.evidence_refs];
+  } else if (toolSharedStorage.status === "contributed") {
+    sharedStorage.status = "contributed";
+    sharedStorage.evidence_refs = [...toolSharedStorage.evidence_refs];
   }
 
   return {
@@ -465,7 +527,8 @@ export function buildSettlementState(input: {
       ...(actorPosition ? { actor_position: actorPosition } : {}),
       crafting_table: {
         status: craftingTablePostcondition ? "placed" : tableNearby ? "nearby" : "unknown",
-        evidence_refs: craftingTablePostcondition?.evidence_refs ?? []
+        position: positionFromNearbyBlock(nearbyCraftingTable),
+        evidence_refs: tableEvidenceRefs
       },
       shared_chest: {
         status: storagePostcondition

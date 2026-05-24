@@ -106,7 +106,7 @@ export function isSuccessfulMeaningfulToolStatus(tool: string, status: string): 
     case "craft_with_table":
       return status === "crafted";
     case "place_block":
-      return status === "placed";
+      return status === "placed" || status === "already_present";
     case "build_pattern":
       return status === "built";
     case "inspect_chest":

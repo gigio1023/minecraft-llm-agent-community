@@ -48,6 +48,7 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.equal(result.report.agency_status.used_life_goal, true);
   assert.equal(result.report.agency_status.cycle_goal_source, "runtime_rule");
   assert.equal(result.report.agency_status.builtin_goal_authority, true);
+  assert.equal(result.report.agency_status.builtin_execution_source, true);
   assert.equal(result.report.agency_status.used_previous_judgment, true);
   assert.equal(result.report.runtime_status, "blocked");
   assert.equal(result.report.agency_status.gameplay_progress_verified, false);

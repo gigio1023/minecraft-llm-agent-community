@@ -8,7 +8,7 @@ import {
   initializeActorWorkspaces,
   listActiveActorActionSkillRecords
 } from "./actorWorkspace.js";
-import { getActorWorkspacePaths } from "./actorWorkspacePaths.js";
+import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "./actorWorkspacePaths.js";
 import { ensureActorSoul } from "./goals/actorSoulStore.js";
 import { bumpLifeGoalCounters, ensureActiveLifeGoal } from "./goals/lifeGoalStore.js";
 import { listStrategicGoals } from "./goals/strategicGoalStore.js";
@@ -80,6 +80,26 @@ type SocialCycleReportCycleWithAttempts = SocialCycleRunReport["cycles"][number]
   action_attempts: SocialCycleActionAttemptReport[];
 };
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function countRelationshipContextRefs(context: {
+  relationship_context: {
+    relationships: unknown[];
+    incoming_relationships: unknown[];
+    relationship_pressures: unknown[];
+    incoming_relationship_pressures: unknown[];
+  };
+}) {
+  return (
+    context.relationship_context.relationships.length +
+    context.relationship_context.incoming_relationships.length +
+    context.relationship_context.relationship_pressures.length +
+    context.relationship_context.incoming_relationship_pressures.length
+  );
+}
+
 function filterActionSkillsForAllowedPrimitives(
   records: readonly ActorActionSkillRecord[],
   allowedPrimitives: readonly string[]
@@ -150,7 +170,10 @@ async function persistJudgmentMemoryWrites(
   actorId: string,
   judgment: CycleJudgment,
   actionIntent: ActionIntent,
-  executedTools: readonly string[]
+  executedTools: readonly string[],
+  runtimeResult: JsonValue,
+  toolStatuses: readonly SocialPrimitiveAttemptStatus[],
+  judgmentRef: string
 ) {
   if (judgment.memory_writes.length === 0) {
     return 0;
@@ -161,11 +184,14 @@ async function persistJudgmentMemoryWrites(
     rootDir,
     judgment.memory_writes.map((write, index) => ({
       schema: "actor-memory-record/v1",
-      memory_id: `social-${judgment.cycle_id}-${index}`,
+      memory_id: `social-${judgment.cycle_id}-${sanitizeWorkspaceFileId(judgmentRef)}-${index}`,
       actor_id: actorId,
       layer: write.layer === "belief" ? "belief" : write.layer,
       status: "active",
-      confidence: write.confidence,
+      confidence:
+        judgment.verifier_status === "passed" || write.confidence !== "observed"
+          ? write.confidence
+          : "uncertain",
       scope: { kind: "actor_private", actor_id: actorId },
       created_at: now,
       updated_at: now,
@@ -184,13 +210,17 @@ async function persistJudgmentMemoryWrites(
         ],
         diagnoses: [judgment.outcome],
         verifier_statuses: [judgment.verifier_status],
-        causal_refs: [judgment.cycle_id]
+        causal_refs: [judgment.cycle_id, judgmentRef]
       },
       content: {
         cycle_id: judgment.cycle_id,
+        judgment_ref: judgmentRef,
         outcome: judgment.outcome,
+        verifier_status: judgment.verifier_status,
         action_intent: actionIntent as unknown as JsonValue,
-        executed_tools: [...executedTools]
+        executed_tools: [...executedTools],
+        tool_statuses: toolStatuses as unknown as JsonValue,
+        runtime_result: runtimeResult
       }
     }))
   );
@@ -238,9 +268,12 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     }
   };
   const runId = `social-cycle-${randomUUID()}`;
-  const rootDir = input.isolateWorkspace
-    ? path.join(config.actorWorkspace.rootDir, "social-runs", runId)
-    : (input.actorWorkspaceRootDir ?? config.actorWorkspace.rootDir);
+  const workspaceBaseDir = input.actorWorkspaceRootDir ?? config.actorWorkspace.rootDir;
+  const rootDir =
+    input.isolateWorkspace === true ||
+    (!input.actorWorkspaceRootDir && input.isolateWorkspace !== false)
+      ? path.join(workspaceBaseDir, "social-runs", runId)
+      : workspaceBaseDir;
   const profile = getActorProfile(input.actorId);
   const reasoning = input.reasoning ?? process.env.SOCIAL_CYCLE_REASONING ?? "low";
 
@@ -251,6 +284,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     model: input.model,
     reasoning
   });
+  report.agency_status.builtin_execution_source = input.providerId === "deterministic-social";
   report.actor_workspace_root_dir = rootDir;
   report.server = {
     mode: input.freshWorld ? "fresh_world" : "live_smoke",
@@ -297,6 +331,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   let bot: Bot | undefined;
   let stopServer: (() => Promise<void>) | undefined;
   let serverRunRcon: ((args: string[]) => Promise<string>) | undefined;
+  let environmentBlocked = false;
 
   if (input.connectToWorld !== false) {
     try {
@@ -324,8 +359,14 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           spawn_access_position: spawnAccessPosition
         };
       }
-    } catch {
+    } catch (error) {
+      environmentBlocked = true;
       report.agency_status.fixture_dependency = true;
+      report.server = {
+        ...report.server,
+        error_kind: "environment_blocked",
+        error: errorMessage(error)
+      };
     }
   } else {
     report.agency_status.fixture_dependency = true;
@@ -350,7 +391,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     );
     const allowedSkillIds = executableActiveSkills.map((s) => s.skill_id);
 
-    for (let cycleIndex = 0; cycleIndex < input.cycles; cycleIndex++) {
+    for (let cycleIndex = 0; !environmentBlocked && cycleIndex < input.cycles; cycleIndex++) {
       const cycleId = `cycle-${String(cycleIndex + 1).padStart(4, "0")}`;
       const worldEvents = await listWorldEvents(rootDir, input.actorId, { runId });
       const strategicGoals = await listStrategicGoals(rootDir, input.actorId);
@@ -375,13 +416,21 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         allowedPrimitiveIds: allowedPrimitives,
         maxActionsPerCycle: input.maxActionsPerCycle,
         cycleIndex,
-        recentToolResults
+        recentToolResults,
+        postconditionResults: allPostconditionResults,
+        evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
+        judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+        memoryWriteCount
       });
 
       report.agency_status.used_world_event_refs = worldEvents.length;
       report.agency_status.used_memory_refs = Math.max(
         report.agency_status.used_memory_refs,
         listActorMemoryRefs(context.memory_packet).length
+      );
+      report.agency_status.used_relationship_refs = Math.max(
+        report.agency_status.used_relationship_refs,
+        countRelationshipContextRefs(context)
       );
       if (report.memory_reuse) {
         report.memory_reuse.retrieved_memory_refs = Math.max(
@@ -551,7 +600,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           input.actorId,
           judgmentResult.judgment,
           planner.intent,
-          execution.executedTools
+          execution.executedTools,
+          execution.runtimeResult,
+          execution.toolStatuses,
+          judgmentResult.judgmentRef
         );
         memoryWriteCount += memoryWrites;
         if (report.memory_reuse) {
@@ -626,7 +678,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     anyMeaningfulProgress,
     completedCycles: report.cycles.length,
     expectedCycles: input.cycles,
-    fixtureDependency: report.agency_status.fixture_dependency
+    fixtureDependency: report.agency_status.fixture_dependency,
+    environmentBlocked
   });
 
   if (providerFailed) {

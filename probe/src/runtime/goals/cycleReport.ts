@@ -52,10 +52,14 @@ export function finalizeRuntimeStatus(
     completedCycles: number;
     expectedCycles: number;
     fixtureDependency: boolean;
+    environmentBlocked?: boolean;
   }
 ): SocialCycleRunReport["runtime_status"] {
   if (input.providerFailed) {
     return "failed";
+  }
+  if (input.environmentBlocked) {
+    return "environment_blocked";
   }
   if (input.completedCycles < input.expectedCycles) {
     return "blocked";

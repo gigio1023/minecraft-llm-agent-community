@@ -101,6 +101,7 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
     ["craft_item", "crafted"],
     ["craft_with_table", "crafted"],
     ["place_block", "placed"],
+    ["place_block", "already_present"],
     ["build_pattern", "built"],
     ["deposit_shared", "deposited"],
     ["inspect_chest", "inspected"],

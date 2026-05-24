@@ -47,6 +47,19 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
   await fs.writeFile(staleProviderInputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
   await fs.writeFile(staleProviderOutputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
   await fs.writeFile(
+    path.join(testArtifactRoot, "npc_b", "action-skills", "index.json"),
+    JSON.stringify({
+      schema: "action-skill-library/v1",
+      owner_actor_id: "npc_b",
+      initialized_at: "2026-05-19T00:00:00.000Z",
+      active: ["craftCraftingTable"],
+      candidates: ["keep"],
+      retired: ["oldShelterTrial"],
+      rejected: ["unsafeDigTrial"]
+    }, null, 2),
+    "utf8"
+  );
+  await fs.writeFile(
     staleActiveSkillPath,
     JSON.stringify({
       schema: "actor-action-skill/v1",
@@ -114,6 +127,9 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     );
     assert.equal(actionSkillIndex.schema, "action-skill-library/v1");
     assert.deepEqual(actionSkillIndex.active, ["collectLogs"]);
+    assert.deepEqual(actionSkillIndex.candidates, ["keep"]);
+    assert.deepEqual(actionSkillIndex.retired, ["oldShelterTrial"]);
+    assert.deepEqual(actionSkillIndex.rejected, ["unsafeDigTrial"]);
 
     const activeRecords = await listActiveActorActionSkillRecords(testArtifactRoot, "npc_b");
     assert.deepEqual(activeRecords, [
@@ -158,9 +174,9 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     assert.equal(relationshipEdge.friction, "none");
     await fs.access(paths.providerInputsDir);
     await fs.access(paths.providerOutputsDir);
-    assert.deepEqual(await fs.readdir(paths.evidenceDir), []);
-    assert.deepEqual(await fs.readdir(paths.providerInputsDir), []);
-    assert.deepEqual(await fs.readdir(paths.providerOutputsDir), []);
+    assert.equal(await fs.readFile(staleEvidencePath, "utf8"), "{\"category\":\"stale_failure\"}\n");
+    assert.equal(await fs.readFile(staleProviderInputPath, "utf8"), "{\"turn_id\":\"stale\"}\n");
+    assert.equal(await fs.readFile(staleProviderOutputPath, "utf8"), "{\"turn_id\":\"stale\"}\n");
     await fs.access(path.join(testArtifactRoot, "index.json"));
   } finally {
     await fs.rm(testArtifactRoot, { recursive: true, force: true });

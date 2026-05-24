@@ -69,6 +69,45 @@ test("stores persist soul, life goal, cycle goal, judgment, and world events", a
   assert.ok(await fs.stat(paths.soulMdFile));
 });
 
+test("existing soul.md is compiled and not overwritten by profile bootstrap", async () => {
+  const actorId = "npc_b";
+  const actorRoot = path.join(rootDir, `human-soul-${Date.now()}`);
+  const paths = getActorWorkspacePaths(actorRoot, actorId);
+  const markdown = `# Jun the cautious builder
+
+Role: witness-settler
+Life direction: Build trust by recording real Minecraft evidence before making settlement promises.
+
+Public responsibilities:
+- keep shared shelter claims tied to verifier artifacts
+
+Private drives:
+- avoid fake progress
+- ask for help when a resource loop stalls
+`;
+
+  await fs.mkdir(paths.actorDir, { recursive: true });
+  await fs.writeFile(paths.soulMdFile, markdown, "utf8");
+
+  const soul = await ensureActorSoul(actorRoot, actorId);
+
+  assert.equal(soul.display_name, "Jun the cautious builder");
+  assert.equal(soul.role, "witness-settler");
+  assert.equal(
+    soul.life_goal,
+    "Build trust by recording real Minecraft evidence before making settlement promises."
+  );
+  assert.deepEqual(soul.public_responsibilities, [
+    "keep shared shelter claims tied to verifier artifacts"
+  ]);
+  assert.deepEqual(soul.private_drives, [
+    "avoid fake progress",
+    "ask for help when a resource loop stalls"
+  ]);
+  assert.equal(await fs.readFile(paths.soulMdFile, "utf8"), markdown);
+  assert.ok(await readActorSoul(actorRoot, actorId));
+});
+
 test("stale expected_goal_id cannot overwrite a different cycle goal id", async () => {
   const actorId = "npc_b";
   const soul = await ensureActorSoul(rootDir, actorId);

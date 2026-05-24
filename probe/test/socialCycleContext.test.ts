@@ -104,7 +104,23 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
     },
     allowedPrimitiveIds: ["observe"],
     maxActionsPerCycle: 1,
-    cycleIndex: 1
+    cycleIndex: 1,
+    recentToolResults: [
+      {
+        tool: "deposit_shared",
+        status: "deposited",
+        evidence_ref: "evidence/cycle-0001-deposit_shared.json",
+        result: {
+          status: "deposited",
+          chestId: "shared_spawn_chest",
+          itemName: "oak_log",
+          movedCount: 1
+        }
+      }
+    ],
+    evidenceRefs: ["evidence/cycle-0001-observe.json"],
+    judgmentRefs: ["judgments/cycle-0001-action-01-judgment.json"],
+    memoryWriteCount: 1
   });
 
   assert.equal(context.ActorSoul.actor_id, "npc_b");
@@ -115,9 +131,16 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   assert.equal(context.memory_packet.retrieval_policy.objective_category, "social_cycle");
   assert.equal(context.settlement_state.inventory_counts.oak_log, 2);
   assert.equal(context.settlement_state.progress.has_crafting_table, true);
+  assert.equal(context.settlement_state.shared_storage.status, "contributed");
+  assert.equal(context.settlement_state.known_positions.shared_chest?.chest_id, "shared_spawn_chest");
   assert.equal(
     context.settlement_state.checklist.items.find((item) => item.id === "crafting_table_known_or_placed")?.status,
     "satisfied"
   );
+  assert.deepEqual(
+    context.settlement_state.checklist.items.find((item) => item.id === "shared_storage_contribution")?.evidence_refs,
+    ["evidence/cycle-0001-deposit_shared.json"]
+  );
   assert.equal(context.settlement_state.blocker_histogram.length, 1);
+  assert.equal(context.relationship_context.relationships.length, 0);
 });

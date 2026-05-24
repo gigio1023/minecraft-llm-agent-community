@@ -139,7 +139,7 @@ async function main() {
     console.log(JSON.stringify({ auto_review_written: reviewHint }));
   }
 
-  if (result.report.runtime_status === "failed") {
+  if (result.report.runtime_status !== "passed") {
     process.exitCode = 1;
   }
 }

@@ -47,6 +47,87 @@ export function compileActorSoulFromProfile(actorId: string, societyId = "settle
   };
 }
 
+function nonEmptyLines(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function markdownHeading(text: string) {
+  const heading = nonEmptyLines(text).find((line) => line.startsWith("# "));
+  return heading?.replace(/^#\s+/, "").trim();
+}
+
+function markdownField(text: string, label: string) {
+  const line = nonEmptyLines(text).find((entry) =>
+    entry.toLowerCase().startsWith(`${label.toLowerCase()}:`)
+  );
+  return line?.slice(label.length + 1).trim();
+}
+
+function markdownBulletSection(text: string, sectionTitle: string) {
+  const lines = text.split(/\r?\n/);
+  const titleIndex = lines.findIndex((line) =>
+    line.trim().toLowerCase() === `${sectionTitle.toLowerCase()}:`
+  );
+  if (titleIndex === -1) {
+    return [];
+  }
+
+  const bullets: string[] = [];
+  for (const rawLine of lines.slice(titleIndex + 1)) {
+    const line = rawLine.trim();
+    if (line.length === 0) {
+      continue;
+    }
+    if (/^[A-Za-z][A-Za-z _-]*:$/.test(line)) {
+      break;
+    }
+    if (line.startsWith("- ")) {
+      bullets.push(line.slice(2).trim());
+    }
+  }
+  return bullets;
+}
+
+function fallbackLifeGoalFromMarkdown(text: string, actorId: string) {
+  const prose = nonEmptyLines(text)
+    .filter((line) => !line.startsWith("#") && !line.startsWith("- "))
+    .filter((line) => !/^[A-Za-z][A-Za-z _-]*:$/.test(line))
+    .join(" ");
+
+  return prose || compileActorSoulFromProfile(actorId).life_goal;
+}
+
+export function compileActorSoulFromMarkdown(input: {
+  actorId: string;
+  markdown: string;
+  societyId?: string;
+}): ActorSoul {
+  const base = compileActorSoulFromProfile(input.actorId, input.societyId);
+  const role = markdownField(input.markdown, "Role") ?? base.role;
+  const lifeGoal =
+    markdownField(input.markdown, "Life direction") ??
+    markdownField(input.markdown, "Life goal") ??
+    fallbackLifeGoalFromMarkdown(input.markdown, input.actorId);
+  const publicResponsibilities = markdownBulletSection(input.markdown, "Public responsibilities");
+  const privateDrives = markdownBulletSection(input.markdown, "Private drives");
+
+  return {
+    ...base,
+    display_name: markdownHeading(input.markdown) ?? base.display_name,
+    role,
+    life_goal: lifeGoal,
+    public_responsibilities: publicResponsibilities.length > 0
+      ? publicResponsibilities
+      : base.public_responsibilities,
+    private_drives: privateDrives.length > 0
+      ? privateDrives
+      : [lifeGoal, ...base.private_drives].slice(0, 3)
+  };
+}
+
 export async function readActorSoul(rootDir: string, actorId: string): Promise<ActorSoul | null> {
   const paths = getActorWorkspacePaths(rootDir, actorId);
   return readJsonIfExists<ActorSoul>(paths.soulJsonFile);
@@ -59,6 +140,20 @@ export async function ensureActorSoul(rootDir: string, actorId: string): Promise
   const existing = await readActorSoul(rootDir, actorId);
   if (existing) {
     return existing;
+  }
+
+  try {
+    const soulMd = await fs.readFile(paths.soulMdFile, "utf8");
+    const soul = compileActorSoulFromMarkdown({
+      actorId,
+      markdown: soulMd
+    });
+    await writeJson(paths.soulJsonFile, soul);
+    return soul;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
   }
 
   const soul = compileActorSoulFromProfile(actorId);

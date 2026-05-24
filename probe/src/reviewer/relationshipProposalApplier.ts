@@ -54,24 +54,34 @@ function isInside(parent: string, child: string) {
   return relative.length === 0 || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-function resolveArtifactRef(rootDir: string, ref: string) {
+function resolveArtifactRefCandidates(rootDir: string, actorId: string, ref: string) {
   if (ref.includes("\0") || ref.trim().length === 0) {
     throw new Error("Relationship proposal evidence ref cannot be empty");
   }
 
-  return path.isAbsolute(ref) ? path.resolve(ref) : path.resolve(rootDir, ref);
+  if (path.isAbsolute(ref)) {
+    return [path.resolve(ref)];
+  }
+
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+  return [
+    path.resolve(paths.actorDir, ref),
+    path.resolve(rootDir, ref)
+  ];
 }
 
 function assertActorEvidenceRef(rootDir: string, actorId: string, ref: string) {
   const paths = getActorWorkspacePaths(rootDir, actorId);
-  const resolved = resolveArtifactRef(rootDir, ref);
   const allowedDirs = [
     paths.evidenceDir,
     paths.providerInputsDir,
     paths.reviewsDir
   ];
+  const resolved = resolveArtifactRefCandidates(rootDir, actorId, ref).find((candidate) =>
+    allowedDirs.some((allowedDir) => isInside(allowedDir, candidate))
+  );
 
-  if (!allowedDirs.some((allowedDir) => isInside(allowedDir, resolved))) {
+  if (!resolved) {
     throw new Error(
       `Relationship proposal evidence ref must stay under ${actorId} evidence, provider input, or review artifacts`
     );
