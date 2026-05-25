@@ -1057,13 +1057,29 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
 
   memory.add("saw npc_b near spawn");
 
-  assert.deepEqual(await observe({ actor, target, dialogueState, memory }), {
-    status: "ok",
-    observerId: "npc_a",
-    position: { x: 0, y: 0, z: 0 },
-    visibleActors: [{ id: "npc_b", distance: 2, busy: true }],
-    memory: ["saw npc_b near spawn"]
-  });
+  const observation = await observe({ actor, target, dialogueState, memory });
+  assert.deepEqual(
+    {
+      status: observation.status,
+      observerId: observation.observerId,
+      position: observation.position,
+      visibleActors: observation.visibleActors,
+      memory: observation.memory
+    },
+    {
+      status: "ok",
+      observerId: "npc_a",
+      position: { x: 0, y: 0, z: 0 },
+      visibleActors: [{ id: "npc_b", distance: 2, busy: true }],
+      memory: ["saw npc_b near spawn"]
+    }
+  );
+  assert.equal(observation.worldStateSummary?.schema, "world-state-summary/v1");
+  assert.ok(
+    observation.worldStateSummary?.limitations.some((entry) =>
+      entry.includes("findBlocks API missing")
+    )
+  );
 
   assert.deepEqual(
     await moveTo({ actor, target, targetId: "npc_b", durationMs: 0 }),
@@ -1109,7 +1125,7 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(memory.list(), ["saw npc_b near spawn", "npc_b answered"]);
 });
 
-test("observe keeps important station blocks even when many closer blocks exist", async () => {
+test("observe keeps legacy nearby block hints nearest-first without station priority", async () => {
   const actor = createFakeBot("npc_a", 0) as ReturnType<typeof createFakeBot> & {
     findBlocks(input: {
       matching: (block: { name: string }) => boolean;
@@ -1140,13 +1156,18 @@ test("observe keeps important station blocks even when many closer blocks exist"
 
   const observation = await observe({ actor: actor as any, target, dialogueState, memory });
 
-  assert.ok(
+  assert.equal(observation.nearbyBlocks?.length, 12);
+  assert.equal(
     observation.nearbyBlocks?.some((block) => block.name === "crafting_table"),
-    "crafting table must survive observe sampling because it gates table-bound crafting"
+    false
+  );
+  assert.equal(
+    observation.worldStateSummary?.block_observations.by_name.some((block) => block.name === "crafting_table"),
+    true
   );
 });
 
-test("observe exposes nearby log resource directions for planning", async () => {
+test("observe exposes query-neutral world-state block observations", async () => {
   const actor = createFakeBot("npc_a", 0) as ReturnType<typeof createFakeBot> & {
     findBlocks(input: {
       matching: (block: { name: string }) => boolean;
@@ -1172,12 +1193,16 @@ test("observe exposes nearby log resource directions for planning", async () => 
 
   const observation = await observe({ actor: actor as any, target, dialogueState, memory });
 
-  assert.deepEqual(observation.nearbyResources?.logs[0], {
+  assert.equal(observation.worldStateSummary?.block_observations.total_verified, 1);
+  assert.deepEqual(observation.worldStateSummary?.block_observations.nearest[0], {
     name: "oak_log",
     distance: 9,
-    direction: "east",
     position: { x: 9, y: 0, z: 0 }
   });
+  assert.equal(
+    observation.worldStateSummary?.block_observations.by_name.find((entry) => entry.name === "oak_log")?.count,
+    1
+  );
 });
 
 test("converse sends directed speech, supports self-talk, and records heard messages", async () => {

@@ -5,13 +5,16 @@ import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAsse
 import type { ActionIntent, ActorCycleGoal } from "../runtime/goals/types.js";
 import { validateActionIntent } from "../runtime/goals/types.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
+import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
+import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import { writeActorGoalArtifact } from "../runtime/goals/goalJsonStore.js";
 import { isSocialExecutablePrimitive } from "../runtime/socialCycleExecution.js";
+import { validateDirectPrimitiveActionIntentArgs } from "../runtime/goals/actionIntentContracts.js";
 
 const actionPlannerSchema = {
   type: "object",
@@ -55,11 +58,20 @@ function executableOwnedActionSkills(
   );
 }
 
+/**
+ * Keeps deferred affordances diagnostic-only by intersecting the CycleGoal with
+ * the direct action surface before provider output can become an ActionIntent.
+ */
 function constrainCycleGoalForSocialExecutor(
   cycleGoal: ActorCycleGoal,
   context: SocialCycleContextPacket
 ): ActorCycleGoal {
-  const allowedPrimitiveIds = cycleGoal.allowed_primitive_ids.filter(isSocialExecutablePrimitive);
+  const directPrimitiveIds = new Set(
+    context.action_surface.direct_primitives.map((primitive) => primitive.primitive_id)
+  );
+  const allowedPrimitiveIds = cycleGoal.allowed_primitive_ids.filter((primitiveId) =>
+    isSocialExecutablePrimitive(primitiveId) && directPrimitiveIds.has(primitiveId)
+  );
   const cycleGoalWithExecutablePrimitives = {
     ...cycleGoal,
     allowed_primitive_ids: allowedPrimitiveIds
@@ -75,6 +87,7 @@ function constrainCycleGoalForSocialExecutor(
   };
 }
 
+/** Performs the final provider-output guard before an intent is persisted. */
 function validateExecutableIntent(
   intent: ActionIntent,
   cycleGoal: ActorCycleGoal
@@ -82,6 +95,10 @@ function validateExecutableIntent(
   if (intent.kind === "use_primitive") {
     if (!intent.primitive_id || !cycleGoal.allowed_primitive_ids.includes(intent.primitive_id)) {
       return `Primitive ${intent.primitive_id ?? "<missing>"} is not executable in this social cycle`;
+    }
+    const argsContract = validateDirectPrimitiveActionIntentArgs(intent);
+    if (!argsContract.ok) {
+      return `ActionIntent args contract failed for ${intent.primitive_id}: ${argsContract.error}`;
     }
   }
 
@@ -97,42 +114,26 @@ function validateExecutableIntent(
   return null;
 }
 
-function runtimeAffordanceDescriptions(primitiveIds: readonly string[]) {
-  const descriptions: Record<string, string> = {
-    observe: "Refresh live inventory, nearby blocks, actors, and memory-facing state.",
-    move_to: "Move to a bounded scouting waypoint or an observed resource position. Args may use {target:\"scout\", direction:\"north|east|south|west\", distance:2..12}, explicit x/y/z, or position:{x,y,z}.",
-    collect_logs: "Try to gather reachable low log blocks; success requires log inventory increase. If blocked, runtime evidence may include nearbyLogHints for later movement or observation.",
-    mine_block: "Mine a specific blockName such as stone when tool prerequisites exist; success requires inventory increase.",
-    craft_item: "Craft an inventory recipe by itemName when ingredients exist.",
-    craft_with_table: "Craft a table-bound recipe by itemName when a crafting table is nearby.",
-    place_block: "Place an explicit inventory itemName at targetPosition, position, or top-level x/y/z; success requires the block to exist in the world afterward.",
-    build_pattern: "Build and verify a bounded starter shelter pattern from available solid materials; success requires placed-block ledger plus world-state shelter verification.",
-    inspect_chest: "Inspect a nearby shared chest when settlement inventory matters.",
-    deposit_shared: "Deposit a chosen itemName/count, or let runtime choose a useful surplus item, into a nearby shared chest.",
-    withdraw_shared: "Withdraw a specific itemName/count from a nearby shared chest when that enables the next survival or settlement task.",
-    say: "Speak when communication matters for this actor or relationship context.",
-    wait: "Wait briefly when the world needs time or no better physical action is justified.",
-    remember: "Record a blocker, observation, or decision when action would otherwise repeat blindly."
-  };
-
-  return primitiveIds.map((primitiveId) => ({
-    primitive_id: primitiveId,
-    description: descriptions[primitiveId] ?? "Runtime primitive"
-  }));
-}
-
+/**
+ * Produces one bounded ActionIntent and stores both provider input and output.
+ *
+ * @remarks The provider sees the action surface, but runtime verification and
+ * active action skill gates still decide what can execute.
+ */
 export async function runSocialActionPlannerProvider(input: {
-  providerId: "openai-api" | "deterministic-social";
+  providerId: "openai-api" | "gemini-api" | "deterministic-social";
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
   cycleGoal: ActorCycleGoal;
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
+  gemini?: GeminiJsonProviderConfig;
   defaultPrimitive?: string;
   turnId?: string;
   actionIndex?: number;
   recentActionAttempts?: JsonValue;
+  runId?: string;
 }): Promise<ActionPlannerProviderResult> {
   const turnId = input.turnId ?? input.cycleId;
   const snapshotId = `action-planner-${turnId}-${randomUUID()}`;
@@ -147,8 +148,20 @@ export async function runSocialActionPlannerProvider(input: {
     cycle_goal: plannerCycleGoal,
     observation: input.context.observation,
     owned_action_skills: ownedActionSkills,
+    action_surface: input.context.action_surface,
+    direct_action_skills: input.context.action_surface.direct_action_skills.filter((skill) =>
+      plannerCycleGoal.allowed_action_skill_ids.includes(skill.action_skill_id)
+    ),
     allowed_primitive_ids: plannerCycleGoal.allowed_primitive_ids,
-    runtime_affordances: runtimeAffordanceDescriptions(plannerCycleGoal.allowed_primitive_ids),
+    runtime_affordances: input.context.action_surface.direct_primitives
+      .filter((primitive) =>
+        plannerCycleGoal.allowed_primitive_ids.includes(primitive.primitive_id)
+      )
+      .map((primitive) => ({
+        primitive_id: primitive.primitive_id,
+        description: primitive.description,
+        args_contract: primitive.args_contract
+      })),
     world_events: input.context.world_events,
     relationship_context: input.context.relationship_context,
     memory_packet: input.context.memory_packet,
@@ -165,12 +178,13 @@ export async function runSocialActionPlannerProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     input: providerInput
   });
 
   let intent: ActionIntent;
+  let usageRecord: ProviderUsageRecord | undefined;
 
   if (input.providerId === "deterministic-social") {
     const primitive = input.defaultPrimitive ?? "observe";
@@ -187,7 +201,43 @@ export async function runSocialActionPlannerProvider(input: {
       fallback_if_blocked: "remember blockage with evidence"
     };
   } else {
-    const result = await callOpenAiJsonSchema<{
+    const providerCall = {
+      schemaName: "social_action_planner",
+      schema: actionPlannerSchema,
+      system: `You plan one bounded ActionIntent for the active CycleGoal.
+ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
+Select from action_surface and runtime_affordances based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface is the actor's current body, not a strategy checklist.
+Deferred primitives or action skills explain missing affordances; do not choose them unless the active CycleGoal already allows the required primitive ids.
+If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different valid affordance based on the current action surface and evidence.
+Do not treat fixed material families, stations, construction readiness, or any other gameplay taxonomy as mandatory planning headings. Use raw observed Minecraft names and runtime evidence; decide relevance from the current CycleGoal.
+Use settlement_state, settlement_checklist, and blocker_histogram as pressure/evidence packets before choosing an action. They are not a mandatory single-domain strategy.
+If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
+If a primitive reports a concrete required position in runtime_result, use structured move_to toward that explicit position or observe current state before retrying. Do not retry the same primitive from outside its reported interaction range.
+Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvent pressure, or memory makes building relevant; never treat a construction target as always-on architecture.
+use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough.
+Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
+      user: JSON.stringify(providerInput),
+      usageContext: {
+        runId: input.runId,
+        actorId: input.actorId,
+        turnId,
+        stage: "action_planner"
+      }
+    };
+    const result = input.providerId === "gemini-api" ? await callGeminiJsonSchema<{
+      action_intent: {
+        kind: ActionIntent["kind"];
+        action_skill_id?: string;
+        primitive_id?: string;
+        args: Record<string, unknown>;
+        why_this_action: string;
+        expected_evidence: string[];
+        fallback_if_blocked: string;
+      };
+    }>({
+      config: input.gemini!,
+      ...providerCall
+    }) : await callOpenAiJsonSchema<{
       action_intent: {
         kind: ActionIntent["kind"];
         action_skill_id?: string;
@@ -199,19 +249,7 @@ export async function runSocialActionPlannerProvider(input: {
       };
     }>({
       config: input.openAi!,
-      schemaName: "social_action_planner",
-      schema: actionPlannerSchema,
-      system: `You plan one bounded ActionIntent for the active CycleGoal.
-ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
-Select from runtime_affordances based on live observation, nearbyResources, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different plausible affordance such as movement toward an observed resource hint, observation, another resource action, speech, or memory.
-For a survival/settlement LifeGoal, repeated surplus of one material is weaker than broadening into tools, stone, storage, safer positioning, or scouting once inventory evidence shows the material is already stocked.
-Use settlement_state, settlement_checklist, and blocker_histogram before choosing an action. Do not spend a turn rediscovering a checklist item that runtime evidence already says is satisfied.
-If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
-If craft_with_table is blocked because a crafting_table is far away or tablePosition is reported, move_to that position or observe current position before retrying table crafting. Do not retry the same table craft repeatedly from outside interaction range.
-For settlement shelter goals, build_pattern can use wood/dirt/cobblestone; do not require stone before attempting a verified starter shelter if solid materials are already available.
-use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough.
-Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
-      user: JSON.stringify(providerInput)
+      ...providerCall
     });
 
     if (!result.ok) {
@@ -224,13 +262,19 @@ Do not claim success through text. Pick actions whose evidence can be verified b
         model: result.model,
         created_at: new Date().toISOString(),
         raw_output_text: result.rawText ?? "",
-        parsed_output: { error: result.message },
-        proposal: { error: result.message }
+        parsed_output: {
+          error: result.message,
+          error_kind: result.errorKind,
+          budget_decision: result.budgetDecision as unknown as JsonValue
+        },
+        proposal: { error: result.message },
+        usage: result.usageRecord
       });
       return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
     }
 
     const payload = normalizeOpenAiJsonPayload(result.parsed as Record<string, unknown>);
+    usageRecord = result.usageRecord;
     const actionIntent = payload.action_intent as {
       kind: ActionIntent["kind"];
       action_skill_id?: string;
@@ -257,21 +301,54 @@ Do not claim success through text. Pick actions whose evidence can be verified b
 
   const validated = validateActionIntent(intent);
   if (!validated.ok) {
+    const error = validated.errors.join("; ");
+    const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
+      schema: "provider-output-snapshot/v1",
+      snapshot_id: `${snapshotId}-out`,
+      actor_id: input.actorId,
+      turn_id: turnId,
+      provider_id: input.providerId,
+      model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
+      created_at: new Date().toISOString(),
+      raw_output_text: JSON.stringify(intent),
+      parsed_output: {
+        error,
+        candidate_intent: intent as unknown as JsonValue
+      },
+      proposal: { error },
+      usage: usageRecord
+    });
     return {
       ok: false,
-      error: validated.errors.join("; "),
+      error,
       inputRef: inputPath,
-      outputRef: ""
+      outputRef: outputPath
     };
   }
 
   const executableError = validateExecutableIntent(validated.intent, plannerCycleGoal);
   if (executableError) {
+    const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
+      schema: "provider-output-snapshot/v1",
+      snapshot_id: `${snapshotId}-out`,
+      actor_id: input.actorId,
+      turn_id: turnId,
+      provider_id: input.providerId,
+      model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
+      created_at: new Date().toISOString(),
+      raw_output_text: JSON.stringify(validated.intent),
+      parsed_output: {
+        error: executableError,
+        candidate_intent: validated.intent as unknown as JsonValue
+      },
+      proposal: { error: executableError },
+      usage: usageRecord
+    });
     return {
       ok: false,
       error: executableError,
       inputRef: inputPath,
-      outputRef: ""
+      outputRef: outputPath
     };
   }
 
@@ -289,11 +366,12 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     raw_output_text: JSON.stringify(validated.intent),
     parsed_output: validated.intent as unknown as JsonValue,
-    proposal: { action_intent_ref: intentRef }
+    proposal: { action_intent_ref: intentRef },
+    usage: usageRecord
   });
 
   return {

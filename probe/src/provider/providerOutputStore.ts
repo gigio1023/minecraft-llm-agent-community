@@ -3,6 +3,7 @@ import path from "node:path";
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "../runtime/actorWorkspacePaths.js";
 import { writeJson } from "../runtime/actorWorkspaceStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
+import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 
 export type ProviderOutputSnapshot = {
   schema: "provider-output-snapshot/v1";
@@ -15,6 +16,8 @@ export type ProviderOutputSnapshot = {
   raw_output_text: string;
   parsed_output: JsonValue;
   proposal: JsonValue;
+  /** Provider-reported or estimated usage for post-run cost/rate-limit audit. */
+  usage?: ProviderUsageRecord;
 };
 
 export async function writeProviderOutputSnapshot(

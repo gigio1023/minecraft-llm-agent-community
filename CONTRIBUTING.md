@@ -15,6 +15,24 @@ should keep that direction explicit in code, docs, tests, and commit history.
   not fold volatile run status into them.
 - Use `docs/docs/Terminology.md` terms in docs, comments, prompts, and reports.
 
+## Code Comments
+
+Follow the TypeScript commenting rules in `AGENTS.md`.
+
+- Prefer clear names, explicit types, and small functions before adding a
+  comment.
+- Use `/** ... */` for exported APIs, cross-module contracts, runtime
+  invariants, and provider-visible schemas.
+- Use `//` only for local implementation notes that explain non-obvious intent,
+  Mineflayer behavior, verifier semantics, timeout/cancellation boundaries,
+  actor workspace ownership, or fake-progress rejection.
+- Do not add comments that restate the next line, decorate sections, or make
+  stale promises about behavior.
+- During comment passes, inspect touched TypeScript files with zero comments and
+  either add a high-signal invariant comment or leave them uncommented only when
+  they are trivial declarations, re-exports, or tests whose intent is already
+  explicit.
+
 ## Commit Scope
 
 Split work into separate commits when the scope changes. A reviewer should be

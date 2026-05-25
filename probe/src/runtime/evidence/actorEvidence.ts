@@ -12,7 +12,10 @@ export type ActorEvidenceCategory =
   | "timeout"
   | "fake_progress_rejection"
   | "provider_snapshot"
-  | "review_input";
+  | "review_input"
+  | "world_state_scan"
+  | "action_intent_contract_failure"
+  | "context_checkpoint";
 
 export type ActorEvidenceRecord = {
   schema: "actor-evidence/v1";

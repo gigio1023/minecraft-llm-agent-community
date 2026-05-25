@@ -17,6 +17,11 @@ leaving enough runtime evidence to explain the result.
 - starts or connects to a local Minecraft server;
 - runs Mineflayer actors through a bounded TypeScript loop;
 - lets a provider propose one action at a time;
+- exposes an `action_surface` packet with direct/deferred runtime affordances;
+- exposes query-neutral world-state diagnostics with scan limits, not gameplay
+  strategy categories;
+- rejects malformed physical `ActionIntent` args before hidden executor defaults
+  can look like progress;
 - verifies progress from Minecraft state, not model text;
 - writes transcripts, provider inputs, evidence, and review artifacts.
 
@@ -40,16 +45,20 @@ Reviewer and repair work runs after the turn from saved artifacts.
 flowchart TD
   Workspace["actor workspace"]
   Context["bounded provider context"]
+  Surface["action_surface"]
   Proposal["CycleGoal / ActionIntent proposal"]
   Gate["active action skill gate"]
   Action["Mineflayer action skill or primitive"]
   Evidence["runtime evidence"]
+  Contract["ActionIntent args contract"]
   Judgment["CycleJudgment and memory"]
   Review["async reviewer sidecars"]
 
   Workspace --> Context
-  Context --> Proposal
-  Proposal --> Gate
+  Context --> Surface
+  Surface --> Proposal
+  Proposal --> Contract
+  Contract --> Gate
   Gate --> Action
   Action --> Evidence
   Evidence --> Judgment
@@ -62,32 +71,35 @@ persistent LifeGoal, per-cycle CycleGoal selection, and CycleJudgment artifacts.
 It separates "Minecraft evidence passed" from "the actor's social-life judgment
 actually controlled the current goal."
 
-The latest live testing showed this separation matters. A 100-cycle home-base
-stress test with the OpenAI social-cycle provider reused prior judgment and
-memory, collected logs, crafted planks, and placed partial shelter shell blocks,
-but did not claim a finished home because the shelter verifier did not pass.
-That result belongs in future work, not the long-term spec.
+The latest live testing showed this separation matters. A 100-cycle
+long-objective stress test with the OpenAI social-cycle provider reused prior
+judgment and memory and produced concrete Minecraft evidence, but did not claim
+goal completion without verifier support.
+That result belongs in future work, not the long-term spec. It should improve
+the autonomy substrate, not turn one domain activity into the architecture.
 
 ```mermaid
 flowchart LR
-  Goal["home-base WorldEvent pressure"]
+  Goal["WorldEvent pressure"]
   Context["Soul/LifeGoal + memory + prior judgment"]
+  Surface["action_surface"]
   Action["bounded Minecraft actions"]
-  Partial["partial block placement"]
-  Verifier["shelter verifier"]
+  Evidence["runtime evidence"]
+  Verifier["verifier"]
   Future["future work: pivot rules and partial-progress reporting"]
 
   Goal --> Context
-  Context --> Action
-  Action --> Partial
-  Partial --> Verifier
+  Context --> Surface
+  Surface --> Action
+  Action --> Evidence
+  Evidence --> Verifier
   Verifier --> Future
 ```
 
 ## What It Is Not
 
 This is not a loose generated-code gameplay loop, generic Minecraft benchmark,
-race-to-diamond project, or persona-first NPC demo.
+race-to-diamond project, house-building architecture, or persona-first NPC demo.
 
 The current proof is simpler: complete concrete Minecraft tasks, reject fake
 progress, and make failures easy to inspect.

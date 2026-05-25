@@ -23,7 +23,10 @@ Short-term product:
 - strong observability through transcript and runtime artifacts;
 - truthful reconnect/session lifecycle evidence when reconnect is in scope;
 - architecture space for per-actor action skill ownership and later action
-  skill evolution.
+  skill evolution;
+- an autonomy substrate that exposes context, `action_surface`, hooks,
+  verification, and artifacts without turning one domain goal into the runtime
+  strategy.
 
 Long-term north star:
 
@@ -38,6 +41,7 @@ Not current goals:
 - full human-like personhood;
 - long-run autonomy as a product deliverable;
 - a Voyager clone;
+- a house-building or structure-planning architecture;
 - pretending partial animation is the same thing as competence.
 
 ## Current Runtime Shape
@@ -48,6 +52,7 @@ flowchart TD
   LifeGoal["ActorLifeGoal"]
   Pressure["WorldEvent, role, relationship, memory, inventory, settlement pressure"]
   Context["social-cycle-context/v1"]
+  Surface["action-surface/v1: direct/deferred affordances"]
   CycleGoal["CycleGoal"]
   Intent["ActionIntent"]
   Gate["runtime gate: actor-owned action skills + allowed primitives"]
@@ -59,7 +64,8 @@ flowchart TD
   Soul --> Context
   LifeGoal --> Context
   Pressure --> Context
-  Context --> CycleGoal
+  Context --> Surface
+  Surface --> CycleGoal
   CycleGoal --> Intent
   Intent --> Gate
   Gate --> Execute
@@ -73,6 +79,41 @@ The provider proposes goals and actions. The runtime owns Minecraft truth:
 validation, execution, timeout, cancellation, verification, transcript, and
 artifact persistence.
 
+`action_surface` is the actor's current body. It is not a domain-specific
+checklist. Building, storage, gathering, crafting, speech, and movement are all
+ordinary affordances until ActorSoul/LifeGoal pressure and runtime evidence make
+one of them relevant.
+
+World context follows the same rule. `world-state-summary/v1` is a bounded,
+query-neutral Mineflayer scan: raw observed Minecraft names, positions,
+distances, scan limits, loaded-world limits, and evidence refs. It must not
+publish fixed resource, station, construction-readiness, or survival-priority
+categories as provider guidance. Its loaded-coverage metadata is deliberately
+non-exhaustive unless a future scanner proves otherwise, so absence claims must
+remain scoped to the scan limits.
+
+Physical `ActionIntent` arguments are a contract. Movement, placement, mining,
+crafting, storage, and chat primitives must receive required structured args
+before execution. Prose fields such as `why_this_action` can explain intent, but
+they are not executable authority, and missing args must not become hidden
+movement or gameplay defaults.
+
+```mermaid
+flowchart LR
+  Observation["query-neutral world-state evidence"]
+  Contract["ActionIntent args contract"]
+  Surface["action_surface"]
+  Provider["provider proposal"]
+  Runtime["runtime gate"]
+  Evidence["artifact-visible result"]
+
+  Observation --> Provider
+  Surface --> Provider
+  Provider --> Contract
+  Contract --> Runtime
+  Runtime --> Evidence
+```
+
 ## What Success Looks Like
 
 The first meaningful success is not a big multi-agent story.
@@ -81,8 +122,8 @@ It is this:
 
 - an actor chooses a bounded CycleGoal from soul, life goal, world pressure,
   memory, and previous judgment;
-- the actor actually attempts Minecraft actions like collecting logs, mining
-  coal, or preparing simple shelter through runtime gates;
+- the actor actually attempts Minecraft actions selected from current evidence
+  and `action_surface` affordances through runtime gates;
 - every action attempt is recorded, including blocked and no-progress attempts;
 - later cycles reuse previous judgment or memory;
 - failures are explainable from transcript, checkpoint-like artifacts, and traces;
@@ -101,37 +142,56 @@ matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment
 ```
 
 The latest long-horizon OpenAI social-cycle stress test asked one actor to work
-toward a small home base for up to 100 cycles. It reached 54 recorded cycles
-before a cleanup-only file-permission blocker stopped the command. The report
-audited cleanly and stayed truthful:
+under broad settlement pressure for up to 100 cycles. It reached 54 recorded
+cycles before a cleanup-only file-permission blocker stopped the command. The
+report audited cleanly and stayed truthful:
 
 - `builtin_goal_authority=false`;
 - `builtin_execution_source=false`;
 - `fixture_dependency=false`;
 - prior `CycleJudgment` and memory were reused in later provider context;
-- the actor collected logs, crafted planks, and placed partial shelter shell
-  blocks;
-- the run did not claim a completed home without shelter verification.
+- the actor produced concrete Minecraft evidence across inventory, crafting,
+  and block-placement attempts;
+- the run did not claim broader goal completion without verifier support.
 
-The main next work is planner/control hardening, not changing the long-term
-spec: required action arguments, repeated-blocker pivot rules, partial-progress
-reporting, review-summary schema catch-up, and fresh-world cleanup ownership.
+That run is a stress test, not a product identity change. The main next work is
+planner/control substrate hardening, not a domain-specific architecture:
+required action arguments, repeated-blocker pivot rules, partial-progress
+reporting, review-summary schema catch-up, fresh-world cleanup ownership, and
+broader action-surface diagnostics.
 See `docs/docs/Architecture/Future-Works.md`.
 
 The active social-cycle implementation now carries a runtime-owned
-`settlement-state/v1` packet and `settlement-checklist/v1` report fields. Those
-fields summarize inventory, shared storage, known table/chest/shelter positions,
-recent blockers, available action skills, missing primitive blockers, memory
-reuse, and checklist progress. They are evidence packets, not provider claims.
+`action-surface/v1` context packet plus `settlement-state/v1` and
+`settlement-checklist/v1` compatibility report fields. These fields summarize
+direct/deferred affordances, inventory, shared storage, known positions, recent
+blockers, available action skills, missing primitive blockers, memory reuse, and
+checklist progress. They are evidence packets, not provider claims or a fixed
+domain plan. New runtime logic should treat them as compatibility and
+diagnostic state until they are renamed or retired behind a broader typed state
+contract.
+
+Recent hardening also makes several fake-success paths visible as blocked
+runtime evidence:
+
+- direct primitive intents cannot carry `action_skill_id`;
+- direct shared-storage transfer intents require explicit `count` or
+  `targetCount`;
+- `wait` and `remember` go through CycleGoal and active action-skill gates;
+- review summaries and report audits only count explicit
+  `world-state-summary/v1` or `world-state-scan/v1` artifacts as world-scan
+  evidence.
 
 ```mermaid
 flowchart LR
   Matrix["14/14 action-skill matrix"]
+  Surface["action-surface/v1"]
   Settlement["settlement-state/v1"]
   Postconditions["action-skill postconditions"]
   SocialReport["social-cycle report"]
   Audit["report audit"]
 
+  Surface --> SocialReport
   Matrix --> Postconditions
   Postconditions --> Settlement
   Settlement --> SocialReport
@@ -143,6 +203,10 @@ flowchart LR
 - no raw JavaScript `eval` gameplay loop;
 - deterministic-first runtime development;
 - runtime-owned validation, timeout, verification, and artifacts;
+- query-neutral world-state diagnostics instead of provider-facing gameplay
+  taxonomies;
+- structured `ActionIntent` argument contracts instead of hidden executor
+  defaults;
 - actor workspace is the source of truth for actor-owned action skill state;
 - tests stay small and Detroit-style;
 - live transcript is the primary behavior evidence;
@@ -214,19 +278,46 @@ The command prints `minecraft_direct_connect=127.0.0.1:25565` for a local
 Minecraft Java client. It starts the Docker server if needed or reports the
 existing managed endpoint. Stop it with `bun run --cwd probe server:stop`.
 
-### Provider auth
+### Provider auth and usage guard
 
-Social-cycle provider calls use the OpenAI API through `OPENAI_API_KEY` in the
-repo-root `.env`. The default social-cycle model is `gpt-5.4-mini` when the
-local account has access to that free-tier mini model.
+Social-cycle runs are deterministic by default. Live provider calls must be
+explicit so free-tier or paid usage does not happen by accident.
+
+Gemini API is the preferred lightweight live social-cycle path for current
+experiments. Gemma 4 31B uses the Gemini API model id `gemma-4-31b-it`.
+
+```text
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemma-4-31b-it
+```
+
+OpenAI API remains available when explicitly selected, but do not use it for
+cost-sensitive tests unless the local account budget has been checked.
 
 ```text
 OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.4-mini
+OPENAI_MODEL=...
 ```
 
 Use `.env.example` as the secret-free template. Do not commit `.env` or provider
 auth stores.
+
+Every provider-backed call writes usage metadata into provider output snapshots
+and the ignored JSONL ledger:
+
+```text
+build/provider-usage/provider-usage-ledger.jsonl
+```
+
+The usage guard checks configured free-tier budgets before a request. Built-in
+guardrails cover `gemini-api` + `gemma-4-31b-it` with the current operator
+reference budget, and local overrides can be supplied with:
+
+```text
+PROVIDER_USAGE_BUDGETS_PATH=build/provider-usage/free-tier-budgets.json
+PROVIDER_USAGE_BUDGETS_JSON='{"budgets":[...]}'
+PROVIDER_USAGE_ENFORCEMENT=enforce
+```
 
 Gameplay paths that use `openai-codex` are separate. They use an ignored local
 auth store such as:
@@ -241,13 +332,22 @@ Deterministic mode should remain usable without live provider access.
 
 ```bash
 cd probe
-OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+GEMINI_MODEL=gemma-4-31b-it bun run probe:social-cycle -- \
   --actor npc_b \
-  --provider openai-api \
+  --provider gemini-api \
   --cycles 2 \
   --max-actions-per-cycle 3 \
-  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --report ../tmp/social-cycle-npc-b-gemma31b.json \
   --no-dashboard
+```
+
+For a very small provider-only check before a real run:
+
+```bash
+cd probe
+bun run probe:gemini-json-smoke -- \
+  --model gemma-4-31b-it \
+  --report ../tmp/gemini-json-smoke.json
 ```
 
 This is the social-life runtime. Long-objective and direct-generated objective
@@ -287,6 +387,8 @@ Primary evidence should come from:
 
 - transcript output;
 - checkpoint-like runtime artifacts;
+- actor workspace evidence and world-state diagnostic summaries;
+- provider input/output snapshots and usage ledger records;
 - Langfuse traces when provider-backed paths are used.
 
 ## Repository Structure

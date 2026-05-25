@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { auditSocialCycleReport } from "../src/runtime/goals/socialCycleReportAuditCli.js";
+import { buildSocialCycleReviewSummary } from "../src/runtime/goals/socialCycleReviewSummary.js";
 import type { SocialCycleRunReport } from "../src/runtime/goals/types.js";
 
 const actorId = "npc_b";
@@ -287,4 +288,219 @@ test("rejects satisfied settlement checklist items without evidence refs", async
       error.includes("Settlement checklist item crafting_table_known_or_placed is satisfied without evidence refs")
     )
   );
+});
+
+test("rejects move_to intents with empty or invalid structured args", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-move-empty-args");
+  const report = baseReport();
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_intent_ref), {
+    schema: "action-intent/v1",
+    actor_id: actorId,
+    cycle_id: "cycle-0001",
+    cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: {},
+    why_this_action: "Move using hidden defaults",
+    expected_evidence: ["position_delta"],
+    fallback_if_blocked: "remember"
+  });
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[1]!.action_intent_ref), {
+    schema: "action-intent/v1",
+    actor_id: actorId,
+    cycle_id: "cycle-0002",
+    cycle_goal_id: report.cycles[1]!.cycle_goal_ref,
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { target: "npc_a" },
+    why_this_action: "Move using prose-era target args",
+    expected_evidence: ["position_delta"],
+    fallback_if_blocked: "remember"
+  });
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.ok(
+    errors.some((error) =>
+      error.includes("move_to intent") && error.includes("has empty args")
+    )
+  );
+  assert.ok(
+    errors.some((error) =>
+      error.includes("move_to intent") && error.includes("has invalid physical args")
+    )
+  );
+});
+
+test("rejects physical absence claims without scan-backed evidence when evidence refs are inspectable", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-claim-without-scan");
+  const report = baseReport();
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.judgment_ref), {
+    schema: "cycle-judgment/v1",
+    actor_id: actorId,
+    cycle_id: "cycle-0001",
+    cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
+    outcome: "blocked",
+    what_happened: "Could not find a matching target nearby.",
+    why_it_mattered_for_life_goal: "An absence claim needs scan evidence before changing direction.",
+    verifier_status: "not_applicable",
+    evidence_refs: report.cycles[0]!.evidence_refs,
+    memory_writes: [],
+    relationship_event_proposals: [],
+    next_goal_pressure: []
+  });
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.ok(
+    errors.some((error) =>
+      error.includes("physical absence") && error.includes("without world-state scan evidence")
+    )
+  );
+});
+
+test("rejects physical absence claims backed only by non-exhaustive scan evidence", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-absence-non-exhaustive");
+  const report = baseReport();
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.judgment_ref), {
+    schema: "cycle-judgment/v1",
+    actor_id: actorId,
+    cycle_id: "cycle-0001",
+    cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
+    outcome: "blocked",
+    what_happened: "No matching target block was found nearby.",
+    why_it_mattered_for_life_goal: "Absence claims require exhaustive evidence.",
+    verifier_status: "not_applicable",
+    evidence_refs: report.cycles[0]!.evidence_refs,
+    memory_writes: [],
+    relationship_event_proposals: [],
+    next_goal_pressure: []
+  });
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.evidence_refs[0]!), {
+    schema: "actor-evidence/v1",
+    actor_id: actorId,
+    evidence_id: report.cycles[0]!.evidence_refs[0],
+    category: "tool_attempt",
+    tool_attempt: {
+      tool: "observe",
+      args: {},
+      result: {
+        worldStateSummary: {
+          schema: "world-state-summary/v1",
+          scan_id: "scan-absence",
+          center: { x: 0, y: 64, z: 0 },
+          radius: 32,
+          vertical_range: { min_y: 48, max_y: 80, center_y: 64 },
+          loaded_coverage: {
+            method: "blockAt-sampled-columns",
+            scope: "sampled_columns_only",
+            sample_stride: 8,
+            sampled_columns: 4,
+            loaded_columns: 4,
+            unknown_columns: 0,
+            exhaustive: false,
+            sample_had_unknown_columns: false,
+            absence_claims_exhaustive: false,
+            incomplete: true
+          },
+          block_observations: {
+            total_verified: 0,
+            truncated: false,
+            by_name: [],
+            nearest: []
+          },
+          limitations: ["sampled scan fixture"]
+        }
+      }
+    }
+  });
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.ok(
+    errors.some((error) =>
+      error.includes("physical absence claim") && error.includes("non-exhaustive")
+    )
+  );
+});
+
+test("review summary surfaces world scan counts and movement contract status", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-review-scan-summary");
+  const report = baseReport();
+  report.actor_workspace_root_dir = workspaceRoot;
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_intent_ref), {
+    schema: "action-intent/v1",
+    actor_id: actorId,
+    cycle_id: "cycle-0001",
+    cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { direction: "east", distance: 6 },
+    why_this_action: "Move toward an explicitly observed waypoint",
+    expected_evidence: ["position_delta"],
+    fallback_if_blocked: "remember"
+  });
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.evidence_refs[0]!), {
+    schema: "actor-evidence/v1",
+    actor_id: actorId,
+    evidence_id: report.cycles[0]!.evidence_refs[0],
+    category: "tool_attempt",
+    tool_attempt: {
+      tool: "observe",
+      args: {},
+      result: {
+        worldStateSummary: {
+          schema: "world-state-summary/v1",
+          scan_id: "scan-1",
+          center: { x: 0, y: 64, z: 0 },
+          radius: 32,
+          vertical_range: { min_y: 48, max_y: 80, center_y: 64 },
+          block_observations: {
+            total_verified: 1,
+            by_name: [{ name: "minecraft_block", count: 1 }],
+            nearest: [{ name: "minecraft_block", distance: 5, position: { x: 5, y: 64, z: 0 } }],
+            truncated: false
+          },
+          loaded_coverage: {
+            method: "blockAt-sampled-columns",
+            scope: "sampled_columns_only",
+            sample_stride: 8,
+            sampled_columns: 4,
+            loaded_columns: 4,
+            unknown_columns: 0,
+            approximate_loaded_ratio: 1,
+            exhaustive: false,
+            sample_had_unknown_columns: false,
+            absence_claims_exhaustive: false,
+            incomplete: true
+          }
+        },
+        nearbyBlocks: [{ name: "minecraft_block", distance: 5 }]
+      }
+    }
+  });
+  await writeJson(reportPath, report);
+
+  const summary = await buildSocialCycleReviewSummary(reportPath);
+  const row = summary.rows[0]!;
+
+  assert.equal(row.movement_contract_status, "valid");
+  assert.equal(row.world_scan_ref_count, 1);
+  assert.deepEqual(row.world_scan_refs, [report.cycles[0]!.evidence_refs[0]]);
+  assert.equal(row.world_scan_counts.world_state_summary, 1);
+  assert.equal(row.world_scan_counts.block_observations, 1);
+  assert.equal(row.world_scan_counts.nearest_examples, 1);
+  assert.equal(row.world_scan_counts.non_exhaustive_coverage, 1);
+  assert.equal(row.world_scan_counts.nearby_blocks, undefined);
 });

@@ -13,6 +13,7 @@ import {
 } from "../runtime/goals/strategicGoalStore.js";
 import { soulRef } from "../runtime/goals/actorSoulStore.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
+import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
@@ -152,15 +153,24 @@ function cycleGoalFromLlm(input: {
   };
 }
 
+/**
+ * Produces the next bounded CycleGoal without granting domain strategy authority.
+ *
+ * @remarks The provider may prioritize any available Minecraft or social
+ * affordance, but only as pressure interpreted under ActorSoul/LifeGoal and the
+ * current action surface.
+ */
 export async function runSocialCycleGoalProvider(input: {
-  providerId: "openai-api" | "deterministic-social";
+  providerId: "openai-api" | "gemini-api" | "deterministic-social";
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
+  gemini?: GeminiJsonProviderConfig;
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
+  runId?: string;
 }): Promise<CycleGoalProviderResult> {
   const snapshotId = `goal-mind-${input.cycleId}-${randomUUID()}`;
   const turnId = input.cycleId;
@@ -175,7 +185,7 @@ export async function runSocialCycleGoalProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     input: providerInput
   });
@@ -233,15 +243,48 @@ export async function runSocialCycleGoalProvider(input: {
   const system = `You are the cycle goal provider for a Minecraft social simulation actor.
 ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a WorldEvent summary.
 WorldEvents are pressure only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
-Choose an ordinary Minecraft CycleGoal when the situation calls for it. Collecting logs is just collecting logs unless observation, memory, or relationships make it socially relevant.
+Choose an ordinary Minecraft CycleGoal when the situation calls for it. A Minecraft action is only socially relevant when observation, memory, role pressure, or relationships make it relevant.
 The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
-For survival and settlement goals, value evidence of diversified progress: safe positioning, resource discovery, enough starter wood, crafting, stone/tool progression, and shared storage. Do not make surplus collection of one stocked material the continuing goal unless live evidence shows it is still the best need.
-Use settlement_state and settlement_checklist as runtime-owned evidence about what is already complete, blocked, or pending. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Use action_surface as the current actor body and affordance catalog. Direct entries are usable now; deferred entries are diagnostics about missing or non-exposed affordances.
+For survival and settlement goals, reason from raw evidence and the available action surface. Do not use fixed material-family, station-family, construction-readiness, or tech-tree categories as mandatory planning headings.
+Use settlement_state and settlement_checklist as runtime-owned pressure/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Do not make any single domain activity an always-on CycleGoal. Building is one possible social pressure among many, selected only when ActorSoul/LifeGoal, WorldEvent pressure, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
-If observation includes nearbyResources or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose a different plausible next direction such as movement, observation, gathering, crafting, speech, or memory based on the live context. Output JSON only.`;
+If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
-  const result = await callOpenAiJsonSchema<{
+  const providerCall = {
+    schemaName: "social_goal_mind",
+    schema: cycleGoalProviderSchema,
+    system,
+    user,
+    usageContext: {
+      runId: input.runId,
+      actorId: input.actorId,
+      turnId,
+      stage: "goal_mind"
+    }
+  };
+  const result = input.providerId === "gemini-api" ? await callGeminiJsonSchema<{
+    strategic_goal_updates: Array<{
+      summary: string;
+      rationale: string;
+      success_direction: string;
+      current_blockers: string[];
+    }>;
+    cycle_goal: {
+      summary: string;
+      rationale: string;
+      success_verifier: string;
+      evidence_required: string[];
+      stop_conditions: string[];
+      allowed_action_skill_ids: string[];
+      allowed_primitive_ids: string[];
+    };
+  }>({
+    config: input.gemini!,
+    ...providerCall
+  }) : await callOpenAiJsonSchema<{
     strategic_goal_updates: Array<{
       summary: string;
       rationale: string;
@@ -259,10 +302,7 @@ If observation includes nearbyResources or previous judgments include blocked ev
     };
   }>({
     config: input.openAi!,
-    schemaName: "social_goal_mind",
-    schema: cycleGoalProviderSchema,
-    system,
-    user
+    ...providerCall
   });
 
   if (!result.ok) {
@@ -275,8 +315,13 @@ If observation includes nearbyResources or previous judgments include blocked ev
       model: result.model,
       created_at: new Date().toISOString(),
       raw_output_text: result.rawText ?? "",
-      parsed_output: { error: result.message, error_kind: result.errorKind },
-      proposal: { error: result.message }
+      parsed_output: {
+        error: result.message,
+        error_kind: result.errorKind,
+        budget_decision: result.budgetDecision as unknown as JsonValue
+      },
+      proposal: { error: result.message },
+      usage: result.usageRecord
     });
     return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
   }
@@ -306,7 +351,8 @@ If observation includes nearbyResources or previous judgments include blocked ev
       created_at: new Date().toISOString(),
       raw_output_text: result.rawText,
       parsed_output: result.parsed as unknown as JsonValue,
-      proposal: { error: "missing_cycle_goal" }
+      proposal: { error: "missing_cycle_goal" },
+      usage: result.usageRecord
     });
     return {
       ok: false,
@@ -370,7 +416,8 @@ If observation includes nearbyResources or previous judgments include blocked ev
       created_at: new Date().toISOString(),
       raw_output_text: result.rawText,
       parsed_output: { validation_errors: validated.errors },
-      proposal: { error: "invalid_cycle_goal" }
+      proposal: { error: "invalid_cycle_goal" },
+      usage: result.usageRecord
     });
     return {
       ok: false,
@@ -395,7 +442,8 @@ If observation includes nearbyResources or previous judgments include blocked ev
     created_at: new Date().toISOString(),
     raw_output_text: result.rawText,
     parsed_output: result.parsed as unknown as JsonValue,
-    proposal: { cycle_goal_ref: cycleGoalRef }
+    proposal: { cycle_goal_ref: cycleGoalRef },
+    usage: result.usageRecord
   });
 
   return {

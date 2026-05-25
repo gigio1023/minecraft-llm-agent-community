@@ -72,37 +72,51 @@ If a recommendation would make the actor ignore Soul/LifeGoal continuity,
 relationships, or social consequences in favor of generic task completion, reject
 or reframe it.
 
+Do not turn one domain goal into core architecture. House, shelter, base,
+storage, mining, farming, travel, repair, conversation, and conflict are
+possible social pressures, not mandatory CycleGoal phases. Do not add
+`StructurePlacementPlan`, `ShelterBlueprint`, `HomeBasePlan`, or similar
+building-first planning artifacts as always-on runtime context. If such an
+artifact is useful, keep it local to a bounded action skill, fixture, or offline
+design tool and make the current Soul/LifeGoal pressure justify its use.
+
+Codex/MCP-style references should be adapted as autonomy substrate: action
+surface, direct/deferred tool exposure, hooks, permission gates, event streams,
+verification, and artifacts. Do not adapt them as hidden domain strategy.
+
 ## Canonical Docs
 
 Read these first:
 
 1. `SPEC.md`
-2. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
-3. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-4. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
-5. `docs/docs/Specification/Reference-Adaptation-Guide.md`
-6. `docs/docs/Documentation-Map.md`
-7. `docs/docs/Agent-Search-Index.md`
-8. `docs/docs/Terminology.md`
-9. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
-10. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-11. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-12. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
-13. `docs/docs/Architecture/Implementation-Workstreams.md`
-14. `docs/docs/Architecture/Action-Skill-Verification.md`
-15. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
-16. `docs/docs/Architecture/Minimal-Probe.md`
-17. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-18. `docs/docs/Setup/Headless-Server.md`
-19. `docs/docs/Setup/Provider-Setup.md`
+2. `AGENTS.md`
+3. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+4. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+5. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+6. `docs/docs/Specification/Reference-Adaptation-Guide.md`
+7. `docs/docs/Documentation-Map.md`
+8. `docs/docs/Agent-Search-Index.md`
+9. `docs/docs/Terminology.md`
+10. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+11. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+12. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+13. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+14. `docs/docs/Architecture/Implementation-Workstreams.md`
+15. `docs/docs/Architecture/Action-Skill-Verification.md`
+16. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+17. `docs/docs/Architecture/Minimal-Probe.md`
+18. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+19. `docs/docs/Setup/Headless-Server.md`
+20. `docs/docs/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
-`SPEC.md` and `docs/docs/Specification/*` are long-term spec files. Editing them
-changes product direction, so do not modify them during routine implementation
-work unless the user explicitly approves a spec update in the current turn. Put
-dated implementation status, command output, and volatile evidence in handoff or
-audit docs instead.
+`SPEC.md` and `docs/docs/Specification/*` are long-term spec files. `AGENTS.md`
+is binding repo-agent guidance for interpreting and applying that spec. Editing
+any of these files changes product direction or agent operating rules, so do not
+modify them during routine implementation work unless the user explicitly
+approves the update in the current turn. Put dated implementation status,
+command output, and volatile evidence in handoff or audit docs instead.
 
 ## Terminology
 
@@ -197,6 +211,11 @@ Important search tokens:
 - `OPENAI_CODEX_PROVIDER`
 - `GAME_RUNTIME_CODEX_AUTH`
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
+- `PROVIDER_USAGE_GUARD`
+- `GEMINI_API_SOCIAL_PROVIDER`
+- `WORLD_STATE_DIAGNOSTICS`
+- `ACTION_INTENT_CONTRACT`
+- `CONTEXT_COMPACTION`
 - `SOCIAL_SIMULATION_SEED`
 - `SPEED_BOUNDED_SOCIAL_SIMULATION`
 - `LIVE_TRANSCRIPT_FIRST`
@@ -242,6 +261,59 @@ Important search tokens:
 - Mineflayer provides the game client API.
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
   eval.
+- Prefer autonomy substrate over domain-specific strategy encoding. Improve
+  context packets, `action_surface`, gates, hooks, verifier feedback, and actor
+  memory before adding a specialized planner for one activity such as house
+  building.
+- Preserve enough world-state evidence for post-run diagnosis. A claim such as
+  "no matching block was observed" must be backed by a bounded scan or an
+  explicit loaded-world limitation, not only by a thin nearest-block summary.
+- World-state diagnostics should record the scan center, radius, vertical range,
+  dimension, loaded-chunk limitation, raw observed block/entity/item names,
+  nearest examples, truncation policy, and evidence refs. Do not imply that
+  unloaded chunks were inspected. Reviews and audits should count explicit
+  `world-state-summary/v1` or `world-state-scan/v1` schema artifacts as scan
+  evidence, not loose legacy keys such as `nearbyBlocks`.
+- Do not expose provider-facing world summaries as fixed material-family,
+  station-family, construction-readiness, or survival-priority categories.
+  World context is evidence substrate: raw Minecraft names, positions,
+  distances, limits, and query refs. The provider decides what matters from
+  ActorSoul/LifeGoal, CycleGoal, action surface, and evidence.
+- It is acceptable for a specific action skill implementation to query a
+  specific Minecraft block or item family as part of its own primitive contract.
+  It is not acceptable to turn those families into always-present planner
+  context, summary headings, or goal pressure.
+- Treat physical `ActionIntent` arguments as a contract. For actions such as
+  `move_to`, `mine_block`, `place_block`, `craft_item`, `inspect_chest`,
+  `deposit_shared`, or structure/building primitives, required target/item/count
+  arguments must be present in structured args before execution.
+- Direct `use_primitive` intents must not carry `action_skill_id` or
+  `args.actionSkillId`. Actor-owned action skill fallback authority exists only
+  after a `use_action_skill` intent is resolved by the runtime.
+- Safe-looking control actions such as `wait` and `remember` are still runtime
+  primitives. They must pass CycleGoal and active action-skill gates.
+- Do not silently convert missing physical arguments into movement or gameplay
+  defaults. A hidden default that makes the bot move can still be a product
+  failure. Reject, repair, or ask the provider for a valid intent, then record
+  the contract failure in artifacts.
+- Natural-language fields such as `why_this_action` explain intent but are not
+  executable authority. If prose mentions a coordinate and structured args are
+  empty or contradictory, the runtime must treat the structured intent as
+  invalid rather than guessing from prose.
+- Use Mineflayer API behavior to shape runtime contracts: target resolution,
+  loaded-world visibility, pathfinder limits, timeout/cancellation behavior, and
+  verifier evidence should be documented in code or spec when they affect an
+  action skill.
+- Long social-cycle runs need context compaction. Do not feed unbounded raw
+  transcripts or repeated observe/wait/remember records back to the provider.
+  Preserve compact, evidence-linked state: ActorSoul/LifeGoal, current
+  inventory, container snapshots, known positions, recent blockers, recent
+  judgments, world-state diagnostics, action-surface contracts, and artifact
+  refs.
+- Compaction must not launder weak evidence into progress. Provider text,
+  memory notes, `wait`, or repeated observation are context, not physical
+  success unless verifier-backed world, inventory, position, block, container,
+  chat, or transcript evidence supports them.
 - Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
   artifacts, structured logs, and optional viewer evidence.
 - Failures should be explainable from artifacts without immediate reproduction.
@@ -291,6 +363,11 @@ practice.
 - During comment passes, explicitly inspect every TypeScript file with zero
   comments. Either add a high-signal contract/invariant comment or leave it
   uncommented only when the file is a trivial CLI/re-export/declarative constant.
+- When the user explicitly requests a comment pass, report whether existing
+  guidance was sufficient, then update only comments that clarify contracts,
+  invariants, runtime evidence, or non-obvious Mineflayer behavior. Tests may
+  receive comments only for non-obvious invariants; do not pad every test with
+  narration.
 - Configuration comments should explain non-obvious defaults, auth boundaries,
   artifact locations, and destructive-vs-non-destructive behavior. Do not label
   obvious scalar defaults.
@@ -395,22 +472,60 @@ Smoke tests (`probe:gemini-live-smoke`, `probe:gemini-native-audio-dialog-smoke`
 are allowed only as quick optional wiring checks. They do not replace Minecraft
 current-run verification.
 
+## Provider Cost And Usage Guard
+
+Live provider calls must be explicit and auditable.
+
+- Do not run OpenAI API models for cost-sensitive tests unless the user has
+  explicitly selected that provider/model and the local free-tier or paid budget
+  is known.
+- Prefer `gemini-api` with `gemma-4-31b-it` for lightweight live provider checks
+  when `GEMINI_API_KEY` is available.
+- Run `probe:gemini-json-smoke` before longer Gemini/Gemma social-cycle tests.
+- Provider calls should write usage into provider output snapshots and
+  `build/provider-usage/provider-usage-ledger.jsonl`.
+- If the user provides provider dashboard usage, encode it in
+  `PROVIDER_USAGE_BUDGETS_JSON` or
+  `build/provider-usage/free-tier-budgets.json` as `already_used` before running
+  long or repeated live provider tests.
+- Treat a usage-budget block as a provider setup/budget blocker, not as actor
+  behavior or action-skill failure.
+
+Gemini/Gemma free-tier limits are provider/project/tier dependent and can
+change. Check current Google AI Studio active limits before long runs. The repo
+has a built-in operator guardrail for `gemini-api` + `gemma-4-31b-it`, but that
+guardrail is not an official quota guarantee.
+
 ## Social Cycle Runtime (Soul / LifeGoal)
 
-Use `probe:social-cycle` for the Soul/LifeGoal/CycleGoal vertical slice. This path
-uses **OpenAI API** (`OPENAI_API_KEY` in repo-local `.env`), not
-`openai-codex` / `build/provider-auth/openai-codex-auth.json`.
+Use `probe:social-cycle` for the Soul/LifeGoal/CycleGoal vertical slice. The CLI
+defaults to `deterministic-social`; live provider calls require an explicit
+provider.
+
+Preferred lightweight live path:
 
 ```bash
 cd probe
-OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
+bun run probe:gemini-json-smoke -- \
+  --model gemma-4-31b-it \
+  --report ../tmp/gemini-json-smoke.json
+
+bun run probe:social-cycle -- \
   --actor npc_b \
-  --provider openai-api \
+  --provider gemini-api \
+  --model gemma-4-31b-it \
   --cycles 2 \
   --max-actions-per-cycle 3 \
-  --report ../tmp/social-cycle-npc-b-gpt54-mini.json \
+  --report ../tmp/social-cycle-npc-b-gemma31b.json \
   --no-dashboard
 ```
+
+This path uses **Gemini API** (`GEMINI_API_KEY` in repo-local `.env`), not
+`openai-codex` / `build/provider-auth/openai-codex-auth.json`.
+
+OpenAI API (`OPENAI_API_KEY`) remains available with
+`--provider openai-api --model "$OPENAI_MODEL"` but should not be used for
+cost-sensitive tests until budget state is known.
 
 `deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
 Do not use `probe:long-objective` as the social-life runtime.

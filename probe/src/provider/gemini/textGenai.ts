@@ -2,18 +2,29 @@ import { GoogleGenAI } from "@google/genai";
 
 import { classifyGeminiError, GeminiPlannerError } from "./errors.js";
 import type { GeminiPlannerConfig } from "./config.js";
+import {
+  appendProviderUsageRecord,
+  buildEstimatedUsage,
+  guardProviderUsageRequest,
+  normalizeGeminiUsage,
+  ProviderUsageBudgetError,
+  type ProviderUsageCallContext,
+  type ProviderUsageRecord
+} from "../providerUsageTracker.js";
 
 export type GeminiTextCallResult = {
   path: "text-genai";
   model: string;
   text: string;
   usedFallbackModel: boolean;
+  usageRecord?: ProviderUsageRecord;
 };
 
 export async function callGeminiTextGenai(input: {
   apiKey: string;
   config: GeminiPlannerConfig;
   prompt: string;
+  usageContext?: ProviderUsageCallContext;
 }): Promise<GeminiTextCallResult> {
   const client = new GoogleGenAI({ apiKey: input.apiKey });
   const models = [input.config.textModel, input.config.textFallbackModel].filter(
@@ -23,7 +34,19 @@ export async function callGeminiTextGenai(input: {
   let lastError: GeminiPlannerError | undefined;
 
   for (const [index, model] of models.entries()) {
+    const started = Date.now();
+    const estimatedUsage = buildEstimatedUsage({
+      inputText: input.prompt,
+      maxOutputTokens: 0
+    });
+    let budgetDecision;
     try {
+      budgetDecision = await guardProviderUsageRequest({
+        providerId: "gemini-api",
+        model,
+        estimatedUsage,
+        context: input.usageContext
+      });
       const response = await client.models.generateContent({
         model,
         contents: input.prompt,
@@ -33,7 +56,6 @@ export async function callGeminiTextGenai(input: {
           }
         }
       });
-
       const text = response.text?.trim() ?? "";
       if (!text) {
         throw new GeminiPlannerError({
@@ -41,16 +63,47 @@ export async function callGeminiTextGenai(input: {
           message: "Gemini text response was empty"
         });
       }
+      const normalizedUsage = normalizeGeminiUsage(response.usageMetadata, estimatedUsage);
+      const usageRecord = await appendProviderUsageRecord({
+        providerId: "gemini-api",
+        model,
+        status: "succeeded",
+        usage: normalizedUsage.usage,
+        usageSource: normalizedUsage.source,
+        context: input.usageContext,
+        elapsedMs: Date.now() - started,
+        rawUsage: normalizedUsage.rawUsage,
+        budgetDecision
+      });
 
       return {
         path: "text-genai",
         model,
         text,
-        usedFallbackModel: index > 0
+        usedFallbackModel: index > 0,
+        usageRecord
       };
     } catch (error) {
+      if (error instanceof ProviderUsageBudgetError) {
+        throw new GeminiPlannerError({
+          kind: "quota_exceeded",
+          message: error.message,
+          retryable: false,
+          cause: error
+        });
+      }
       lastError = classifyGeminiError(error);
       if (!lastError.retryable || index === models.length - 1) {
+        await appendProviderUsageRecord({
+          providerId: "gemini-api",
+          model,
+          status: "failed",
+          usage: estimatedUsage,
+          usageSource: "estimated",
+          context: input.usageContext,
+          elapsedMs: Date.now() - started,
+          budgetDecision
+        });
         throw lastError;
       }
     }

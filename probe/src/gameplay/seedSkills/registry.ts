@@ -231,10 +231,10 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
   },
   {
     id: "buildBasicShelter",
-    summary: "Build and verify a small starter shelter shell near the settlement base",
+    summary: "Run one bounded starter shelter shell action skill when shelter pressure is relevant",
     runtimeStatus: "implemented",
     implementationNotes:
-      "Uses build_pattern to expand a bounded starter-shelter blueprint into verified place_block operations and a world-state shelter scan.",
+      "Uses build_pattern to place and verify a small shell. This is one seed action skill, not a core runtime strategy or default social goal.",
     intentKinds: ["bootstrap_progress", "inspect_settlement_state"],
     validRoles: ["settler"],
     preconditions: ["inventory has solid build material such as planks, logs, dirt, or cobblestone", "safe build site nearby"],

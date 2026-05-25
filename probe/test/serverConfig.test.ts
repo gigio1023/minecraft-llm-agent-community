@@ -33,6 +33,8 @@ test("loads probe config and builds vanilla server env", () => {
   assert.deepEqual(config.bots, ["npc_a", "npc_b"]);
 
   assert.equal(env.EULA, "TRUE");
+  assert.equal(env.MC_UID, String(process.getuid?.() ?? 1000));
+  assert.equal(env.MC_GID, String(process.getgid?.() ?? 1000));
   assert.equal(env.VERSION, "1.21.11");
   assert.equal(env.TYPE, "VANILLA");
   assert.equal(env.ONLINE_MODE, "FALSE");

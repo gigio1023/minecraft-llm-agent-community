@@ -1,9 +1,14 @@
-import type { Vec3 } from "vec3";
+import { randomUUID } from "node:crypto";
 
 import { createDialogueState } from "../runtime/dialogueState.js";
 import { createMemory } from "../runtime/memory.js";
 import type { ItemStack } from "../gameplay/storage/sharedStorageLedger.js";
-import { isLogName } from "./collectLogs.js";
+import {
+  scanWorldState,
+  summarizeWorldStateScan,
+  type WorldStatePosition,
+  type WorldStateSummary
+} from "./worldStateScan.js";
 
 type DialogueState = ReturnType<typeof createDialogueState>;
 type MemoryStore = ReturnType<typeof createMemory>;
@@ -24,8 +29,8 @@ type PositionedActor = {
     matching: (block: { name: string }) => boolean;
     maxDistance: number;
     count: number;
-  }) => Vec3[];
-  blockAt?: (position: Vec3, extraInfos?: boolean) => { name: string } | null;
+  }) => WorldStatePosition[];
+  blockAt?: (position: WorldStatePosition, extraInfos?: boolean) => { name: string } | null;
 };
 
 export type ObserveResult = {
@@ -40,30 +45,11 @@ export type ObserveResult = {
   memory: string[];
   inventory?: Array<{ name: string; count: number }>;
   nearbyBlocks?: Array<{ name: string; distance: number }>;
-  nearbyResources?: {
-    logs: Array<{
-      name: string;
-      distance: number;
-      direction: string;
-      position: { x: number; y: number; z: number };
-    }>;
-    stone: Array<{
-      name: string;
-      distance: number;
-      direction: string;
-      position: { x: number; y: number; z: number };
-    }>;
-    coal: Array<{
-      name: string;
-      distance: number;
-      direction: string;
-      position: { x: number; y: number; z: number };
-    }>;
-  };
   sharedChest?: {
     chestId: string;
     items: Array<{ name: string; count: number }>;
   };
+  worldStateSummary?: WorldStateSummary;
 };
 
 type ObserveArgs = {
@@ -100,23 +86,14 @@ function roundPosition(position: { x: number; y: number; z: number }) {
   };
 }
 
-function directionFrom(origin: { x: number; z: number }, target: { x: number; z: number }) {
-  const dx = target.x - origin.x;
-  const dz = target.z - origin.z;
-  if (Math.abs(dx) >= Math.abs(dz)) {
-    return dx >= 0 ? "east" : "west";
-  }
-  return dz >= 0 ? "south" : "north";
-}
-
 function scanNearbyBlocks(actor: PositionedActor) {
   if (!actor.findBlocks || !actor.blockAt) {
     return undefined;
   }
 
-  // Nearby blocks are coarse evidence for verification and debugging, not a
-  // full world model. Keep the scan small so observe remains cheap in each loop.
-  const blockSnapshots = actor
+  // This legacy hint is nearest-first only. Strategic or station-like priority
+  // belongs in runtime-owned action skills or verifiers, not provider context.
+  return actor
     .findBlocks({
       matching: (block) => block.name !== "air" && block.name !== "void_air",
       maxDistance: 16,
@@ -126,94 +103,8 @@ function scanNearbyBlocks(actor: PositionedActor) {
       name: actor.blockAt?.(position)?.name ?? "unknown",
       distance: roundDistance(actor.entity.position.distanceTo(position))
     }))
-    .sort((left, right) => left.distance - right.distance);
-  const importantBlocks = new Set(["crafting_table", "chest"]);
-  const selected = new Map<string, { name: string; distance: number }>();
-
-  for (const block of blockSnapshots.filter((entry) => importantBlocks.has(entry.name))) {
-    selected.set(`${block.name}:${block.distance}`, block);
-  }
-
-  for (const block of blockSnapshots) {
-    if (selected.size >= 12) {
-      break;
-    }
-    selected.set(`${block.name}:${block.distance}`, block);
-  }
-
-  return [...selected.values()].sort((left, right) => left.distance - right.distance);
-}
-
-function scanResourceBlocks(input: {
-  actor: PositionedActor;
-  matches(blockName: string): boolean;
-  maxDistance: number;
-  count: number;
-  limit: number;
-}) {
-  const seen = new Set<string>();
-  return input.actor
-    .findBlocks?.({
-      matching: (block) => input.matches(block.name),
-      maxDistance: input.maxDistance,
-      count: input.count
-    })
-    .map((position) => {
-      const block = input.actor.blockAt?.(position);
-      return block && input.matches(block.name)
-        ? {
-            name: block.name,
-            distance: roundDistance(input.actor.entity.position.distanceTo(position)),
-            direction: directionFrom(input.actor.entity.position, position),
-            position: roundPosition(position)
-          }
-        : null;
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .filter((entry) => {
-      const entryKey = `${entry.name}:${Math.floor(entry.position.x)}:${Math.floor(entry.position.y)}:${Math.floor(entry.position.z)}`;
-      if (seen.has(entryKey)) {
-        return false;
-      }
-      seen.add(entryKey);
-      return true;
-    })
     .sort((left, right) => left.distance - right.distance)
-    .slice(0, input.limit) ?? [];
-}
-
-function scanNearbyResources(actor: PositionedActor): ObserveResult["nearbyResources"] | undefined {
-  if (!actor.findBlocks || !actor.blockAt) {
-    return undefined;
-  }
-
-  const logs = scanResourceBlocks({
-    actor,
-    matches: isLogName,
-    maxDistance: 32,
-    count: 24,
-    limit: 8
-  });
-  const stone = scanResourceBlocks({
-    actor,
-    matches: (blockName) => blockName === "stone" || blockName === "cobblestone",
-    maxDistance: 32,
-    count: 24,
-    limit: 8
-  });
-  const coal = scanResourceBlocks({
-    actor,
-    matches: (blockName) => blockName === "coal_ore" || blockName === "deepslate_coal_ore",
-    maxDistance: 32,
-    count: 16,
-    limit: 6
-  });
-
-  if (logs.length === 0 && stone.length === 0 && coal.length === 0) {
-    return undefined;
-  }
-
-  return { logs, stone, coal };
+    .slice(0, 12);
 }
 
 export async function observe({
@@ -225,7 +116,15 @@ export async function observe({
 }: ObserveArgs): Promise<ObserveResult> {
   const inventory = inspectInventory(actor);
   const nearbyBlocks = scanNearbyBlocks(actor);
-  const nearbyResources = scanNearbyResources(actor);
+  const worldStateSummary = summarizeWorldStateScan(
+    scanWorldState({
+      bot: actor,
+      actorId: actor.username,
+      scanId: `observe-${actor.username}-${randomUUID()}`,
+      radius: 32,
+      caps: { blockObservations: 64, nearestExamples: 12 }
+    })
+  );
   const sharedChestItems = sharedChest
     ? await Promise.resolve(sharedChest.inspect()).catch(() => null)
     : null;
@@ -252,7 +151,7 @@ export async function observe({
     memory: memory.list(),
     ...(inventory ? { inventory } : {}),
     ...(nearbyBlocks ? { nearbyBlocks } : {}),
-    ...(nearbyResources ? { nearbyResources } : {}),
+    worldStateSummary,
     ...(sharedChest && sharedChestItems
       ? {
           sharedChest: {

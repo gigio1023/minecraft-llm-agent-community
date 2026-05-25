@@ -28,12 +28,14 @@ matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment
 This proves the seed action skills can pass when each skill is isolated with
 runtime-owned fixtures and current-run postcondition evidence.
 
-### 100-Cycle Home-Base Stress Test
+### Long-Horizon Social-Cycle Stress Test
 
 The long-horizon OpenAI social-cycle test used one actor, one fresh world, and a
-WorldEvent pressure to make a small believable home base.
+broad settlement WorldEvent pressure. The scenario is historical evidence for
+runtime substrate gaps, not a product architecture.
 
-Run artifact:
+Run artifact. The file name is historical and should not be copied as a future
+scenario naming convention:
 
 ```text
 tmp/live-social-cycle-openai-home-100.json
@@ -53,16 +55,14 @@ Observed result:
 - `memory_writes=224`;
 - report audit passed.
 
-Concrete Minecraft progress happened, but the home was not completed:
+Concrete Minecraft progress happened, but the broader goal was not completed:
 
-- cycle 35: `collect_logs` collected logs with inventory delta `+2`;
-- cycle 36: `craft_item` crafted `oak_planks` with inventory delta `+4`;
-- cycle 38: `build_pattern` placed four shelter shell blocks, then returned
-  `progressing` because the full shelter verifier still saw an incomplete
-  shell.
+- current-run inventory, crafting, and block-placement evidence appeared in the
+  report;
+- partial progress remained partial because the matching verifier did not pass.
 
 The test did not lie about completion. The run remained `blocked` rather than
-claiming a finished home.
+claiming completed goal success.
 
 ## Behavior Verdict
 
@@ -70,32 +70,47 @@ Verdict: `DIAGNOSABLE_FAILURE`.
 
 The current runtime is good at rejecting fake success and preserving context.
 The current planner/control surface is not yet good at turning a long-horizon
-home-base pressure into a reliable precondition-aware action sequence.
+pressure packet into a reliable precondition-aware action sequence.
 
 Repeated blockers from the 54 recorded cycles:
 
-| Blocker | Count | Meaning |
-|---------|------:|---------|
-| `collect_logs found no reachable low log block within 24 blocks` | 8 | Resource discovery and bounded movement are not integrated enough. |
-| `craft_item requires itemName` | 6 | Provider argument contract is too weak. |
-| `mine_block requires a pickaxe before mining stone` | 5 | Planner repeats post-pickaxe actions before the precondition is satisfied. |
-| `build_pattern found no solid build material in inventory` | 2 | Shelter building is attempted before material readiness. |
-| `No craftable inventory recipe found for oak_planks` | 2 | Crafting retries need better inventory/recipe context. |
-| `No craftable inventory recipe found for crafting_table` | 2 | Station progression still needs stronger prerequisites. |
+| Blocker Class | Meaning |
+|---------------|---------|
+| no matching reachable target | World-state diagnostics and bounded movement are not integrated enough. |
+| missing required primitive arg | Provider output must fail contract validation before execution. |
+| missing tool/item/station precondition | Planner repeats an action before its precondition is satisfied. |
+| missing usable material/container state | Provider context needs clearer current inventory/container evidence. |
+| recipe or target mismatch | Runtime should expose exact blocker evidence and require a pivot or repair. |
 
 ## Priority Work
 
 ### P0: Planner Argument Contract Hardening
 
-`craft_item` should not reach execution without a valid `itemName`.
+Status: baseline implemented for direct primitive execution. Keep extending this
+as new primitives become provider-visible.
+
+Current contract rule:
+
+- direct provider `use_primitive` cannot rely on prose fields for executable
+  targets;
+- direct provider `use_primitive` cannot spoof `args.actionSkillId` to borrow an
+  action-skill-local fallback;
+- direct provider shared-storage transfers must provide explicit `count` or
+  `targetCount`;
+- safe-looking control actions such as `wait` and `remember` still pass through
+  CycleGoal and active action-skill gates;
+- resolved actor-owned action skill primitive calls may use documented local
+  fallbacks at that resolved boundary;
+- contract failure should be persisted as evidence.
 
 Future implementation options:
 
 - reject malformed `ActionIntent` before execution and request a repaired
   provider output;
-- expose a small enum or structured alias map for craftable items;
-- convert common natural-language outputs into canonical Minecraft item ids
-  only when the conversion is unambiguous;
+- expose structured primitive arg schemas and current affordance hints without
+  naming preferred strategies;
+- convert common natural-language outputs into canonical Minecraft ids only when
+  the conversion is unambiguous and recorded;
 - write a failed intent artifact when required fields are missing, so the next
   cycle sees the exact schema problem.
 
@@ -112,46 +127,59 @@ temporarily unavailable or mark it as a prohibited retry.
 Example:
 
 ```text
-collect_logs + no reachable low log within 24 blocks
--> do not retry collect_logs immediately
--> choose bounded scout movement, observe resource direction, or another
-   precondition action
+same primitive + same structured args + same blocker reason
+-> do not retry the same primitive/args immediately
+-> choose a different valid affordance, observe, repair args, move within a
+   bounded target, or record a truthful memory/judgment
 ```
 
 This should be a runtime rule over recent evidence, not a provider memory note
 that the model may ignore.
 
-### P0: Home-Base Precondition Planner
+### P0: Autonomy Surface And Blocker-Aware Context
 
-The WorldEvent "make a home" should compile into a small runtime-visible
-checklist without replacing the ActorLifeGoal:
+The long-horizon run should not create a domain-specific architecture. It showed
+a broader substrate gap: the provider needs a clearer actor body, recent
+blockers, malformed-argument feedback, and partial-progress semantics.
+
+Future context should expose `action_surface` plus pressure-specific state:
 
 ```mermaid
 flowchart TD
-  HomePressure["WorldEvent pressure: make a believable home base"]
-  Checklist["runtime checklist: resources, station, material, placement, verification"]
-  Context["provider context with current checklist state"]
+  Pressure["ActorSoul/LifeGoal + current pressure"]
+  Surface["action_surface: direct and deferred affordances"]
+  Blockers["recent blockers and missing affordances"]
+  Context["provider context"]
   Intent["ActionIntent"]
   Gate["action skill gate + primitive preconditions"]
   Evidence["Minecraft evidence"]
   Judgment["CycleJudgment"]
 
-  HomePressure --> Checklist
-  Checklist --> Context
+  Pressure --> Context
+  Surface --> Context
+  Blockers --> Context
   Context --> Intent
   Intent --> Gate
   Gate --> Evidence
   Evidence --> Judgment
-  Judgment --> Checklist
+  Judgment --> Blockers
 ```
 
-The checklist should make prerequisite gaps explicit:
+The context should make prerequisite gaps explicit without making one activity
+mandatory:
 
-- reachable wood exists;
-- enough wood or planks are in inventory;
-- crafting table is present or placeable;
-- enough solid material exists for `build_pattern`;
-- shelter shell placement has partial or complete verifier evidence.
+- which primitives and action skills are executable now;
+- which affordances are deferred because actor ownership, role permission, or
+  primitive support is missing;
+- whether a recent blocker repeats the same primitive and argument shape;
+- what exact argument or precondition is missing;
+- whether current-run evidence is full progress, partial progress, blocked, or
+  no progress.
+
+If a WorldEvent or CycleGoal makes a specific domain activity relevant, local
+state for that activity may appear as pressure-specific context. That local
+state must not become the general cycle architecture or a standing planner
+checklist.
 
 ### P0: Partial Progress Semantics
 
@@ -165,21 +193,21 @@ report should distinguish:
 
 This avoids two bad outcomes:
 
-- counting a partial shell as a finished home;
+- counting partial block placement as a finished target;
 - hiding real block placement under a report-level `gameplay_progress_verified=false`.
 
 ### P1: Review Summary Schema Catch-Up
 
-The social-cycle report itself carried `action_attempts`, provider refs,
-previous judgment, and memory context. The generated review summary treated most
-cycles as `missing:?`, which means the review CLI has fallen behind the current
-report shape.
+Status: baseline implemented for current report shape, movement contract status,
+and world-scan evidence counts. Keep this item open for future report schema
+additions.
 
 Fix target:
 
-- read nested `cycles[].action_attempts[]`;
-- count `executed_tools` and `tool_statuses` from current report fields;
-- detect previous judgment from provider input snapshots under `.input`;
+- keep reading nested `cycles[].action_attempts[]`;
+- keep counting `executed_tools` and `tool_statuses` from current report fields;
+- keep detecting previous judgment from provider input snapshots under `.input`;
+- surface `action_intent_contract_failure` and world-state diagnostics clearly;
 - surface `partial_verified_progress` once that status exists.
 
 ### P1: Fresh-World Cleanup Ownership
@@ -194,79 +222,148 @@ Fix target:
 - or record cleanup failure as cleanup-only without obscuring the completed
   report.
 
-### P1: Resource Discovery And Bounded Movement
+### P1: Target Discovery And Bounded Movement
 
-`collect_logs` can pass in a fixture, but the long-horizon run repeatedly found
-no reachable low logs nearby. The next layer should connect observation hints to
-bounded movement and resource discovery.
+An action skill can pass in a fixture while a long-horizon run still fails
+because the target is not nearby, not loaded, unreachable, or not represented in
+the provider context. The next layer should connect raw world-state diagnostics
+to bounded target discovery and movement without adding a domain strategy.
 
 Potential action-skill candidates:
 
-- `scout_for_low_logs`;
-- `move_to_observed_resource_hint`;
-- `explore_until_resource`;
-- `return_to_home_base`.
+- `scout_toward_observed_target`;
+- `move_to_verified_position`;
+- `find_reachable_blocks`;
+- `check_path_to_block`;
+- `collect_dropped_items`.
 
-Keep movement bounded and evidence-first. Do not turn exploration into
-unbounded wandering.
+Keep movement bounded and evidence-first. Do not turn exploration into unbounded
+wandering or into a hidden strategy phase.
 
-## MCP House-Building Reference
+## Minecraft MCP And Codex-Style Tool Runtime References
 
-External examples are references, not product goals. The useful reference here
-is a Minecraft MCP server that exposes Mineflayer-backed Minecraft control to
-Claude-compatible MCP clients and advertises building/structure interaction.
+External examples are references, not product goals. The remembered Minecraft
+MCP/Claude construction example is useful because it shows how much leverage
+comes from a clean action interface. It is not evidence that this repo should
+become a construction-first architecture.
+
+Research status, 2026-05-24:
+
+- [`joshdevous/minecraft-builder-claude-mcp-server`](https://github.com/joshdevous/minecraft-builder-claude-mcp-server)
+  has Claude produce JSON block coordinates and converts them into
+  WorldEdit-compatible `.schem` files. Use it as an offline planning reference
+  for typed coordinate data. Do not treat `.schem` generation or WorldEdit paste
+  as embodied actor progress.
+- [`yuniko-software/minecraft-mcp-server`](https://github.com/yuniko-software/minecraft-mcp-server)
+  exposes Mineflayer movement, inventory, block, crafting, furnace, chat,
+  flight, and game-state tools through MCP. Use it as a tool-surface and
+  argument-schema reference. Do not copy text-only success semantics.
+- [`FundamentalLabs/minecraft-mcp`](https://github.com/FundamentalLabs/minecraft-mcp)
+  includes high-level building helpers backed by `/setblock`, `/fill`, `/clone`,
+  raw commands, or dynamic JavaScript. Use it as a warning about powerful admin
+  surfaces. Those paths are not actor action skills in this repo.
+- [`gerred/mcpmc`](https://github.com/gerred/mcpmc) exposes typed resources and
+  tools for navigation, digging, placement, inventory, crafting, containers, and
+  real-time state. Use it as a reference for resource-style context and progress
+  notifications.
+- [`arjunkmrm/mcp-minecraft`](https://github.com/arjunkmrm/mcp-minecraft) is a
+  compact Claude Desktop Mineflayer bridge. Use it as a primitive checklist and
+  setup-ergonomics reference, not as a verification model.
+- [`openai/codex`](https://github.com/openai/codex) is the stronger architecture
+  analogy: a tool runtime with direct/deferred exposure, hooks, permission
+  checks, event streams, and evidence accounting. It does not hard-code a
+  strategy for Python, TypeScript, or C# tasks.
 
 Reference links:
 
 - [yuniko-software/minecraft-mcp-server](https://github.com/yuniko-software/minecraft-mcp-server)
+- [joshdevous/minecraft-builder-claude-mcp-server](https://github.com/joshdevous/minecraft-builder-claude-mcp-server)
+- [FundamentalLabs/minecraft-mcp](https://github.com/FundamentalLabs/minecraft-mcp)
+- [gerred/mcpmc](https://github.com/gerred/mcpmc)
+- [arjunkmrm/mcp-minecraft](https://github.com/arjunkmrm/mcp-minecraft)
+- [OpenAI Codex](https://github.com/openai/codex)
 - [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
-
-Ideas to adapt, not copy:
-
-- clear tool surface for position, movement, inventory, block placement, and
-  structure manipulation;
-- tool descriptions that make the model aware of available Minecraft actions;
-- explicit client permission boundaries;
-- the ability to describe or upload a building target, then let tools perform
-  bounded world edits.
 
 Translation into this repo:
 
 ```mermaid
 flowchart LR
-  MCPExample["External MCP house-building demo"]
-  ToolSurface["clear Minecraft tool surface"]
-  StructureIntent["structure intent or blueprint"]
-  RuntimePlan["repo-owned bounded build plan"]
-  PlacementLedger["place_block/build_pattern ledger"]
-  Verifier["world-block verifier"]
-  SoulFrame["Soul/LifeGoal social context"]
+  References["MCP / Codex-style references"]
+  Surface["action_surface"]
+  Hooks["pre/post action hooks"]
+  Gates["role and action-skill gates"]
+  Evidence["world/inventory/container evidence"]
+  Judgment["CycleJudgment"]
+  Soul["Soul/LifeGoal pressure"]
 
-  MCPExample --> ToolSurface
-  MCPExample --> StructureIntent
-  ToolSurface --> RuntimePlan
-  StructureIntent --> RuntimePlan
-  RuntimePlan --> PlacementLedger
-  PlacementLedger --> Verifier
-  SoulFrame --> RuntimePlan
+  References --> Surface
+  References --> Hooks
+  References --> Gates
+  Surface --> Judgment
+  Hooks --> Evidence
+  Gates --> Evidence
+  Soul --> Judgment
+  Evidence --> Judgment
 ```
 
-Do not import the MCP demo as the active architecture. This repo should keep the
-actor workspace, action-skill ownership, runtime postconditions, and
-Soul/LifeGoal continuity as the governing frame. The MCP idea is useful because
-it highlights how much leverage comes from a clean action interface, not because
-it proves that arbitrary model-directed building is enough.
+Ideas to adapt:
+
+- typed, bounded argument schemas for provider-visible actions;
+- compact world-status context: position, health, food, game mode, time,
+  selected item, inventory summary, nearby entities, raw observed names, and
+  scan limits;
+- direct/deferred action exposure so the model can see both usable affordances
+  and missing affordances;
+- block-affordance diagnostics: target-before block, support block, face vector,
+  occupied-target guard, target-after block, and inventory delta;
+- reachability/preflight helpers for movement, block search, target lookup,
+  equipment, and container access;
+- recipe affordance summaries with exact item id, table requirement, missing
+  ingredients, result count, and nearest crafting table;
+- bounded chat history as social pressure/evidence, not as free authority;
+- optional offline design artifacts only when a specific action skill needs
+  them.
+
+Do not translate:
+
+- MCP as the active runtime boundary;
+- WorldEdit or `.schem` paste as actor progress;
+- `/setblock`, `/fill`, `/clone`, `/give`, raw commands, or dynamic JavaScript;
+- creative/peaceful/flat-world defaults for survival competence proof;
+- "success" strings from Mineflayer calls without world or inventory rereads;
+- fuzzy item matching unless the chosen alias is explicit and recorded;
+- `StructureBlueprint`, `ShelterBlueprint`, or similar building artifacts as
+  mandatory core cycle context.
+
+Seed action skill and primitive implications:
+
+- Do not add `buildHouseFromDescription`, `StructurePlacementPlan`, or a
+  building-first planner as core runtime architecture.
+- Keep `buildBasicShelter` and `build_pattern` as bounded affordances selected
+  only when current pressure makes building relevant.
+- Promote small, general affordances before larger domain behaviors:
+  `collectDroppedItems`, `equipBestTool`, `findReachableBlocks`,
+  `checkPathToBlock`, `recipe_affordance`/`can_craft`, `use_furnace`, richer
+  container access, and better observation packets.
+- If a future structure artifact becomes useful, keep it local to a bounded
+  action skill or offline design workflow. It must compile into ordinary
+  verified runtime actions and cannot claim progress before world verification.
+
+This keeps the external insight where it helps: better affordances, better
+diagnosis, and better runtime evidence. It avoids changing the core architecture
+or bypassing embodied Mineflayer work.
 
 ## Suggested Next Implementation Order
 
-1. Harden `ActionIntent` argument validation for `craft_item` and
-   `craft_with_table`.
+1. Keep `ActionIntent` argument validation as a regression gate and extend it
+   whenever a new primitive becomes provider-visible.
 2. Add runtime-level repeated-blocker suppression and pivot pressure.
 3. Add partial-progress status to social-cycle reports and review summaries.
-4. Update review summary CLI to read the current nested report shape.
-5. Fix fresh-world cleanup ownership.
-6. Add a small home-base checklist compiler that remains WorldEvent pressure,
-   not LifeGoal replacement.
-7. Add bounded resource-discovery action skills only after blocker-aware pivot
-   logic is in place.
+4. Fix fresh-world cleanup ownership.
+5. Expand `action_surface` with direct/deferred affordances, missing-argument
+   diagnostics, and pressure-specific state.
+6. Add bounded target-discovery and equipment affordances only after
+   blocker-aware pivot logic is in place.
+7. Consider domain-local design artifacts only when a specific action skill
+   needs them; do not add building artifacts as core cycle context.

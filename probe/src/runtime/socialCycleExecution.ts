@@ -8,12 +8,17 @@ import { validateProposal } from "../tools/index.js";
 import type { ActionIntent } from "./goals/types.js";
 import type { ActorCycleGoal } from "./goals/types.js";
 import {
+  validatePrimitiveActionIntentArgs,
+  type MoveToTargetMetadata
+} from "./goals/actionIntentContracts.js";
+import {
   buildActiveActionSkillGate,
   checkActiveActionSkillPermission,
   type ActiveActionSkillGate
 } from "./activeActionSkillGate.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
+import type { ActorEvidenceCategory } from "./evidence/actorEvidence.js";
 import { createDialogueState } from "./dialogueState.js";
 import { createMemory } from "./memory.js";
 import { observe, type ObserveResult } from "../tools/observe.js";
@@ -49,6 +54,11 @@ import {
   type ToolResultRecord
 } from "./settlement/settlementState.js";
 import { runAction } from "./actions/actionRunner.js";
+import {
+  attachRuntimeHooksToResult,
+  runPrimitivePostActionHooks,
+  runPrimitivePreActionHooks
+} from "./actions/actionHooks.js";
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "observe",
@@ -88,6 +98,7 @@ export type SocialCycleExecutionResult = {
   toolStatuses: SocialPrimitiveAttemptStatus[];
   verifierStatus: "passed" | "failed" | "not_applicable";
   gateBlocked: boolean;
+  contractBlocked: boolean;
   actionSkillExecutionUnit: boolean;
   postconditionResults: ActionSkillPostconditionResult[];
   toolResults: ToolResultRecord[];
@@ -101,7 +112,7 @@ export type SocialMovementPolicy = {
 
 export const DEFAULT_SOCIAL_MOVEMENT_POLICY: SocialMovementPolicy = {
   maxDistanceBlocks: 12,
-  allowedTargets: ["bounded_scout_waypoint", "observed_resource", "known_settlement_position", "visible_actor"],
+  allowedTargets: ["explicit_position", "bounded_scout_waypoint"],
   requiresMeasuredMovementEvidence: true
 };
 
@@ -155,13 +166,14 @@ async function writeToolEvidence(input: {
   args: Record<string, unknown>;
   result: JsonValue;
   verifierReason: string;
+  category?: ActorEvidenceCategory;
 }) {
   const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
   const evidencePath = await writeActorEvidenceRecord(input.actorWorkspaceRootDir, {
     schema: "actor-evidence/v1",
     evidence_id: input.evidenceId,
     actor_id: input.actorId,
-    category: "tool_attempt",
+    category: input.category ?? "tool_attempt",
     created_at: new Date().toISOString(),
     turn_id: input.cycleId,
     tool_attempt: {
@@ -211,6 +223,9 @@ function readTransferCount(args: Record<string, unknown>) {
   if (typeof args.targetCount === "number") {
     return Math.max(1, Math.floor(args.targetCount));
   }
+  // Direct provider transfer intents are rejected before execution unless a
+  // count is explicit. This fallback is only for actor-owned action-skill
+  // bundles whose local policy resolves shared-storage transfer size.
   return 64;
 }
 
@@ -298,6 +313,20 @@ function chooseCraftItemName(input: {
   return undefined;
 }
 
+function chooseMineBlockName(args: Record<string, unknown>) {
+  const explicit = readOptionalString(args, "blockName") ?? readOptionalString(args, "targetBlock");
+  if (explicit) {
+    return explicit;
+  }
+
+  const actionSkillId = readOptionalString(args, "actionSkillId");
+  if (actionSkillId === "mineCobblestone") {
+    return "stone";
+  }
+
+  return undefined;
+}
+
 function firstCraftablePlanksName(bot: Bot) {
   const log = bot.inventory.items().find((item) => item.name.endsWith("_log") && item.count > 0);
   return log ? planksForLog(log.name) : undefined;
@@ -332,7 +361,9 @@ function normalizeCraftItemName(bot: Bot, itemName: string) {
 function argsForPrimitive(intent: ActionIntent, primitive: AllowedTool) {
   return {
     ...intent.args,
-    ...(intent.action_skill_id ? { actionSkillId: intent.action_skill_id } : {}),
+    ...(intent.kind === "use_action_skill" && intent.action_skill_id
+      ? { actionSkillId: intent.action_skill_id }
+      : {}),
     primitiveId: primitive
   };
 }
@@ -427,40 +458,20 @@ function readBuildAnchor(bot: Bot, args: Record<string, unknown>): Positioned {
   );
 }
 
-function readScoutDistance(args: Record<string, unknown>) {
-  const raw = typeof args.distance === "number" ? args.distance : 8;
-  return Math.max(2, Math.min(12, Math.floor(raw)));
-}
-
-function readScoutTarget(args: Record<string, unknown>, origin: Positioned): Positioned {
-  const objectTarget =
-    readPositionedObject(args.position) ??
-    readPositionedObject(args.targetPosition) ??
-    readPositionedObject(args.target_position);
-  if (objectTarget) {
-    return objectTarget;
+function moveTargetFromContract(target: MoveToTargetMetadata, origin: Positioned): Positioned {
+  if (target.kind === "position") {
+    return target.position;
   }
 
-  if (
-    typeof args.x === "number" &&
-    typeof args.y === "number" &&
-    typeof args.z === "number"
-  ) {
-    return { x: args.x, y: args.y, z: args.z };
-  }
-
-  const step = readScoutDistance(args);
-  const direction = typeof args.direction === "string" ? args.direction.toLowerCase() : "east";
-  switch (direction) {
+  switch (target.direction) {
     case "north":
-      return { x: origin.x, y: origin.y, z: origin.z - step };
+      return { x: origin.x, y: origin.y, z: origin.z - target.distance };
     case "south":
-      return { x: origin.x, y: origin.y, z: origin.z + step };
+      return { x: origin.x, y: origin.y, z: origin.z + target.distance };
     case "west":
-      return { x: origin.x - step, y: origin.y, z: origin.z };
+      return { x: origin.x - target.distance, y: origin.y, z: origin.z };
     case "east":
-    default:
-      return { x: origin.x + step, y: origin.y, z: origin.z };
+      return { x: origin.x + target.distance, y: origin.y, z: origin.z };
   }
 }
 
@@ -522,7 +533,23 @@ async function runSocialMoveTo(input: {
   movementPolicy?: SocialMovementPolicy;
 }): Promise<JsonValue> {
   const before = positionOf(input.bot);
-  const requestedTarget = readScoutTarget(input.args, before);
+  const argsContract = validatePrimitiveActionIntentArgs({
+    primitiveId: "move_to",
+    args: input.args,
+    actionSkillId: readOptionalString(input.args, "actionSkillId")
+  });
+  if (!argsContract.ok || !argsContract.target) {
+    return {
+      status: "blocked",
+      beforePosition: before,
+      distanceMoved: 0,
+      action_intent_contract: argsContract,
+      reason: argsContract.ok
+        ? "move_to contract did not resolve a target"
+        : `ActionIntent args contract failed: ${argsContract.error}`
+    } as JsonValue;
+  }
+  const requestedTarget = moveTargetFromContract(argsContract.target, before);
   const target = resolveSurfaceTarget(input.bot, requestedTarget, before);
   const movementPolicy = input.movementPolicy ?? DEFAULT_SOCIAL_MOVEMENT_POLICY;
   const requestedDistance = distance(before, target);
@@ -535,6 +562,7 @@ async function runSocialMoveTo(input: {
       distanceMoved: 0,
       distanceToTarget: round(requestedDistance),
       movementPolicy,
+      action_intent_contract: argsContract,
       reason: `move_to target is ${round(requestedDistance)} blocks away, above bounded social movement limit ${movementPolicy.maxDistanceBlocks}.`
     } as JsonValue;
   }
@@ -592,6 +620,7 @@ async function runSocialMoveTo(input: {
     pathfinderFailureReason,
     manualFallbackUsed,
     movementPolicy,
+    action_intent_contract: argsContract,
     reason: arrived
       ? "move_to reached the bounded scouting waypoint."
       : moved
@@ -642,15 +671,21 @@ async function runSocialPrimitive(input: {
         signal: input.signal
       })) as unknown as JsonValue;
     case "mine_block":
+      {
+        const blockName = chooseMineBlockName(proposal.args);
+        if (!blockName) {
+          return { status: "blocked", reason: "mine_block requires blockName or targetBlock" };
+        }
       return (await mineBlock({
         bot: input.bot,
-        blockName: readString(proposal.args, "blockName", "stone"),
+        blockName,
         targetCount: readOptionalCount(proposal.args),
         searchDistance: typeof proposal.args.searchDistance === "number"
           ? Math.max(4, Math.min(48, Math.floor(proposal.args.searchDistance)))
           : undefined,
         signal: input.signal
       })) as unknown as JsonValue;
+      }
     case "craft_item": {
       const itemName = chooseCraftItemName({ bot: input.bot, args: proposal.args });
       if (!itemName) {
@@ -802,10 +837,25 @@ async function executePrimitiveWithEvidence(input: {
   toolResult: JsonValue;
   evidenceRef: string;
   gateBlocked: boolean;
+  contractBlocked: boolean;
   status: string;
 }> {
+  // Hook records are written into tool evidence so reviewers can separate
+  // permission blocks, missing live bots, and post-action progress classification.
   const permission = checkActiveActionSkillPermission(input.gate, input.tool);
-  if (!permission.allowed) {
+  const preHooks = runPrimitivePreActionHooks({
+    tool: input.tool,
+    permission,
+    hasLiveBot: Boolean(input.bot)
+  });
+  if (!preHooks.allowed) {
+    const toolResult = attachRuntimeHooksToResult({
+      result: preHooks.blockedResult ?? { status: "blocked", reason: "pre-action hook blocked execution" },
+      hooks: preHooks.records
+    });
+    const reason =
+      preHooks.records.find((record) => record.status === "blocked")?.reason ??
+      "pre-action hook blocked execution";
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
@@ -813,27 +863,59 @@ async function executePrimitiveWithEvidence(input: {
       evidenceId: `${input.cycleId}-${input.tool}-gate-blocked`,
       tool: input.tool,
       args: input.args,
-      result: { status: "blocked", reason: permission.reason },
-      verifierReason: permission.reason
+      result: toolResult,
+      verifierReason: reason
     });
-    return { toolResult: { status: "blocked", reason: permission.reason }, evidenceRef: ref, gateBlocked: true, status: "blocked" };
+    return {
+      toolResult,
+      evidenceRef: ref,
+      gateBlocked: true,
+      contractBlocked: false,
+      status: "blocked"
+    };
   }
 
-  if (!input.bot) {
+  // Argument contracts are separate from action-skill gates: the primitive may
+  // be allowed, but the provider still must supply explicit executable args.
+  const argsContract = validatePrimitiveActionIntentArgs({
+    primitiveId: input.tool,
+    args: input.args,
+    actionSkillId: readOptionalString(input.args, "actionSkillId")
+  });
+  if (!argsContract.ok) {
+    const toolResult = attachRuntimeHooksToResult({
+      result: {
+        status: "blocked",
+        reason: `ActionIntent args contract failed: ${argsContract.error}`,
+        action_intent_contract: argsContract as unknown as JsonValue
+      },
+      hooks: [
+        ...preHooks.records,
+        {
+          schema: "runtime-action-hook/v1",
+          phase: "pre",
+          hook_id: "action_intent_args_contract",
+          status: "blocked",
+          reason: argsContract.error
+        }
+      ]
+    });
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
       cycleId: input.cycleId,
-      evidenceId: `${input.cycleId}-${input.tool}-synthetic`,
+      evidenceId: `${input.cycleId}-${input.tool}-args-contract-blocked`,
       tool: input.tool,
       args: input.args,
-      result: { status: "blocked", reason: "No live bot for primitive execution" },
-      verifierReason: "no_bot"
+      result: toolResult,
+      verifierReason: argsContract.error,
+      category: "action_intent_contract_failure"
     });
     return {
-      toolResult: { status: "blocked", reason: "No live bot for primitive execution" },
+      toolResult,
       evidenceRef: ref,
       gateBlocked: true,
+      contractBlocked: true,
       status: "blocked"
     };
   }
@@ -862,6 +944,15 @@ async function executePrimitiveWithEvidence(input: {
       } as JsonValue);
 
   const status = readToolStatus(toolResult);
+  const postHooks = runPrimitivePostActionHooks({
+    tool: input.tool,
+    status,
+    result: toolResult
+  });
+  const resultWithHooks = attachRuntimeHooksToResult({
+    result: toolResult,
+    hooks: [...preHooks.records, ...postHooks]
+  });
   const ref = await writeToolEvidence({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
     actorId: input.actorId,
@@ -869,10 +960,16 @@ async function executePrimitiveWithEvidence(input: {
     evidenceId: `${input.cycleId}-${input.tool}`,
     tool: input.tool,
     args: input.args,
-    result: toolResult,
+    result: resultWithHooks,
     verifierReason: status
   });
-  return { toolResult, evidenceRef: ref, gateBlocked: false, status };
+  return {
+    toolResult: resultWithHooks,
+    evidenceRef: ref,
+    gateBlocked: false,
+    contractBlocked: false,
+    status
+  };
 }
 
 export async function executeSocialActionIntent(input: {
@@ -897,32 +994,178 @@ export async function executeSocialActionIntent(input: {
   const toolStatuses: SocialPrimitiveAttemptStatus[] = [];
   const turnId = input.turnId ?? input.cycleId;
   let gateBlocked = false;
+  let contractBlocked = false;
   let actionSkillExecutionUnit = false;
   const memory = createMemory(8);
 
   if (input.intent.kind === "wait" || input.intent.kind === "remember") {
+    // wait/remember do not mutate Minecraft directly, but they still influence
+    // future cycles. Keep them inside the same CycleGoal and active action-skill
+    // authority model so they cannot become an unchecked escape hatch.
+    const controlTool = input.intent.kind as AllowedTool;
+    if (!input.cycleGoal.allowed_primitive_ids.includes(controlTool)) {
+      return {
+        observation,
+        runtimeResult: {
+          status: "blocked",
+          reason: `Primitive ${controlTool} not allowed by CycleGoal`
+        },
+        evidenceRefs,
+        executedTools,
+        toolStatuses,
+        verifierStatus: "not_applicable",
+        gateBlocked: true,
+        contractBlocked: false,
+        actionSkillExecutionUnit: false,
+        postconditionResults: [],
+        toolResults: []
+      };
+    }
+
+    let controlGate: ActiveActionSkillGate;
+    try {
+      controlGate = buildActiveActionSkillGate({
+        actorId: input.actorId,
+        activeActionSkills: input.activeActionSkills
+      });
+    } catch (error) {
+      return {
+        observation,
+        runtimeResult: {
+          status: "blocked",
+          reason: error instanceof Error ? error.message : String(error)
+        },
+        evidenceRefs,
+        executedTools,
+        toolStatuses,
+        verifierStatus: "not_applicable",
+        gateBlocked: true,
+        contractBlocked: false,
+        actionSkillExecutionUnit: false,
+        postconditionResults: [],
+        toolResults: []
+      };
+    }
+
+    const permission = checkActiveActionSkillPermission(controlGate, controlTool);
+    if (!permission.allowed) {
+      const toolResult: JsonValue = {
+        status: "blocked",
+        reason: permission.reason,
+        runtime_hooks: [
+          {
+            schema: "runtime-action-hook/v1",
+            phase: "pre",
+            hook_id: "active_action_skill_gate",
+            status: "blocked",
+            reason: permission.reason
+          }
+        ]
+      };
+      const ref = await writeToolEvidence({
+        actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+        actorId: input.actorId,
+        cycleId: turnId,
+        evidenceId: `${turnId}-${controlTool}-gate-blocked`,
+        tool: controlTool,
+        args: input.intent.args,
+        result: toolResult,
+        verifierReason: permission.reason
+      });
+      evidenceRefs.push(ref);
+      executedTools.push(controlTool);
+      toolStatuses.push({ tool: controlTool, status: "blocked" });
+      return {
+        observation,
+        runtimeResult: toolResult,
+        evidenceRefs,
+        executedTools,
+        toolStatuses,
+        verifierStatus: "not_applicable",
+        gateBlocked: true,
+        contractBlocked: false,
+        actionSkillExecutionUnit: false,
+        postconditionResults: [],
+        toolResults: [
+          {
+            tool: controlTool,
+            status: "blocked",
+            result: toolResult,
+            evidence_ref: ref
+          }
+        ]
+      };
+    }
+
+    const argsContract = validatePrimitiveActionIntentArgs({
+      primitiveId: controlTool,
+      args: input.intent.args
+    });
+    if (!argsContract.ok) {
+      const toolResult: JsonValue = {
+        status: "blocked",
+        reason: `ActionIntent args contract failed: ${argsContract.error}`,
+        action_intent_contract: argsContract as unknown as JsonValue
+      };
+      const ref = await writeToolEvidence({
+        actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+        actorId: input.actorId,
+        cycleId: turnId,
+        evidenceId: `${turnId}-${controlTool}-args-contract-blocked`,
+        tool: controlTool,
+        args: input.intent.args,
+        result: toolResult,
+        verifierReason: argsContract.error,
+        category: "action_intent_contract_failure"
+      });
+      evidenceRefs.push(ref);
+      executedTools.push(controlTool);
+      toolStatuses.push({ tool: controlTool, status: "blocked" });
+      return {
+        observation,
+        runtimeResult: toolResult,
+        evidenceRefs,
+        executedTools,
+        toolStatuses,
+        verifierStatus: "not_applicable",
+        gateBlocked: true,
+        contractBlocked: true,
+        actionSkillExecutionUnit: false,
+        postconditionResults: [],
+        toolResults: [
+          {
+            tool: controlTool,
+            status: "blocked",
+            result: toolResult,
+            evidence_ref: ref
+          }
+        ]
+      };
+    }
+
     if (!input.bot) {
       const ref = await writeToolEvidence({
         actorWorkspaceRootDir: input.actorWorkspaceRootDir,
         actorId: input.actorId,
         cycleId: turnId,
         evidenceId: `synthetic-${turnId}-${randomUUID()}`,
-        tool: input.intent.kind,
+        tool: controlTool,
         args: input.intent.args,
         result: { status: "ok", synthetic: true },
-        verifierReason: `synthetic ${input.intent.kind}`
+        verifierReason: `synthetic ${controlTool}`
       });
       evidenceRefs.push(ref);
-      executedTools.push(input.intent.kind);
-      toolStatuses.push({ tool: input.intent.kind, status: "ok" });
+      executedTools.push(controlTool);
+      toolStatuses.push({ tool: controlTool, status: "ok" });
       return {
         observation,
-        runtimeResult: { status: "ok", synthetic: true, kind: input.intent.kind },
+        runtimeResult: { status: "ok", synthetic: true, kind: controlTool },
         evidenceRefs,
         executedTools,
         toolStatuses,
         verifierStatus: "not_applicable",
         gateBlocked: false,
+        contractBlocked: false,
         actionSkillExecutionUnit: false,
         postconditionResults: [],
         toolResults: []
@@ -938,16 +1181,16 @@ export async function executeSocialActionIntent(input: {
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
       cycleId: turnId,
-      evidenceId: `${turnId}-${input.intent.kind}`,
-      tool: input.intent.kind,
+      evidenceId: `${turnId}-${controlTool}`,
+      tool: controlTool,
       args: input.intent.args,
       result: result as unknown as JsonValue,
       verifierReason: "status" in result ? String(result.status) : "ok"
     });
     evidenceRefs.push(ref);
-    executedTools.push(input.intent.kind);
+    executedTools.push(controlTool);
     toolStatuses.push({
-      tool: input.intent.kind,
+      tool: controlTool,
       status: "status" in result ? String(result.status) : "ok"
     });
 
@@ -959,6 +1202,7 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: false,
+      contractBlocked: false,
       actionSkillExecutionUnit: false,
       postconditionResults: [],
       toolResults: []
@@ -978,6 +1222,7 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
+      contractBlocked: false,
       actionSkillExecutionUnit,
       postconditionResults: [],
       toolResults: []
@@ -993,6 +1238,7 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
+      contractBlocked: false,
       actionSkillExecutionUnit,
       postconditionResults: [],
       toolResults: []
@@ -1012,6 +1258,7 @@ export async function executeSocialActionIntent(input: {
         toolStatuses,
         verifierStatus: "not_applicable",
         gateBlocked: true,
+        contractBlocked: false,
         actionSkillExecutionUnit,
         postconditionResults: [],
         toolResults: []
@@ -1037,6 +1284,7 @@ export async function executeSocialActionIntent(input: {
       toolStatuses,
       verifierStatus: "not_applicable",
       gateBlocked: true,
+      contractBlocked: false,
       actionSkillExecutionUnit,
       postconditionResults: [],
       toolResults: []
@@ -1070,6 +1318,7 @@ export async function executeSocialActionIntent(input: {
 
     if (
       step.gateBlocked ||
+      step.contractBlocked ||
       step.status === "error" ||
       step.status === "blocked" ||
       step.status === "failed" ||
@@ -1077,6 +1326,7 @@ export async function executeSocialActionIntent(input: {
       step.status === "cancelled"
     ) {
       gateBlocked = step.gateBlocked;
+      contractBlocked = step.contractBlocked;
       break;
     }
   }
@@ -1112,6 +1362,7 @@ export async function executeSocialActionIntent(input: {
     toolStatuses,
     verifierStatus,
     gateBlocked,
+    contractBlocked,
     actionSkillExecutionUnit,
     postconditionResults,
     toolResults
@@ -1127,6 +1378,13 @@ export function resolvePrimitivesForSocialIntent(
   blockedReason?: string;
 } {
   if (intent.kind === "use_primitive" && intent.primitive_id) {
+    if (intent.action_skill_id) {
+      return {
+        primitives: [],
+        actionSkillExecutionUnit: false,
+        blockedReason: "Direct primitive intents cannot carry action_skill_id; use use_action_skill for actor-owned action skill execution"
+      };
+    }
     if (!isSocialExecutablePrimitive(intent.primitive_id)) {
       return {
         primitives: [],

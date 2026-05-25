@@ -13,6 +13,15 @@ type ActorRefResolution =
   | { ok: true; filePath: string }
   | { ok: false; reason: string };
 
+type WorldScanEvidenceSummary = {
+  inspectedRefCount: number;
+  scanRefs: string[];
+  counts: Record<string, number>;
+  nonExhaustiveRefCount: number;
+  truncatedRefCount: number;
+  missingMetadataRefCount: number;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -299,6 +308,14 @@ async function readProviderInput(actorDir: string, ref: string) {
   return readJsonIfExists<{ input?: Record<string, unknown> }>(resolved.filePath);
 }
 
+async function readActorRefJson<T>(actorDir: string, ref: string) {
+  const resolved = resolveActorRefPath(actorDir, ref);
+  if (!resolved.ok || !await pathExists(resolved.filePath)) {
+    return null;
+  }
+  return readJsonIfExists<T>(resolved.filePath);
+}
+
 async function auditProviderInputs(actorDir: string, inputRefs: string[]) {
   const errors: string[] = [];
   for (const ref of inputRefs) {
@@ -332,6 +349,312 @@ function extractWorldEventSummaries(input: Record<string, unknown>) {
   return input.world_events
     .map((event) => isRecord(event) && typeof event.summary === "string" ? event.summary : null)
     .filter((summary): summary is string => typeof summary === "string" && summary.length > 0);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasPositionShape(value: unknown) {
+  return isRecord(value) &&
+    isFiniteNumber(value.x) &&
+    isFiniteNumber(value.y) &&
+    isFiniteNumber(value.z);
+}
+
+function moveToPhysicalArgsStatus(args: unknown) {
+  if (!isRecord(args)) {
+    return "invalid_args" as const;
+  }
+  if (Object.keys(args).length === 0) {
+    return "empty_args" as const;
+  }
+  if (
+    hasPositionShape(args.position) ||
+    hasPositionShape(args.targetPosition) ||
+    hasPositionShape(args.target_position) ||
+    hasPositionShape(args)
+  ) {
+    return "valid" as const;
+  }
+
+  const direction = typeof args.direction === "string" ? args.direction.toLowerCase() : null;
+  const distance = args.distance;
+  if (
+    direction &&
+    ["north", "south", "east", "west"].includes(direction) &&
+    isFiniteNumber(distance) &&
+    distance > 0 &&
+    distance <= 12
+  ) {
+    return "valid" as const;
+  }
+
+  return "invalid_args" as const;
+}
+
+function isMoveToIntent(intent: unknown): intent is Record<string, unknown> & { args: unknown } {
+  return isRecord(intent) &&
+    intent.kind === "use_primitive" &&
+    intent.primitive_id === "move_to";
+}
+
+function collectActionIntentRefs(
+  cycle: SocialCycleRunReport["cycles"][number]
+) {
+  const refs = new Set<string>();
+  if (cycle.action_intent_ref) {
+    refs.add(cycle.action_intent_ref);
+  }
+  for (const attempt of cycle.action_attempts ?? []) {
+    if (attempt.action_intent_ref) {
+      refs.add(attempt.action_intent_ref);
+    }
+  }
+  return [...refs];
+}
+
+async function auditMoveToIntentContracts(input: {
+  actorDir: string;
+  cycle: SocialCycleRunReport["cycles"][number];
+  cycleNumber: number;
+  errors: string[];
+}) {
+  for (const ref of collectActionIntentRefs(input.cycle)) {
+    const intent = await readActorRefJson<Record<string, unknown>>(input.actorDir, ref);
+    if (!isMoveToIntent(intent)) {
+      continue;
+    }
+
+    const status = moveToPhysicalArgsStatus(intent.args);
+    if (status === "empty_args") {
+      input.errors.push(
+        `Cycle ${input.cycleNumber} move_to intent ${ref} has empty args; structured movement target args are required`
+      );
+    } else if (status === "invalid_args") {
+      input.errors.push(
+        `Cycle ${input.cycleNumber} move_to intent ${ref} has invalid physical args; expected position/targetPosition/x,y,z or direction+distance within the movement policy`
+      );
+    }
+  }
+}
+
+function collectWorldScanCounts(
+  value: unknown,
+  counts: Record<string, number>,
+  depth = 0
+): { found: boolean; nonExhaustive: boolean; truncated: boolean; missingMetadata: boolean } {
+  const empty = {
+    found: false,
+    nonExhaustive: false,
+    truncated: false,
+    missingMetadata: false
+  };
+  if (depth > 8 || value === null || value === undefined) {
+    return empty;
+  }
+  let result = { ...empty };
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = collectWorldScanCounts(entry, counts, depth + 1);
+      result = {
+        found: result.found || nested.found,
+        nonExhaustive: result.nonExhaustive || nested.nonExhaustive,
+        truncated: result.truncated || nested.truncated,
+        missingMetadata: result.missingMetadata || nested.missingMetadata
+      };
+    }
+    return result;
+  }
+  if (!isRecord(value)) {
+    return empty;
+  }
+
+  // Only explicit world-state schemas count as scan evidence. Legacy hints such
+  // as nearbyBlocks are useful debug context, but they are too weak to support
+  // absence claims in an audit.
+  if (value.schema === "world-state-summary/v1" || value.schema === "world-state-scan/v1") {
+    const schemaLabel = value.schema === "world-state-summary/v1"
+      ? "world_state_summary"
+      : "world_state_scan";
+    counts[schemaLabel] = (counts[schemaLabel] ?? 0) + 1;
+    const blockObservations = isRecord(value.block_observations)
+      ? value.block_observations
+      : undefined;
+    if (blockObservations) {
+      counts.block_observations = (counts.block_observations ?? 0) + 1;
+      counts.block_name_counts =
+        (counts.block_name_counts ?? 0) +
+        (Array.isArray(blockObservations.by_name) ? blockObservations.by_name.length : 0);
+      counts.nearest_examples =
+        (counts.nearest_examples ?? 0) +
+        (Array.isArray(blockObservations.nearest) ? blockObservations.nearest.length : 0);
+      if (isFiniteNumber(blockObservations.total_verified)) {
+        counts.verified_blocks = (counts.verified_blocks ?? 0) + blockObservations.total_verified;
+      }
+      if (blockObservations.truncated === true) {
+        counts.truncated_block_observations = (counts.truncated_block_observations ?? 0) + 1;
+      }
+    }
+
+    const loadedCoverage = isRecord(value.loaded_coverage) ? value.loaded_coverage : undefined;
+    if (loadedCoverage) {
+      counts.loaded_coverage = (counts.loaded_coverage ?? 0) + 1;
+      if (
+        loadedCoverage.absence_claims_exhaustive !== true ||
+        loadedCoverage.exhaustive === false ||
+        loadedCoverage.scope === "sampled_columns_only"
+      ) {
+        counts.non_exhaustive_coverage = (counts.non_exhaustive_coverage ?? 0) + 1;
+      }
+    }
+
+    const hasMetadata = isRecord(value.center) &&
+      isFiniteNumber(value.radius) &&
+      isRecord(value.vertical_range) &&
+      Boolean(loadedCoverage);
+    if (hasMetadata) {
+      counts.scan_metadata = (counts.scan_metadata ?? 0) + 1;
+    } else {
+      counts.missing_scan_metadata = (counts.missing_scan_metadata ?? 0) + 1;
+    }
+
+    result = {
+      found: true,
+      nonExhaustive: (counts.non_exhaustive_coverage ?? 0) > 0,
+      truncated: blockObservations?.truncated === true,
+      missingMetadata: !hasMetadata
+    };
+  }
+
+  for (const entry of Object.values(value)) {
+    const nested = collectWorldScanCounts(entry, counts, depth + 1);
+    result = {
+      found: result.found || nested.found,
+      nonExhaustive: result.nonExhaustive || nested.nonExhaustive,
+      truncated: result.truncated || nested.truncated,
+      missingMetadata: result.missingMetadata || nested.missingMetadata
+    };
+  }
+  return result;
+}
+
+async function summarizeWorldScanEvidence(
+  actorDir: string,
+  refs: readonly string[]
+): Promise<WorldScanEvidenceSummary> {
+  const scanRefs: string[] = [];
+  const counts: Record<string, number> = {};
+  let inspectedRefCount = 0;
+  let nonExhaustiveRefCount = 0;
+  let truncatedRefCount = 0;
+  let missingMetadataRefCount = 0;
+
+  for (const ref of [...new Set(refs)]) {
+    const artifact = await readActorRefJson<unknown>(actorDir, ref);
+    if (!artifact) {
+      continue;
+    }
+    inspectedRefCount += 1;
+    const artifactCounts: Record<string, number> = {};
+    const quality = collectWorldScanCounts(artifact, artifactCounts);
+    if (!quality.found) {
+      continue;
+    }
+    scanRefs.push(ref);
+    if (quality.nonExhaustive) {
+      nonExhaustiveRefCount += 1;
+    }
+    if (quality.truncated) {
+      truncatedRefCount += 1;
+    }
+    if (quality.missingMetadata) {
+      missingMetadataRefCount += 1;
+    }
+    for (const [key, count] of Object.entries(artifactCounts)) {
+      counts[key] = (counts[key] ?? 0) + count;
+    }
+  }
+
+  return {
+    inspectedRefCount,
+    scanRefs,
+    counts,
+    nonExhaustiveRefCount,
+    truncatedRefCount,
+    missingMetadataRefCount
+  };
+}
+
+function textHasPhysicalAbsenceClaim(text: string) {
+  return /(?:\bno\b|\bnone\b|\bmissing\b|\bnot found\b|\bcannot find\b|\bcan't find\b|\bcould not find\b|\bcouldn't find\b|\bfailed to find\b).{0,100}\b(?:nearby|reachable|observed|available|target|block|item|entity|position|container|station)\b/i.test(text) ||
+    /\b(?:target|block|item|entity|position|container|station)\b.{0,100}(?:\bnone\b|\bmissing\b|\bnot found\b|\bunavailable\b|\babsent\b)/i.test(text);
+}
+
+function textHasPhysicalProgressClaim(text: string) {
+  return /\b(?:collected|gathered|picked up|obtained|mined|dug|crafted|placed|built|deposited|withdrew|moved|arrived|reached)\b.{0,100}\b(?:block|item|entity|container|inventory|position|target|waypoint|world)\b/i.test(text) ||
+    /\b(?:block|item|entity|container|inventory|position|target|waypoint|world)\b.{0,100}\b(?:collected|gathered|picked up|obtained|mined|dug|crafted|placed|built|deposited|withdrew|moved|arrived|reached)\b/i.test(text);
+}
+
+function collectJudgmentClaimKinds(judgment: unknown) {
+  if (!isRecord(judgment)) {
+    return [];
+  }
+  const texts = [
+    judgment.what_happened,
+    judgment.why_it_mattered_for_life_goal,
+    ...(Array.isArray(judgment.next_goal_pressure) ? judgment.next_goal_pressure : []),
+    ...(Array.isArray(judgment.memory_writes)
+      ? judgment.memory_writes.map((write) => isRecord(write) ? write.summary : undefined)
+      : [])
+  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+
+  const kinds = new Set<string>();
+  for (const text of texts) {
+    if (textHasPhysicalAbsenceClaim(text)) {
+      kinds.add("physical absence");
+    }
+    if (textHasPhysicalProgressClaim(text)) {
+      kinds.add("physical progress");
+    }
+  }
+  return [...kinds];
+}
+
+async function auditScanBackedPhysicalClaims(input: {
+  actorDir: string;
+  cycle: SocialCycleRunReport["cycles"][number];
+  cycleNumber: number;
+  errors: string[];
+}) {
+  const judgment = await readActorRefJson<Record<string, unknown>>(
+    input.actorDir,
+    input.cycle.judgment_ref
+  );
+  const claimKinds = collectJudgmentClaimKinds(judgment);
+  if (claimKinds.length === 0) {
+    return;
+  }
+
+  const scanSummary = await summarizeWorldScanEvidence(input.actorDir, input.cycle.evidence_refs);
+  if (scanSummary.scanRefs.length === 0) {
+    input.errors.push(
+      `Cycle ${input.cycleNumber} judgment makes ${claimKinds.join(" and ")} claim without world-state scan evidence`
+    );
+  }
+  if (
+    claimKinds.includes("physical absence") &&
+    (scanSummary.nonExhaustiveRefCount > 0 || scanSummary.truncatedRefCount > 0)
+  ) {
+    input.errors.push(
+      `Cycle ${input.cycleNumber} judgment makes physical absence claim with non-exhaustive or truncated world-state scan evidence`
+    );
+  }
+  if (scanSummary.missingMetadataRefCount > 0) {
+    input.errors.push(
+      `Cycle ${input.cycleNumber} world-state scan evidence is missing scan metadata needed for audit`
+    );
+  }
 }
 
 function auditSettlementEvidence(report: SocialCycleRunReport, errors: string[]) {
@@ -440,6 +763,18 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
 
       const inputErrors = await auditProviderInputs(actorDir, cycle.provider_input_refs);
       errors.push(...inputErrors);
+      await auditMoveToIntentContracts({
+        actorDir,
+        cycle,
+        cycleNumber,
+        errors
+      });
+      await auditScanBackedPhysicalClaims({
+        actorDir,
+        cycle,
+        cycleNumber,
+        errors
+      });
     }
   }
 
@@ -463,10 +798,10 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
   }
 
   if (
-    report.provider.provider_id === "openai-api" &&
+    report.provider.provider_id !== "deterministic-social" &&
     report.agency_status.builtin_goal_authority
   ) {
-    errors.push("OpenAI social run used builtin goal authority");
+    errors.push("Live provider social run used builtin goal authority");
   }
 
   if (

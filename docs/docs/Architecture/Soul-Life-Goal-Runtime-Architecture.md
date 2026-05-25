@@ -310,7 +310,7 @@ type CycleJudgment = {
   actor_id: string;
   cycle_id: string;
   cycle_goal_id: string;
-  outcome: "verified_progress" | "no_progress" | "blocked" | "unsafe" | "socially_resolved";
+  outcome: "verified_progress" | "partial_verified_progress" | "no_progress" | "blocked" | "unsafe" | "socially_resolved";
   what_happened: string;
   why_it_mattered_for_life_goal: string;
   verifier_status: "passed" | "failed" | "not_applicable";
@@ -454,7 +454,7 @@ Cycle Judgment는 runtime result와 verifier evidence를 받아 다음 cycle의 
 
 ```ts
 type CycleJudgmentOutput = {
-  outcome: "verified_progress" | "no_progress" | "blocked" | "unsafe" | "socially_resolved";
+  outcome: "verified_progress" | "partial_verified_progress" | "no_progress" | "blocked" | "unsafe" | "socially_resolved";
   what_happened: string;
   why_it_mattered_for_life_goal: string;
   evidence_refs: string[];

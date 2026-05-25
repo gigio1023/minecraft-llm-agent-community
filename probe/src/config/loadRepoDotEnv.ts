@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 
 /**
  * Loads repo-root `.env` without overwriting unrelated process env keys.
- * Social-cycle OpenAI auth uses OPENAI_API_KEY from this file.
+ * Social-cycle provider auth uses repo-local keys such as OPENAI_API_KEY and
+ * GEMINI_API_KEY from this file without printing secret values.
  */
 export function loadRepoDotEnv(repoRoot: string, options?: { overrideKeys?: string[] }) {
   const override = new Set(options?.overrideKeys ?? ["OPENAI_API_KEY", "GEMINI_API_KEY"]);

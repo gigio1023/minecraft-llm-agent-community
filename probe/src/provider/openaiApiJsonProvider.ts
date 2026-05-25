@@ -1,10 +1,23 @@
 import OpenAI from "openai";
 
+import {
+  appendProviderUsageRecord,
+  buildEstimatedUsage,
+  guardProviderUsageRequest,
+  normalizeOpenAiUsage,
+  ProviderUsageBudgetError,
+  type ProviderUsageBudgetDecision,
+  type ProviderUsageCallContext,
+  type ProviderUsageRecord
+} from "./providerUsageTracker.js";
+
 export type OpenAiJsonProviderConfig = {
   apiKey: string;
   model: string;
   reasoning?: string;
   maxCompletionTokens?: number;
+  repoRoot?: string;
+  usageLedgerPath?: string;
 };
 
 export type OpenAiJsonCallResult<T> =
@@ -14,11 +27,14 @@ export type OpenAiJsonCallResult<T> =
       rawText: string;
       elapsedMs: number;
       model: string;
+      usageRecord?: ProviderUsageRecord;
+      budgetDecision?: ProviderUsageBudgetDecision;
     }
   | {
       ok: false;
       errorKind:
         | "missing_api_key"
+        | "usage_budget_exceeded"
         | "model_not_found"
         | "quota"
         | "rate_limit"
@@ -30,6 +46,8 @@ export type OpenAiJsonCallResult<T> =
       elapsedMs: number;
       model: string;
       rawText?: string;
+      usageRecord?: ProviderUsageRecord;
+      budgetDecision?: ProviderUsageBudgetDecision;
     };
 
 type OpenAiErrorKind = Extract<OpenAiJsonCallResult<unknown>, { ok: false }>["errorKind"];
@@ -123,9 +141,20 @@ export async function callOpenAiJsonSchema<T>(input: {
   schema: Record<string, unknown>;
   system: string;
   user: string;
+  usageContext?: ProviderUsageCallContext;
 }): Promise<OpenAiJsonCallResult<T>> {
   const started = Date.now();
   const model = input.config.model;
+  const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
+  const usageContext = {
+    repoRoot: input.config.repoRoot,
+    ledgerPath: input.config.usageLedgerPath,
+    ...input.usageContext
+  };
+  const estimatedUsage = buildEstimatedUsage({
+    inputText: `${input.system}\n${input.user}`,
+    maxOutputTokens: maxCompletionTokens
+  });
 
   if (!input.config.apiKey.trim()) {
     return {
@@ -137,12 +166,34 @@ export async function callOpenAiJsonSchema<T>(input: {
     };
   }
 
+  let budgetDecision: ProviderUsageBudgetDecision | undefined;
+  try {
+    budgetDecision = await guardProviderUsageRequest({
+      providerId: "openai-api",
+      model,
+      estimatedUsage,
+      context: usageContext
+    });
+  } catch (error) {
+    if (error instanceof ProviderUsageBudgetError) {
+      return {
+        ok: false,
+        errorKind: "usage_budget_exceeded",
+        message: error.message,
+        elapsedMs: Date.now() - started,
+        model,
+        budgetDecision: error.decision
+      };
+    }
+    throw error;
+  }
+
   const client = new OpenAI({ apiKey: input.config.apiKey });
 
   try {
     const response = await client.chat.completions.create({
       model,
-      max_completion_tokens: input.config.maxCompletionTokens ?? 1600,
+      max_completion_tokens: maxCompletionTokens,
       messages: [
         { role: "system", content: input.system },
         { role: "user", content: input.user }
@@ -158,6 +209,18 @@ export async function callOpenAiJsonSchema<T>(input: {
         }
       }
     });
+    const normalizedUsage = normalizeOpenAiUsage(response.usage, estimatedUsage);
+    const usageRecord = await appendProviderUsageRecord({
+      providerId: "openai-api",
+      model,
+      status: "succeeded",
+      usage: normalizedUsage.usage,
+      usageSource: normalizedUsage.source,
+      context: usageContext,
+      elapsedMs: Date.now() - started,
+      rawUsage: normalizedUsage.rawUsage,
+      budgetDecision
+    });
 
     const rawText = response.choices[0]?.message?.content ?? "";
     if (!rawText.trim()) {
@@ -167,7 +230,9 @@ export async function callOpenAiJsonSchema<T>(input: {
         message: "OpenAI returned empty completion content",
         elapsedMs: Date.now() - started,
         model,
-        rawText
+        rawText,
+        usageRecord,
+        budgetDecision
       };
     }
 
@@ -178,7 +243,9 @@ export async function callOpenAiJsonSchema<T>(input: {
         parsed,
         rawText,
         elapsedMs: Date.now() - started,
-        model
+        model,
+        usageRecord,
+        budgetDecision
       };
     } catch {
       return {
@@ -187,16 +254,30 @@ export async function callOpenAiJsonSchema<T>(input: {
         message: "OpenAI output was not valid JSON",
         elapsedMs: Date.now() - started,
         model,
-        rawText
+        rawText,
+        usageRecord,
+        budgetDecision
       };
     }
   } catch (error) {
+    const usageRecord = await appendProviderUsageRecord({
+      providerId: "openai-api",
+      model,
+      status: "failed",
+      usage: estimatedUsage,
+      usageSource: "estimated",
+      context: usageContext,
+      elapsedMs: Date.now() - started,
+      budgetDecision
+    });
     return {
       ok: false,
       errorKind: classifyOpenAiError(error),
       message: error instanceof Error ? error.message : String(error),
       elapsedMs: Date.now() - started,
-      model
+      model,
+      usageRecord,
+      budgetDecision
     };
   }
 }
