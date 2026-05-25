@@ -89,32 +89,34 @@ verification, and artifacts. Do not adapt them as hidden domain strategy.
 Read these first:
 
 1. `SPEC.md`
-2. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
-3. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-4. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
-5. `docs/docs/Specification/Reference-Adaptation-Guide.md`
-6. `docs/docs/Documentation-Map.md`
-7. `docs/docs/Agent-Search-Index.md`
-8. `docs/docs/Terminology.md`
-9. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
-10. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-11. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-12. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
-13. `docs/docs/Architecture/Implementation-Workstreams.md`
-14. `docs/docs/Architecture/Action-Skill-Verification.md`
-15. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
-16. `docs/docs/Architecture/Minimal-Probe.md`
-17. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-18. `docs/docs/Setup/Headless-Server.md`
-19. `docs/docs/Setup/Provider-Setup.md`
+2. `AGENTS.md`
+3. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+4. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+5. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+6. `docs/docs/Specification/Reference-Adaptation-Guide.md`
+7. `docs/docs/Documentation-Map.md`
+8. `docs/docs/Agent-Search-Index.md`
+9. `docs/docs/Terminology.md`
+10. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+11. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+12. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+13. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
+14. `docs/docs/Architecture/Implementation-Workstreams.md`
+15. `docs/docs/Architecture/Action-Skill-Verification.md`
+16. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+17. `docs/docs/Architecture/Minimal-Probe.md`
+18. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+19. `docs/docs/Setup/Headless-Server.md`
+20. `docs/docs/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
-`SPEC.md` and `docs/docs/Specification/*` are long-term spec files. Editing them
-changes product direction, so do not modify them during routine implementation
-work unless the user explicitly approves a spec update in the current turn. Put
-dated implementation status, command output, and volatile evidence in handoff or
-audit docs instead.
+`SPEC.md` and `docs/docs/Specification/*` are long-term spec files. `AGENTS.md`
+is binding repo-agent guidance for interpreting and applying that spec. Editing
+any of these files changes product direction or agent operating rules, so do not
+modify them during routine implementation work unless the user explicitly
+approves the update in the current turn. Put dated implementation status,
+command output, and volatile evidence in handoff or audit docs instead.
 
 ## Terminology
 
@@ -211,6 +213,9 @@ Important search tokens:
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
 - `PROVIDER_USAGE_GUARD`
 - `GEMINI_API_SOCIAL_PROVIDER`
+- `WORLD_STATE_DIAGNOSTICS`
+- `ACTION_INTENT_CONTRACT`
+- `CONTEXT_COMPACTION`
 - `SOCIAL_SIMULATION_SEED`
 - `SPEED_BOUNDED_SOCIAL_SIMULATION`
 - `LIVE_TRANSCRIPT_FIRST`
@@ -260,6 +265,55 @@ Important search tokens:
   context packets, `action_surface`, gates, hooks, verifier feedback, and actor
   memory before adding a specialized planner for one activity such as house
   building.
+- Preserve enough world-state evidence for post-run diagnosis. A claim such as
+  "no matching block was observed" must be backed by a bounded scan or an
+  explicit loaded-world limitation, not only by a thin nearest-block summary.
+- World-state diagnostics should record the scan center, radius, vertical range,
+  dimension, loaded-chunk limitation, raw observed block/entity/item names,
+  nearest examples, truncation policy, and evidence refs. Do not imply that
+  unloaded chunks were inspected. Reviews and audits should count explicit
+  `world-state-summary/v1` or `world-state-scan/v1` schema artifacts as scan
+  evidence, not loose legacy keys such as `nearbyBlocks`.
+- Do not expose provider-facing world summaries as fixed material-family,
+  station-family, construction-readiness, or survival-priority categories.
+  World context is evidence substrate: raw Minecraft names, positions,
+  distances, limits, and query refs. The provider decides what matters from
+  ActorSoul/LifeGoal, CycleGoal, action surface, and evidence.
+- It is acceptable for a specific action skill implementation to query a
+  specific Minecraft block or item family as part of its own primitive contract.
+  It is not acceptable to turn those families into always-present planner
+  context, summary headings, or goal pressure.
+- Treat physical `ActionIntent` arguments as a contract. For actions such as
+  `move_to`, `mine_block`, `place_block`, `craft_item`, `inspect_chest`,
+  `deposit_shared`, or structure/building primitives, required target/item/count
+  arguments must be present in structured args before execution.
+- Direct `use_primitive` intents must not carry `action_skill_id` or
+  `args.actionSkillId`. Actor-owned action skill fallback authority exists only
+  after a `use_action_skill` intent is resolved by the runtime.
+- Safe-looking control actions such as `wait` and `remember` are still runtime
+  primitives. They must pass CycleGoal and active action-skill gates.
+- Do not silently convert missing physical arguments into movement or gameplay
+  defaults. A hidden default that makes the bot move can still be a product
+  failure. Reject, repair, or ask the provider for a valid intent, then record
+  the contract failure in artifacts.
+- Natural-language fields such as `why_this_action` explain intent but are not
+  executable authority. If prose mentions a coordinate and structured args are
+  empty or contradictory, the runtime must treat the structured intent as
+  invalid rather than guessing from prose.
+- Use Mineflayer API behavior to shape runtime contracts: target resolution,
+  loaded-world visibility, pathfinder limits, timeout/cancellation behavior, and
+  verifier evidence should be documented in code or spec when they affect an
+  action skill.
+- Long social-cycle runs need context compaction. Do not feed unbounded raw
+  transcripts or repeated observe/wait/remember records back to the provider.
+  Preserve compact, evidence-linked state: ActorSoul/LifeGoal, current
+  inventory, container snapshots, known positions, recent blockers, recent
+  judgments, world-state diagnostics, action-surface contracts, and artifact
+  refs.
+- Compaction must not launder weak evidence into progress. Provider text,
+  memory notes, `wait`, or repeated observation are context, not physical
+  success unless verifier-backed world, inventory, position, block, container,
+  chat, or transcript evidence supports them.
 - Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
   artifacts, structured logs, and optional viewer evidence.
 - Failures should be explainable from artifacts without immediate reproduction.

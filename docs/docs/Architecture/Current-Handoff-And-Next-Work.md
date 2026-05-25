@@ -126,10 +126,11 @@ Implemented surfaces:
   goals, and relationship pressure in provider-facing context;
 - social-cycle context now includes `action_surface`, a direct/deferred
   affordance packet for the actor's current body. It is not a domain strategy or
-  home-building checklist;
+  single-domain checklist;
 - social-cycle context now includes a runtime-owned `settlement_state` packet
   with inventory counts, checklist progress, blocker histogram, active action
-  skill ids, shared storage summary, and known table/chest/shelter status;
+  skill ids, shared storage summary, known positions, and checklist status. This
+  is compatibility diagnostic state, not a fixed provider strategy;
 - provider input snapshots with credential-shaped key rejection;
 - provider output store added for dashboard/review visibility;
 - opt-in `openai-codex` gameplay provider path.
@@ -138,12 +139,41 @@ Implemented surfaces:
   events, with the provider input snapshot still attached when snapshots are
   enabled.
 
+### World-State Diagnostics And ActionIntent Contracts
+
+Provider context now has a stricter autonomy-substrate boundary:
+
+- `observe` can include `world-state-summary/v1`, a bounded Mineflayer scan with
+  center, radius, vertical range, loaded-world limits, raw observed Minecraft
+  names, nearest examples, truncation, and limitations;
+- loaded-world coverage is marked as sampled and non-exhaustive unless a future
+  scanner can prove otherwise. Absence claims must stay scoped to scan limits;
+- provider-facing world summaries must stay query-neutral and must not expose
+  fixed resource, station, construction-readiness, or survival-priority
+  categories;
+- direct provider `use_primitive` intents are checked against structured
+  primitive args contracts before persistence/execution;
+- natural-language rationale fields are not executable authority;
+- direct provider primitive intents cannot spoof `args.actionSkillId` to borrow
+  an action-skill-local fallback;
+- direct provider shared-storage transfers require explicit `count` or
+  `targetCount`;
+- `wait` and `remember` pass through CycleGoal and active action-skill gates
+  instead of bypassing runtime authority;
+- report audit/review now count only explicit `world-state-summary/v1` or
+  `world-state-scan/v1` artifacts as scan evidence;
+- missing physical args produce artifact-visible
+  `action_intent_contract_failure` evidence instead of hidden movement or
+  gameplay defaults.
+
 Important files:
 
 - `probe/src/provider/actorProviderContext.ts`;
 - `probe/src/provider/providerInputStore.ts`;
 - `probe/src/provider/providerOutputStore.ts`;
 - `probe/src/provider/openaiCodexGameplayProvider.ts`;
+- `probe/src/tools/worldStateScan.ts`;
+- `probe/src/runtime/goals/actionIntentContracts.ts`;
 - `probe/test/runtimeArtifacts.test.ts`;
 - `probe/test/actorProviderContext.relationshipPressure.test.ts`.
 
@@ -312,20 +342,19 @@ Latest fresh action-skill matrix:
 - this proves the seed action skills can work when their preconditions are made
   explicit by the harness.
 
-Latest long-horizon OpenAI home-base stress test:
+Latest long-horizon OpenAI social-cycle stress test:
 
-- command target: one actor, `gpt-5.4-mini`, fresh world, 100 cycles, home-base
-  WorldEvent pressure;
+- command target: one actor, `gpt-5.4-mini`, fresh world, 100 cycles, broad
+  settlement WorldEvent pressure;
 - recorded result: 54 cycles before cleanup hit a host file-permission blocker;
 - report audit: passed;
 - `builtin_goal_authority=false`, `builtin_execution_source=false`,
   `fixture_dependency=false`;
 - later provider inputs used prior judgment and memory;
-- concrete progress included `collect_logs` inventory delta `+2`,
-  `craft_item` `oak_planks +4`, and `build_pattern` placing four partial
-  shelter shell blocks;
-- the run did not claim a finished home because the shelter verifier still saw
-  an incomplete shell.
+- concrete progress included current-run inventory, crafting, and block
+  placement evidence;
+- the run did not claim broader goal completion because the matching verifier
+  did not pass.
 
 Interpretation:
 
@@ -826,11 +855,11 @@ Implemented behavior:
   a dug `stone` attempt, `blockRemoved=true`, positive `cobblestone`
   `inventoryDelta`, and passed verifier evidence.
 
-Remaining mining expansion:
+Remaining target-action expansion:
 
-- coal, ores, branch mining, underground target selection, and large target
-  counts remain future action-skill contracts. Do not treat the narrow
-  `mineCobblestone` proof as broad mining autonomy.
+- broader target discovery, target selection, traversal, and large target counts
+  remain future action-skill contracts. Do not treat one narrow proof as broad
+  autonomy.
 
 ### P1: Dashboard As Runtime Observer
 
@@ -888,24 +917,29 @@ Check:
 
 ## Suggested Next Work Order
 
-1. Keep the 14-action-skill live matrix as the regression gate after action
-   skill, primitive, role, or verifier changes.
-2. Implement the P0 future-work items from `Architecture/Future-Works.md`:
-   planner argument contract hardening, repeated-blocker pivot rules, and
-   partial-progress status.
-3. Add repeatability checks for the most interruption-sensitive skills,
-   starting with `collectLogs` variants: reachable low log, first candidate
-   unreachable then second reachable, dropped-item pickup after dig, no log
-   nearby, and abort while pathing or digging.
-4. Update the social-cycle review summary CLI so it reads the current nested
-   report shape instead of rendering most action attempts as `missing:?`.
-5. Use dashboard runtime events to inspect each live probe turn while keeping
-   the dashboard as an observer, not a control plane.
-6. Feed live failures into actor evidence and reviewer queue.
-7. Expand mining and resource discovery only after the narrow
-   `mineCobblestone` proof remains stable.
-8. Only then re-run broader 3-actor/3-bot LLM gameplay as a product smoke, not as a
-   substitute for per-action-skill proof.
+1. Keep the implemented action-skill live matrix as the regression gate after
+   action skill, primitive, role, or verifier changes.
+2. Preserve the corrected architecture rule: provider-facing context is
+   query-neutral evidence substrate, not a fixed resource, station,
+   construction, or survival strategy taxonomy.
+3. Treat physical `ActionIntent` args as the immediate runtime contract. Missing
+   target, item, position, or container args should fail with artifact-visible
+   `action_intent_contract_failure` evidence instead of hidden executor defaults.
+4. Improve world-state diagnostics as a raw Mineflayer scan: center, radius,
+   vertical range, loaded-world limits, raw observed names, nearest examples,
+   truncation, and evidence refs.
+5. Expand context compaction only as evidence-linked state preservation:
+   ActorSoul/LifeGoal, current inventory, known positions, container snapshots,
+   repeated blockers, action-surface contracts, recent judgments, and artifact
+   refs. Do not convert provider prose or memory notes into progress.
+6. Add repeatability checks for interruption-sensitive action skills based on
+   observed failures, but keep those checks action-skill-local. Do not promote
+   one domain activity into the general cycle architecture.
+7. Use dashboard runtime events and review summaries to inspect each live probe
+   turn while keeping those tools as observers, not control planes.
+8. Feed live failures into actor evidence and reviewer queue.
+9. Only then re-run broader multi-actor LLM gameplay as a product smoke, not as
+   a substitute for per-action-skill proof.
 
-This keeps the project focused on real action skill competence before scaling
-back to broader actor behavior.
+This keeps the project focused on autonomy substrate and real action competence
+before scaling back to broader actor behavior.

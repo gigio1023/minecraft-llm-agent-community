@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
   compileSocialAllowedPrimitives,
+  executeSocialActionIntent,
   filterExecutableSocialActionSkills,
   resolvePrimitivesForSocialIntent
 } from "../src/runtime/socialCycleExecution.js";
@@ -228,6 +232,83 @@ test("use_action_skill resolves full owned primitive bundle", () => {
   assert.equal(resolved.actionSkillExecutionUnit, true);
   assert.deepEqual(resolved.primitives, ["observe", "collect_logs", "wait"]);
   assert.ok(isMeaningfulGameplayPrimitive("collect_logs"));
+});
+
+test("direct primitive intent cannot smuggle action-skill fallback authority", () => {
+  const resolved = resolvePrimitivesForSocialIntent(
+    {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "use_primitive",
+      primitive_id: "place_block",
+      action_skill_id: "placeCraftingTable",
+      args: {},
+      why_this_action: "try to call a primitive with action-skill fallback authority",
+      expected_evidence: [],
+      fallback_if_blocked: "remember"
+    },
+    [testActionSkillRecord("placeCraftingTable", ["observe", "place_block"], "npc_b")]
+  );
+
+  assert.deepEqual(resolved.primitives, []);
+  assert.equal(resolved.actionSkillExecutionUnit, false);
+  assert.match(resolved.blockedReason ?? "", /Direct primitive intents cannot carry action_skill_id/);
+});
+
+test("wait and remember still pass through CycleGoal and active action-skill gates", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-control-gate-"));
+  const result = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0001",
+      status: "active",
+      source: "llm_planner",
+      summary: "Test control primitive gating",
+      rationale: "The executor must not bypass gates for safe-looking control actions.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime_primitive_or_evidence",
+        evidence_required: ["tool_attempt"]
+      },
+      allowed_action_skill_ids: ["observeOnly"],
+      allowed_primitive_ids: ["wait"],
+      stop_conditions: ["gate_blocked"]
+    },
+    intent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "wait",
+      args: { ticks: 1 },
+      why_this_action: "test wait gate",
+      expected_evidence: ["tool_attempt"],
+      fallback_if_blocked: "remember"
+    },
+    activeActionSkills: [
+      testActionSkillRecord("observeOnly", ["observe"], "npc_b")
+    ]
+  });
+
+  assert.equal(result.gateBlocked, true);
+  assert.equal(result.contractBlocked, false);
+  assert.deepEqual(result.executedTools, ["wait"]);
+  assert.match(JSON.stringify(result.runtimeResult), /not backed by active action skills/);
 });
 
 test("social action skill exposure keeps only executable primitive bundles", () => {

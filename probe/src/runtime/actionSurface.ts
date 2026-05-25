@@ -1,4 +1,8 @@
 import { runtimePrimitives } from "../gameplay/primitives/registry.js";
+import {
+  primitiveArgsContractSummary,
+  type PrimitiveArgsContractSummary
+} from "./goals/actionIntentContracts.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 
 export type ActionSurfaceExposure = "direct" | "deferred";
@@ -10,6 +14,7 @@ export type ActionSurfacePrimitive = {
   executable: boolean;
   reason: string;
   description: string;
+  args_contract: PrimitiveArgsContractSummary;
 };
 
 export type ActionSurfaceActionSkill = {
@@ -41,9 +46,9 @@ export type ActionSurfacePacket = {
 
 const primitiveDescriptions: Record<string, string> = {
   observe: "Refresh live inventory, nearby blocks, actors, and memory-facing state.",
-  move_to: "Move to a bounded waypoint, observed resource, known settlement position, or visible actor.",
+  move_to: "Move to an explicit position or bounded scout waypoint.",
   collect_logs: "Gather reachable low log blocks; success requires inventory evidence.",
-  mine_block: "Mine a requested block such as stone when tool and reachability evidence allow it.",
+  mine_block: "Mine an explicitly requested block when tool and reachability evidence allow it.",
   craft_item: "Craft an inventory recipe when ingredients exist.",
   craft_with_table: "Craft a table-bound recipe when a crafting table is nearby.",
   place_block: "Place one explicit inventory block and verify the world block afterward.",
@@ -100,8 +105,8 @@ function actionSkillExposure(input: {
 
 /**
  * Builds the model-visible action surface without turning any domain objective
- * into a core strategy. Shelter, storage, mining, and speech are all just
- * affordances until Soul/LifeGoal pressure and runtime evidence make one useful.
+ * into a core strategy. Physical and social primitives are all just affordances
+ * until Soul/LifeGoal pressure and runtime evidence make one useful.
  */
 export function buildActionSurfacePacket(input: {
   actorId: string;
@@ -131,7 +136,8 @@ export function buildActionSurfacePacket(input: {
         roleAllowedPrimitiveIds,
         activePrimitiveIds
       }),
-      description: primitiveDescription(primitive.id)
+      description: primitiveDescription(primitive.id),
+      args_contract: primitiveArgsContractSummary(primitive.id)
     };
   });
 

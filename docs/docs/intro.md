@@ -18,6 +18,10 @@ leaving enough runtime evidence to explain the result.
 - runs Mineflayer actors through a bounded TypeScript loop;
 - lets a provider propose one action at a time;
 - exposes an `action_surface` packet with direct/deferred runtime affordances;
+- exposes query-neutral world-state diagnostics with scan limits, not gameplay
+  strategy categories;
+- rejects malformed physical `ActionIntent` args before hidden executor defaults
+  can look like progress;
 - verifies progress from Minecraft state, not model text;
 - writes transcripts, provider inputs, evidence, and review artifacts.
 
@@ -46,13 +50,15 @@ flowchart TD
   Gate["active action skill gate"]
   Action["Mineflayer action skill or primitive"]
   Evidence["runtime evidence"]
+  Contract["ActionIntent args contract"]
   Judgment["CycleJudgment and memory"]
   Review["async reviewer sidecars"]
 
   Workspace --> Context
   Context --> Surface
   Surface --> Proposal
-  Proposal --> Gate
+  Proposal --> Contract
+  Contract --> Gate
   Gate --> Action
   Action --> Evidence
   Evidence --> Judgment
@@ -65,28 +71,28 @@ persistent LifeGoal, per-cycle CycleGoal selection, and CycleJudgment artifacts.
 It separates "Minecraft evidence passed" from "the actor's social-life judgment
 actually controlled the current goal."
 
-The latest live testing showed this separation matters. A 100-cycle home-base
-stress test with the OpenAI social-cycle provider reused prior judgment and
-memory, collected logs, crafted planks, and placed partial shelter shell blocks,
-but did not claim a finished home because the shelter verifier did not pass.
+The latest live testing showed this separation matters. A 100-cycle
+long-objective stress test with the OpenAI social-cycle provider reused prior
+judgment and memory and produced concrete Minecraft evidence, but did not claim
+goal completion without verifier support.
 That result belongs in future work, not the long-term spec. It should improve
-the autonomy substrate, not turn house-building into the architecture.
+the autonomy substrate, not turn one domain activity into the architecture.
 
 ```mermaid
 flowchart LR
-  Goal["home-base WorldEvent pressure"]
+  Goal["WorldEvent pressure"]
   Context["Soul/LifeGoal + memory + prior judgment"]
   Surface["action_surface"]
   Action["bounded Minecraft actions"]
-  Partial["partial block placement"]
-  Verifier["shelter verifier"]
+  Evidence["runtime evidence"]
+  Verifier["verifier"]
   Future["future work: pivot rules and partial-progress reporting"]
 
   Goal --> Context
   Context --> Surface
   Surface --> Action
-  Action --> Partial
-  Partial --> Verifier
+  Action --> Evidence
+  Evidence --> Verifier
   Verifier --> Future
 ```
 

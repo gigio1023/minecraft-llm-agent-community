@@ -9,9 +9,10 @@ This is the engineering-practice spec.
 ## Long-Term Spec Governance
 
 `SPEC.md` and files in `docs/docs/Specification/` are long-term spec documents.
+`AGENTS.md` is binding repo-agent guidance for how agents apply those specs.
 
 Agents must not change them casually. Editing these files means changing product
-direction or architecture rules.
+direction, architecture rules, or agent operating rules.
 
 Allowed edits:
 
@@ -35,6 +36,9 @@ Prefer:
 - explicit state transitions;
 - runtime evidence;
 - typed contracts;
+- explicit `ActionIntent` argument validation;
+- bounded world-state diagnostics;
+- evidence-linked context compaction;
 - bounded helpers;
 - narrow validators.
 
@@ -46,6 +50,8 @@ Avoid:
 - broad mocks that pass while real behavior breaks;
 - speculative abstractions detached from current runtime pressure;
 - burying product intent in prompts only.
+- hidden physical-action defaults that turn invalid provider output into
+  misleading movement or gameplay.
 
 In TypeScript, use narrow types and small modules. In Python-like code, the
 equivalent rule would be to prefer explicit domain models such as Pydantic
@@ -106,7 +112,9 @@ Use tests this way:
 - keep them small;
 - test one owned behavior or regression;
 - reject fake success and hidden dependencies;
-- protect action-skill gates, verifier rules, artifact refs, and domain models;
+- protect action-skill gates, `ActionIntent` validators, verifier rules,
+  artifact refs, world-state diagnostic summaries, compaction invariants, and
+  domain models;
 - delete or rewrite tests that would pass after real logic breaks.
 
 Do not add elaborate test scaffolds for persona richness or long-run autonomy.
@@ -122,6 +130,9 @@ Primary evidence should come from:
 - actor workspace evidence;
 - provider input/output snapshots;
 - verifier output.
+- world-state diagnostic artifacts that scope absence claims and loaded-world
+  limits;
+- compact provider context packets with evidence refs for long runs.
 
 Smoke tests are allowed as wiring checks. They do not replace current-run
 Minecraft evidence.

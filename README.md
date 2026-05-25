@@ -79,10 +79,40 @@ The provider proposes goals and actions. The runtime owns Minecraft truth:
 validation, execution, timeout, cancellation, verification, transcript, and
 artifact persistence.
 
-`action_surface` is the actor's current body. It is not a home-building
-checklist. Shelter, storage, mining, crafting, speech, and movement are all
+`action_surface` is the actor's current body. It is not a domain-specific
+checklist. Building, storage, gathering, crafting, speech, and movement are all
 ordinary affordances until ActorSoul/LifeGoal pressure and runtime evidence make
 one of them relevant.
+
+World context follows the same rule. `world-state-summary/v1` is a bounded,
+query-neutral Mineflayer scan: raw observed Minecraft names, positions,
+distances, scan limits, loaded-world limits, and evidence refs. It must not
+publish fixed resource, station, construction-readiness, or survival-priority
+categories as provider guidance. Its loaded-coverage metadata is deliberately
+non-exhaustive unless a future scanner proves otherwise, so absence claims must
+remain scoped to the scan limits.
+
+Physical `ActionIntent` arguments are a contract. Movement, placement, mining,
+crafting, storage, and chat primitives must receive required structured args
+before execution. Prose fields such as `why_this_action` can explain intent, but
+they are not executable authority, and missing args must not become hidden
+movement or gameplay defaults.
+
+```mermaid
+flowchart LR
+  Observation["query-neutral world-state evidence"]
+  Contract["ActionIntent args contract"]
+  Surface["action_surface"]
+  Provider["provider proposal"]
+  Runtime["runtime gate"]
+  Evidence["artifact-visible result"]
+
+  Observation --> Provider
+  Surface --> Provider
+  Provider --> Contract
+  Contract --> Runtime
+  Runtime --> Evidence
+```
 
 ## What Success Looks Like
 
@@ -92,9 +122,8 @@ It is this:
 
 - an actor chooses a bounded CycleGoal from soul, life goal, world pressure,
   memory, and previous judgment;
-- the actor actually attempts Minecraft actions like collecting logs, mining
-  coal, storage work, conversation, movement, or preparing simple shelter
-  through runtime gates;
+- the actor actually attempts Minecraft actions selected from current evidence
+  and `action_surface` affordances through runtime gates;
 - every action attempt is recorded, including blocked and no-progress attempts;
 - later cycles reuse previous judgment or memory;
 - failures are explainable from transcript, checkpoint-like artifacts, and traces;
@@ -113,23 +142,23 @@ matrix_scope_counts current_run=14 historical_transcript=0 missing=0 environment
 ```
 
 The latest long-horizon OpenAI social-cycle stress test asked one actor to work
-toward a small home base for up to 100 cycles. It reached 54 recorded cycles
-before a cleanup-only file-permission blocker stopped the command. The report
-audited cleanly and stayed truthful:
+under broad settlement pressure for up to 100 cycles. It reached 54 recorded
+cycles before a cleanup-only file-permission blocker stopped the command. The
+report audited cleanly and stayed truthful:
 
 - `builtin_goal_authority=false`;
 - `builtin_execution_source=false`;
 - `fixture_dependency=false`;
 - prior `CycleJudgment` and memory were reused in later provider context;
-- the actor collected logs, crafted planks, and placed partial shelter shell
-  blocks;
-- the run did not claim a completed home without shelter verification.
+- the actor produced concrete Minecraft evidence across inventory, crafting,
+  and block-placement attempts;
+- the run did not claim broader goal completion without verifier support.
 
 That run is a stress test, not a product identity change. The main next work is
-planner/control substrate hardening, not a home-base architecture: required
-action arguments, repeated-blocker pivot rules, partial-progress reporting,
-review-summary schema catch-up, fresh-world cleanup ownership, and broader
-action-surface diagnostics.
+planner/control substrate hardening, not a domain-specific architecture:
+required action arguments, repeated-blocker pivot rules, partial-progress
+reporting, review-summary schema catch-up, fresh-world cleanup ownership, and
+broader action-surface diagnostics.
 See `docs/docs/Architecture/Future-Works.md`.
 
 The active social-cycle implementation now carries a runtime-owned
@@ -138,7 +167,20 @@ The active social-cycle implementation now carries a runtime-owned
 direct/deferred affordances, inventory, shared storage, known positions, recent
 blockers, available action skills, missing primitive blockers, memory reuse, and
 checklist progress. They are evidence packets, not provider claims or a fixed
-home-building plan.
+domain plan. New runtime logic should treat them as compatibility and
+diagnostic state until they are renamed or retired behind a broader typed state
+contract.
+
+Recent hardening also makes several fake-success paths visible as blocked
+runtime evidence:
+
+- direct primitive intents cannot carry `action_skill_id`;
+- direct shared-storage transfer intents require explicit `count` or
+  `targetCount`;
+- `wait` and `remember` go through CycleGoal and active action-skill gates;
+- review summaries and report audits only count explicit
+  `world-state-summary/v1` or `world-state-scan/v1` artifacts as world-scan
+  evidence.
 
 ```mermaid
 flowchart LR
@@ -161,6 +203,10 @@ flowchart LR
 - no raw JavaScript `eval` gameplay loop;
 - deterministic-first runtime development;
 - runtime-owned validation, timeout, verification, and artifacts;
+- query-neutral world-state diagnostics instead of provider-facing gameplay
+  taxonomies;
+- structured `ActionIntent` argument contracts instead of hidden executor
+  defaults;
 - actor workspace is the source of truth for actor-owned action skill state;
 - tests stay small and Detroit-style;
 - live transcript is the primary behavior evidence;
@@ -341,6 +387,8 @@ Primary evidence should come from:
 
 - transcript output;
 - checkpoint-like runtime artifacts;
+- actor workspace evidence and world-state diagnostic summaries;
+- provider input/output snapshots and usage ledger records;
 - Langfuse traces when provider-backed paths are used.
 
 ## Repository Structure

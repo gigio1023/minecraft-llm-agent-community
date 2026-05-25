@@ -77,27 +77,6 @@ export type SocialCycleContextPacket = {
   };
 };
 
-const memoryRelevantItemNames = [
-  "oak_log",
-  "birch_log",
-  "spruce_log",
-  "jungle_log",
-  "acacia_log",
-  "dark_oak_log",
-  "mangrove_log",
-  "cherry_log",
-  "oak_planks",
-  "birch_planks",
-  "spruce_planks",
-  "jungle_planks",
-  "stick",
-  "crafting_table",
-  "wooden_pickaxe",
-  "stone_pickaxe",
-  "cobblestone",
-  "coal"
-] as const;
-
 function memoryItemNamesFromObservation(observation: ObserveResult | Record<string, unknown>) {
   const inventory = (observation as { inventory?: unknown }).inventory;
   if (!Array.isArray(inventory)) {
@@ -115,10 +94,7 @@ function memoryItemNamesFromObservation(observation: ObserveResult | Record<stri
 
 function memoryItemNamesFromWorldEvents(worldEvents: readonly WorldEvent[]) {
   const summaries = worldEvents.map((event) => event.summary.toLowerCase()).join("\n");
-  return memoryRelevantItemNames.filter((itemName) => {
-    const spaced = itemName.replaceAll("_", " ");
-    return summaries.includes(itemName) || summaries.includes(spaced);
-  });
+  return [...new Set(summaries.match(/\b[a-z0-9]+(?:_[a-z0-9]+)+\b/g) ?? [])];
 }
 
 /** Builds the compact context packet used by CycleGoal, ActionIntent, and judgment providers. */

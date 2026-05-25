@@ -25,9 +25,10 @@ Soul / ActorSoul
 + runtime affordances
 ```
 
-The actor may still gather logs, craft tools, build shelter, place blocks, or
-deposit items. Those actions matter because they create social consequences and
-durable evidence. They are not isolated benchmark objectives.
+The actor may still gather, craft, place blocks, move, communicate, inspect,
+store, repair, or perform other Minecraft actions. Those actions matter because
+they create social consequences and durable evidence. They are not isolated
+benchmark objectives.
 
 The runtime should increase actor autonomy by improving context, action
 surface, gates, hooks, verification, and artifact memory. It should not encode
@@ -76,11 +77,11 @@ Examples:
 - Placing a crafting table is gameplay progress.
 - Placing a crafting table because the settlement lacks a shared station is
   social-simulation progress.
-- Depositing logs is gameplay progress.
-- Depositing logs against a remembered obligation or shared scarcity is
-  social-simulation progress.
-- Building shelter is gameplay progress.
-- Building shelter while updating memory about settlement safety is
+- Moving an item into shared storage is gameplay progress.
+- Moving an item into shared storage against a remembered obligation or shared
+  scarcity is social-simulation progress.
+- Placing blocks is gameplay progress.
+- Placing blocks while updating memory about a shared safety concern is
   social-simulation progress.
 
 These examples are not a priority order. Shelter is one possible pressure source

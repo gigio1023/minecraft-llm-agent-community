@@ -162,3 +162,23 @@ active replacement.
 - Future work discovered from long-horizon live runs is tracked in
   `docs/docs/Architecture/Future-Works.md` and must not be treated as a spec
   change unless explicitly promoted through the spec governance process.
+
+## 2026-05-25 Direction Correction
+
+- Provider-facing context must stay query-neutral and evidence-oriented. Do not
+  summarize the world as fixed resource, station, construction-readiness, or
+  survival-priority categories.
+- Specific action skill implementations may query specific Minecraft blocks or
+  items locally, but those local queries must not become global planner context.
+- Physical `ActionIntent` args are a runtime contract. Missing target, item,
+  position, container, or text args should produce artifact-visible contract
+  failure rather than hidden movement or gameplay defaults.
+- `AGENTS.md` is binding repo-agent guidance. Edits to `AGENTS.md`, `SPEC.md`,
+  or `docs/docs/Specification/*` require explicit approval when they change
+  direction or operating rules.
+- World-state diagnostics are observability substrate: scan center, radius,
+  vertical range, loaded-world limits, raw observed Minecraft names, nearest
+  examples, truncation, and evidence refs.
+- `Future-Works.md` is a backlog of substrate improvements. It must not turn a
+  long-run scenario, house-building example, or MCP building demo into product
+  architecture.

@@ -74,9 +74,9 @@ Example:
 An **action skill** is a Minecraft/Mineflayer-based bundled behavior that the
 game runtime can validate, execute, verify, and record.
 
-Action skills include bounded gameplay behaviors such as collecting logs,
-crafting steps, storage interaction, movement routines, block placement, shelter
-building, and conversation-like actions when those actions run through the game
+Action skills include bounded gameplay behaviors such as gathering, crafting
+steps, storage interaction, movement routines, block placement, construction
+helpers, and conversation-like actions when those actions run through the game
 runtime.
 
 Action skills must be:
@@ -226,6 +226,24 @@ evidence includes inventory deltas, block deltas, position distance, container
 state, chat records, transcript records, runtime artifacts, Langfuse traces, and
 human-visible behavior notes.
 
+## World-State Diagnostics
+
+**World-state diagnostics** are bounded Mineflayer observations that describe
+the actor's surrounding world with explicit scan limits.
+
+They should make claims such as "no matching target was observed" auditable by
+recording the scan center, radius, vertical range, dimension, loaded-world
+limits, raw observed Minecraft names, nearest examples, query refs, and
+evidence refs.
+
+Do not call thin nearest-block summaries or provider guesses world-state
+diagnostics.
+
+Do not shape provider-facing diagnostics as fixed material-family,
+station-family, construction-readiness, or survival-priority categories. Those
+categories are action-skill-local query concerns when needed, not the runtime's
+general world vocabulary.
+
 ## Human-Visible Behavior Note
 
 A **human-visible behavior note** is what the user or reviewer saw in game, such
@@ -284,6 +302,10 @@ enough for action selection and verification.
 An **ActionIntent** is one proposed action for the current CycleGoal. It can
 target a runtime primitive or an owned action skill, subject to runtime gates.
 
+Physical ActionIntent args are an executable contract. A rationale field such
+as `why_this_action` can explain the intent, but it cannot supply missing
+coordinates, item names, counts, container ids, anchors, or block selectors.
+
 ## CycleJudgment
 
 A **CycleJudgment** is the evidence-backed interpretation of what happened in a
@@ -316,9 +338,26 @@ changes what other actors can observe and use.
 
 ## Settlement State
 
-**Settlement state** is structured world/social context such as shared stations,
-storage contents, shelter/safety status, known resource locations, pending
-obligations, and remembered blockers.
+**Settlement state** is a compatibility term for structured world/social
+diagnostic context such as shared storage contents, known world positions,
+current blocker history, pending obligations, and evidence-linked status from
+prior runtime work.
+
+Settlement state is not a provider-facing strategy taxonomy and not a hidden
+single-domain checklist. If a field mentions a concrete Minecraft activity, it
+must be interpreted as retained evidence or pressure, not as a mandatory
+CycleGoal phase.
+
+## Context Compaction
+
+**Context compaction** is the runtime process of turning long transcript history
+into a compact, evidence-linked provider context packet.
+
+It should preserve ActorSoul/LifeGoal continuity, current inventory, container
+snapshots, known positions, recent blockers, recent CycleJudgments, world-state
+diagnostics, action-surface contracts, and artifact refs. It must not turn
+provider prose, `wait`, memory notes, or repeated observations into claimed
+physical progress.
 
 ## Agent Guide
 

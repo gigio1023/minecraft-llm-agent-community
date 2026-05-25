@@ -90,9 +90,9 @@ bun run server:stop
 | T1 | Fresh live action skill contracts | deterministic | one actor/bot | implemented action skills pass with current-run evidence |
 | T2 | Live Gemini social cycle | Gemini API `gemma-4-31b-it` | one actor | real action attempt, evidence, judgment, memory, later-cycle context, provider usage summary |
 | T3 | Multi-actor connection smoke | deterministic | two actors | both actors connect and produce causal transcript artifacts |
-| T4 | Live Gemini social cycle under resource pressure | Gemini API `gemma-4-31b-it` | one actor | attempts resource progression without fake pass and stays within usage guard |
-| T5 | Coal or shelter readiness gate | selected provider | one actor | passes only with `mine_block`/craft/build evidence, otherwise blocks |
-| T6 | Long-horizon home-base stress test | selected live provider with budget guard | one actor | context continuity, truthful blocked state, partial or complete home-building evidence |
+| T4 | Live Gemini social cycle under concrete world pressure | Gemini API `gemma-4-31b-it` | one actor | attempts evidence-backed Minecraft progress without fake pass and stays within usage guard |
+| T5 | Explicit target readiness gate | selected provider | one actor | passes only with current-run primitive/action-skill evidence, otherwise blocks |
+| T6 | Long-horizon social-cycle stress test | selected live provider with budget guard | one actor | context continuity, truthful blocked state, partial or complete verifier-backed evidence |
 
 ## T0: Server Preflight
 
@@ -163,7 +163,7 @@ bun run probe:social-cycle -- \
   --cycles 3 \
   --max-actions-per-cycle 3 \
   --isolate-workspace \
-  --world-event "The settlement needs real Minecraft progress toward wood, stone, coal, and a small shelter. Prefer executable actions such as collect_logs or mine_block when evidence allows it. Do not claim success without inventory or block evidence." \
+  --world-event "The settlement needs real Minecraft progress chosen from current observation and action_surface evidence. Do not claim success without inventory, block, position, container, chat, transcript, or verifier evidence." \
   --report ../tmp/live-social-cycle-gemini-api.json \
   --no-dashboard
 ```
@@ -242,9 +242,10 @@ Pass criteria:
 This test does not prove live-provider social agency. It proves multi-actor server
 connection and causal transcript shape.
 
-## T4: Resource-Pressure Social Cycle
+## T4: Concrete-Pressure Social Cycle
 
-Run the same live Gemini social cycle with explicit scarcity pressure.
+Run the same live Gemini social cycle with explicit but query-neutral world
+pressure.
 
 ```bash
 bun run probe:social-cycle -- \
@@ -254,7 +255,7 @@ bun run probe:social-cycle -- \
   --cycles 4 \
   --max-actions-per-cycle 3 \
   --isolate-workspace \
-  --world-event "The actor should explore for coal, collect wood, gather stone, and prepare for a small rocky wooden shelter. Treat this as pressure, not a guaranteed goal. Record blockers honestly." \
+  --world-event "The actor should make one useful Minecraft change selected from current evidence and available action_surface affordances. Treat this as pressure, not a guaranteed goal. Record blockers honestly." \
   --report ../tmp/live-social-cycle-resource-pressure.json \
   --no-dashboard
 ```
@@ -263,36 +264,30 @@ Pass criteria:
 
 - run audits cleanly;
 - no pass without real gameplay progress;
-- if only logs are collected, the report says logs were collected and does not
-  claim coal or shelter progress;
-- if coal or stone is attempted, `mine_block` evidence includes before/after
-  inventory or block-removal facts;
+- if only one narrow action succeeds, the report names only that verified action
+  and does not claim broader goal completion;
+- if a target block or item action is attempted, evidence includes before/after
+  inventory, position, block, container, or failure facts as applicable;
 - later cycles cite previous judgment or memory.
 
-## T5: Coal And Shelter Readiness Gate
+## T5: Explicit Target Readiness Gate
 
 This is the next simulation gate, not yet a free pass.
 
-Coal readiness requires:
+Target readiness requires:
 
-- an owned action skill or primitive path that can execute `mine_block` for
-  `coal_ore` or `deepslate_coal_ore`;
-- evidence showing block target, block removal, inventory delta, and failure
-  reason when pickup fails;
-- no provider claim of coal success without current-run coal evidence.
+- an owned action skill or primitive path that can execute the selected target;
+- structured `ActionIntent` args for physical targets, items, positions, or
+  containers;
+- evidence showing the target, before/after state, and failure reason when the
+  action cannot complete;
+- no provider claim of target success without current-run target evidence.
 
-Shelter readiness requires:
+Until the selected verifier passes, target tests must end as blocked or partial
+progress. A run that performs adjacent work and claims the whole target is
+complete fails this plan.
 
-- explicit action skill ownership for bounded placement/building behavior;
-- a primitive or action skill that can place blocks;
-- a verifier that checks the constructed block pattern in the world;
-- no shelter claim from collected materials alone.
-
-Until complete shelter verification passes, shelter tests must end as blocked or
-partial progress. A run that collects wood or places only a partial shell and
-claims "built shelter" fails this plan.
-
-## T6: Long-Horizon Home-Base Stress Test
+## T6: Long-Horizon Social-Cycle Stress Test
 
 This is a manual, budget-sensitive live test. It is useful after T0 and T1 are
 clean. It should run one actor only and must have a provider usage budget
@@ -308,9 +303,9 @@ bun run probe:social-cycle -- \
   --isolate-workspace \
   --fresh-world \
   --prepare-spawn-access \
-  --world-seed home-100cycle-20260524 \
-  --world-event "Long-horizon settlement pressure: help npc_b make a small believable home base, a starter shelter or homestead, not a race to diamonds. Progress should be incremental and evidence-first: observe the area, gather wood, craft basic materials, place or use a crafting table, gather stone when reachable, contribute to shared storage when useful, and build or improve a small shelter near the settlement. Do not claim the home is complete without block placement, inventory, container, or verifier evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
-  --report ../tmp/live-social-cycle-gemini-home-100.json \
+  --world-seed social-pressure-100cycle-20260524 \
+  --world-event "Long-horizon settlement pressure: help npc_b make useful Minecraft progress selected from current observation, memory, prior judgment, and action_surface affordances. Progress should be incremental and evidence-first. Do not claim the broader goal is complete without verifier evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
+  --report ../tmp/live-social-cycle-gemini-social-pressure-100.json \
   --no-dashboard
 ```
 
@@ -319,9 +314,10 @@ Pass criteria:
 - Live provider is used; builtin and deterministic authority remain false.
 - `fixture_dependency` is false after fresh-world setup.
 - Previous judgment or memory is used in later cycles.
-- The actor makes at least one meaningful current-run Minecraft change such as
-  collected logs, crafted material, or placed shelter shell blocks.
-- The report does not mark a completed home unless shelter verification passes.
+- The actor makes at least one meaningful current-run Minecraft change backed by
+  inventory, position, block, container, chat, transcript, or verifier evidence.
+- The report does not mark the broader goal complete unless the matching
+  verifier passes.
 - Repeated blockers are visible in evidence and can be grouped by reason.
 
 Known current result:
@@ -329,9 +325,8 @@ Known current result:
 - latest run recorded 54 cycles before cleanup hit a host file-permission
   blocker;
 - the report audit passed;
-- logs were collected, planks were crafted, and `build_pattern` placed partial
-  shelter shell blocks;
-- the home was not completed and the runtime did not claim completion.
+- concrete current-run inventory and block-placement evidence was recorded;
+- the broader goal was not completed and the runtime did not claim completion.
 
 Follow-up items from this test live in
 `docs/docs/Architecture/Future-Works.md`.
@@ -377,5 +372,5 @@ The simulation is accepted only when all of these are true in one live run:
 8. The audit passes.
 9. Cleanup stops the managed server.
 
-The concept is not accepted for coal or shelter until those specific actions
-have their own live evidence and verifiers.
+The concept is not accepted for any specific target until that target has its
+own live evidence and verifier.

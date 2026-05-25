@@ -156,9 +156,9 @@ function cycleGoalFromLlm(input: {
 /**
  * Produces the next bounded CycleGoal without granting domain strategy authority.
  *
- * @remarks The provider may prioritize shelter, storage, movement, or speech,
- * but only as pressure interpreted under ActorSoul/LifeGoal and the current
- * action surface.
+ * @remarks The provider may prioritize any available Minecraft or social
+ * affordance, but only as pressure interpreted under ActorSoul/LifeGoal and the
+ * current action surface.
  */
 export async function runSocialCycleGoalProvider(input: {
   providerId: "openai-api" | "gemini-api" | "deterministic-social";
@@ -243,14 +243,14 @@ export async function runSocialCycleGoalProvider(input: {
   const system = `You are the cycle goal provider for a Minecraft social simulation actor.
 ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a WorldEvent summary.
 WorldEvents are pressure only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
-Choose an ordinary Minecraft CycleGoal when the situation calls for it. Collecting logs is just collecting logs unless observation, memory, or relationships make it socially relevant.
+Choose an ordinary Minecraft CycleGoal when the situation calls for it. A Minecraft action is only socially relevant when observation, memory, role pressure, or relationships make it relevant.
 The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
 Use action_surface as the current actor body and affordance catalog. Direct entries are usable now; deferred entries are diagnostics about missing or non-exposed affordances.
-For survival and settlement goals, value evidence of diversified progress: safe positioning, resource discovery, enough starter wood, crafting, stone/tool progression, and shared storage. Do not make surplus collection of one stocked material the continuing goal unless live evidence shows it is still the best need.
-Use settlement_state and settlement_checklist as runtime-owned pressure/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal home-building plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
-Do not make shelter, home, base, or structure construction an always-on CycleGoal. Building is one possible social pressure among many, selected only when ActorSoul/LifeGoal, WorldEvent pressure, memory, or observation makes it relevant.
+For survival and settlement goals, reason from raw evidence and the available action surface. Do not use fixed material-family, station-family, construction-readiness, or tech-tree categories as mandatory planning headings.
+Use settlement_state and settlement_checklist as runtime-owned pressure/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Do not make any single domain activity an always-on CycleGoal. Building is one possible social pressure among many, selected only when ActorSoul/LifeGoal, WorldEvent pressure, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
-If observation includes nearbyResources or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose a different plausible next direction such as movement, observation, gathering, crafting, speech, or memory based on the live context. Output JSON only.`;
+If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
   const providerCall = {

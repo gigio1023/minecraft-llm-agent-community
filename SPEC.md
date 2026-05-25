@@ -1,6 +1,6 @@
 # SPEC
 
-Updated: 2026-05-24
+Updated: 2026-05-25
 
 This is the canonical gateway spec for the current rebuild.
 
@@ -12,7 +12,9 @@ tree contest, or a Voyager clone.
 ## 1. Spec Authority And Governance
 
 `SPEC.md` and the documents under `docs/docs/Specification/` define the long-term
-project spec. Changing them changes the product direction.
+project spec. `AGENTS.md` is binding repo-agent guidance for how agents apply
+that spec in day-to-day work. Changing any of these files changes product
+direction or agent operating rules.
 
 Rules for agents:
 
@@ -79,6 +81,48 @@ does not hard-code a strategy for every programming language. It exposes tools,
 context, hooks, approvals, events, and evidence so the model can act within a
 bounded environment. This repo should do the Minecraft/Soul-grounded equivalent.
 
+## 2.2 Diagnostic Evidence, Intent Contracts, And Compaction
+
+The runtime must make failure diagnosable from artifacts. If a future reviewer,
+Codex run, or human maintainer cannot tell whether the actor was boxed in,
+walking through unloaded terrain, repeatedly executing an invalid intent, or
+working from stale observations, the runtime evidence is insufficient.
+
+World-state claims must be scoped and auditable. For example, "no matching
+target was observed" is not just an observation summary; it is an evidence claim
+that should include the scan center, radius, vertical range, loaded-world
+limitation, raw observed Minecraft names, nearest examples, and artifact refs.
+The runtime must not imply that it inspected chunks that Mineflayer had not
+loaded.
+
+Provider-facing world context must not become a fixed survival-game taxonomy.
+Do not summarize the actor's world under hardcoded material-family,
+station-family, construction-readiness, or survival-priority categories. The
+substrate should expose raw Minecraft observations, query limits, positions,
+distances, and evidence refs; the provider chooses relevance under ActorSoul,
+LifeGoal, CycleGoal, action surface, and current evidence.
+
+Physical `ActionIntent` arguments are a contract, not a hint. Required arguments
+for actions such as movement, mining, placement, crafting, storage, inspection,
+or building must be present in structured args before execution. Natural-language
+fields may explain why an action was chosen, but they are not executable
+authority. If `why_this_action` mentions a target coordinate while structured
+`args` are empty, the runtime should reject or repair the intent and record an
+`ActionIntent` contract failure rather than silently applying a movement default.
+
+Mineflayer-backed primitives should document the Mineflayer API assumptions they
+depend on: loaded-chunk visibility, target lookup, pathfinder behavior, timeout
+and cancellation semantics, and the evidence needed to verify success or
+truthful failure.
+
+Long social-cycle runs need context compaction. The provider should not receive
+an unbounded raw transcript or a repeated pile of observe/wait/remember records.
+Compaction must preserve ActorSoul/LifeGoal continuity, current inventory,
+container snapshots, known positions, recent blockers, recent judgments,
+world-state diagnostics, action-surface contracts, and artifact refs. It must
+not convert provider prose, memory notes, or weak observation into claimed
+physical progress.
+
 ## 3. Complete Spec Reading Map
 
 Read these documents to understand the full spec:
@@ -140,6 +184,16 @@ Setup docs:
   transcript, or verifier evidence.
 - Do not confuse animation, partial motion, optimistic text, reflection, or a
   terminal memory note with success.
+- Do not confuse a hidden programming default with a valid action. Missing
+  required physical `ActionIntent` args are a runtime contract failure unless a
+  documented repair path produces structured args and records that repair.
+- Absence claims about observed targets, blocks, items, entities, or hazards
+  must be scoped by world-state diagnostic evidence and Mineflayer loaded-world
+  limits.
+- World context summaries must stay query-neutral and evidence-oriented. They
+  must not encode fixed gameplay priorities or domain strategy categories.
+- Context compaction must keep evidence refs and current actor state while
+  dropping raw repetition. It must not upgrade weak evidence into progress.
 - Social simulation must not be expected from persona text alone.
 - Social simulation must not be reduced to generic task completion.
 - Autonomy support must be implemented as substrate: context, action surface,
@@ -151,8 +205,8 @@ Setup docs:
 The first meaningful proof is small:
 
 - one bounded actor;
-- real Minecraft actions such as resource gathering, crafting, storage,
-  movement, shelter, or settlement maintenance;
+- real Minecraft actions such as gathering, crafting, storage, movement,
+  block placement, communication, or settlement maintenance;
 - action attempts recorded whether passed, blocked, failed, or no-progress;
 - CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, world pressure,
   memory, relationships, and prior judgments;
