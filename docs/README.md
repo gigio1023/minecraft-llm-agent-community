@@ -1,15 +1,28 @@
-# Documentation Website
+# Docusaurus Website
 
 This directory contains the Docusaurus documentation site for
 `minecraft-llm-agent-community`.
 
-The docs are part of the repo's runtime evidence surface. Keep the web docs in
-sync with `SPEC.md`, `README.md`, `docs/docs/intro.md`,
-`docs/docs/Documentation-Map.md`, and `docs/docs/Agent-Search-Index.md`.
+Docusaurus-exposed docs live under:
+
+```text
+docs/blog-doc/
+```
+
+The route on the generated site can still be `/docs/...`; the repository path is
+the important ownership boundary. Do not add new public docs under `docs/docs/`.
+
+Repo-internal docs live at the project root. Historical research, stale public
+plans, and raw paper dumps live under `docs/research-archive/`.
+
+Keep the web docs in sync with `SPEC.md`, `README.md`,
+`CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
+`docs/blog-doc/Documentation-Map.md`, and
+`docs/blog-doc/Agent-Search-Index.md`.
 
 Long-term spec changes still require explicit approval. Future implementation
 ideas discovered from live runs belong in
-`docs/docs/Architecture/Future-Works.md` unless they are promoted through spec
+`docs/blog-doc/Architecture/Future-Works.md` unless they are promoted through spec
 governance.
 
 ### Installation

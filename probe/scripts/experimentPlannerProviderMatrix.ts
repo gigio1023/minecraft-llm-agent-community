@@ -245,8 +245,8 @@ async function main() {
     },
     parallelLimit: PARALLEL_LIMIT,
     docs: [
-      "docs/docs/Setup/OpenAI-Tier3-Free-Usage.md",
-      "docs/docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md"
+      "docs/blog-doc/Setup/OpenAI-Tier3-Free-Usage.md",
+      "docs/blog-doc/Architecture/Gemini-Native-Audio-Codegen-Verdict.md"
     ]
   };
 

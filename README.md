@@ -46,73 +46,41 @@ Not current goals:
 
 ## Current Runtime Shape
 
-```mermaid
-flowchart TD
-  Soul["ActorSoul / soul.md"]
-  LifeGoal["ActorLifeGoal"]
-  Pressure["WorldEvent, role, relationship, memory, inventory, settlement pressure"]
-  Context["social-cycle-context/v1"]
-  Surface["action-surface/v1: direct/deferred affordances"]
-  CycleGoal["CycleGoal"]
-  Intent["ActionIntent"]
-  Gate["runtime gate: actor-owned action skills + allowed primitives"]
-  Execute["Mineflayer primitive or action-skill bundle"]
-  Verify["runtime verifier + action-skill postcondition"]
-  Artifacts["transcript, evidence, provider snapshots, report"]
-  Memory["actor workspace memory and CycleJudgment"]
+The current implementation is a bounded social-cycle runtime. The provider can
+propose goals, actions, and judgments, but Minecraft truth stays inside the
+runtime: contracts, gates, Mineflayer execution, verification, artifacts, and
+actor workspace state.
 
-  Soul --> Context
-  LifeGoal --> Context
-  Pressure --> Context
-  Context --> Surface
-  Surface --> CycleGoal
-  CycleGoal --> Intent
-  Intent --> Gate
-  Gate --> Execute
-  Execute --> Verify
-  Verify --> Artifacts
-  Artifacts --> Memory
-  Memory --> Context
-```
-
-The provider proposes goals and actions. The runtime owns Minecraft truth:
-validation, execution, timeout, cancellation, verification, transcript, and
-artifact persistence.
-
-`action_surface` is the actor's current body. It is not a domain-specific
-checklist. Building, storage, gathering, crafting, speech, and movement are all
-ordinary affordances until ActorSoul/LifeGoal pressure and runtime evidence make
-one of them relevant.
-
-World context follows the same rule. `world-state-summary/v1` is a bounded,
-query-neutral Mineflayer scan: raw observed Minecraft names, positions,
-distances, scan limits, loaded-world limits, and evidence refs. It must not
-publish fixed resource, station, construction-readiness, or survival-priority
-categories as provider guidance. Its loaded-coverage metadata is deliberately
-non-exhaustive unless a future scanner proves otherwise, so absence claims must
-remain scoped to the scan limits.
-
-Physical `ActionIntent` arguments are a contract. Movement, placement, mining,
-crafting, storage, and chat primitives must receive required structured args
-before execution. Prose fields such as `why_this_action` can explain intent, but
-they are not executable authority, and missing args must not become hidden
-movement or gameplay defaults.
+For a review-friendly architecture walkthrough with focused Mermaid diagrams,
+see
+[Current Implementation Architecture Review](CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md).
 
 ```mermaid
 flowchart LR
-  Observation["query-neutral world-state evidence"]
-  Contract["ActionIntent args contract"]
-  Surface["action_surface"]
-  Provider["provider proposal"]
-  Runtime["runtime gate"]
-  Evidence["artifact-visible result"]
+  Soul["ActorSoul + LifeGoal"]
+  Context["bounded provider context"]
+  Provider["provider proposals"]
+  Runtime["runtime contracts and gates"]
+  Minecraft["Mineflayer + Minecraft"]
+  Evidence["evidence, report, memory"]
 
-  Observation --> Provider
-  Surface --> Provider
-  Provider --> Contract
-  Contract --> Runtime
-  Runtime --> Evidence
+  Soul --> Context
+  Evidence --> Context
+  Context --> Provider
+  Provider --> Runtime
+  Runtime --> Minecraft
+  Minecraft --> Evidence
 ```
+
+In short:
+
+- `action_surface` is the actor's current body, not a domain-specific checklist;
+- `world-state-summary/v1` is query-neutral evidence with explicit scan limits;
+- physical `ActionIntent` args are executable contracts, not prose suggestions;
+- `runtime-retry-constraint/v1` blocks exact repeated target/args failures
+  before another Mineflayer call;
+- memory can influence later cycles, but Minecraft progress still requires
+  verifier-backed runtime evidence.
 
 ## What Success Looks Like
 
@@ -154,22 +122,23 @@ report audited cleanly and stayed truthful:
   and block-placement attempts;
 - the run did not claim broader goal completion without verifier support.
 
-That run is a stress test, not a product identity change. The main next work is
-planner/control substrate hardening, not a domain-specific architecture:
-required action arguments, repeated-blocker pivot rules, partial-progress
-reporting, review-summary schema catch-up, fresh-world cleanup ownership, and
-broader action-surface diagnostics.
-See `docs/docs/Architecture/Future-Works.md`.
+That run is a stress test, not a product identity change. The main next work
+remains planner/control substrate hardening, not a domain-specific architecture:
+partial-progress reporting, review-summary schema catch-up, fresh-world cleanup
+ownership, broader action-surface diagnostics, and bounded target discovery.
+Required action arguments and exact repeated-blocker retry constraints are now
+baseline runtime gates.
+See `docs/blog-doc/Architecture/Future-Works.md`.
 
-The active social-cycle implementation now carries a runtime-owned
-`action-surface/v1` context packet plus `settlement-state/v1` and
-`settlement-checklist/v1` compatibility report fields. These fields summarize
-direct/deferred affordances, inventory, shared storage, known positions, recent
-blockers, available action skills, missing primitive blockers, memory reuse, and
-checklist progress. They are evidence packets, not provider claims or a fixed
-domain plan. New runtime logic should treat them as compatibility and
-diagnostic state until they are renamed or retired behind a broader typed state
-contract.
+The active social-cycle implementation now carries runtime-owned
+`action-surface/v1`, `runtime-retry-constraint/v1`, `settlement-state/v1`, and
+`settlement-checklist/v1` context/report fields. These fields summarize
+direct/deferred affordances, exact repeated retry gates, inventory, shared
+storage, known positions, recent blockers, available action skills, missing
+primitive blockers, memory reuse, and checklist progress. They are evidence
+packets and runtime gates, not provider claims or a fixed domain plan. New
+runtime logic should treat settlement compatibility state as diagnostic state
+until it is renamed or retired behind a broader typed state contract.
 
 Recent hardening also makes several fake-success paths visible as blocked
 runtime evidence:
@@ -178,25 +147,11 @@ runtime evidence:
 - direct shared-storage transfer intents require explicit `count` or
   `targetCount`;
 - `wait` and `remember` go through CycleGoal and active action-skill gates;
+- repeated exact target/args blockers become runtime retry constraints and are
+  blocked before another Mineflayer call, with review-summary counts;
 - review summaries and report audits only count explicit
   `world-state-summary/v1` or `world-state-scan/v1` artifacts as world-scan
   evidence.
-
-```mermaid
-flowchart LR
-  Matrix["14/14 action-skill matrix"]
-  Surface["action-surface/v1"]
-  Settlement["settlement-state/v1"]
-  Postconditions["action-skill postconditions"]
-  SocialReport["social-cycle report"]
-  Audit["report audit"]
-
-  Surface --> SocialReport
-  Matrix --> Postconditions
-  Postconditions --> Settlement
-  Settlement --> SocialReport
-  SocialReport --> Audit
-```
 
 ## Core Principles
 
@@ -237,22 +192,25 @@ Read these first:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
-4. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-5. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
-6. `docs/docs/Specification/Reference-Adaptation-Guide.md`
-7. `docs/docs/Documentation-Map.md`
-8. `docs/docs/Agent-Search-Index.md`
-9. `docs/docs/Terminology.md`
-10. `docs/docs/Architecture/Minimal-Probe.md`
-11. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-12. `docs/docs/Architecture/Real-Server-Simulation-Test-Plan.md`
-13. `docs/docs/Architecture/Future-Works.md`
-14. `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+3. `CLAUDE.md`
+4. `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
+5. `docs/blog-doc/Specification/Runtime-Evidence-And-Action-Skills.md`
+6. `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
+7. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
+8. `docs/blog-doc/Documentation-Map.md`
+9. `docs/blog-doc/Agent-Search-Index.md`
+10. `docs/blog-doc/Terminology.md`
+11. `docs/blog-doc/Architecture/Minimal-Probe.md`
+12. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+14. `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
+15. `docs/blog-doc/Architecture/Future-Works.md`
+16. `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 
-Historical plans and research still exist in `docs/docs/Plans/` and
-`docs/docs/Research/`, but not every older plan is still an active implementation
-instruction.
+Historical plans, research pages, and raw paper dumps live under
+`docs/research-archive/`. They are preserved for context, but they are not
+active implementation instructions unless an active spec or handoff doc promotes
+them.
 
 ## Quick Start
 
@@ -396,15 +354,17 @@ Primary evidence should come from:
 | Directory | Purpose |
 |-----------|---------|
 | `probe/` | Runtime code, bot orchestration, tools, server setup, transcript handling. |
-| `docs/` | Search index, architecture docs, setup guides, research, and plans. |
+| `docs/blog-doc/` | Docusaurus-exposed public docs. |
+| `docs/research-archive/` | Internal historical research, old plans, and paper dumps. |
+| `docs/blog/` | Docusaurus blog posts. |
 | `build/provider-auth/` | Ignored local provider auth storage. |
 
 ```mermaid
 flowchart TB
   Spec["SPEC.md"]
   Agents["AGENTS.md"]
-  DocsSpec["docs/docs/Specification/*"]
-  Arch["docs/docs/Architecture/*"]
+  DocsSpec["docs/blog-doc/Specification/*"]
+  Arch["docs/blog-doc/Architecture/*"]
   Runtime["probe/src/runtime/*"]
   Provider["probe/src/provider/*"]
   Tools["probe/src/tools/*"]
@@ -423,19 +383,23 @@ flowchart TB
 
 - `SPEC.md` is the canonical rebuild spec.
 - `AGENTS.md` is the canonical repo guidance for agents.
-- `docs/docs/Documentation-Map.md` classifies docs as active spec, active
+- `CLAUDE.md` mirrors the binding repo-agent rules for Claude Code and points
+  back to `AGENTS.md` when rules conflict.
+- `docs/blog-doc/Documentation-Map.md` classifies docs as active spec, active
   architecture, current state, supporting track, or historical context.
-- `docs/docs/Terminology.md` is the normative vocabulary for docs, comments,
+- `docs/blog-doc/Terminology.md` is the normative vocabulary for docs, comments,
   prompts, and report labels.
-- `docs/docs/Architecture/Minimal-Probe.md` describes the active current-phase goal.
-- `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
+- `docs/blog-doc/Architecture/Minimal-Probe.md` describes the active current-phase goal.
+- `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
   runtime success from actor soul, life goal, and cycle-goal authority.
-- `docs/docs/Architecture/Future-Works.md` records live-run follow-ups and
+- `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+  explains the current implementation with focused diagrams for review.
+- `docs/blog-doc/Architecture/Future-Works.md` records live-run follow-ups and
   external reference ideas without changing the long-term spec.
-- `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+- `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
   is the current Composer 2.5 implementation handoff for that architecture.
-- Older plan docs are useful as historical context, but some are now archived and
-  should not be treated as the current build plan.
+- Docusaurus-exposed docs live under `docs/blog-doc/`; internal research and old
+  plans live under `docs/research-archive/`.
 
 ## License
 
