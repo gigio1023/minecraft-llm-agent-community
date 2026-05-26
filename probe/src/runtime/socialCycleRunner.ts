@@ -35,6 +35,11 @@ import {
   filterExecutableSocialActionSkills,
   observeActorWorld
 } from "./socialCycleExecution.js";
+import {
+  buildRuntimeRetryAttempt,
+  deriveRuntimeRetryConstraints,
+  type RuntimeRetryAttempt
+} from "./retryConstraints.js";
 import { writeJson, type ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 import { listActorMemoryRefs, writeActorMemoryRecords } from "../memory/actorMemory.js";
 import { getActorProfile } from "../npc/profiles.js";
@@ -76,6 +81,7 @@ type SocialCycleActionAttemptReport = {
   tool_statuses: SocialPrimitiveAttemptStatus[];
   runtime_result: JsonValue;
   runtime_status: string;
+  retry_constraint_blocked: boolean;
   postcondition_results: ActionSkillPostconditionResult[];
 };
 
@@ -397,6 +403,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     judgment: CycleJudgment;
   } | null = null;
   const recentToolResults: ToolResultRecord[] = [];
+  const runtimeRetryAttempts: RuntimeRetryAttempt[] = [];
   const allPostconditionResults: ActionSkillPostconditionResult[] = [];
   let memoryWriteCount = 0;
 
@@ -415,6 +422,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       const strategicGoals = await listStrategicGoals(rootDir, input.actorId);
       const previousJudgments =
         previousCycleJudgment && cycleIndex > 0 ? [previousCycleJudgment] : [];
+      const cycleRetryConstraints = deriveRuntimeRetryConstraints({
+        actorId: input.actorId,
+        attempts: runtimeRetryAttempts
+      });
 
       if (previousJudgments.length > 0) {
         report.agency_status.used_previous_judgment = true;
@@ -438,8 +449,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         postconditionResults: allPostconditionResults,
         evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
         judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
-        memoryWriteCount
+        memoryWriteCount,
+        runtimeRetryConstraints: cycleRetryConstraints
       });
+      report.runtime_retry_constraints = cycleRetryConstraints;
 
       report.agency_status.used_world_event_refs = worldEvents.length;
       report.agency_status.used_memory_refs = Math.max(
@@ -497,13 +510,22 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
       for (let actionIndex = 0; actionIndex < input.maxActionsPerCycle; actionIndex++) {
         const actionTurnId = `${cycleId}-action-${String(actionIndex + 1).padStart(2, "0")}`;
-        const actionContext =
+        const actionRetryConstraints = deriveRuntimeRetryConstraints({
+          actorId: input.actorId,
+          attempts: runtimeRetryAttempts
+        });
+        const baseActionContext =
           actionIndex === 0
             ? context
             : {
                 ...context,
                 observation: await observeActorWorld({ actorId: input.actorId, bot })
               };
+        const actionContext = {
+          ...baseActionContext,
+          runtime_retry_constraints: actionRetryConstraints
+        };
+        report.runtime_retry_constraints = actionRetryConstraints;
         const planner = await runSocialActionPlannerProvider({
           providerId: input.providerId,
           actorWorkspaceRootDir: rootDir,
@@ -524,7 +546,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             runtime_status: attempt.runtime_status,
             runtime_result: attempt.runtime_result,
             evidence_refs: attempt.evidence_refs,
-            judgment_ref: attempt.judgment_ref
+            judgment_ref: attempt.judgment_ref,
+            retry_constraint_blocked: attempt.retry_constraint_blocked
           })),
           runId
         });
@@ -545,8 +568,27 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleGoal: cycleGoalProvider.cycleGoal,
           intent: planner.intent,
           activeActionSkills: executableActiveSkills,
+          runtimeRetryConstraints: actionRetryConstraints,
           bot
         });
+        const retryAttempt = buildRuntimeRetryAttempt({
+          actorId: input.actorId,
+          cycleId,
+          turnId: actionTurnId,
+          actionIndex,
+          intent: planner.intent,
+          execution
+        });
+        if (retryAttempt) {
+          runtimeRetryAttempts.push(retryAttempt);
+          if (runtimeRetryAttempts.length > 48) {
+            runtimeRetryAttempts.splice(0, runtimeRetryAttempts.length - 48);
+          }
+          report.runtime_retry_constraints = deriveRuntimeRetryConstraints({
+            actorId: input.actorId,
+            attempts: runtimeRetryAttempts
+          });
+        }
 
         lastVerifier = execution.verifierStatus;
         actionSkillExecutionUnit = execution.actionSkillExecutionUnit;
@@ -619,6 +661,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             : execution.verifierStatus === "failed"
               ? "failed"
               : "completed",
+          retry_constraint_blocked: execution.retryConstraintBlocked,
           postcondition_results: execution.postconditionResults
         });
 

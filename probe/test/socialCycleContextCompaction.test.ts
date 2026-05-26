@@ -214,6 +214,32 @@ function contextPacket(): SocialCycleContextPacketLike {
       judgmentRefs: ["judgments/cycle-0002-action-01-judgment.json"],
       now: createdAt
     }),
+    runtime_retry_constraints: [
+      {
+        schema: "runtime-retry-constraint/v1",
+        constraint_id: "retry-primitive-move_to-test",
+        actor_id: "npc_b",
+        action_kind: "use_primitive",
+        target: {
+          kind: "primitive",
+          id: "move_to",
+          primitive_id: "move_to"
+        },
+        args_fingerprint: "abc123",
+        args_normalized: { direction: "east", distance: 8 },
+        blocker_key: "blocked_pathfinder_failed",
+        blocker_status: "blocked",
+        blocker_reason: "pathfinder failed before target",
+        repeat_count: 2,
+        attempt_refs: ["cycle-0001-action-01", "cycle-0002-action-01"],
+        evidence_refs: ["evidence/cycle-0002-move_to.json"],
+        rule: {
+          same_target_and_args_blocked: true,
+          provider_must_pivot_or_repair_args: true,
+          runtime_blocks_before_mineflayer: true
+        }
+      }
+    ],
     world_events: [
       {
         schema: "world-event/v1",
@@ -275,6 +301,11 @@ test("social-cycle context checkpoint preserves authority names and compact refs
   );
   assert.equal(observationEntry?.retention, "summary_and_ref");
   assert.deepEqual(observationEntry?.refs, ["evidence/cycle-0003-observe.json"]);
+
+  const retryEntry = checkpoint.replacement_context_manifest.entries.find((entry) =>
+    entry.context_name === "runtime retry constraints"
+  );
+  assert.equal(retryEntry?.retention, "summary_and_ref");
 });
 
 test("compact summary facts are ref-backed and cannot claim physical progress", () => {
@@ -313,6 +344,12 @@ test("compact summary facts are ref-backed and cannot claim physical progress", 
   assert.ok(observationFact);
   assert.match(observationFact.summary, /coverage=sampled_columns_only\/non_exhaustive/);
   assert.doesNotMatch(observationFact.summary, /observed blocks=not present/);
+
+  const retryFact = checkpoint.compact_summary.facts.find((fact) =>
+    fact.label === "runtime retry constraints"
+  );
+  assert.ok(retryFact);
+  assert.match(retryFact.summary, /exact target\/args gates/);
 });
 
 test("builder rejects compact summaries without required evidence refs", () => {

@@ -6,6 +6,7 @@ import type {
   SettlementState
 } from "../settlement/settlementState.js";
 import type { ProviderUsageSummary } from "../../provider/providerUsageTracker.js";
+import type { RuntimeRetryConstraint } from "../retryConstraints.js";
 
 export type ActorSoul = {
   schema: "actor-soul/v1";
@@ -314,6 +315,7 @@ export type SocialCycleRunReport = {
       tool_statuses: Array<{ tool: string; status: string }>;
       runtime_result?: unknown;
       runtime_status: string;
+      retry_constraint_blocked?: boolean;
       postcondition_results?: ActionSkillPostconditionResult[];
     }>;
   }>;
@@ -322,6 +324,7 @@ export type SocialCycleRunReport = {
   settlement_state?: SettlementState;
   settlement_checklist?: SettlementChecklist;
   postcondition_results?: ActionSkillPostconditionResult[];
+  runtime_retry_constraints?: RuntimeRetryConstraint[];
   relationship_application_results?: Array<{
     event_id: string;
     from_actor_id: string;

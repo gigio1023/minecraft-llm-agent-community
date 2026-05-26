@@ -20,6 +20,11 @@ import {
 import type { ActionIntent, CycleJudgment } from "../src/runtime/goals/types.js";
 import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
 import { evaluateSocialActionSkillPostcondition } from "../src/runtime/settlement/settlementState.js";
+import {
+  buildRuntimeRetryAttempt,
+  deriveRuntimeRetryConstraints,
+  findMatchingRuntimeRetryConstraint
+} from "../src/runtime/retryConstraints.js";
 
 test("gatherer social affordances expose the role-safe runtime body", () => {
   const allowed = compileSocialAllowedPrimitives("gatherer");
@@ -309,6 +314,146 @@ test("wait and remember still pass through CycleGoal and active action-skill gat
   assert.equal(result.contractBlocked, false);
   assert.deepEqual(result.executedTools, ["wait"]);
   assert.match(JSON.stringify(result.runtimeResult), /not backed by active action skills/);
+});
+
+test("runtime retry constraints group exact repeated blocker target and args", () => {
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "cycle-goal-1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { direction: "east", distance: 8 },
+    why_this_action: "scout",
+    expected_evidence: ["tool_attempt"],
+    fallback_if_blocked: "observe"
+  };
+  const first = buildRuntimeRetryAttempt({
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    turnId: "cycle-0001-action-01",
+    actionIndex: 0,
+    intent,
+    execution: {
+      runtimeResult: { status: "blocked", reason: "pathfinder failed near target" },
+      evidenceRefs: ["evidence/cycle-0001-move_to.json"],
+      verifierStatus: "failed",
+      toolStatuses: [{ tool: "move_to", status: "blocked" }]
+    }
+  });
+  const second = buildRuntimeRetryAttempt({
+    actorId: "npc_b",
+    cycleId: "cycle-0002",
+    turnId: "cycle-0002-action-01",
+    actionIndex: 0,
+    intent: { ...intent, cycle_id: "cycle-0002" },
+    execution: {
+      runtimeResult: { status: "blocked", reason: "pathfinder failed near target" },
+      evidenceRefs: ["evidence/cycle-0002-move_to.json"],
+      verifierStatus: "failed",
+      toolStatuses: [{ tool: "move_to", status: "blocked" }]
+    }
+  });
+
+  assert.ok(first);
+  assert.ok(second);
+  const constraints = deriveRuntimeRetryConstraints({
+    actorId: "npc_b",
+    attempts: [first, second]
+  });
+
+  assert.equal(constraints.length, 1);
+  assert.equal(constraints[0]?.target.id, "move_to");
+  assert.equal(constraints[0]?.repeat_count, 2);
+  assert.ok(findMatchingRuntimeRetryConstraint(intent, constraints));
+  assert.equal(
+    findMatchingRuntimeRetryConstraint(
+      { ...intent, args: { direction: "west", distance: 8 } },
+      constraints
+    ),
+    null
+  );
+});
+
+test("social executor blocks an exact retry constraint before Mineflayer execution", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-retry-constraint-"));
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0003",
+    cycle_goal_id: "cycle-goal-1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { direction: "east", distance: 8 },
+    why_this_action: "repeat blocked movement",
+    expected_evidence: ["tool_attempt"],
+    fallback_if_blocked: "observe"
+  };
+  const attempts = ["cycle-0001-action-01", "cycle-0002-action-01"].map((turnId) =>
+    buildRuntimeRetryAttempt({
+      actorId: "npc_b",
+      cycleId: turnId.slice(0, 10),
+      turnId,
+      intent,
+      execution: {
+        runtimeResult: { status: "blocked", reason: "pathfinder failed near target" },
+        evidenceRefs: [`evidence/${turnId}-move_to.json`],
+        verifierStatus: "failed",
+        toolStatuses: [{ tool: "move_to", status: "blocked" }]
+      }
+    })
+  );
+  const constraints = deriveRuntimeRetryConstraints({
+    actorId: "npc_b",
+    attempts: attempts.filter((attempt): attempt is NonNullable<typeof attempt> => attempt !== null)
+  });
+
+  const result = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0003",
+    turnId: "cycle-0003-action-01",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0003",
+      status: "active",
+      source: "llm_planner",
+      summary: "Do not blindly retry a blocked exact action",
+      rationale: "The runtime should force a pivot or argument repair.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime_primitive_or_evidence",
+        evidence_required: ["tool_attempt"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["move_to", "observe"],
+      stop_conditions: ["retry_constraint_blocked"]
+    },
+    intent,
+    activeActionSkills: [],
+    runtimeRetryConstraints: constraints
+  });
+
+  assert.equal(result.retryConstraintBlocked, true);
+  assert.equal(result.gateBlocked, true);
+  assert.equal(result.executedTools.length, 0);
+  assert.equal(result.evidenceRefs.length, 1);
+  assert.match(JSON.stringify(result.runtimeResult), /runtime_retry_constraint/);
+
+  const evidencePath = path.join(workspaceRoot, "npc_b", result.evidenceRefs[0]!);
+  const evidence = JSON.parse(await fs.readFile(evidencePath, "utf8"));
+  assert.equal(evidence.category, "retry_constraint_blocked");
 });
 
 test("social action skill exposure keeps only executable primitive bundles", () => {

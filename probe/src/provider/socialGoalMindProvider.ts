@@ -250,6 +250,7 @@ For survival and settlement goals, reason from raw evidence and the available ac
 Use settlement_state and settlement_checklist as runtime-owned pressure/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
 Do not make any single domain activity an always-on CycleGoal. Building is one possible social pressure among many, selected only when ActorSoul/LifeGoal, WorldEvent pressure, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
+If runtime_retry_constraints are present, treat them as hard evidence that the exact target plus structured args should not be selected again until context changes.
 If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);

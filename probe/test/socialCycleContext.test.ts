@@ -134,6 +134,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   // missing action skill primitives as executable planner options.
   assert.equal(context.action_surface.schema, "action-surface/v1");
   assert.equal(context.action_surface.rules.exposes_actor_body_not_strategy, true);
+  assert.deepEqual(context.runtime_retry_constraints, []);
   assert.ok(context.action_surface.direct_primitives.some((entry) => entry.primitive_id === "observe"));
   assert.ok(
     context.action_surface.deferred_action_skills.some((entry) =>

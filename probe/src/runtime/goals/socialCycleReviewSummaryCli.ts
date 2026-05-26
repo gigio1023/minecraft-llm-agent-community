@@ -36,7 +36,9 @@ async function main() {
       review_markdown: mdPath,
       total_cycles: summary.total_cycles,
       outcome_counts: summary.outcome_counts,
-      cycles_with_prior_judgment: summary.cycles_with_prior_judgment_context
+      cycles_with_prior_judgment: summary.cycles_with_prior_judgment_context,
+      runtime_retry_constraints: summary.runtime_retry_constraint_count,
+      retry_constraint_blocked_attempts: summary.retry_constraint_blocked_attempts
     })
   );
 }

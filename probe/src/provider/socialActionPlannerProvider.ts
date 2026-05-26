@@ -168,6 +168,7 @@ export async function runSocialActionPlannerProvider(input: {
     settlement_state: input.context.settlement_state,
     settlement_checklist: input.context.settlement_state.checklist,
     blocker_histogram: input.context.settlement_state.blocker_histogram,
+    runtime_retry_constraints: input.context.runtime_retry_constraints,
     previous_cycle_judgments: input.context.previous_cycle_judgments,
     recent_action_attempts: input.recentActionAttempts ?? []
   } as JsonValue;
@@ -209,6 +210,7 @@ ActorSoul and ActorLifeGoal are fixed context. The actor cares about social cons
 Select from action_surface and runtime_affordances based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface is the actor's current body, not a strategy checklist.
 Deferred primitives or action skills explain missing affordances; do not choose them unless the active CycleGoal already allows the required primitive ids.
 If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different valid affordance based on the current action surface and evidence.
+runtime_retry_constraints are hard runtime suppressions over exact target plus structured args. Do not choose an ActionIntent that matches one; pivot to a different valid affordance, repair the structured args, observe current state, or record a truthful blocker.
 Do not treat fixed material families, stations, construction readiness, or any other gameplay taxonomy as mandatory planning headings. Use raw observed Minecraft names and runtime evidence; decide relevance from the current CycleGoal.
 Use settlement_state, settlement_checklist, and blocker_histogram as pressure/evidence packets before choosing an action. They are not a mandatory single-domain strategy.
 If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.

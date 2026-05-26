@@ -437,6 +437,45 @@ test("review summary surfaces world scan counts and movement contract status", a
   const workspaceRoot = await makeWorkspaceRoot("social-review-scan-summary");
   const report = baseReport();
   report.actor_workspace_root_dir = workspaceRoot;
+  report.runtime_retry_constraints = [
+    {
+      schema: "runtime-retry-constraint/v1",
+      constraint_id: "retry-primitive-move_to-test",
+      actor_id: actorId,
+      action_kind: "use_primitive",
+      target: { kind: "primitive", id: "move_to", primitive_id: "move_to" },
+      args_fingerprint: "abc123",
+      args_normalized: { direction: "east", distance: 6 },
+      blocker_key: "blocked_pathfinder_failed",
+      blocker_status: "blocked",
+      blocker_reason: "pathfinder failed",
+      repeat_count: 2,
+      attempt_refs: ["cycle-0001-action-01", "cycle-0002-action-01"],
+      evidence_refs: ["evidence/cycle-0001-observe.json"],
+      rule: {
+        same_target_and_args_blocked: true,
+        provider_must_pivot_or_repair_args: true,
+        runtime_blocks_before_mineflayer: true
+      }
+    }
+  ];
+  report.cycles[0]!.action_attempts = [
+    {
+      attempt_id: "cycle-0001-action-01",
+      action_index: 0,
+      turn_id: "cycle-0001-action-01",
+      action_intent_ref: report.cycles[0]!.action_intent_ref,
+      provider_input_refs: [],
+      provider_output_refs: [],
+      evidence_refs: [report.cycles[0]!.evidence_refs[0]!],
+      judgment_ref: report.cycles[0]!.judgment_ref,
+      verifier_status: "not_applicable",
+      executed_tools: [],
+      tool_statuses: [],
+      runtime_status: "blocked",
+      retry_constraint_blocked: true
+    }
+  ];
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_intent_ref), {
@@ -503,4 +542,7 @@ test("review summary surfaces world scan counts and movement contract status", a
   assert.equal(row.world_scan_counts.nearest_examples, 1);
   assert.equal(row.world_scan_counts.non_exhaustive_coverage, 1);
   assert.equal(row.world_scan_counts.nearby_blocks, undefined);
+  assert.equal(row.retry_constraint_blocked, true);
+  assert.equal(summary.runtime_retry_constraint_count, 1);
+  assert.equal(summary.retry_constraint_blocked_attempts, 1);
 });

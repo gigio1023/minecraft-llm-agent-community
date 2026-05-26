@@ -26,7 +26,8 @@ export type SocialCycleManifestContextName =
   | "memory packet"
   | "relationship context"
   | "world events"
-  | "settlement state";
+  | "settlement state"
+  | "runtime retry constraints";
 
 export type SocialCycleManifestRetention =
   | "full"
@@ -61,7 +62,8 @@ export type SocialCycleSummaryFactScope =
   | "memory_context"
   | "world_event_pressure"
   | "relationship_context"
-  | "settlement_state";
+  | "settlement_state"
+  | "runtime_retry_constraints";
 
 export type EvidenceBackedSocialCycleSummaryFact = {
   label: string;
@@ -113,6 +115,7 @@ export type SocialCycleContextPacketLike = {
   relationship_context?: SocialCycleContextPacket["relationship_context"];
   memory_packet?: SocialCycleContextPacket["memory_packet"];
   settlement_state?: SettlementState;
+  runtime_retry_constraints?: SocialCycleContextPacket["runtime_retry_constraints"];
   world_events?: SocialCycleContextPacket["world_events"];
 };
 
@@ -405,6 +408,15 @@ function summarizeSettlementState(settlementState: SettlementState) {
   ].join("; ");
 }
 
+function summarizeRuntimeRetryConstraints(
+  constraints: NonNullable<SocialCycleContextPacket["runtime_retry_constraints"]>
+) {
+  const rows = constraints.map((constraint) =>
+    `${constraint.target.kind}:${constraint.target.id} args=${constraint.args_fingerprint} blocker=${constraint.blocker_key} repeats=${constraint.repeat_count}`
+  );
+  return `runtime retry constraints=${describeList(rows, "none")}`;
+}
+
 function manifestEntry(input: {
   contextName: SocialCycleManifestContextName;
   present: boolean;
@@ -538,6 +550,14 @@ function buildInputManifest(input: {
         refs: [refs.inputContextRef, ...(refs.evidenceRefs ?? [])],
         estimatedValue: context.settlement_state,
         reason: "Settlement state is runtime-owned state and blocker context."
+      }),
+      manifestEntry({
+        contextName: "runtime retry constraints",
+        present: (context.runtime_retry_constraints?.length ?? 0) > 0,
+        retention: "full",
+        refs: [refs.inputContextRef, ...(refs.evidenceRefs ?? [])],
+        estimatedValue: context.runtime_retry_constraints ?? [],
+        reason: "Retry constraints are runtime gates over exact repeated target/args failures."
       })
     ]
   };
@@ -554,6 +574,7 @@ function buildReplacementManifest(input: {
   const latestObservationFact = factByLabel.get("latest observation");
   const actionSurfaceFact = factByLabel.get("action_surface contracts");
   const evidenceFact = factByLabel.get("verifier/evidence refs");
+  const retryConstraintsFact = factByLabel.get("runtime retry constraints");
   return {
     schema: "social-cycle-context-manifest/v1",
     entries: [
@@ -656,6 +677,14 @@ function buildReplacementManifest(input: {
         refs: [input.refs.inputContextRef, ...(input.refs.evidenceRefs ?? [])],
         estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "settlement_state"),
         reason: "Settlement state is summarized as current state and blockers."
+      }),
+      manifestEntry({
+        contextName: "runtime retry constraints",
+        present: (input.context.runtime_retry_constraints?.length ?? 0) > 0,
+        retention: "summary_and_ref",
+        refs: [input.refs.inputContextRef, ...(input.refs.evidenceRefs ?? [])],
+        estimatedValue: retryConstraintsFact,
+        reason: "Retry constraints are compacted as gate state, not as provider advice."
       })
     ]
   };
@@ -744,6 +773,19 @@ function buildCompactSummary(input: {
         refs.latestObservationRef,
         ...context.settlement_state.shared_storage.evidence_refs,
         ...(refs.evidenceRefs ?? [])
+      ])
+    }));
+  }
+
+  if ((context.runtime_retry_constraints?.length ?? 0) > 0) {
+    facts.push(buildFact({
+      label: "runtime retry constraints",
+      scope: "runtime_retry_constraints",
+      summary: `${summarizeRuntimeRetryConstraints(context.runtime_retry_constraints!)}. These are exact target/args gates, not a domain strategy.`,
+      evidenceRefs: uniqueRefs([
+        refs.inputContextRef,
+        ...(refs.evidenceRefs ?? []),
+        ...context.runtime_retry_constraints!.flatMap((constraint) => constraint.evidence_refs)
       ])
     }));
   }

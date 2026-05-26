@@ -13,6 +13,7 @@ import type {
   StrategicGoal,
   WorldEvent
 } from "./types.js";
+import type { RuntimeRetryConstraint } from "../retryConstraints.js";
 import {
   buildActionSurfacePacket,
   type ActionSurfacePacket
@@ -63,6 +64,7 @@ export type SocialCycleContextPacket = {
   }>;
   allowed_primitive_ids: string[];
   action_surface: ActionSurfacePacket;
+  runtime_retry_constraints: RuntimeRetryConstraint[];
   relationship_context: SocialCycleRelationshipContext;
   memory_packet: ActorMemoryRetrievalPacket;
   settlement_state: SettlementState;
@@ -116,6 +118,7 @@ export async function assembleSocialCycleContext(input: {
   evidenceRefs?: readonly string[];
   judgmentRefs?: readonly string[];
   memoryWriteCount?: number;
+  runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
 }): Promise<SocialCycleContextPacket> {
   const actionSkillIds = input.activeActionSkills.map((record) => record.skill_id);
   const itemNames = [
@@ -188,6 +191,7 @@ export async function assembleSocialCycleContext(input: {
     })),
     allowed_primitive_ids: [...input.allowedPrimitiveIds],
     action_surface: actionSurface,
+    runtime_retry_constraints: [...(input.runtimeRetryConstraints ?? [])],
     relationship_context: {
       relationships: Array.isArray(providerContext.relationships)
         ? providerContext.relationships
