@@ -25,12 +25,13 @@ test("normalizeObjectivePhasePlannerId maps provider aliases to canonical ids", 
   assert.equal(normalizeObjectivePhasePlannerId("deterministic"), "builtin-planner");
   assert.equal(normalizeObjectivePhasePlannerId("builtin"), "builtin-planner");
   assert.equal(normalizeObjectivePhasePlannerId("openai-codex"), "openai-codex-planner");
-  assert.equal(normalizeObjectivePhasePlannerId("gemini-planner"), "gemini-live-planner");
+  assert.equal(normalizeObjectivePhasePlannerId("gemini-planner"), "gemini-planner");
+  assert.equal(normalizeObjectivePhasePlannerId("gemini-live-planner"), "gemini-planner");
 });
 
 test("normalizeObjectivePhasePlannerId defaults to gemini when unset", () => {
   withEnv("PROBE_LONG_OBJECTIVE_PROVIDER", undefined, () => {
-    assert.equal(normalizeObjectivePhasePlannerId(undefined), "gemini-live-planner");
+    assert.equal(normalizeObjectivePhasePlannerId(undefined), "gemini-planner");
   });
 });
 

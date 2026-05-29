@@ -71,10 +71,10 @@ This document outlines the proposed specification, parameter structures, pre-con
 *   **Vanilla Mapping**: Placing torches to prevent mob spawns.
 
 ### 10. `eatFoodWhenHungry`
-*   **Target Primitives**: `observe`, `wait`, `consume_item`, `vitals_observation` *(Missing)*
+*   **Target Primitives**: `observe`, `consume_item` *(implemented runtime primitive)*
 *   **Mineflayer APIs**: `bot.food`, `bot.equip()`, `bot.consume()`.
-*   **Pre-conditions**: Hunger points &lt; 20. Has edible food in inventory.
-*   **Verification Check**: Food item count decreases, and `bot.food` hunger points increase.
+*   **Pre-conditions**: Raw observation includes food/vitals and edible inventory; the model decides whether eating matters.
+*   **Verification Check**: Food item count decreases, `bot.food` increases, or health changes after consumption.
 *   **Vanilla Mapping**: Eating food to restore health/hunger.
 
 ### 11. `sleepAtNight`

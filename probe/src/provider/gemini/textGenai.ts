@@ -11,6 +11,7 @@ import {
   type ProviderUsageCallContext,
   type ProviderUsageRecord
 } from "../providerUsageTracker.js";
+import { parseOpenAiJsonText } from "../openaiApiJsonProvider.js";
 
 export type GeminiTextCallResult = {
   path: "text-genai";
@@ -18,7 +19,43 @@ export type GeminiTextCallResult = {
   text: string;
   usedFallbackModel: boolean;
   usageRecord?: ProviderUsageRecord;
+  rawStructuredText?: string;
 };
+
+type GeminiGeneratedSourceEnvelope = {
+  source: string;
+  notes?: string;
+};
+
+const generatedSourceSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    source: {
+      type: "string",
+      description: "Complete TypeScript source. Must include export async function run(ctx)."
+    },
+    notes: {
+      type: "string",
+      description: "Brief non-authoritative generation note."
+    }
+  },
+  required: ["source"]
+} as const;
+
+function parseGeneratedSourceEnvelope(rawText: string): GeminiGeneratedSourceEnvelope {
+  const parsed = parseOpenAiJsonText<Partial<GeminiGeneratedSourceEnvelope>>(rawText);
+  if (typeof parsed.source !== "string" || parsed.source.trim().length === 0) {
+    throw new GeminiPlannerError({
+      kind: "parse",
+      message: "Gemini structured planner response did not include non-empty source"
+    });
+  }
+  return {
+    source: parsed.source,
+    ...(typeof parsed.notes === "string" ? { notes: parsed.notes } : {})
+  };
+}
 
 export async function callGeminiTextGenai(input: {
   apiKey: string;
@@ -51,6 +88,10 @@ export async function callGeminiTextGenai(input: {
         model,
         contents: input.prompt,
         config: {
+          systemInstruction:
+            "Return only JSON matching the provided schema. Put the complete generated TypeScript program in the source field. Do not wrap the source in Markdown fences.",
+          responseMimeType: "application/json",
+          responseJsonSchema: generatedSourceSchema,
           httpOptions: {
             timeout: input.config.textRequestTimeoutMs
           }
@@ -63,6 +104,7 @@ export async function callGeminiTextGenai(input: {
           message: "Gemini text response was empty"
         });
       }
+      const envelope = parseGeneratedSourceEnvelope(text);
       const normalizedUsage = normalizeGeminiUsage(response.usageMetadata, estimatedUsage);
       const usageRecord = await appendProviderUsageRecord({
         providerId: "gemini-api",
@@ -79,9 +121,10 @@ export async function callGeminiTextGenai(input: {
       return {
         path: "text-genai",
         model,
-        text,
+        text: envelope.source.trim(),
         usedFallbackModel: index > 0,
-        usageRecord
+        usageRecord,
+        rawStructuredText: text
       };
     } catch (error) {
       if (error instanceof ProviderUsageBudgetError) {

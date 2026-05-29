@@ -106,7 +106,6 @@ async function main() {
   const scenarios: Array<{ pathMode: string; forcePath?: ObjectivePlannerPathId; trials: number }> =
     [
       { pathMode: "text-genai", forcePath: "text-genai", trials: 2 },
-      { pathMode: "live-transcription", forcePath: "live-transcription", trials: 2 },
       { pathMode: "default-order", trials: 1 }
     ];
 

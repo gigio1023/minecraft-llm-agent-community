@@ -139,6 +139,8 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   mine_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_with_table?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  consume_item?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  run_mineflayer_program?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   place_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   build_pattern?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   inspect_chest(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -297,6 +299,24 @@ async function executeTool<TActor extends RuntimeActor>(
             ok: false,
             status: "blocked",
             message: "craft_with_table handler is not installed"
+          };
+    case "consume_item":
+      return tools.consume_item
+        ? tools.consume_item({ actor, target, args: validated.args })
+        : {
+            tool: "consume_item",
+            ok: false,
+            status: "blocked",
+            message: "consume_item handler is not installed"
+          };
+    case "run_mineflayer_program":
+      return tools.run_mineflayer_program
+        ? tools.run_mineflayer_program({ actor, target, args: validated.args })
+        : {
+            tool: "run_mineflayer_program",
+            ok: false,
+            status: "blocked",
+            message: "run_mineflayer_program handler is not installed"
           };
     case "place_block":
       return tools.place_block

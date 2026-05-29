@@ -46,7 +46,7 @@ test("reviewer tasks call out missing smelt helper", () => {
     runId: "test",
     objectiveId: "obtain_current_run_iron_ingot_1" as const,
     actorId: "npc_b",
-    providerId: "gemini-live-planner",
+    providerId: "gemini-planner",
     evidenceScope: "current_run" as const,
     status: "failed" as const,
     stopReason: "missing_helper" as const,
@@ -58,7 +58,7 @@ test("reviewer tasks call out missing smelt helper", () => {
         verifierStatus: "failed" as const,
         verifierReason: "no iron",
         generated: {
-          providerId: "gemini-live-planner",
+          providerId: "gemini-planner",
           model: "gemini-2.5-flash",
           execution: {
             status: "completed" as const,

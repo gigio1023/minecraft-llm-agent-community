@@ -158,6 +158,10 @@ export function isSuccessfulMeaningfulToolStatus(tool: string, status: string): 
     case "craft_item":
     case "craft_with_table":
       return status === "crafted";
+    case "consume_item":
+      return status === "consumed";
+    case "run_mineflayer_program":
+      return status === "completed_with_evidence";
     case "place_block":
       return status === "placed" || status === "already_present";
     case "build_pattern":

@@ -33,7 +33,7 @@ test("planDirectGeneratedSource keeps valid LLM source", async () => {
     planner: stubPlanner({
       sourceKind: "llm-generated-ts",
       source: validLlmSource,
-      plannerId: "gemini-live-planner",
+      plannerId: "gemini-planner",
       model: "gemini-2.5-flash"
     }),
     request: baseRequest
@@ -50,7 +50,7 @@ test("planDirectGeneratedSource marks empty LLM source as provider blocked", asy
     planner: stubPlanner({
       sourceKind: "llm-generated-ts",
       source: "",
-      plannerId: "gemini-live-planner",
+      plannerId: "gemini-planner",
       model: "gemini-2.5-flash",
       errorKind: "empty_response"
     }),
@@ -87,7 +87,7 @@ test("planDirectGeneratedSource marks sandbox-rejected LLM source unsafe", async
     planner: stubPlanner({
       sourceKind: "llm-generated-ts",
       source: blockedLlmSource,
-      plannerId: "gemini-live-planner",
+      plannerId: "gemini-planner",
       model: "gemini-2.5-flash"
     }),
     request: baseRequest

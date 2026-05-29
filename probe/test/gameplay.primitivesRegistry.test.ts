@@ -11,6 +11,8 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
     "mine_block",
     "craft_item",
     "craft_with_table",
+    "consume_item",
+    "run_mineflayer_program",
     "place_block",
     "build_pattern",
     "inspect_chest",
@@ -27,6 +29,14 @@ test("runtime primitive registry exposes current runtime-owned actions and rejec
   assert.deepEqual(getRuntimePrimitive("mine_block"), {
     id: "mine_block",
     category: "gathering"
+  });
+  assert.deepEqual(getRuntimePrimitive("consume_item"), {
+    id: "consume_item",
+    category: "survival"
+  });
+  assert.deepEqual(getRuntimePrimitive("run_mineflayer_program"), {
+    id: "run_mineflayer_program",
+    category: "generated"
   });
   assert.deepEqual(getRuntimePrimitive("build_pattern"), {
     id: "build_pattern",

@@ -19,16 +19,21 @@ export async function loadGeminiApiKey(repoRoot: string): Promise<string | undef
     return process.env.GEMINI_API_KEY.trim();
   }
 
-  const authPath = path.join(repoRoot, "build/provider-auth/gemini-live.env");
-  try {
-    const raw = await fs.readFile(authPath, "utf8");
-    const match = raw.match(credentialPattern);
-    if (match?.[1]) {
-      return stripQuotes(match[1]);
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
+  const authPaths = [
+    path.join(repoRoot, "build/provider-auth/gemini.env"),
+    path.join(repoRoot, "build/provider-auth/gemini-live.env")
+  ];
+  for (const authPath of authPaths) {
+    try {
+      const raw = await fs.readFile(authPath, "utf8");
+      const match = raw.match(credentialPattern);
+      if (match?.[1]) {
+        return stripQuotes(match[1]);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
     }
   }
 

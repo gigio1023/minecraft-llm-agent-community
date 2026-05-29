@@ -1,14 +1,14 @@
 import type { ObjectivePhasePlannerId } from "./types.js";
 
 const CANONICAL_PLANNER_IDS: readonly ObjectivePhasePlannerId[] = [
-  "gemini-live-planner",
+  "gemini-planner",
   "openai-codex-planner",
   "builtin-planner"
 ];
 
 function normalizeExplicitPlannerId(raw: string): ObjectivePhasePlannerId {
   if (raw === "gemini-live-planner" || raw === "gemini-planner") {
-    return "gemini-live-planner";
+    return "gemini-planner";
   }
   if (raw === "openai-codex-planner" || raw === "openai-codex") {
     return "openai-codex-planner";
@@ -37,5 +37,5 @@ export function normalizeObjectivePhasePlannerId(explicit?: string): ObjectivePh
     return normalizeExplicitPlannerId(fromEnv);
   }
 
-  return "gemini-live-planner";
+  return "gemini-planner";
 }

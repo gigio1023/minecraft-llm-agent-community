@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import type { Bot } from "mineflayer";
 import { goals } from "mineflayer-pathfinder";
 import { Vec3 } from "vec3";
@@ -28,6 +29,8 @@ import { collectLogs } from "../tools/collectLogs.js";
 import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
+import { consumeItem, selectFoodCandidateName } from "../tools/consumeItem.js";
+import { runMineflayerProgram } from "../tools/runMineflayerProgram.js";
 import { placeBlock } from "../tools/placeBlock.js";
 import { buildPattern } from "../tools/buildPattern.js";
 import { createMineflayerSharedChestAccessor } from "../tools/liveSharedChest.js";
@@ -73,6 +76,8 @@ export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "mine_block",
   "craft_item",
   "craft_with_table",
+  "consume_item",
+  "run_mineflayer_program",
   "place_block",
   "build_pattern",
   "inspect_chest",
@@ -244,6 +249,10 @@ function readOptionalString(args: Record<string, unknown>, key: string) {
     : undefined;
 }
 
+function readGeneratedSource(args: Record<string, unknown>) {
+  return typeof args.source === "string" ? args.source : "";
+}
+
 function readOptionalCount(args: Record<string, unknown>) {
   return typeof args.targetCount === "number" ? args.targetCount : undefined;
 }
@@ -340,6 +349,23 @@ function chooseCraftItemName(input: {
     const log = inventory.find((item) => item.name.endsWith("_log") && item.count > 0);
     const plankName = log ? planksForLog(log.name) : undefined;
     return plankName ?? (planks ? "stick" : undefined);
+  }
+
+  return undefined;
+}
+
+function chooseConsumeItemName(input: {
+  bot: Bot;
+  args: Record<string, unknown>;
+}) {
+  const explicit = readOptionalString(input.args, "itemName");
+  if (explicit) {
+    return normalizeCraftItemName(input.bot, explicit);
+  }
+
+  const actionSkillId = readOptionalString(input.args, "actionSkillId");
+  if (actionSkillId === "eatFoodWhenHungry") {
+    return selectFoodCandidateName(input.bot);
   }
 
   return undefined;
@@ -664,6 +690,7 @@ async function runSocialMoveTo(input: {
 }
 
 async function runSocialPrimitive(input: {
+  actorWorkspaceRootDir: string;
   actorId: string;
   tool: AllowedTool;
   args: Record<string, unknown>;
@@ -732,16 +759,37 @@ async function runSocialPrimitive(input: {
       }
       return (await craftWithTable({ bot: input.bot, itemName })) as unknown as JsonValue;
     }
+    case "consume_item": {
+      const itemName = chooseConsumeItemName({ bot: input.bot, args: proposal.args });
+      if (!itemName) {
+        return { status: "blocked", reason: "consume_item requires itemName or edible inventory for eatFoodWhenHungry" };
+      }
+      return (await consumeItem({
+        bot: input.bot,
+        itemName,
+        signal: input.signal
+      })) as unknown as JsonValue;
+    }
+    case "run_mineflayer_program": {
+      const source = readGeneratedSource(proposal.args);
+      const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
+      return (await runMineflayerProgram({
+        actorId: input.actorId,
+        bot: input.bot,
+        targetBot: input.targetBot,
+        source,
+        purpose: readOptionalString(proposal.args, "purpose"),
+        expectedObservation: readOptionalString(proposal.args, "expectedObservation") ??
+          readOptionalString(proposal.args, "expected_observation"),
+        timeoutMs: typeof proposal.args.timeoutMs === "number" ? proposal.args.timeoutMs : undefined,
+        artifactDir: path.join(paths.actorDir, "action-skills", "direct-trials"),
+        signal: input.signal
+      })) as unknown as JsonValue;
+    }
     case "place_block": {
       const itemName = choosePlaceBlockItemName({ bot: input.bot, args: proposal.args });
       if (!itemName) {
         return { status: "blocked", reason: "place_block requires explicit itemName or a station-placement action skill" };
-      }
-      if (roleId !== "settler" && itemName !== "crafting_table") {
-        return {
-          status: "blocked",
-          reason: `${roleId} may only use place_block for verified crafting_table placement`
-        };
       }
       return (await placeBlock({
         bot: input.bot,
@@ -865,6 +913,7 @@ async function executePrimitiveWithEvidence(input: {
   bot?: Bot;
   targetBot?: Bot;
   gate: ActiveActionSkillGate;
+  allowActionSkillFallback: boolean;
 }): Promise<{
   toolResult: JsonValue;
   evidenceRef: string;
@@ -909,10 +958,56 @@ async function executePrimitiveWithEvidence(input: {
 
   // Argument contracts are separate from action-skill gates: the primitive may
   // be allowed, but the provider still must supply explicit executable args.
+  if (!input.allowActionSkillFallback) {
+    const directFallback =
+      readOptionalString(input.args, "actionSkillId") ??
+      readOptionalString(input.args, "action_skill_id");
+    if (directFallback) {
+      const reason =
+        "Direct primitive intents cannot carry args.actionSkillId; use use_action_skill for actor-owned action skill execution";
+      const toolResult = attachRuntimeHooksToResult({
+        result: {
+          status: "blocked",
+          reason
+        },
+        hooks: [
+          ...preHooks.records,
+          {
+            schema: "runtime-action-hook/v1",
+            phase: "pre",
+            hook_id: "action_intent_args_contract",
+            status: "blocked",
+            reason
+          }
+        ]
+      });
+      const ref = await writeToolEvidence({
+        actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+        actorId: input.actorId,
+        cycleId: input.cycleId,
+        evidenceId: `${input.cycleId}-${input.tool}-args-contract-blocked`,
+        tool: input.tool,
+        args: input.args,
+        result: toolResult,
+        verifierReason: reason,
+        category: "action_intent_contract_failure"
+      });
+      return {
+        toolResult,
+        evidenceRef: ref,
+        gateBlocked: true,
+        contractBlocked: true,
+        status: "blocked"
+      };
+    }
+  }
+
   const argsContract = validatePrimitiveActionIntentArgs({
     primitiveId: input.tool,
     args: input.args,
-    actionSkillId: readOptionalString(input.args, "actionSkillId")
+    actionSkillId: input.allowActionSkillFallback
+      ? readOptionalString(input.args, "actionSkillId")
+      : undefined
   });
   if (!argsContract.ok) {
     const toolResult = attachRuntimeHooksToResult({
@@ -957,6 +1052,7 @@ async function executePrimitiveWithEvidence(input: {
     action: (signal) =>
       runSocialPrimitive({
         actorId: input.actorId,
+        actorWorkspaceRootDir: input.actorWorkspaceRootDir,
         tool: input.tool,
         args: input.args,
         bot: input.bot!,
@@ -1069,29 +1165,9 @@ export async function executeSocialActionIntent(input: {
 
   if (input.intent.kind === "wait" || input.intent.kind === "remember") {
     // wait/remember do not mutate Minecraft directly, but they still influence
-    // future cycles. Keep them inside the same CycleGoal and active action-skill
-    // authority model so they cannot become an unchecked escape hatch.
+    // future cycles. Keep them inside the active action-skill authority model
+    // so they cannot become an unchecked escape hatch.
     const controlTool = input.intent.kind as AllowedTool;
-    if (!input.cycleGoal.allowed_primitive_ids.includes(controlTool)) {
-      return {
-        observation,
-        runtimeResult: {
-          status: "blocked",
-          reason: `Primitive ${controlTool} not allowed by CycleGoal`
-        },
-        evidenceRefs,
-        executedTools,
-        toolStatuses,
-        verifierStatus: "not_applicable",
-        gateBlocked: true,
-        contractBlocked: false,
-        retryConstraintBlocked: false,
-        actionSkillExecutionUnit: false,
-        postconditionResults: [],
-        toolResults: []
-      };
-    }
-
     let controlGate: ActiveActionSkillGate;
     try {
       controlGate = buildActiveActionSkillGate({
@@ -1322,28 +1398,6 @@ export async function executeSocialActionIntent(input: {
     };
   }
 
-  for (const primitive of primitivesToRun) {
-    if (!input.cycleGoal.allowed_primitive_ids.includes(primitive)) {
-      return {
-        observation,
-        runtimeResult: {
-          status: "blocked",
-          reason: `Primitive ${primitive} not allowed by CycleGoal`
-        },
-        evidenceRefs,
-        executedTools,
-        toolStatuses,
-        verifierStatus: "not_applicable",
-        gateBlocked: true,
-        contractBlocked: false,
-        retryConstraintBlocked: false,
-        actionSkillExecutionUnit,
-        postconditionResults: [],
-        toolResults: []
-      };
-    }
-  }
-
   let gate: ActiveActionSkillGate;
   try {
     gate = buildActiveActionSkillGate({
@@ -1382,7 +1436,8 @@ export async function executeSocialActionIntent(input: {
       args: argsForPrimitive(input.intent, primitive),
       bot: input.bot,
       targetBot: input.targetBot,
-      gate
+      gate,
+      allowActionSkillFallback: input.intent.kind === "use_action_skill"
     });
     evidenceRefs.push(step.evidenceRef);
     executedTools.push(primitive);

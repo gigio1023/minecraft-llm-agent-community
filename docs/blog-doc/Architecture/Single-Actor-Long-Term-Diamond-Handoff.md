@@ -94,7 +94,7 @@ calls from runners.
 Recommended provider id:
 
 ```text
-gemini-live-planner
+gemini-planner
 ```
 
 Recommended auth source:
@@ -113,7 +113,7 @@ Never print the key. Never commit it. Use an ignored repo-local auth file or
 environment variable:
 
 ```text
-build/provider-auth/gemini-live.env
+build/provider-auth/gemini.env
 ```
 
 That path is ignored by the repo's `.gitignore`.
@@ -128,21 +128,13 @@ GEMINI_TEXT_FALLBACK_MODEL=gemini-2.5-flash-lite
 GEMINI_TEXT_REQUEST_TIMEOUT_MS=900000
 GEMINI_TEXT_MAX_PARALLEL=1
 
-GEMINI_PLANNER_FALLBACK=live-transcription
-GEMINI_LIVE_MODEL=gemini-2.0-flash-live-001
-GEMINI_LIVE_RESPONSE_MODE=audio_with_output_transcription
-GEMINI_LIVE_MAX_SESSIONS=1
-GEMINI_LIVE_TURN_TIMEOUT_MS=900000
-GEMINI_LIVE_ENDPOINT=wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent
-
 PROBE_LONG_OBJECTIVE_PROVIDER=gemini-planner
-PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai
 ```
 
 Implementation expectation:
 
-1. Prefer standard text-only `google-genai` calls first because they are simpler
-   and easier to debug.
+1. Use standard text-only `google-genai` calls with structured JSON output.
 2. When standard text-only calls hit quota/rate-limit errors such as `429`, fall
    back to Gemini Live.
 3. Use Gemini Live as a text-only-like path by requesting audio output with
@@ -185,7 +177,7 @@ Suggested command:
 
 ```bash
 cd probe
-bun run probe:long-objective -- --objective obtain_current_run_diamond_1 --actor npc_b --provider gemini-live-planner --max-phases 12 --max-actions-per-phase 12 --report ../tmp/long-objective-diamond-gemini-live.json
+bun run probe:long-objective -- --objective obtain_current_run_diamond_1 --actor npc_b --provider gemini-planner --max-phases 12 --max-actions-per-phase 12 --report ../tmp/long-objective-diamond-gemini.json
 ```
 
 The runner should produce a report with:
@@ -316,15 +308,11 @@ Build a provider adapter that can be used by objective generation and review.
 
 Required:
 
-- `gemini-live-planner` provider id;
+- `gemini-planner` provider id;
 - key loading from `GEMINI_API_KEY` or ignored
-  `build/provider-auth/gemini-live.env`;
+  `build/provider-auth/gemini.env`;
 - primary text-only GenAI path using `GEMINI_TEXT_MODEL`;
-- fallback Live path using `GEMINI_LIVE_MODEL` only after quota/rate-limit or
-  configured fallback conditions;
-- Live API session open/send/receive/close;
-- one call at a time by default because free tier Live has low session
-  concurrency;
+- structured JSON output whose `source` field contains the generated TypeScript;
 - transcript-safe input/output snapshots;
 - credential-shaped key filtering;
 - fallback error classification.
@@ -401,7 +389,7 @@ encouragement.
 
 ```bash
 cd probe
-bun run probe:gemini-live-smoke -- --prompt "Return JSON: {\"ok\":true}" --report ../tmp/gemini-live-smoke.json
+bun run probe:gemini-planner-smoke -- --prompt "Return JSON: {\"ok\":true}" --report ../tmp/gemini-planner-smoke.json
 ```
 
 Pass:
@@ -414,7 +402,7 @@ Pass:
 
 ```bash
 cd probe
-bun run probe:long-objective -- --objective craft_current_run_stone_pickaxe_1 --actor npc_b --provider gemini-live-planner --max-phases 4 --max-actions-per-phase 10 --report ../tmp/long-stone-pickaxe.json
+bun run probe:long-objective -- --objective craft_current_run_stone_pickaxe_1 --actor npc_b --provider gemini-planner --max-phases 4 --max-actions-per-phase 10 --report ../tmp/long-stone-pickaxe.json
 ```
 
 Pass:
@@ -425,7 +413,7 @@ Pass:
 
 ```bash
 cd probe
-bun run probe:long-objective -- --objective obtain_current_run_iron_ingot_1 --actor npc_b --provider gemini-live-planner --max-phases 8 --max-actions-per-phase 12 --report ../tmp/long-iron-ingot.json
+bun run probe:long-objective -- --objective obtain_current_run_iron_ingot_1 --actor npc_b --provider gemini-planner --max-phases 8 --max-actions-per-phase 12 --report ../tmp/long-iron-ingot.json
 ```
 
 Pass or useful failure:
@@ -437,7 +425,7 @@ Pass or useful failure:
 
 ```bash
 cd probe
-bun run probe:long-objective -- --objective obtain_current_run_diamond_1 --actor npc_b --provider gemini-live-planner --max-phases 20 --max-actions-per-phase 16 --report ../tmp/long-diamond-attempt.json
+bun run probe:long-objective -- --objective obtain_current_run_diamond_1 --actor npc_b --provider gemini-planner --max-phases 20 --max-actions-per-phase 16 --report ../tmp/long-diamond-attempt.json
 ```
 
 First acceptable result:
@@ -479,20 +467,17 @@ chains. The target ladder is:
 Use Gemini Live as a cheap high-volume planner/generator when available. A
 GEMINI_API_KEY exists in ~/git/iyuno-ai-engineer-task/.env; load it without
 printing it and copy only into ignored local auth/env storage such as
-build/provider-auth/gemini-live.env or the process environment. Do not commit
+build/provider-auth/gemini.env or the process environment. Do not commit
 secrets.
 
-The local .env has been prepared with a provider order:
-PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription.
-Implement that order explicitly. First use standard text-only google-genai
-calls with GEMINI_TEXT_MODEL=gemini-2.5-flash. If the text path hits quota or
-rate limits, fall back to Gemini Live with GEMINI_LIVE_MODEL=gemini-2.0-flash-live-001.
-For the Live fallback, treat it as text-only by enabling output transcription,
-discarding audio bytes, and using only the streamed transcription text. Keep
-GEMINI_LIVE_MAX_SESSIONS=1 by default.
+The local .env should use:
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai.
+Use standard text-only google-genai calls with GEMINI_TEXT_MODEL=gemini-2.5-flash
+and structured JSON output. If the text path hits quota or rate limits, record a
+provider blocker instead of falling back to Gemini Live.
 
 Build:
-- gemini-live-planner provider adapter or smoke path;
+- gemini-planner provider adapter or smoke path;
 - single-actor long objective runner;
 - phase/report schema with explicit stop reasons;
 - current-run verifiers for each implemented phase;

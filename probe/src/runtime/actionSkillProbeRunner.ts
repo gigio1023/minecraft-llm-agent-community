@@ -1,6 +1,7 @@
 import type { SeedActionSkillId } from "../gameplay/seedSkills/registry.js";
 import { getSeedActionSkill } from "../gameplay/seedSkills/registry.js";
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import {
   getActionSkillVerificationContract,
   type ActionSkillVerificationContract
@@ -26,6 +27,8 @@ import { collectLogs } from "../tools/collectLogs.js";
 import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
+import { consumeItem } from "../tools/consumeItem.js";
+import { runMineflayerProgram } from "../tools/runMineflayerProgram.js";
 import { placeBlock, type Positioned } from "../tools/placeBlock.js";
 import { buildPattern } from "../tools/buildPattern.js";
 import { getRoleContract } from "../npc/roles/contracts.js";
@@ -44,6 +47,7 @@ import {
 } from "../server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
 import { execDockerCompose } from "../server/composeCommand.js";
+import { getActorWorkspacePaths } from "./actorWorkspacePaths.js";
 
 export type ActionSkillProbeConfig = {
   actorId: string;
@@ -99,12 +103,14 @@ const probeFixtureOffsets = {
 
 const deterministicProbeDriverSkillIds = [
   "runtimeObserveAndRemember",
+  "runBoundedMineflayerProgram",
   "collectLogs",
   "craftPlanksAndSticks",
   "craftCraftingTable",
   "craftWoodenPickaxe",
   "mineCobblestone",
   "placeCraftingTable",
+  "eatFoodWhenHungry",
   "buildBasicShelter",
   "inspectSharedChest",
   "depositSharedItems",
@@ -128,6 +134,7 @@ export type ActionSkillProbePreconditionMode =
   | "inventory_planks_and_sticks"
   | "table_craft_inputs"
   | "placeable_crafting_table"
+  | "hungry_with_food"
   | "shelter_build_materials"
   | "placed_stone_with_pickaxe"
   | "inspectable_shared_chest"
@@ -136,12 +143,14 @@ export type ActionSkillProbePreconditionMode =
 
 const actionSkillProbePreconditionModes = {
   runtimeObserveAndRemember: "none",
+  runBoundedMineflayerProgram: "none",
   collectLogs: "placed_logs",
   craftPlanksAndSticks: "inventory_logs",
   craftCraftingTable: "inventory_planks_and_sticks",
   craftWoodenPickaxe: "table_craft_inputs",
   mineCobblestone: "placed_stone_with_pickaxe",
   placeCraftingTable: "placeable_crafting_table",
+  eatFoodWhenHungry: "hungry_with_food",
   buildBasicShelter: "shelter_build_materials",
   inspectSharedChest: "inspectable_shared_chest",
   depositSharedItems: "depositable_shared_chest",
@@ -443,6 +452,14 @@ export function buildProbePreconditionRconCommands(input: {
     give("crafting_table", 1);
   }
 
+  if (preconditionMode === "hungry_with_food") {
+    commands.push(
+      ["difficulty", "normal"],
+      ["effect", "give", input.actorUsername, "minecraft:hunger", "10", "32", "true"]
+    );
+    give("bread", 2);
+  }
+
   if (preconditionMode === "shelter_build_materials") {
     commands.push(
       ["execute", "at", input.actorUsername, "run", "fill", "~-3", "~-1", "~-3", "~8", "~-1", "~8", "stone"],
@@ -510,7 +527,14 @@ async function setupProbePreconditions(input: {
     await runRcon(command);
   }
 
-  await new Promise((resolve) => setTimeout(resolve, skillId === "collectLogs" ? 3000 : 1500));
+  await new Promise((resolve) => {
+    const waitMs = skillId === "eatFoodWhenHungry"
+      ? 5500
+      : skillId === "collectLogs"
+        ? 3000
+        : 1500;
+    setTimeout(resolve, waitMs);
+  });
 }
 
 function createActionSkillProbeProvider(
@@ -525,7 +549,12 @@ function createActionSkillProbeProvider(
   let turn = 0;
   return {
     next(input: {
-      observation?: { inventory?: Array<{ name: string; count: number }> };
+      observation?: {
+        inventory?: Array<{ name: string; count: number }>;
+        vitals?: {
+          food_candidates?: Array<{ name: string; count: number }>;
+        };
+      };
       lastResult: { tool: string; status: string; verification?: { status?: string } } | null;
     }) {
       turn += 1;
@@ -546,6 +575,28 @@ function createActionSkillProbeProvider(
           return { tool: "remember", args: { note: "runtimeObserveAndRemember probe observed, waited, and persisted memory" } };
         }
         throw new Error(`runtimeObserveAndRemember probe received unexpected last tool: ${input.lastResult.tool}`);
+      }
+
+      if (skillId === "runBoundedMineflayerProgram") {
+        if (
+          input.lastResult.tool === "run_mineflayer_program" &&
+          input.lastResult.status === "completed_with_evidence"
+        ) {
+          return { tool: "remember", args: { note: "runBoundedMineflayerProgram completed with helper and post-observation evidence" } };
+        }
+        return {
+          tool: "run_mineflayer_program",
+          args: {
+            purpose: "probe bounded generated helper execution",
+            expectedObservation: "source, helper events, delivered chat, and post-observation are recorded",
+            source: `
+              export async function run(ctx) {
+                await ctx.observe();
+                return ctx.say("I can report what I just saw.");
+              }
+            `
+          }
+        };
       }
 
       if (skillId === "inspectSharedChest") {
@@ -647,6 +698,17 @@ function createActionSkillProbeProvider(
         }
 
         return { tool: "place_block", args: { itemName: "crafting_table" } };
+      }
+
+      if (skillId === "eatFoodWhenHungry") {
+        if (input.lastResult.tool === "consume_item" && input.lastResult.status === "consumed") {
+          return { tool: "remember", args: { note: "eatFoodWhenHungry consumed edible food with vitals evidence" } };
+        }
+
+        const itemName = input.observation?.vitals?.food_candidates?.find((item) => item.count > 0)?.name ??
+          input.observation?.inventory?.find((item) => item.name === "bread" && item.count > 0)?.name ??
+          "bread";
+        return { tool: "consume_item", args: { itemName } };
       }
 
       if (skillId === "buildBasicShelter") {
@@ -807,6 +869,42 @@ function hasToolResult(
   return steps.some((step) => step.tool === tool && predicate(asRecord(step.result)));
 }
 
+function hasVitalsObservationWithFoodCandidate(step: ProbeTranscriptStep) {
+  if (step.tool !== "observe") {
+    return false;
+  }
+
+  const result = asRecord(step.result);
+  const observation = asRecord(result.observation);
+  const vitals = asRecord(observation.vitals);
+  const foodCandidates = arrayField(vitals, "food_candidates").map(asRecord);
+
+  return result.status === "ok" &&
+    observation.status === "ok" &&
+    typeof vitals.food === "number" &&
+    foodCandidates.some((candidate) =>
+      typeof candidate.name === "string" &&
+      (numberField(candidate, "count") ?? 0) > 0
+    );
+}
+
+function hasConsumedFoodEvidence(result: Record<string, unknown>) {
+  const before = asRecord(result.before);
+  const after = asRecord(result.after);
+
+  return result.status === "consumed" &&
+    typeof result.itemName === "string" &&
+    result.itemName.trim().length > 0 &&
+    typeof before.food === "number" &&
+    before.food < 20 &&
+    typeof after.food === "number" &&
+    (
+      (numberField(result, "count_delta") ?? 0) < 0 ||
+      (numberField(result, "food_delta") ?? 0) > 0 ||
+      (numberField(result, "health_delta") ?? 0) > 0
+    );
+}
+
 function hasToolResultAfter(
   steps: ProbeTranscriptStep[],
   input: {
@@ -932,6 +1030,54 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         })
         ? null
         : "runtimeObserveAndRemember did not persist a non-empty memory note after waiting";
+    }
+  },
+  runBoundedMineflayerProgram: {
+    skillId: "runBoundedMineflayerProgram",
+    evidenceSummary: [
+      "run_mineflayer_program stored generated source and helper call evidence",
+      "at least one helper call produced verifier-classified evidence",
+      "post-observation was recorded for the next closed-loop action"
+    ],
+    minimumPassingTranscript: {
+      steps: [{
+        tool: "run_mineflayer_program",
+        result: {
+          status: "completed_with_evidence",
+          sourcePath: "/tmp/socialCycleMineflayerProgram.ts",
+          helperEvents: [
+            { name: "observe", status: "completed", result: { status: "ok" } },
+            { name: "say", status: "completed", result: { status: "delivered", text: "I can report what I just saw." } }
+          ],
+          postObservation: { status: "ok", observerId: "npc_b", visibleActors: [], memory: [] }
+        }
+      }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "run_mineflayer_program", (result) => {
+        const helperEvents = arrayField(result, "helperEvents").map(asRecord);
+        const postObservation = asRecord(result.postObservation);
+        return result.status === "completed_with_evidence" &&
+          typeof result.sourcePath === "string" &&
+          result.sourcePath.length > 0 &&
+          postObservation.status === "ok" &&
+          helperEvents.some((event) => {
+            const helperResult = asRecord(event.result);
+            return event.status === "completed" &&
+              (
+                helperResult.status === "delivered" ||
+                helperResult.status === "collected" ||
+                helperResult.status === "mined" ||
+                helperResult.status === "crafted" ||
+                helperResult.status === "consumed" ||
+                helperResult.status === "placed" ||
+                helperResult.status === "already_present" ||
+                helperResult.status === "built"
+              );
+          });
+      })
+        ? null
+        : "runBoundedMineflayerProgram did not record generated source, verified helper evidence, and post-observation";
     }
   },
   collectLogs: {
@@ -1213,6 +1359,58 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
       })
         ? null
         : "placeCraftingTable did not record a verified crafting_table placement with target coordinates and inventory delta";
+    }
+  },
+  eatFoodWhenHungry: {
+    skillId: "eatFoodWhenHungry",
+    evidenceSummary: [
+      "observe exposed raw vitals and edible inventory candidates",
+      "consume_item verified a named food item through inventory or vitals delta"
+    ],
+    minimumPassingTranscript: {
+      steps: [
+        {
+          tool: "observe",
+          result: {
+            status: "ok",
+            observation: {
+              status: "ok",
+              observerId: "npc_b",
+              visibleActors: [],
+              memory: [],
+              vitals: {
+                food: 14,
+                food_candidates: [{ name: "bread", count: 2, food_points: 5, saturation: 6 }]
+              }
+            }
+          }
+        },
+        {
+          tool: "consume_item",
+          result: {
+            status: "consumed",
+            itemName: "bread",
+            before: { food: 14, inventory_counts: { bread: 2 } },
+            after: { food: 19, inventory_counts: { bread: 1 } },
+            count_delta: -1,
+            food_delta: 5,
+            health_delta: 0
+          }
+        }
+      ]
+    },
+    validate(steps) {
+      const observationIndex = steps.findIndex(hasVitalsObservationWithFoodCandidate);
+
+      if (observationIndex < 0) {
+        return "eatFoodWhenHungry did not observe raw vitals and edible inventory evidence";
+      }
+
+      return steps
+        .slice(observationIndex + 1)
+        .some((step) => step.tool === "consume_item" && hasConsumedFoodEvidence(asRecord(step.result)))
+        ? null
+        : "eatFoodWhenHungry did not record consume_item evidence with a named food item and inventory or vitals delta";
     }
   },
   buildBasicShelter: {
@@ -1627,6 +1825,7 @@ export async function runLiveActionSkillProbe(
   const config = buildProbeConfig(input);
   let server: ServerEndpoint | null = null;
   let bots: ProbeBots | null = null;
+  let runRcon: RconRunner | undefined;
 
   try {
     const serverContext = await ensureProbeServer(config);
@@ -1637,7 +1836,7 @@ export async function runLiveActionSkillProbe(
       host: server.host,
       port: server.port
     });
-    const runRcon = serverContext.rconContext
+    runRcon = serverContext.rconContext
       ? await createRconRunner(serverContext.rconContext)
       : undefined;
     await teleportProbeBotsToSpawn(bots, config.spawn, runRcon);
@@ -1762,6 +1961,37 @@ export async function runLiveActionSkillProbe(
           withActionWrapper(
             () => craftWithTable({ bot: actor, itemName: readStringArg(args, "itemName") }),
             { tool: "craft_with_table" }
+          ),
+        consume_item: ({ actor, args }) =>
+          withActionWrapper(
+            (signal) => consumeItem({
+              bot: actor,
+              itemName: readStringArg(args, "itemName"),
+              signal
+            }),
+            { tool: "consume_item" }
+          ),
+        run_mineflayer_program: ({ actor, target, args }) =>
+          withActionWrapper(
+            (signal) => runMineflayerProgram({
+              actorId: actor.username,
+              bot: actor,
+              targetBot: target,
+              source: readStringArg(args, "source"),
+              purpose: typeof args.purpose === "string" ? args.purpose : undefined,
+              expectedObservation:
+                typeof args.expectedObservation === "string"
+                  ? args.expectedObservation
+                  : undefined,
+              timeoutMs: typeof args.timeoutMs === "number" ? args.timeoutMs : undefined,
+              artifactDir: path.join(
+                getActorWorkspacePaths(config.actorWorkspace.rootDir, actor.username).actorDir,
+                "action-skills",
+                "direct-trials"
+              ),
+              signal
+            }),
+            { tool: "run_mineflayer_program", timeoutMs: 12_000 }
           ),
         place_block: ({ actor, args }) =>
           withActionWrapper(
@@ -1929,6 +2159,9 @@ export async function runLiveActionSkillProbe(
       errorMessage: error instanceof Error ? error.message : String(error)
     };
   } finally {
+    if (runRcon && input.skillId === "eatFoodWhenHungry") {
+      await runRcon(["difficulty", "peaceful"]).catch(() => {});
+    }
     if (bots) {
       await closeBots(bots);
     }

@@ -9,11 +9,10 @@ import {
   type GeminiPlannerPathId
 } from "./config.js";
 import { classifyGeminiError, type GeminiPlannerErrorKind } from "./errors.js";
-import { callGeminiLiveTranscription } from "./liveTranscription.js";
 import { callGeminiTextGenai } from "./textGenai.js";
 
 export type GeminiPlannerCallMetadata = {
-  providerId: "gemini-live-planner";
+  providerId: "gemini-planner";
   selectedPath: GeminiPlannerPathId;
   model: string;
   attemptedPaths: GeminiPlannerPathId[];
@@ -56,13 +55,16 @@ export async function callGeminiLivePlanner(input: {
     actor_id: input.actorId,
     turn_id: input.turnId,
     provider_id: config.providerId,
-    model: config.liveModel,
+    model: config.textModel,
     created_at: new Date().toISOString(),
     input: {
       prompt: input.prompt,
       provider_order: [config.primaryPath, config.fallbackPath].filter(Boolean),
-      preferred_path: "native-audio-dialog",
-      live_api_version: config.liveApiVersion
+      preferred_path: "text-genai",
+      structured_output: {
+        response_mime_type: "application/json",
+        response_schema: "generated_source_envelope"
+      }
     } as JsonValue
   });
 
@@ -108,20 +110,17 @@ export async function callGeminiLivePlanner(input: {
   for (const [index, pathId] of order.entries()) {
     attemptedPaths.push(pathId);
     try {
-      const response =
-        pathId === "text-genai"
-          ? await callGeminiTextGenai({
-              apiKey,
-              config,
-              prompt: input.prompt,
-              usageContext: {
-                repoRoot,
-                actorId: input.actorId,
-                turnId: input.turnId,
-                stage: "gemini_text_genai"
-              }
-            })
-          : await callGeminiLiveTranscription({ apiKey, config, prompt: input.prompt });
+      const response = await callGeminiTextGenai({
+        apiKey,
+        config,
+        prompt: input.prompt,
+        usageContext: {
+          repoRoot,
+          actorId: input.actorId,
+          turnId: input.turnId,
+          stage: "gemini_text_genai"
+        }
+      });
 
       const text = stripCodeFence(response.text);
       const outputRef = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
@@ -132,15 +131,10 @@ export async function callGeminiLivePlanner(input: {
         provider_id: config.providerId,
         model: response.model,
         created_at: new Date().toISOString(),
-        raw_output_text: response.text,
+        raw_output_text: response.rawStructuredText ?? response.text,
         parsed_output: {
           selected_path: response.path,
-          ...(response.path === "live-transcription"
-            ? {
-                requested_live_model: (response as { requestedModel?: string }).requestedModel,
-                live_api_version: (response as { apiVersion?: string }).apiVersion
-              }
-            : {}),
+          structured_output: true,
           attempted_paths: attemptedPaths,
           ...(index > 0
             ? {
@@ -149,8 +143,8 @@ export async function callGeminiLivePlanner(input: {
               }
             : {})
         },
-        proposal: { source_kind: "gemini_planner_text" },
-        usage: response.path === "text-genai" ? response.usageRecord : undefined
+        proposal: { source_kind: "gemini_planner_structured_source" },
+        usage: response.usageRecord
       });
 
       return {

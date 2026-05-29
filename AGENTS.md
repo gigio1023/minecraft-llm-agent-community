@@ -506,31 +506,33 @@ Reference anchors:
 ## Default LLM Planner (Codegen)
 
 For **Mineflayer TypeScript codegen** (long-objective / direct-generated planner),
-do **not** use Gemini Native Audio Dialog as the primary path. Recorded verdict:
+do **not** use Gemini Native Audio Dialog as a planner path. Recorded verdict:
 `docs/blog-doc/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
 
 Use:
 
-- **REST `text-genai`** (`gemini-2.5-flash` via `@google/genai`) — current working
-  path; `--force-path text-genai` on long-objective CLI, or
+- **REST `text-genai`** (`gemini-2.5-flash` via `@google/genai`) with
+  structured output (`responseMimeType: "application/json"` plus
+  `responseJsonSchema`) — current working path; `--force-path text-genai` on
+  long-objective CLI, or
 - **Gemini OpenAI-compatible Chat Completions** (OpenAI SDK + same `system`/`user`
   message shape) — evaluate via `probe/scripts/experimentGeminiOpenAiCompatMatrix.ts`.
 
-Native Audio Dialog (`live-transcription`) remains in the repo for dialog/smoke
-only: text in, audio out, **transcription-only** readback. It is not reliable for
-`export async function run(ctx)` generation.
+Native Audio Dialog (`live-transcription`) is not a fallback, recovery path, or
+provider order entry for `export async function run(ctx)` generation.
 
 Codegen-friendly defaults (override in ignored `.env`):
 
 ```text
 GEMINI_PLANNER_PRIMARY=text-genai
-PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai
 ```
 
 Implementation:
 
-- `probe/src/provider/gemini/nativeAudioDialog.ts`
-- `callGeminiLivePlanner()` prefers `live-transcription` first
+- `probe/src/provider/gemini/textGenai.ts`
+- `callGeminiLivePlanner()` is a legacy-named facade; active planner calls use
+  only the structured REST `text-genai` path.
 - Long-objective planning goes through `ObjectivePhasePlannerPort`
   (`probe/src/provider/planner/`) — Gemini, OpenAI Codex, or explicit
   `builtin-planner`
@@ -554,8 +556,8 @@ proof:
    verifier output.
 3. Feed failures back into substrate or prompt fixes.
 
-Smoke tests (`probe:gemini-live-smoke`, `probe:gemini-native-audio-dialog-smoke`)
-are allowed only as quick optional wiring checks. They do not replace Minecraft
+Smoke tests (`probe:gemini-planner-smoke`, `probe:gemini-json-smoke`) are
+allowed only as quick optional wiring checks. They do not replace Minecraft
 current-run verification.
 
 ## Provider Cost And Usage Guard

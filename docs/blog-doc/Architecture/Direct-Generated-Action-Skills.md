@@ -59,6 +59,13 @@ The default direct context should expose high-level helpers first:
 Raw `bot` access may be exposed in trusted research runs, but generated code
 should prefer helpers because helper calls create reviewable evidence.
 
+The social-cycle runtime exposes the same principle through
+`run_mineflayer_program`: provider-generated source may choose a short helper
+program for the current observation, but the artifact must keep the source,
+helper calls, result, timeout/error status, and post-observation together.
+CycleGoal text does not narrow the actor body; the current action surface and
+runtime gates decide whether this primitive is available.
+
 The helpers are intentionally more capable than the smallest Mineflayer API
 call. For early-game objectives, a generated call such as
 `craftItem("crafting_table", 1)` should be treated as a reasonable request, not

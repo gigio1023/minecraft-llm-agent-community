@@ -37,9 +37,8 @@ or explicit stop.
 flowchart TB
   CLI[probe:long-objective CLI] --> Runner[longObjectiveRunner]
   Runner --> Ladder[phase ladder + budgets]
-  Ladder --> Planner[gemini-live-planner]
-  Planner --> Text[text-genai path]
-  Planner --> Live[live-transcription fallback]
+  Ladder --> Planner[gemini-planner]
+  Planner --> Text["structured text-genai path"]
   Runner --> Exec[runDirectGeneratedActionSkill]
   Exec --> Ctx[direct gameplay context helpers]
   Ctx --> Verify[current-run verifiers]
@@ -55,15 +54,15 @@ Principle: **LLM plans and generates TypeScript; runtime owns truth.**
 
 | Deliverable | Path | Notes |
 |-------------|------|-------|
-| Auth loader | `probe/src/provider/gemini/auth.ts` | `GEMINI_API_KEY` or `build/provider-auth/gemini-live.env`; never log key |
+| Auth loader | `probe/src/provider/gemini/auth.ts` | `GEMINI_API_KEY` or `build/provider-auth/gemini.env`; never log key |
 | Config | `probe/src/provider/gemini/config.ts` | Env from handoff: text model, live model, order, timeouts |
-| Text path | `probe/src/provider/gemini/textGenai.ts` | `@google/genai` `generateContent` |
-| Live fallback | `probe/src/provider/gemini/liveTranscription.ts` | WebSocket; discard audio; use output transcription |
-| Facade | `probe/src/provider/gemini/geminiLivePlanner.ts` | Provider id `gemini-live-planner`; snapshots + fallback metadata |
-| Smoke CLI | `probe/src/provider/gemini/smokeCli.ts` | `probe:gemini-live-smoke` |
+| Text path | `probe/src/provider/gemini/textGenai.ts` | `@google/genai` `generateContent` with `responseMimeType: "application/json"` and `responseJsonSchema` |
+| Facade | `probe/src/provider/gemini/geminiLivePlanner.ts` | Legacy-named facade; provider id `gemini-planner`; snapshots structured source metadata |
+| Smoke CLI | `probe/src/provider/gemini/smokeCli.ts` | `probe:gemini-planner-smoke` |
 
-Provider order: `PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription`
-(default). On `429`/quota, classify `provider_blocked` and try Live when configured.
+Provider order: `PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai` (default).
+On `429`/quota, classify `provider_blocked`; do not recover through Native
+Audio Dialog.
 
 ## Workstream B — Long objective harness
 
@@ -107,7 +106,7 @@ New tool modules (evidence-first, minimal):
 
 | Gate | Command | Pass |
 |------|---------|------|
-| 1 | `bun run probe:gemini-live-smoke` | Snapshot + no secret leak |
+| 1 | `bun run probe:gemini-planner-smoke` | Snapshot + no secret leak |
 | 2 | `probe:long-objective --objective craft_current_run_stone_pickaxe_1` | `stone_pickaxe >= 1` (live) |
 | 3 | iron ingot objective | pass or precise `missing_helper` / `missing_verifier` |
 | 4 | diamond attempt | diamond or truthful ladder + stop reason |
@@ -120,8 +119,8 @@ CI without keys: unit tests for verifiers, planner classification, deterministic
 cd probe
 bun test
 bun run typecheck
-bun run probe:gemini-live-smoke -- --prompt 'Return JSON: {"ok":true}' --report ../tmp/gemini-live-smoke.json
-bun run probe:long-objective -- --objective craft_current_run_stone_pickaxe_1 --actor npc_b --provider gemini-live-planner --max-phases 4 --max-actions-per-phase 10 --report ../tmp/long-stone-pickaxe.json
+bun run probe:gemini-planner-smoke -- --prompt 'Return JSON: {"ok":true}' --report ../tmp/gemini-planner-smoke.json
+bun run probe:long-objective -- --objective craft_current_run_stone_pickaxe_1 --actor npc_b --provider gemini-planner --max-phases 4 --max-actions-per-phase 10 --report ../tmp/long-stone-pickaxe.json
 ```
 
 ```bash

@@ -2,12 +2,12 @@ import type { JsonValue } from "../inputSnapshot.js";
 
 /** Planner backends that can propose direct-generated TypeScript source text. */
 export type ObjectivePhasePlannerId =
-  | "gemini-live-planner"
+  | "gemini-planner"
   | "openai-codex-planner"
   | "builtin-planner";
 
-/** Gemini transport paths; owned here so objectives do not import gemini config. */
-export type ObjectivePlannerPathId = "text-genai" | "live-transcription";
+/** Gemini planner transport paths; active codegen uses structured REST text generation only. */
+export type ObjectivePlannerPathId = "text-genai";
 
 /**
  * How the phase program was produced.

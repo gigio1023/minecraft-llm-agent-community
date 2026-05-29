@@ -14,7 +14,7 @@ import {
 
 test("seed action skill registry provides roadmap action skills covering core, survival utility, social, and hostile categories", () => {
   const all = listSeedActionSkills();
-  assert.equal(all.length, 30);
+  assert.equal(all.length, 31);
 
   const coreIds = listCoreActionSkillIds();
   assert.equal(coreIds.length, 12);
@@ -52,14 +52,15 @@ test("seed action skill registry separates implemented action skills from planne
   const plannedIds = listPlannedSeedActionSkills().map((actionSkill) => actionSkill.id);
 
   assert.ok(implementedIds.includes("runtimeObserveAndRemember"));
+  assert.ok(implementedIds.includes("runBoundedMineflayerProgram"));
   assert.ok(implementedIds.includes("collectLogs"));
   assert.ok(implementedIds.includes("craftCraftingTable"));
   assert.ok(implementedIds.includes("mineCobblestone"));
   assert.ok(implementedIds.includes("placeCraftingTable"));
   assert.ok(implementedIds.includes("buildBasicShelter"));
+  assert.ok(implementedIds.includes("eatFoodWhenHungry"));
   assert.ok(plannedIds.includes("mineCoal"));
   assert.ok(plannedIds.includes("smeltRawIron"));
-  assert.ok(plannedIds.includes("eatFoodWhenHungry"));
   assert.ok(plannedIds.includes("setupSharedStash"));
 
   const mineCobblestone = getSeedActionSkill("mineCobblestone");
@@ -74,7 +75,6 @@ test("reference-derived initial abilities stay planned until their primitives ex
     ["exploreForMaterials", ["explore_until", "world_diff"]],
     ["equipBestTool", ["equip_item", "held_item_observation"]],
     ["placeTorchLightArea", ["place_block", "light_level_observation"]],
-    ["eatFoodWhenHungry", ["consume_item", "vitals_observation"]],
     ["sleepAtNight", ["use_bed", "time_observation"]],
     ["fleeDanger", ["observe_hostiles", "flee_from_entity"]],
     ["setupSharedStash", ["place_block", "open_container", "register_shared_chest"]]
@@ -85,4 +85,23 @@ test("reference-derived initial abilities stay planned until their primitives ex
     assert.equal(actionSkill.runtimeStatus, "planned");
     assert.deepEqual(actionSkill.missingPrimitives, missingPrimitives);
   }
+});
+
+test("eatFoodWhenHungry is active once vitals observation and consume_item are runtime-owned", () => {
+  const actionSkill = getSeedActionSkill("eatFoodWhenHungry");
+  assert.equal(actionSkill.runtimeStatus, "implemented");
+  assert.deepEqual(actionSkill.primitiveIds, ["observe", "consume_item"]);
+  assert.equal(actionSkill.missingPrimitives, undefined);
+});
+
+test("runBoundedMineflayerProgram exposes generated helper code as an observed runtime boundary", () => {
+  const actionSkill = getSeedActionSkill("runBoundedMineflayerProgram");
+  assert.equal(actionSkill.runtimeStatus, "implemented");
+  assert.deepEqual(actionSkill.primitiveIds, [
+    "observe",
+    "run_mineflayer_program",
+    "observe",
+    "remember"
+  ]);
+  assert.equal(actionSkill.missingPrimitives, undefined);
 });
