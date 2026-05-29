@@ -168,6 +168,7 @@ export async function runSocialActionPlannerProvider(input: {
     settlement_state: input.context.settlement_state,
     settlement_checklist: input.context.settlement_state.checklist,
     blocker_histogram: input.context.settlement_state.blocker_histogram,
+    runtime_retry_constraints: input.context.runtime_retry_constraints,
     previous_cycle_judgments: input.context.previous_cycle_judgments,
     recent_action_attempts: input.recentActionAttempts ?? []
   } as JsonValue;
@@ -207,13 +208,16 @@ export async function runSocialActionPlannerProvider(input: {
       system: `You plan one bounded ActionIntent for the active CycleGoal.
 ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
 Select from action_surface and runtime_affordances based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface is the actor's current body, not a strategy checklist.
+Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
 Deferred primitives or action skills explain missing affordances; do not choose them unless the active CycleGoal already allows the required primitive ids.
+Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not executable in this ActionIntent until exposed as direct primitives or direct action skills.
 If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different valid affordance based on the current action surface and evidence.
+runtime_retry_constraints are hard runtime suppressions over exact target plus structured args. Do not choose an ActionIntent that matches one; pivot to a different valid affordance, repair the structured args, observe current state, or record a truthful blocker.
 Do not treat fixed material families, stations, construction readiness, or any other gameplay taxonomy as mandatory planning headings. Use raw observed Minecraft names and runtime evidence; decide relevance from the current CycleGoal.
-Use settlement_state, settlement_checklist, and blocker_histogram as pressure/evidence packets before choosing an action. They are not a mandatory single-domain strategy.
+Use settlement_state, settlement_checklist, and blocker_histogram as observation/evidence/context packets before choosing an action. They are not a mandatory single-domain strategy.
 If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
 If a primitive reports a concrete required position in runtime_result, use structured move_to toward that explicit position or observe current state before retrying. Do not retry the same primitive from outside its reported interaction range.
-Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvent pressure, or memory makes building relevant; never treat a construction target as always-on architecture.
+Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvents, observation, or memory makes building relevant; never treat a construction target as always-on architecture.
 use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
       user: JSON.stringify(providerInput),

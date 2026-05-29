@@ -34,6 +34,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
       schema: "actor-memory-record/v1",
       memory_id: "social-cycle-blocker",
       actor_id: "npc_b",
+      kind: "blocker",
       layer: "episodic",
       status: "active",
       confidence: "observed",
@@ -70,7 +71,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
     evidence_refs: [],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   };
 
   const context = await assembleSocialCycleContext({
@@ -84,7 +85,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
         schema: "world-event/v1",
         event_id: "evt-1",
         kind: "scenario_event",
-        authority: "pressure_only",
+        authority: "context_only",
         summary: "Need logs",
         actor_refs: ["npc_b"],
         evidence_refs: [],
@@ -128,17 +129,32 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   assert.notEqual(context.ActorLifeGoal.objective, "Need logs");
   assert.equal(contextCitesPreviousJudgment(context, "cycle-0001"), true);
   assert.equal(context.memory_packet.retrieved_episodic[0]?.memory_id, "social-cycle-blocker");
+  assert.equal(context.memory_packet.retrieved_episodic[0]?.kind, "blocker");
   assert.equal(context.memory_packet.retrieval_policy.objective_category, "social_cycle");
 
   // The action surface exposes what the actor can do now, without treating
   // missing action skill primitives as executable planner options.
   assert.equal(context.action_surface.schema, "action-surface/v1");
   assert.equal(context.action_surface.rules.exposes_actor_body_not_strategy, true);
+  assert.deepEqual(context.runtime_retry_constraints, []);
   assert.ok(context.action_surface.direct_primitives.some((entry) => entry.primitive_id === "observe"));
   assert.ok(
     context.action_surface.deferred_action_skills.some((entry) =>
       entry.action_skill_id === "collectLogs" &&
       entry.missing_primitives.includes("collect_logs")
+    )
+  );
+  assert.equal(context.action_surface.rules.mineflayer_is_capability_substrate, true);
+  assert.equal(context.action_surface.rules.raw_mineflayer_api_not_provider_authority, true);
+  assert.ok(
+    context.action_surface.mineflayer_expansion_opportunities.some((entry) =>
+      entry.capability_id === "runtime_adapter_for_collect_logs" &&
+      entry.status === "missing_runtime_adapter"
+    )
+  );
+  assert.ok(
+    context.action_surface.mineflayer_expansion_opportunities.some((entry) =>
+      entry.capability_id === "inventory_equipment_management"
     )
   );
   assert.equal(context.settlement_state.inventory_counts.oak_log, 2);

@@ -8,7 +8,7 @@ import {
   createRelationshipEventRef
 } from "../src/npc/relationships/relationshipLedger.js";
 
-test("goal stack exposes relationship-derived action pressure as a gated goal", () => {
+test("goal stack exposes relationship-derived action context as a gated goal", () => {
   const goalStack = buildActorGoalStack({
     actorProfile: getActorProfile("npc_a"),
     relationshipEdges: [
@@ -34,10 +34,10 @@ test("goal stack exposes relationship-derived action pressure as a gated goal", 
   assert.equal(goalStack.relationship_goal?.priority, "urgent");
   assert.equal(goalStack.relationship_goal?.target_actor_id, "npc_b");
   assert.equal(
-    goalStack.relationship_goal?.source_pressure_kind,
+    goalStack.relationship_goal?.source_context_signal_kind,
     "recovery_social_caution"
   );
-  assert.equal(goalStack.relationship_goal?.action_boundary, "intent_pressure_only");
+  assert.equal(goalStack.relationship_goal?.action_boundary, "intent_context_only");
   assert.equal(goalStack.relationship_goal?.active_action_skill_required, true);
   assert.equal(goalStack.relationship_goal?.role_contract_boundary, "unchanged");
   assert.deepEqual(goalStack.relationship_goal?.evidence_refs, [

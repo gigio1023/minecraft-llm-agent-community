@@ -37,10 +37,10 @@ test("ActorSoul and LifeGoal validators accept canonical records", () => {
   );
 });
 
-test("WorldEvent pressure is not accepted as LifeGoal objective", () => {
+test("WorldEvent context is not accepted as LifeGoal objective", () => {
   const soul = compileActorSoulFromProfile("npc_b");
-  const pressure = "The settlement needs diamond tools immediately";
-  assert.notEqual(soul.life_goal, pressure);
+  const worldEventContext = "The settlement needs diamond tools immediately";
+  assert.notEqual(soul.life_goal, worldEventContext);
 });
 
 test("validateActorCycleGoal rejects wrong schema", () => {
@@ -93,7 +93,7 @@ test("validateCycleJudgment rejects invalid outcome and malformed memory writes"
     evidence_refs: [],
     memory_writes: [{ layer: "dream", summary: "", confidence: "certain" }],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   });
 
   assert.equal(result.ok, false);
@@ -113,7 +113,7 @@ test("validateCycleJudgment accepts partial verified progress as a bounded evide
     evidence_refs: ["evidence/cycle-0001-build_pattern.json"],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: ["Continue from verified partial evidence or pivot if blocked."]
+    next_goal_context: ["Continue from verified partial evidence or pivot if blocked."]
   });
 
   assert.equal(result.ok, true);

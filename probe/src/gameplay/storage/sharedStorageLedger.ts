@@ -118,7 +118,7 @@ export function createSharedStorageLedger() {
       afterInventory: readonly ItemStack[];
     }) {
       // Withdrawal reason is part of the storage evidence contract: taking a
-      // shared item should be explainable as task pressure, not a silent drain.
+      // shared item should be explainable from task context, not a silent drain.
       const entry: SharedStorageLedgerEntry = {
         seq: nextSeq(),
         kind: "withdraw",

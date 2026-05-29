@@ -122,7 +122,7 @@ export function observeWorld({
   runtimeState.recordObservation?.(actor.username as MutualActorId, observation);
 
   // Social context is appended after the raw world observation so transcript
-  // review can separate Minecraft facts from derived memory/role pressure.
+  // review can separate Minecraft facts from derived memory/role context.
   return {
     ...observation,
     ...((runtimeState.socialContext?.(actor.username as MutualActorId)

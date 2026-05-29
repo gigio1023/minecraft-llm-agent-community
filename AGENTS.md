@@ -22,7 +22,7 @@ Immediate target:
 
 North star:
 
-- actors, represented by Mineflayer bots, with role pressure, action skill
+- actors, represented by Mineflayer bots, with role context, action skill
   ownership, memory, and later human-in-the-loop social play.
 
 Not current delivery targets:
@@ -43,9 +43,9 @@ the product direction is a Soul-grounded social simulation seed.
 
 When `soul.md` or an ActorSoul artifact defines an actor, treat it as the actor's
 identity seed. Short-, mid-, and long-term goals should be derived under that
-Soul/LifeGoal frame, with social pressure, memory, relationships, role pressure,
+Soul/LifeGoal frame, with social context, memory, relationships, role context,
 shared/private inventory, obligations, trust, conflict, and settlement state in
-view. Gameplay progress matters because it creates real pressure and evidence
+view. Gameplay progress matters because it creates observations, consequences, and evidence
 for social life, not because the top-level objective is to optimize a Minecraft
 benchmark.
 
@@ -53,7 +53,7 @@ Use external references by translating their mechanisms into this project:
 
 - skill-library papers imply evidence-backed, actor-owned action skill promotion,
   not raw eval loops or global skill reuse detached from the actor;
-- curriculum papers imply bounded goal pressure and capability scaffolding, not a
+- curriculum papers imply bounded capability scaffolding under ActorSoul/LifeGoal, not a
   universal benchmark objective;
 - reasoning/action papers imply CycleGoal -> ActionIntent -> evidence ->
   CycleJudgment loops, not unconstrained chain-of-thought as authority;
@@ -74,11 +74,11 @@ or reframe it.
 
 Do not turn one domain goal into core architecture. House, shelter, base,
 storage, mining, farming, travel, repair, conversation, and conflict are
-possible social pressures, not mandatory CycleGoal phases. Do not add
+possible context sources, not mandatory CycleGoal phases. Do not add
 `StructurePlacementPlan`, `ShelterBlueprint`, `HomeBasePlan`, or similar
 building-first planning artifacts as always-on runtime context. If such an
 artifact is useful, keep it local to a bounded action skill, fixture, or offline
-design tool and make the current Soul/LifeGoal pressure justify its use.
+design tool and make the current Soul/LifeGoal context justify its use.
 
 Codex/MCP-style references should be adapted as autonomy substrate: action
 surface, direct/deferred tool exposure, hooks, permission gates, event streams,
@@ -90,29 +90,34 @@ Read these first:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
-4. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-5. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
-6. `docs/docs/Specification/Reference-Adaptation-Guide.md`
-7. `docs/docs/Documentation-Map.md`
-8. `docs/docs/Agent-Search-Index.md`
-9. `docs/docs/Terminology.md`
-10. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
-11. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-12. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-13. `docs/docs/Architecture/Async-Reviewer-Sidecars.md`
-14. `docs/docs/Architecture/Implementation-Workstreams.md`
-15. `docs/docs/Architecture/Action-Skill-Verification.md`
-16. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
-17. `docs/docs/Architecture/Minimal-Probe.md`
-18. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-19. `docs/docs/Setup/Headless-Server.md`
-20. `docs/docs/Setup/Provider-Setup.md`
+3. `CLAUDE.md`
+4. `GEMINI.md`
+5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+6. `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
+7. `docs/blog-doc/Specification/Runtime-Evidence-And-Action-Skills.md`
+8. `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
+9. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
+10. `docs/blog-doc/Documentation-Map.md`
+11. `docs/blog-doc/Agent-Search-Index.md`
+12. `docs/blog-doc/Terminology.md`
+13. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
+14. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
+15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+16. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+17. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+18. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+19. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+20. `docs/blog-doc/Architecture/Minimal-Probe.md`
+21. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+22. `docs/blog-doc/Setup/Headless-Server.md`
+23. `docs/blog-doc/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
-`SPEC.md` and `docs/docs/Specification/*` are long-term spec files. `AGENTS.md`
-is binding repo-agent guidance for interpreting and applying that spec. Editing
+`SPEC.md` and `docs/blog-doc/Specification/*` are long-term spec files.
+`AGENTS.md` is binding repo-agent guidance for interpreting and applying that
+spec. `CLAUDE.md` and `GEMINI.md` mirror these rules for their agent surfaces
+and must point back to `AGENTS.md` as the authority when rules conflict. Editing
 any of these files changes product direction or agent operating rules, so do not
 modify them during routine implementation work unless the user explicitly
 approves the update in the current turn. Put dated implementation status,
@@ -126,7 +131,7 @@ command output, and volatile evidence in handoff or audit docs instead.
   validate, execute, verify, and record. Conversation-like actions are action
   skills when they run through the game runtime.
 - Do not use bare `skill` in active guidance when the meaning could be confused.
-- `docs/docs/Terminology.md` is normative. New docs, code comments, prompts,
+- `docs/blog-doc/Terminology.md` is normative. New docs, code comments, prompts,
   report labels, and agent guides must follow it.
 - If existing code or docs conflict with `Terminology.md`, either update them or
   add an explicit legacy-identifier mapping in `Terminology.md`. Do not spread
@@ -189,9 +194,73 @@ Use the user's language when practical. For this repo, Korean explanations are
 often appropriate, but keep code identifiers, commands, file paths, schema names,
 and canonical terminology exact.
 
+## Thinking, Research, Review, And Change Discipline
+
+Search token: `KARPATHY_GUIDELINES`.
+
+These Karpathy-style rules are binding for coding, research, reviews, refactors,
+and implementation planning in this repo. They are adapted from the user-provided
+MIT-licensed `karpathy-guidelines` note, derived from Andrej Karpathy's public
+observations on common LLM coding mistakes:
+`https://x.com/karpathy/status/2015883857489522876`.
+
+### Think Before Coding
+
+- Before non-trivial edits, state the working assumptions, the intended change
+  boundary, and the verifiable success criteria.
+- If multiple interpretations exist, name them. Do not silently choose the path
+  that would change product direction, runtime authority, provider cost, data
+  retention, auth, or platform setup.
+- If a simpler approach solves the request, say so and prefer it.
+- If uncertainty can be resolved from repo context, inspect the repo first. If a
+  reasonable assumption would be risky, stop and ask the user instead of hiding
+  confusion in code.
+- During literature, GitHub, or web research, separate "what the reference
+  teaches mechanically" from "how this repo should adapt it." References are not
+  specs, and a mechanism that conflicts with Soul/LifeGoal continuity or
+  autonomy substrate rules must be rejected or reframed.
+
+### Simplicity First
+
+- Write the minimum code that solves the current problem and can be verified.
+- Do not add features, configuration knobs, abstractions, provider paths, action
+  skills, or domain planners that were not requested or directly required by the
+  current runtime contract.
+- Avoid speculative flexibility. If an abstraction has one use and no immediate
+  need, keep the implementation direct.
+- If a change grows beyond the smallest clear shape, simplify before proceeding.
+  Large files should be split by responsibility, but not converted into a
+  framework.
+
+### Surgical Changes
+
+- Touch only files that are needed for the user's request and the required
+  documentation/test alignment.
+- Do not "improve" adjacent code, comments, formatting, terminology, or docs
+  unless the current change made them wrong or the user asked for cleanup.
+- Match the existing style and ownership boundaries even when another style
+  seems preferable.
+- Remove imports, variables, helpers, docs, and tests that your own change made
+  obsolete. Mention unrelated dead code or stale docs instead of deleting them.
+- Every changed line should trace to the request, a verified blocker, or a
+  documented repo rule.
+
+### Goal-Driven Execution
+
+- Convert work into explicit success criteria before implementing. For example,
+  "reject missing physical args" means "produce a contract-failure artifact and
+  pass the focused regression test," not "the bot moved somewhere."
+- For multi-step work, keep a short plan with a verification step for each
+  material task.
+- Loop until the chosen verification has run or until the blocker is recorded
+  with the exact command, platform, provider, artifact path, and failure mode.
+- Prefer real runtime evidence when behavior matters. Unit tests protect narrow
+  regressions, but social-cycle value is proven by truthful reports, helper
+  events, verifier output, actor workspace artifacts, and provider usage records.
+
 ## Search Index
 
-Read `docs/docs/Agent-Search-Index.md` first for routing.
+Read `docs/blog-doc/Agent-Search-Index.md` first for routing.
 
 Important search tokens:
 
@@ -200,6 +269,7 @@ Important search tokens:
 - `MINECRAFT_GAMEPLAY_MODEL`
 - `SPEC_GOVERNANCE`
 - `DOCUMENTATION_MAP`
+- `KARPATHY_GUIDELINES`
 - `TERMINOLOGY`
 - `SOUL_GROUNDED_SOCIAL_SIMULATION`
 - `RUNTIME_EVIDENCE_ACTION_SKILLS`
@@ -215,7 +285,9 @@ Important search tokens:
 - `GEMINI_API_SOCIAL_PROVIDER`
 - `WORLD_STATE_DIAGNOSTICS`
 - `ACTION_INTENT_CONTRACT`
+- `RUNTIME_RETRY_CONSTRAINT`
 - `CONTEXT_COMPACTION`
+- `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW`
 - `SOCIAL_SIMULATION_SEED`
 - `SPEED_BOUNDED_SOCIAL_SIMULATION`
 - `LIVE_TRANSCRIPT_FIRST`
@@ -256,7 +328,7 @@ Important search tokens:
   - `transcript/` for transcript and artifact persistence.
 - Do not let quick probes become permanent monoliths.
 - Do not expect social simulation from persona text alone.
-- Add Minecraft task pressure first: resource gathering, crafting, storage,
+- Add concrete Minecraft observations and consequences first: resource gathering, crafting, storage,
   movement, scarcity, and shared/private inventory.
 - Mineflayer provides the game client API.
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
@@ -282,7 +354,7 @@ Important search tokens:
 - It is acceptable for a specific action skill implementation to query a
   specific Minecraft block or item family as part of its own primitive contract.
   It is not acceptable to turn those families into always-present planner
-  context, summary headings, or goal pressure.
+  context, summary headings, or goal interpretation.
 - Treat physical `ActionIntent` arguments as a contract. For actions such as
   `move_to`, `mine_block`, `place_block`, `craft_item`, `inspect_chest`,
   `deposit_shared`, or structure/building primitives, required target/item/count
@@ -300,6 +372,11 @@ Important search tokens:
   executable authority. If prose mentions a coordinate and structured args are
   empty or contradictory, the runtime must treat the structured intent as
   invalid rather than guessing from prose.
+- Repeated identical blocker evidence should become a `runtime-retry-constraint/v1`
+  gate over the exact ActionIntent target and structured args. This is a
+  runtime safety rule, not a domain strategy or memory suggestion. It must block
+  before Mineflayer execution and write evidence when the provider repeats the
+  prohibited target/args.
 - Use Mineflayer API behavior to shape runtime contracts: target resolution,
   loaded-world visibility, pathfinder limits, timeout/cancellation behavior, and
   verifier evidence should be documented in code or spec when they affect an
@@ -328,7 +405,7 @@ Important search tokens:
   candidate actor-owned action skill memory.
 - Prefer structured domain models, typed records, discriminated unions, schemas,
   and validators over ad hoc dictionary blobs. Runtime state, action evidence,
-  actor memory, provider packets, relationship pressure, and verifier results
+  actor memory, provider packets, relationship context signal, and verifier results
   should be machine-auditable and hard to misread.
 - Keep tests small and Detroit-style. Use them to protect real owned behavior,
   not to simulate a fake feeling of coverage.
@@ -372,7 +449,7 @@ practice.
   artifact locations, and destructive-vs-non-destructive behavior. Do not label
   obvious scalar defaults.
 - Prefer TSDoc `@remarks` for invariants that must survive refactors (for example,
-  “WorldEvent is pressure, not LifeGoal”). Use `@see` to link architecture docs
+  “WorldEvent is context, not LifeGoal”). Use `@see` to link architecture docs
   when a module implements a written contract.
 - Keep JSDoc tags sparse: `@param` only when the name is not self-explanatory;
   avoid `@returns` on obvious `Promise<void>` helpers.
@@ -407,10 +484,19 @@ Reference anchors:
 
 ## Documentation Rules
 
-- Keep `SPEC.md`, `README.md`, `docs/docs/intro.md`,
-  `docs/docs/Documentation-Map.md`, `docs/docs/Terminology.md`, and
-  `docs/docs/Agent-Search-Index.md` aligned.
-- When adding or changing project vocabulary, update `docs/docs/Terminology.md`
+- Keep `SPEC.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/blog-doc/intro.md`,
+  `docs/blog-doc/Documentation-Map.md`, `docs/blog-doc/Terminology.md`, and
+  `docs/blog-doc/Agent-Search-Index.md` aligned.
+- Docusaurus-exposed documentation pages live under `docs/blog-doc/`. Despite
+  the directory name, this is the public docs source, not a blog-post folder.
+- Do not add new public docs under `docs/docs/`.
+- Do not put ordinary documentation, specs, architecture notes, setup guides,
+  handoffs, reviews, or research notes under `docs/blog/`. `docs/blog/` is only
+  for explicitly requested chronological blog posts.
+- Repo-internal review and operation docs belong in the project root when they
+  guide branch review or agents directly. Historical research, stale public
+  plans, and raw paper dumps belong under `docs/research-archive/`.
+- When adding or changing project vocabulary, update `docs/blog-doc/Terminology.md`
   first, then update affected docs/code comments/prompts to match it.
 - If a plan becomes historical rather than active, mark it clearly as archived or
   deprecated instead of leaving it ambiguous.
@@ -421,7 +507,7 @@ Reference anchors:
 
 For **Mineflayer TypeScript codegen** (long-objective / direct-generated planner),
 do **not** use Gemini Native Audio Dialog as the primary path. Recorded verdict:
-`docs/docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
+`docs/blog-doc/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
 
 Use:
 
@@ -530,7 +616,7 @@ cost-sensitive tests until budget state is known.
 `deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
 Do not use `probe:long-objective` as the social-life runtime.
 
-Canonical plan: `docs/docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
+Canonical plan: `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
 
 ## Auth Rule
 

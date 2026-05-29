@@ -224,7 +224,7 @@ test("cycle judgment relationship proposals accept actor-relative evidence refs"
           evidence_refs: [actorRelativeEvidenceRef]
         }
       ],
-      next_goal_pressure: []
+      next_goal_context: []
     });
 
     const edge = await readRelationshipEdge(rootDir, "npc_a", "npc_b");

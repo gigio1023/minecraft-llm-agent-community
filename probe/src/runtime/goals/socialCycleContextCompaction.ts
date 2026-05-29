@@ -26,7 +26,8 @@ export type SocialCycleManifestContextName =
   | "memory packet"
   | "relationship context"
   | "world events"
-  | "settlement state";
+  | "settlement state"
+  | "runtime retry constraints";
 
 export type SocialCycleManifestRetention =
   | "full"
@@ -59,9 +60,10 @@ export type SocialCycleSummaryFactScope =
   | "runtime_evidence_refs"
   | "prior_judgment_context"
   | "memory_context"
-  | "world_event_pressure"
+  | "world_event_context"
   | "relationship_context"
-  | "settlement_state";
+  | "settlement_state"
+  | "runtime_retry_constraints";
 
 export type EvidenceBackedSocialCycleSummaryFact = {
   label: string;
@@ -113,6 +115,7 @@ export type SocialCycleContextPacketLike = {
   relationship_context?: SocialCycleContextPacket["relationship_context"];
   memory_packet?: SocialCycleContextPacket["memory_packet"];
   settlement_state?: SettlementState;
+  runtime_retry_constraints?: SocialCycleContextPacket["runtime_retry_constraints"];
   world_events?: SocialCycleContextPacket["world_events"];
 };
 
@@ -385,6 +388,7 @@ function summarizeActionSurface(actionSurface: ActionSurfacePacket) {
     `direct action skills=${describeList(directActionSkills)}`,
     `deferred=${describeList(deferred)}`,
     `missing affordances=${describeList(actionSurface.missing_affordances)}`,
+    `mineflayer expansion opportunities=${actionSurface.mineflayer_expansion_opportunities.length}`,
     "runtime verification remains required"
   ].join("; ");
 }
@@ -403,6 +407,15 @@ function summarizeSettlementState(settlementState: SettlementState) {
     `shared storage=${settlementState.shared_storage.status}`,
     `recent blockers=${describeList(blockers)}`
   ].join("; ");
+}
+
+function summarizeRuntimeRetryConstraints(
+  constraints: NonNullable<SocialCycleContextPacket["runtime_retry_constraints"]>
+) {
+  const rows = constraints.map((constraint) =>
+    `${constraint.target.kind}:${constraint.target.id} args=${constraint.args_fingerprint} blocker=${constraint.blocker_key} repeats=${constraint.repeat_count}`
+  );
+  return `runtime retry constraints=${describeList(rows, "none")}`;
 }
 
 function manifestEntry(input: {
@@ -505,7 +518,7 @@ function buildInputManifest(input: {
         retention: "full",
         refs: context.previous_cycle_judgments?.map((entry) => entry.ref) ?? [],
         estimatedValue: context.previous_cycle_judgments ?? [],
-        reason: "Prior judgments provide pressure but do not become new physical facts."
+        reason: "Prior judgments provide context but do not become new physical facts."
       }),
       manifestEntry({
         contextName: "memory packet",
@@ -521,7 +534,7 @@ function buildInputManifest(input: {
         retention: "full",
         refs: [refs.inputContextRef],
         estimatedValue: context.relationship_context,
-        reason: "Relationship pressure informs goals under ActorSoul/LifeGoal."
+        reason: "Relationship context informs goals under ActorSoul/LifeGoal."
       }),
       manifestEntry({
         contextName: "world events",
@@ -529,7 +542,7 @@ function buildInputManifest(input: {
         retention: "full",
         refs: [refs.inputContextRef],
         estimatedValue: context.world_events ?? [],
-        reason: "WorldEvents are pressure only and do not replace LifeGoal."
+        reason: "WorldEvents provide context and do not replace LifeGoal."
       }),
       manifestEntry({
         contextName: "settlement state",
@@ -538,6 +551,14 @@ function buildInputManifest(input: {
         refs: [refs.inputContextRef, ...(refs.evidenceRefs ?? [])],
         estimatedValue: context.settlement_state,
         reason: "Settlement state is runtime-owned state and blocker context."
+      }),
+      manifestEntry({
+        contextName: "runtime retry constraints",
+        present: (context.runtime_retry_constraints?.length ?? 0) > 0,
+        retention: "full",
+        refs: [refs.inputContextRef, ...(refs.evidenceRefs ?? [])],
+        estimatedValue: context.runtime_retry_constraints ?? [],
+        reason: "Retry constraints are runtime gates over exact repeated target/args failures."
       })
     ]
   };
@@ -554,6 +575,7 @@ function buildReplacementManifest(input: {
   const latestObservationFact = factByLabel.get("latest observation");
   const actionSurfaceFact = factByLabel.get("action_surface contracts");
   const evidenceFact = factByLabel.get("verifier/evidence refs");
+  const retryConstraintsFact = factByLabel.get("runtime retry constraints");
   return {
     schema: "social-cycle-context-manifest/v1",
     entries: [
@@ -646,8 +668,8 @@ function buildReplacementManifest(input: {
         present: (input.context.world_events?.length ?? 0) > 0,
         retention: "summary_and_ref",
         refs: [input.refs.inputContextRef],
-        estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "world_event_pressure"),
-        reason: "WorldEvents remain pressure only under ActorSoul/LifeGoal."
+        estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "world_event_context"),
+        reason: "WorldEvents remain context under ActorSoul/LifeGoal."
       }),
       manifestEntry({
         contextName: "settlement state",
@@ -656,6 +678,14 @@ function buildReplacementManifest(input: {
         refs: [input.refs.inputContextRef, ...(input.refs.evidenceRefs ?? [])],
         estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "settlement_state"),
         reason: "Settlement state is summarized as current state and blockers."
+      }),
+      manifestEntry({
+        contextName: "runtime retry constraints",
+        present: (input.context.runtime_retry_constraints?.length ?? 0) > 0,
+        retention: "summary_and_ref",
+        refs: [input.refs.inputContextRef, ...(input.refs.evidenceRefs ?? [])],
+        estimatedValue: retryConstraintsFact,
+        reason: "Retry constraints are compacted as gate state, not as provider advice."
       })
     ]
   };
@@ -748,6 +778,19 @@ function buildCompactSummary(input: {
     }));
   }
 
+  if ((context.runtime_retry_constraints?.length ?? 0) > 0) {
+    facts.push(buildFact({
+      label: "runtime retry constraints",
+      scope: "runtime_retry_constraints",
+      summary: `${summarizeRuntimeRetryConstraints(context.runtime_retry_constraints!)}. These are exact target/args gates, not a domain strategy.`,
+      evidenceRefs: uniqueRefs([
+        refs.inputContextRef,
+        ...(refs.evidenceRefs ?? []),
+        ...context.runtime_retry_constraints!.flatMap((constraint) => constraint.evidence_refs)
+      ])
+    }));
+  }
+
   if (context.memory_packet) {
     facts.push(buildFact({
       label: "memory packet",
@@ -761,7 +804,7 @@ function buildCompactSummary(input: {
     facts.push(buildFact({
       label: "relationship context",
       scope: "relationship_context",
-      summary: `Relationship context retained counts: relationships=${countArray(context.relationship_context.relationships)}, incoming=${countArray(context.relationship_context.incoming_relationships)}, pressures=${countArray(context.relationship_context.relationship_pressures)}.`,
+      summary: `Relationship context retained counts: relationships=${countArray(context.relationship_context.relationships)}, incoming=${countArray(context.relationship_context.incoming_relationships)}, context signals=${countArray(context.relationship_context.relationship_context_signals)}.`,
       evidenceRefs: [refs.inputContextRef]
     }));
   }
@@ -770,8 +813,8 @@ function buildCompactSummary(input: {
     const summaries = context.world_events!.slice(-4).map((event) => event.summary);
     facts.push(buildFact({
       label: "world events",
-      scope: "world_event_pressure",
-      summary: `WorldEvents remain pressure only: ${describeList(summaries)}.`,
+      scope: "world_event_context",
+      summary: `WorldEvents retained as context: ${describeList(summaries)}.`,
       evidenceRefs: [refs.inputContextRef, ...context.world_events!.flatMap((event) => event.evidence_refs)]
     }));
   }

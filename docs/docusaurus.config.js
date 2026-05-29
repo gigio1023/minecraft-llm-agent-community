@@ -46,14 +46,15 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          path: 'blog-doc',
           sidebarPath: './sidebars.js',
           editUrl:
-            'https://github.com/naem1023/minecraft-llm-agent-community/tree/feature/agent-loop-evolution/docs/',
+            'https://github.com/naem1023/minecraft-llm-agent-community/tree/main/docs/',
         },
         blog: {
           showReadingTime: true,
           editUrl:
-            'https://github.com/naem1023/minecraft-llm-agent-community/tree/feature/agent-loop-evolution/docs/',
+            'https://github.com/naem1023/minecraft-llm-agent-community/tree/main/docs/',
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -76,7 +77,7 @@ const config = {
         items: [
           {
             type: 'docSidebar',
-            sidebarId: 'tutorialSidebar',
+            sidebarId: 'blogDocSidebar',
             position: 'left',
             label: 'Docs',
           },

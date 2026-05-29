@@ -27,6 +27,7 @@ export type CycleReviewRow = {
   world_scan_refs: string[];
   world_scan_counts: Record<string, number>;
   movement_contract_status: MovementContractStatus;
+  retry_constraint_blocked: boolean;
 };
 
 export type SocialCycleReviewSummary = {
@@ -40,6 +41,8 @@ export type SocialCycleReviewSummary = {
   outcome_counts: Record<string, number>;
   verifier_counts: Record<string, number>;
   primitive_counts: Record<string, number>;
+  runtime_retry_constraint_count: number;
+  retry_constraint_blocked_attempts: number;
   cycles_with_prior_judgment_context: number;
   rows: CycleReviewRow[];
 };
@@ -269,6 +272,10 @@ export async function buildSocialCycleReviewSummary(
   const outcome_counts: Record<string, number> = {};
   const verifier_counts: Record<string, number> = {};
   const primitive_counts: Record<string, number> = {};
+  const runtimeRetryConstraintCount = report.runtime_retry_constraints?.length ?? 0;
+  const retryConstraintBlockedAttempts = report.cycles
+    .flatMap((cycle) => cycle.action_attempts ?? [])
+    .filter((attempt) => attempt.retry_constraint_blocked === true).length;
   let cycles_with_prior_judgment_context = 0;
 
   const rows: CycleReviewRow[] = [];
@@ -314,7 +321,9 @@ export async function buildSocialCycleReviewSummary(
       world_scan_ref_count: scanSummary.worldScanRefs.length,
       world_scan_refs: scanSummary.worldScanRefs,
       world_scan_counts: scanSummary.worldScanCounts,
-      movement_contract_status: movementContractStatus(intent)
+      movement_contract_status: movementContractStatus(intent),
+      retry_constraint_blocked:
+        cycle.action_attempts?.some((attempt) => attempt.retry_constraint_blocked === true) ?? false
     });
   }
 
@@ -329,6 +338,8 @@ export async function buildSocialCycleReviewSummary(
     outcome_counts,
     verifier_counts,
     primitive_counts,
+    runtime_retry_constraint_count: runtimeRetryConstraintCount,
+    retry_constraint_blocked_attempts: retryConstraintBlockedAttempts,
     cycles_with_prior_judgment_context,
     rows
   };
@@ -343,6 +354,8 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
     `- runtime_status: **${summary.runtime_status}**`,
     `- cycles in report: **${summary.total_cycles}**`,
     `- cycles citing prior judgment in CycleGoal provider: **${summary.cycles_with_prior_judgment_context}**`,
+    `- runtime retry constraints: **${summary.runtime_retry_constraint_count}**`,
+    `- retry-constraint blocked attempts: **${summary.retry_constraint_blocked_attempts}**`,
     "",
     "## Outcome distribution",
     "",
@@ -356,8 +369,8 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
     "",
     "## Cycle timeline",
     "",
-    "| cycle | outcome | verifier | action | scan refs | move contract | CycleGoal (short) | cites prior |",
-    "|-------|---------|----------|--------|-----------|---------------|-------------------|-------------|"
+    "| cycle | outcome | verifier | action | scan refs | move contract | retry gate | CycleGoal (short) | cites prior |",
+    "|-------|---------|----------|--------|-----------|---------------|------------|-------------------|-------------|"
   ];
 
   for (const row of summary.rows) {
@@ -370,7 +383,7 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
       ? `${row.world_scan_ref_count}${scanCounts ? ` (${scanCounts})` : ""}`
       : "0";
     lines.push(
-      `| ${row.cycle_id} | ${row.judgment_outcome} | ${row.verifier_status} | ${action} | ${scanCell} | ${row.movement_contract_status} | ${goal} | ${row.cites_prior ? "yes" : "no"} |`
+      `| ${row.cycle_id} | ${row.judgment_outcome} | ${row.verifier_status} | ${action} | ${scanCell} | ${row.movement_contract_status} | ${row.retry_constraint_blocked ? "blocked" : "no"} | ${goal} | ${row.cites_prior ? "yes" : "no"} |`
     );
   }
 

@@ -1,5 +1,5 @@
 import type { CanonicalTranscriptPart, CanonicalJsonValue } from "../../transcript/canonical/transcriptParts.js";
-import type { LifecycleMode } from "../../runtime/pressureIntent.js";
+import type { LifecycleMode } from "../../runtime/contextIntent.js";
 
 export type CompactionCheckpointSummary = {
   overallMission: string;

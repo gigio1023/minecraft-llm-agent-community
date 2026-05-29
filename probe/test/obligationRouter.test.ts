@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { routeObligationPressures } from "../src/npc/social/obligationRouter.js";
+import { routeObligationContextSignals } from "../src/npc/social/obligationRouter.js";
 
-test("obligation router generates blocked_teammate pressure from bulletin entries", () => {
-  const pressures = routeObligationPressures({
+test("obligation router generates blocked_teammate context signal from bulletin entries", () => {
+  const contextSignals = routeObligationContextSignals({
     actorId: "npc_a",
     roleId: "gatherer",
     bulletinEntries: [
@@ -20,14 +20,14 @@ test("obligation router generates blocked_teammate pressure from bulletin entrie
     turn: 4
   });
 
-  const blocked = pressures.find((p) => p.kind === "blocked_teammate");
+  const blocked = contextSignals.find((p) => p.kind === "blocked_teammate");
   assert.ok(blocked, "should detect blocked crafter waiting for logs");
   assert.equal(blocked!.relatedActorId, "npc_b");
   assert.ok(blocked!.summary.includes("npc_b"));
 });
 
 test("obligation router generates shared_shortage when chest is below threshold", () => {
-  const pressures = routeObligationPressures({
+  const contextSignals = routeObligationContextSignals({
     actorId: "npc_a",
     roleId: "quartermaster",
     bulletinEntries: [],
@@ -36,13 +36,13 @@ test("obligation router generates shared_shortage when chest is below threshold"
     turn: 5
   });
 
-  const shortage = pressures.find((p) => p.kind === "shared_shortage");
+  const shortage = contextSignals.find((p) => p.kind === "shared_shortage");
   assert.ok(shortage, "should detect shared shortage below threshold");
   assert.ok(shortage!.summary.includes("2 items"));
 });
 
 test("obligation router generates conversation_backlog from pending mail", () => {
-  const pressures = routeObligationPressures({
+  const contextSignals = routeObligationContextSignals({
     actorId: "npc_a",
     roleId: "gatherer",
     bulletinEntries: [],
@@ -53,13 +53,13 @@ test("obligation router generates conversation_backlog from pending mail", () =>
     turn: 4
   });
 
-  const backlog = pressures.find((p) => p.kind === "conversation_backlog");
+  const backlog = contextSignals.find((p) => p.kind === "conversation_backlog");
   assert.ok(backlog, "should detect conversation backlog");
   assert.ok(backlog!.summary.includes("2 unread"));
 });
 
 test("obligation router ignores bulletin entries about the actor itself", () => {
-  const pressures = routeObligationPressures({
+  const contextSignals = routeObligationContextSignals({
     actorId: "npc_a",
     roleId: "gatherer",
     bulletinEntries: [
@@ -74,5 +74,5 @@ test("obligation router ignores bulletin entries about the actor itself", () => 
     turn: 2
   });
 
-  assert.equal(pressures.length, 0, "should not generate pressures from own bulletin");
+  assert.equal(contextSignals.length, 0, "should not generate context signals from own bulletin");
 });

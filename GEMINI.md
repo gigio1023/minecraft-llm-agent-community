@@ -1,147 +1,50 @@
-# Repo Agent Notes
+# Gemini Agent Repo Guidance
 
-This file intentionally mirrors `AGENTS.md`.
+`AGENTS.md` is the binding authority for this repository. This file exists so
+Gemini-based agent sessions see the same operating rules quickly. If this file
+and `AGENTS.md` disagree, follow `AGENTS.md` and update this file only when the
+user has approved an operating-rule change.
 
-If you update project-defining repo guidance, keep `GEMINI.md` and `AGENTS.md`
-aligned.
-
-## Current Direction
-
-This repository is a rebuild staging area for a headless Minecraft agent-loop
-runtime.
-
-Do not revive the old Voyager-style architecture as the active path.
-
-The current implementation goal is not a full village simulator.
-It is a small, bounded, observable runtime that can later grow into a social
-simulation seed.
-
-Immediate target:
-
-- one bot that can perform boring gameplay tasks end-to-end;
-- transcript and runtime artifacts that explain success, failure, stall, and reconnect;
-- single-bot live reconnect;
-- architecture support for per-agent action skill ownership and later bounded
-  action skill evolution.
-
-North star:
-
-- a social simulation seed with role pressure, action skill ownership, memory,
-  and later human-in-the-loop social play.
-
-Not current delivery targets:
-
-- persona richness as a content goal;
-- long-run autonomy as a product goal;
-- large multi-bot society behavior before single-bot competence is trustworthy.
-
-## Canonical Docs
-
-Read these first:
+## Read First
 
 1. `SPEC.md`
-2. `docs/docs/Agent-Search-Index.md`
-3. `docs/docs/Terminology.md`
-4. `docs/docs/Architecture/Minimal-Probe.md`
-5. `docs/docs/Setup/Headless-Server.md`
-6. `docs/docs/Setup/Provider-Setup.md`
+2. `AGENTS.md`
+3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+4. `docs/blog-doc/Documentation-Map.md`
+5. `docs/blog-doc/Agent-Search-Index.md`
+6. `docs/blog-doc/Terminology.md`
 
-Treat `SPEC.md` as the canonical rebuild spec.
+## Project Direction
 
-## Terminology
+This repo is a bounded, observable headless Minecraft runtime for a
+Soul-grounded social simulation seed. It is not a Voyager clone, a Minecraft
+benchmark project, or a house-building architecture.
 
-- `agent skill`: Codex/Claude-style capability under `.agents/skills/*/SKILL.md`,
-  built or maintained with `skill-builder`.
-- `action skill`: Minecraft/Mineflayer-based bundled behavior the runtime can
-  validate, execute, verify, and record. Conversation-like actions are action
-  skills when they run through the game runtime.
-- Do not use bare `skill` in active guidance when the meaning could be confused.
+Providers propose goals, actions, and judgments. Runtime code owns Minecraft
+truth: schemas, structured args, permission gates, Mineflayer execution,
+verification, artifacts, actor workspace state, and provider usage records.
 
-## Search Index
+## Change Discipline
 
-Read `docs/docs/Agent-Search-Index.md` first for routing.
+Follow `KARPATHY_GUIDELINES` from `AGENTS.md`:
 
-Important search tokens:
+- state assumptions and success criteria before non-trivial work;
+- prefer the simplest implementation that satisfies the current request;
+- make surgical changes and avoid unrelated cleanup;
+- verify with the smallest meaningful command, and use live runtime artifacts
+  when behavior matters.
 
-- `MINECRAFT_AGENT_LOOP_MIGRATION`
-- `HEADLESS_MINEFLAYER_PROBE`
-- `MINECRAFT_GAMEPLAY_MODEL`
-- `SKILL_VILLAGE_FAILURE`
-- `NO_VOYAGER_EVAL_LOOP`
-- `NO_MANUAL_CLIENT_GATE`
-- `OPENAI_CODEX_PROVIDER`
-- `GAME_RUNTIME_CODEX_AUTH`
-- `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
-- `SOCIAL_SIMULATION_SEED`
-- `LIVE_TRANSCRIPT_FIRST`
-- `CHECKPOINT_READY_RUNTIME`
-- `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
-- `ACTION_SKILL`
-- `AGENT_SKILL`
+## Documentation Boundary
 
-## Design Rules
+Docusaurus-exposed docs live under `docs/blog-doc/`. Repo-internal review and
+agent-operation docs live at the project root. Historical research, old public
+plans, and raw paper dumps live under `docs/research-archive/`.
 
-- Use Minecraft as an experiment accelerator.
-- The first meaningful proof is not a big society. It is boring competence plus
-  strong observability.
-- Keep implementation aggressively simple. Prefer small, named modules over large files.
-- If a TypeScript file becomes large, split it by responsibility before adding more behavior.
-- Keep functions small and single-purpose.
-- Avoid runner files that mix config, provider calls, reconnect, transcript,
-  persistence, and gameplay execution in one place.
-- Use clear directory boundaries:
-  - `gameplay/` for progression, curriculum, primitives, seed action skills,
-    verification;
-  - `runtime/` for loop, actions, session, and orchestration;
-  - `memory/` and `runtime/state/` for agent and runtime state;
-  - `skills/` for seed/generated action skill ownership and execution;
-  - `provider/` for model calls and tracing;
-  - `transcript/` for transcript and artifact persistence.
-- Do not let quick probes become permanent monoliths.
-- Do not expect social simulation from persona text alone.
-- Add Minecraft task pressure first: resource gathering, crafting, storage,
-  movement, scarcity, and shared/private inventory.
-- Mineflayer provides the game client API.
-- Prefer bounded TypeScript helpers and bounded action skill bundles over raw
-  eval.
-- Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
-  artifacts, structured logs, and optional viewer evidence.
-- Failures should be explainable from artifacts without immediate reproduction.
-- Progress must be real. Do not confuse partial motion, initial animation, or
-  optimistic status text with success.
-- Keep tests small and Detroit-style. Use them to protect real owned behavior,
-  not to simulate a fake feeling of coverage.
-- Live transcript is the primary evidence of runtime value.
+Do not add new public docs under `docs/docs/`. Do not treat archived research as
+an active build instruction unless an active spec or handoff promotes it.
 
-## Testing Rules
+## Provider Cost And Auth
 
-- Keep tests aggressively small, direct, and Detroit-style.
-- Prefer tests that prove one important owned behavior or regression.
-- Use tests to reject fake success and hidden dependencies.
-- Do not add broad mocks or snapshot-heavy suites.
-- If a test would still pass after the real logic was broken, rewrite or delete it.
-- Do not add elaborate tests for persona richness or long-run autonomy yet.
-
-## Documentation Rules
-
-- Keep `SPEC.md`, `README.md`, `docs/docs/intro.md`, and
-  `docs/docs/Agent-Search-Index.md` aligned.
-- If a plan becomes historical rather than active, mark it clearly as archived or
-  deprecated instead of leaving it ambiguous.
-- Prefer one canonical definition doc over several drifting ones.
-- Never use absolute local paths in committed docs.
-
-## Auth Rule
-
-When this repo says "Codex auth" for gameplay, it means game-runtime provider
-auth for the `openai-codex` provider. It does not mean Codex CLI login.
-
-Use an ignored repo-local auth store such as:
-
-```text
-build/provider-auth/openai-codex-auth.json
-```
-
-Do not inspect or print raw tokens. Do not start a browser/device login flow
-unless the auth store is missing, expired, rejected by a live smoke, or the user
-explicitly asks to refresh provider auth.
+Live provider calls must be explicit and usage-guarded. Gameplay Codex auth is
+the repo-local game-runtime provider auth store, not Codex CLI login. Do not
+inspect or print raw tokens.

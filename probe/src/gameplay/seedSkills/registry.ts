@@ -1,4 +1,4 @@
-import type { IntentKind } from "../../runtime/pressureIntent.js";
+import type { IntentKind } from "../../runtime/contextIntent.js";
 import type { RoleId } from "../../npc/roles/contracts.js";
 import type { RuntimePrimitiveId } from "../primitives/registry.js";
 
@@ -231,7 +231,7 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
   },
   {
     id: "buildBasicShelter",
-    summary: "Run one bounded starter shelter shell action skill when shelter pressure is relevant",
+    summary: "Run one bounded starter shelter shell action skill when current context makes shelter relevant",
     runtimeStatus: "implemented",
     implementationNotes:
       "Uses build_pattern to place and verify a small shell. This is one seed action skill, not a core runtime strategy or default social goal.",
@@ -360,7 +360,7 @@ const socialActionSkills: SeedActionSkill[] = [
   }
 ];
 
-// Hostile pressure is intentionally bounded and mostly planned; it needs
+// Hostile behavior is intentionally bounded and mostly planned; it needs
 // explicit engagement budgets and evidence before it can affect live runs.
 
 const hostileActionSkills: SeedActionSkill[] = [
@@ -376,9 +376,9 @@ const hostileActionSkills: SeedActionSkill[] = [
   },
   {
     id: "threatenApproach",
-    summary: "Move toward a cooperative NPC to apply social pressure",
+    summary: "Move toward a cooperative NPC with bounded hostile-role context",
     runtimeStatus: "planned",
-    implementationNotes: "Requires hostile role runtime, engagement budget, and social-pressure verification.",
+    implementationNotes: "Requires hostile role runtime, engagement budget, and social-context verification.",
     intentKinds: ["avoid_or_retreat"],
     validRoles: [],
     preconditions: ["target visible", "engagement timeout not exceeded"],

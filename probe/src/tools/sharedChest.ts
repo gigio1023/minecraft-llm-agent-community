@@ -146,7 +146,7 @@ export async function depositToSharedChest(input: {
   const beforeInventory = snapshotItems(input.inventory.items());
   const personalCount = countItems(beforeInventory, input.itemName);
   const reserve = readKeepItemCount(input.roleId, input.itemName);
-  // Shared storage pressure must not drain the actor below its role-owned
+  // Shared storage context must not drain the actor below its role-owned
   // personal reserve.
   const movableCount = Math.min(input.count, Math.max(0, personalCount - reserve));
 

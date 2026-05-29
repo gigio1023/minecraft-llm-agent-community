@@ -59,6 +59,10 @@ import {
   runPrimitivePostActionHooks,
   runPrimitivePreActionHooks
 } from "./actions/actionHooks.js";
+import {
+  findMatchingRuntimeRetryConstraint,
+  type RuntimeRetryConstraint
+} from "./retryConstraints.js";
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "observe",
@@ -99,6 +103,7 @@ export type SocialCycleExecutionResult = {
   verifierStatus: "passed" | "failed" | "not_applicable";
   gateBlocked: boolean;
   contractBlocked: boolean;
+  retryConstraintBlocked: boolean;
   actionSkillExecutionUnit: boolean;
   postconditionResults: ActionSkillPostconditionResult[];
   toolResults: ToolResultRecord[];
@@ -184,6 +189,33 @@ async function writeToolEvidence(input: {
     verifier_reason: input.verifierReason
   });
   return evidenceRefFromPath(paths.actorDir, evidencePath);
+}
+
+async function writeRetryConstraintEvidence(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  cycleId: string;
+  intent: ActionIntent;
+  constraint: RuntimeRetryConstraint;
+}) {
+  const result: JsonValue = {
+    status: "blocked",
+    reason:
+      "runtime_retry_constraint blocked the same action target and structured args after repeated matching blockers",
+    retry_constraint: input.constraint as unknown as JsonValue,
+    action_intent: input.intent as unknown as JsonValue
+  };
+  return writeToolEvidence({
+    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    cycleId: input.cycleId,
+    evidenceId: `${input.cycleId}-${input.constraint.constraint_id}-blocked`,
+    tool: `retry_constraint:${input.constraint.target.kind}:${input.constraint.target.id}`,
+    args: input.intent.args,
+    result,
+    verifierReason: input.constraint.blocker_reason,
+    category: "retry_constraint_blocked"
+  });
 }
 
 function readToolStatus(toolResult: JsonValue): string {
@@ -980,6 +1012,7 @@ export async function executeSocialActionIntent(input: {
   cycleGoal: ActorCycleGoal;
   intent: ActionIntent;
   activeActionSkills: readonly ActorActionSkillRecord[];
+  runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
   bot?: Bot;
   targetBot?: Bot;
 }): Promise<SocialCycleExecutionResult> {
@@ -997,6 +1030,42 @@ export async function executeSocialActionIntent(input: {
   let contractBlocked = false;
   let actionSkillExecutionUnit = false;
   const memory = createMemory(8);
+  const matchingRetryConstraint = findMatchingRuntimeRetryConstraint(
+    input.intent,
+    input.runtimeRetryConstraints ?? []
+  );
+
+  if (matchingRetryConstraint) {
+    // A retry constraint is a runtime gate, not provider advice. It prevents
+    // repeated no-op Mineflayer calls while preserving an evidence trail the
+    // next planner turn can inspect.
+    const ref = await writeRetryConstraintEvidence({
+      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+      actorId: input.actorId,
+      cycleId: turnId,
+      intent: input.intent,
+      constraint: matchingRetryConstraint
+    });
+    return {
+      observation,
+      runtimeResult: {
+        status: "blocked",
+        reason:
+          "runtime_retry_constraint blocked the same action target and structured args after repeated matching blockers",
+        retry_constraint: matchingRetryConstraint as unknown as JsonValue
+      },
+      evidenceRefs: [ref],
+      executedTools: [],
+      toolStatuses: [],
+      verifierStatus: "not_applicable",
+      gateBlocked: true,
+      contractBlocked: false,
+      retryConstraintBlocked: true,
+      actionSkillExecutionUnit: false,
+      postconditionResults: [],
+      toolResults: []
+    };
+  }
 
   if (input.intent.kind === "wait" || input.intent.kind === "remember") {
     // wait/remember do not mutate Minecraft directly, but they still influence
@@ -1016,6 +1085,7 @@ export async function executeSocialActionIntent(input: {
         verifierStatus: "not_applicable",
         gateBlocked: true,
         contractBlocked: false,
+        retryConstraintBlocked: false,
         actionSkillExecutionUnit: false,
         postconditionResults: [],
         toolResults: []
@@ -1041,6 +1111,7 @@ export async function executeSocialActionIntent(input: {
         verifierStatus: "not_applicable",
         gateBlocked: true,
         contractBlocked: false,
+        retryConstraintBlocked: false,
         actionSkillExecutionUnit: false,
         postconditionResults: [],
         toolResults: []
@@ -1084,6 +1155,7 @@ export async function executeSocialActionIntent(input: {
         verifierStatus: "not_applicable",
         gateBlocked: true,
         contractBlocked: false,
+        retryConstraintBlocked: false,
         actionSkillExecutionUnit: false,
         postconditionResults: [],
         toolResults: [
@@ -1130,6 +1202,7 @@ export async function executeSocialActionIntent(input: {
         verifierStatus: "not_applicable",
         gateBlocked: true,
         contractBlocked: true,
+        retryConstraintBlocked: false,
         actionSkillExecutionUnit: false,
         postconditionResults: [],
         toolResults: [
@@ -1166,6 +1239,7 @@ export async function executeSocialActionIntent(input: {
         verifierStatus: "not_applicable",
         gateBlocked: false,
         contractBlocked: false,
+        retryConstraintBlocked: false,
         actionSkillExecutionUnit: false,
         postconditionResults: [],
         toolResults: []
@@ -1203,6 +1277,7 @@ export async function executeSocialActionIntent(input: {
       verifierStatus: "not_applicable",
       gateBlocked: false,
       contractBlocked: false,
+      retryConstraintBlocked: false,
       actionSkillExecutionUnit: false,
       postconditionResults: [],
       toolResults: []
@@ -1223,6 +1298,7 @@ export async function executeSocialActionIntent(input: {
       verifierStatus: "not_applicable",
       gateBlocked: true,
       contractBlocked: false,
+      retryConstraintBlocked: false,
       actionSkillExecutionUnit,
       postconditionResults: [],
       toolResults: []
@@ -1239,6 +1315,7 @@ export async function executeSocialActionIntent(input: {
       verifierStatus: "not_applicable",
       gateBlocked: true,
       contractBlocked: false,
+      retryConstraintBlocked: false,
       actionSkillExecutionUnit,
       postconditionResults: [],
       toolResults: []
@@ -1259,6 +1336,7 @@ export async function executeSocialActionIntent(input: {
         verifierStatus: "not_applicable",
         gateBlocked: true,
         contractBlocked: false,
+        retryConstraintBlocked: false,
         actionSkillExecutionUnit,
         postconditionResults: [],
         toolResults: []
@@ -1285,6 +1363,7 @@ export async function executeSocialActionIntent(input: {
       verifierStatus: "not_applicable",
       gateBlocked: true,
       contractBlocked: false,
+      retryConstraintBlocked: false,
       actionSkillExecutionUnit,
       postconditionResults: [],
       toolResults: []
@@ -1363,6 +1442,7 @@ export async function executeSocialActionIntent(input: {
     verifierStatus,
     gateBlocked,
     contractBlocked,
+    retryConstraintBlocked: false,
     actionSkillExecutionUnit,
     postconditionResults,
     toolResults

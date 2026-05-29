@@ -5,16 +5,20 @@ Updated: 2026-05-25
 This is the canonical gateway spec for the current rebuild.
 
 The long-term product direction is a **Soul-grounded Minecraft social
-simulation seed**. Minecraft is the pressure/evidence substrate. The project is
-not a generic Minecraft LLM benchmark, a race-to-diamond agent, a fastest-tech
-tree contest, or a Voyager clone.
+simulation seed**. Minecraft is the observation/evidence substrate: raw world
+state, inventory, entities, positions, chat, blocks, tool results, and artifact
+refs should be preserved richly enough for the model to decide what matters.
+The project is not a generic Minecraft LLM benchmark, a race-to-diamond agent,
+a fastest-tech tree contest, or a Voyager clone.
 
 ## 1. Spec Authority And Governance
 
-`SPEC.md` and the documents under `docs/docs/Specification/` define the long-term
-project spec. `AGENTS.md` is binding repo-agent guidance for how agents apply
-that spec in day-to-day work. Changing any of these files changes product
-direction or agent operating rules.
+`SPEC.md` and the documents under `docs/blog-doc/Specification/` define the
+long-term project spec. `docs/blog-doc/` is the Docusaurus-exposed documentation
+root. Repo-internal review and agent-operation docs live at the project root,
+and historical research lives under `docs/research-archive/`. `AGENTS.md` is
+binding repo-agent guidance for how agents apply that spec in day-to-day work.
+Changing any of these files changes product direction or agent operating rules.
 
 Rules for agents:
 
@@ -29,7 +33,7 @@ Rules for agents:
 
 Detailed governance lives in:
 
-- `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+- `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
 
 ## 2. Product Identity
 
@@ -37,16 +41,16 @@ The actor is not just an LLM controller attached to Mineflayer.
 
 When `soul.md` or an ActorSoul artifact defines an actor, it is the actor's
 identity seed. Short-, mid-, and long-term goals are derived under the
-Soul/LifeGoal frame and constrained by world pressure, role pressure, memory,
+Soul/LifeGoal frame and informed by observed world state, role context, memory,
 relationships, obligations, trust, conflict, shared/private inventory, and
 settlement state.
 
-Gameplay progress matters because it creates real pressure and evidence for
-social life. It is not the top-level objective by itself.
+Gameplay progress matters because it creates observations, evidence, and social
+consequences. It is not the top-level objective by itself.
 
 Read the product identity spec:
 
-- `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
+- `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
 
 ## 2.1 Autonomy Substrate, Not Domain Strategy
 
@@ -55,10 +59,11 @@ action surface, verifier-backed feedback, hook points, and artifact-grounded
 memory. It must not turn one example goal into core runtime strategy.
 
 House, shelter, base, storage, mining, farming, travel, repair, conversation,
-and conflict are possible social pressures. None of them should become an
-always-on CycleGoal phase, privileged planner object, or universal checklist
-unless the active ActorSoul, LifeGoal, WorldEvent, memory, relationship state,
-or observation makes that pressure relevant in the current cycle.
+and conflict are possible things the actor may notice or care about. None of
+them should become an always-on CycleGoal phase, privileged planner object, or
+universal checklist unless the active ActorSoul, LifeGoal, WorldEvent, memory,
+relationship state, or observation makes that activity relevant in the current
+cycle.
 
 Concrete rules:
 
@@ -72,9 +77,9 @@ Concrete rules:
 - The runtime may expose an `action_surface` packet, direct/deferred
   affordances, pre/post action hooks, approval-like gates, verifier status,
   event streams, and review artifacts. Those are substrate capabilities.
-- A provider may choose building only when current pressure makes building a
-  reasonable action. The system should not push every social goal through house
-  construction.
+- A provider may choose building only when current observation, memory,
+  relationship context, or CycleGoal makes building a reasonable action. The
+  system should not push every social situation through house construction.
 
 This mirrors the useful lesson from Codex-style tool runtimes: the core system
 does not hard-code a strategy for every programming language. It exposes tools,
@@ -129,48 +134,52 @@ Read these documents to understand the full spec:
 
 1. `SPEC.md`
    - entrypoint, authority, project identity, non-negotiable rules.
-2. `docs/docs/Specification/Soul-Grounded-Social-Simulation.md`
-   - Soul/ActorSoul identity, LifeGoal continuity, social pressure, and what
+2. `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
+   - Soul/ActorSoul identity, LifeGoal continuity, social context, and what
      counts as social simulation progress.
-3. `docs/docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+3. `docs/blog-doc/Specification/Runtime-Evidence-And-Action-Skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.
-4. `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+4. `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
    - spec change governance, implementation style, Detroit-style tests, live
      runs, comments, file size, domain modeling, and documentation rules.
-5. `docs/docs/Specification/Reference-Adaptation-Guide.md`
+5. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
    - how to use external research without copying reference architectures.
-6. `docs/docs/Documentation-Map.md`
+6. `docs/blog-doc/Documentation-Map.md`
    - documentation authority order, active/supporting/historical categories,
      and cleanup rules.
-7. `docs/docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+7. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
    - concrete Soul/LifeGoal/CycleGoal architecture.
-8. `docs/docs/Architecture/Runtime-Loop-And-Verification.md`
+8. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
    - hot path, runtime verification, and bounded execution.
-9. `docs/docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+9. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
    - transcript and artifact persistence contract.
-10. `docs/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+10. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
-11. `docs/docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-    - actor profiles, role pressure, and relationship state.
-12. `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
+11. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+    - actor profiles, role context, and relationship state.
+12. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
     - current implementation state and next work.
-13. `docs/docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+    - repo-internal whole-project implementation map for current boundaries,
+      runtime flow, evidence, and risks.
+14. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
     - latest architecture/implementation cross-check.
-14. `docs/docs/Agent-Search-Index.md`
+15. `docs/blog-doc/Agent-Search-Index.md`
     - routing map and search tokens.
-15. `docs/docs/Terminology.md`
+16. `docs/blog-doc/Terminology.md`
     - canonical terms such as `agent skill` and `action skill`.
 
 Setup docs:
 
-- `docs/docs/Setup/Headless-Server.md`
-- `docs/docs/Setup/Provider-Setup.md`
+- `docs/blog-doc/Setup/Headless-Server.md`
+- `docs/blog-doc/Setup/Provider-Setup.md`
 
 ## 4. Non-Negotiable Direction
 
 - Soul/LifeGoal continuity is the top-level simulation frame.
-- WorldEvents are pressure, not direct replacement for LifeGoal.
+- WorldEvents are event/context records, not raw observation and not a direct
+  replacement for LifeGoal.
 - Runtime owns physical truth: validation, timeout, cancellation, execution,
   verification, transcript, artifacts, and lifecycle guards.
 - Providers propose goals and actions. They do not decide success.
@@ -208,8 +217,8 @@ The first meaningful proof is small:
 - real Minecraft actions such as gathering, crafting, storage, movement,
   block placement, communication, or settlement maintenance;
 - action attempts recorded whether passed, blocked, failed, or no-progress;
-- CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, world pressure,
-  memory, relationships, and prior judgments;
+- CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, observation,
+  world events, memory, relationships, and prior judgments;
 - CycleJudgment written from runtime evidence;
 - later cycles retrieve and use prior memory or judgment;
 - failures explainable from artifacts without immediate reproduction.
@@ -227,7 +236,7 @@ The proof is not:
 The runtime shape is:
 
 ```text
-ActorSoul + LifeGoal + world/social pressure + memory
+ActorSoul + LifeGoal + observation + world events + memory
 -> CycleGoal
 -> ActionIntent
 -> active action skill / primitive gate
@@ -266,7 +275,7 @@ after the real runtime behavior is broken, rewrite or delete it.
 
 Detailed testing rules live in:
 
-- `docs/docs/Specification/Engineering-Governance-And-Testing.md`
+- `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
 
 ## 8. External References
 
@@ -275,8 +284,8 @@ External research is used for mechanisms, not for product identity.
 Reference mechanisms must be translated into this project:
 
 - skill-library work -> actor-owned, evidence-backed action skill promotion;
-- curriculum work -> bounded Soul/LifeGoal-compatible pressure, not benchmark
-  optimization;
+- curriculum work -> bounded capability scaffolding under ActorSoul/LifeGoal,
+  not benchmark optimization;
 - reasoning/action work -> CycleGoal, ActionIntent, evidence, CycleJudgment;
 - memory/reflection work -> artifact-grounded memory and review, not claimed
   progress;
@@ -288,7 +297,7 @@ Reference mechanisms must be translated into this project:
 
 Detailed reference mapping with links lives in:
 
-- `docs/docs/Specification/Reference-Adaptation-Guide.md`
+- `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
 
 Reference anchors include:
 
@@ -314,8 +323,8 @@ those details in handoff and audit docs, not as the long-term spec itself.
 
 Current-state references:
 
-- `docs/docs/Architecture/Current-Handoff-And-Next-Work.md`
-- `docs/docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+- `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+- `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
 
 As of this spec update, the current action-skill evidence baseline is described
 in the architecture audit, including the fresh 14/14 live matrix after the

@@ -7,7 +7,7 @@ export type HostileRoleContract = {
 };
 
 // Hostile behavior is intentionally smaller than cooperative behavior: it can
-// create pressure, but cannot use open-ended combat or storage primitives.
+// create bounded conflict context, but cannot use open-ended combat or storage primitives.
 export const hostileRoleContract: HostileRoleContract = {
   roleId: "hostile",
   allowedTools: ["move_to", "wait", "remember"],

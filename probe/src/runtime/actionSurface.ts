@@ -28,6 +28,15 @@ export type ActionSurfaceActionSkill = {
   reason: string;
 };
 
+export type MineflayerExpansionOpportunity = {
+  capability_id: string;
+  category: string;
+  status: "unadapted_mineflayer_capability" | "missing_runtime_adapter";
+  opens_affordance: string;
+  required_boundary: "bounded_runtime_adapter" | "actor_action_skill_candidate";
+  reason: string;
+};
+
 export type ActionSurfacePacket = {
   schema: "action-surface/v1";
   actor_id: string;
@@ -37,10 +46,13 @@ export type ActionSurfacePacket = {
   deferred_action_skills: ActionSurfaceActionSkill[];
   recent_blockers: Array<{ key: string; count: number; example: string }>;
   missing_affordances: string[];
+  mineflayer_expansion_opportunities: MineflayerExpansionOpportunity[];
   rules: {
     exposes_actor_body_not_strategy: true;
-    domain_goals_are_pressure_not_core_architecture: true;
+    domain_goals_are_context_not_core_architecture: true;
     runtime_verification_required: true;
+    mineflayer_is_capability_substrate: true;
+    raw_mineflayer_api_not_provider_authority: true;
   };
 };
 
@@ -52,14 +64,57 @@ const primitiveDescriptions: Record<string, string> = {
   craft_item: "Craft an inventory recipe when ingredients exist.",
   craft_with_table: "Craft a table-bound recipe when a crafting table is nearby.",
   place_block: "Place one explicit inventory block and verify the world block afterward.",
-  build_pattern: "Run one bounded block-pattern executor only when the current pressure makes building relevant.",
+  build_pattern: "Run one bounded block-pattern executor only when current context makes building relevant.",
   inspect_chest: "Inspect a nearby shared chest and record a container snapshot.",
   deposit_shared: "Deposit role-allowed useful inventory into shared storage.",
   withdraw_shared: "Withdraw a specific item from shared storage when it enables the current goal.",
-  say: "Speak when communication matters for the current relationship or role pressure.",
+  say: "Speak when communication matters for the current relationship or role context.",
   wait: "Wait briefly when the world needs time or no better physical action is justified.",
   remember: "Record a blocker, observation, or decision to avoid blind repetition."
 };
+
+const mineflayerExpansionCatalog: MineflayerExpansionOpportunity[] = [
+  {
+    capability_id: "inventory_equipment_management",
+    category: "inventory",
+    status: "unadapted_mineflayer_capability",
+    opens_affordance: "equip, unequip, and prepare tools or armor before a physical action",
+    required_boundary: "bounded_runtime_adapter",
+    reason: "Mineflayer exposes inventory and equipment control, but this runtime has no verified equipment primitive yet."
+  },
+  {
+    capability_id: "item_use_and_consumption",
+    category: "survival",
+    status: "unadapted_mineflayer_capability",
+    opens_affordance: "eat food, use selected items, or interact with usable inventory items",
+    required_boundary: "bounded_runtime_adapter",
+    reason: "Item use can change survival state and must be wrapped with typed args, timeout, and verifier evidence before providers may choose it."
+  },
+  {
+    capability_id: "entity_interaction",
+    category: "entity",
+    status: "unadapted_mineflayer_capability",
+    opens_affordance: "interact with villagers, animals, dropped items, or other loaded entities",
+    required_boundary: "actor_action_skill_candidate",
+    reason: "Entity interaction is part of the Mineflayer body, but this repo needs actor-owned contracts before exposing it as direct action."
+  },
+  {
+    capability_id: "container_interaction",
+    category: "storage",
+    status: "unadapted_mineflayer_capability",
+    opens_affordance: "open, inspect, withdraw from, and deposit into containers beyond the current shared-chest helpers",
+    required_boundary: "actor_action_skill_candidate",
+    reason: "The runtime has shared storage helpers, but broader Mineflayer container behavior should become bounded action-skill candidates."
+  },
+  {
+    capability_id: "defense_and_combat",
+    category: "survival",
+    status: "unadapted_mineflayer_capability",
+    opens_affordance: "avoid, face, attack, or disengage from loaded hostile entities",
+    required_boundary: "actor_action_skill_candidate",
+    reason: "Combat and defense affect safety and social state, so they need explicit policy, evidence, and promotion before direct exposure."
+  }
+];
 
 function primitiveDescription(primitiveId: string) {
   return primitiveDescriptions[primitiveId] ?? "Runtime primitive exposed by the current actor body.";
@@ -103,10 +158,27 @@ function actionSkillExposure(input: {
   };
 }
 
+function buildMineflayerExpansionOpportunities(input: {
+  missingAffordances: readonly string[];
+}): MineflayerExpansionOpportunity[] {
+  const missingRuntimeAdapters = input.missingAffordances.map((primitiveId) => ({
+    capability_id: `runtime_adapter_for_${primitiveId}`,
+    category: "runtime_adapter",
+    status: "missing_runtime_adapter" as const,
+    opens_affordance: primitiveId,
+    required_boundary: "bounded_runtime_adapter" as const,
+    reason: `Actor-owned action skills reference ${primitiveId}, but it is not executable in the current actor body.`
+  }));
+
+  return [...missingRuntimeAdapters, ...mineflayerExpansionCatalog].sort((left, right) =>
+    left.capability_id.localeCompare(right.capability_id)
+  );
+}
+
 /**
  * Builds the model-visible action surface without turning any domain objective
  * into a core strategy. Physical and social primitives are all just affordances
- * until Soul/LifeGoal pressure and runtime evidence make one useful.
+ * until Soul/LifeGoal context and runtime evidence make one useful.
  */
 export function buildActionSurfacePacket(input: {
   actorId: string;
@@ -144,6 +216,10 @@ export function buildActionSurfacePacket(input: {
   const actionSkillRows = input.activeActionSkills.map((record) =>
     actionSkillExposure({ record, executablePrimitiveIds })
   );
+  const missingAffordances = actionSkillRows
+    .flatMap((row) => row.missing_primitives)
+    .filter((primitiveId, index, all) => all.indexOf(primitiveId) === index)
+    .sort();
 
   return {
     schema: "action-surface/v1",
@@ -153,14 +229,16 @@ export function buildActionSurfacePacket(input: {
     direct_action_skills: actionSkillRows.filter((row) => row.exposure === "direct"),
     deferred_action_skills: actionSkillRows.filter((row) => row.exposure === "deferred"),
     recent_blockers: [...(input.recentBlockers ?? [])],
-    missing_affordances: actionSkillRows
-      .flatMap((row) => row.missing_primitives)
-      .filter((primitiveId, index, all) => all.indexOf(primitiveId) === index)
-      .sort(),
+    missing_affordances: missingAffordances,
+    mineflayer_expansion_opportunities: buildMineflayerExpansionOpportunities({
+      missingAffordances
+    }),
     rules: {
       exposes_actor_body_not_strategy: true,
-      domain_goals_are_pressure_not_core_architecture: true,
-      runtime_verification_required: true
+      domain_goals_are_context_not_core_architecture: true,
+      runtime_verification_required: true,
+      mineflayer_is_capability_substrate: true,
+      raw_mineflayer_api_not_provider_authority: true
     }
   };
 }

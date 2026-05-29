@@ -66,8 +66,10 @@ test("direct generated objective memory captures episode and procedural candidat
 
   assert.equal(records.length, 2);
   assert.equal(records[0]?.layer, "episodic");
+  assert.equal(records[0]?.kind, "direct_objective_episode");
   assert.equal(records[0]?.status, "active");
   assert.equal(records[1]?.layer, "procedural");
+  assert.equal(records[1]?.kind, "action_skill_note");
   assert.equal(records[1]?.status, "candidate");
   assert.deepEqual(records[0]?.index.objective_ids, ["craft_current_run_stone_axe_1"]);
   assert.equal(records[0]?.index.item_names.includes("stone_axe"), true);
@@ -101,6 +103,7 @@ test("failed direct generated objective memory captures guardrail candidate", ()
 
   assert.equal(records.length, 2);
   assert.equal(records[1]?.layer, "guardrail");
+  assert.equal(records[1]?.kind, "blocker");
   assert.equal(records[1]?.status, "candidate");
   assert.equal(records[1]?.index.diagnoses.includes("inventory_no_delta"), true);
 });
@@ -150,7 +153,38 @@ test("retrieves objective-scoped typed memory without using stale records", asyn
     assert.equal(packet.retrieved_episodic.length, 1);
     assert.equal(packet.retrieved_procedural.length, 1);
     assert.equal(packet.retrieved_episodic[0]?.memory_id.includes("stale"), false);
+    assert.equal(packet.retrieved_episodic[0]?.kind, "direct_objective_episode");
     assert.equal(packet.retrieved_episodic[0]?.reason.includes("objective:"), true);
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("retrieval normalizes legacy memory records that do not yet have kind", async () => {
+  const rootDir = path.resolve(
+    here,
+    "test-artifacts",
+    `actor-memory-legacy-${process.pid}-${Date.now()}`
+  );
+
+  try {
+    const legacyPath = path.join(rootDir, "npc_b/memory/episodic/legacy.json");
+    const record = buildDirectGeneratedObjectiveMemoryRecords({
+      report: baseReport({ runId: "legacy-run" }),
+      now: "2026-05-23T00:00:00.000Z"
+    })[0]!;
+    const legacyRecord = { ...record } as Partial<ActorMemoryRecord>;
+    delete legacyRecord.kind;
+    await fs.mkdir(path.dirname(legacyPath), { recursive: true });
+    await fs.writeFile(legacyPath, JSON.stringify(legacyRecord, null, 2));
+
+    const packet = await retrieveActorMemoryForObjective(rootDir, "npc_b", {
+      objectiveId: "craft_current_run_stone_axe_1",
+      limit: 8
+    });
+
+    assert.equal(packet.retrieved_episodic[0]?.memory_id, "episode-legacy-run");
+    assert.equal(packet.retrieved_episodic[0]?.kind, "direct_objective_episode");
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

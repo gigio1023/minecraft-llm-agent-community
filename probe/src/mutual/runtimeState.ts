@@ -117,12 +117,12 @@ export function createMutualRuntimeState({
     });
   }
 
-  function maybeAdvanceHostilePressure(actorId: MutualActorId) {
+  function maybeAdvanceHostileContext(actorId: MutualActorId) {
     if (!socialContextEnabled || !hostileEnabled) {
       return;
     }
 
-    // Hostile pressure only appears after material/social context exists. This
+    // Hostile context only appears after material/social context exists. This
     // keeps Phase 1 from manufacturing drama before the world has shared facts.
     if (!markerDropped && sharedSettlement.snapshot().knownSharedChests.length === 0) {
       hostileAlerts.delete(actorId);
@@ -148,7 +148,7 @@ export function createMutualRuntimeState({
 
     if (decision.action === "move_to") {
       hostileEngagementTicks[actorId] += 1;
-      const note = `bounded hostile pressure is approaching ${actorId}`;
+      const note = `bounded hostile context is approaching ${actorId}`;
       sharedSettlement.recordHostileSighting({
         actorId: "hostile",
         note,
@@ -221,7 +221,7 @@ export function createMutualRuntimeState({
     const roleId = roleOf(actorId);
 
     // Providers receive a compact state bundle, not direct mutable stores. That
-    // keeps role pressure visible while preserving runtime ownership of memory.
+    // keeps role context visible while preserving runtime ownership of memory.
     return {
       role: roleId ? getRoleContract(roleId) : null,
       mailbox: mailbox.visible(actorId),
@@ -249,7 +249,7 @@ export function createMutualRuntimeState({
       }
 
       threads[actorId].setCurrentTask(currentTasks[actorId]);
-      maybeAdvanceHostilePressure(actorId);
+      maybeAdvanceHostileContext(actorId);
       updateBulletin(actorId);
     },
     setCurrentTask(actorId: MutualActorId, taskId: string | null) {
@@ -361,7 +361,7 @@ export function createMutualRuntimeState({
       threads[actorId].recordObservation(observation);
       const blocker = hostileAlerts.get(actorId);
       threads[actorId].updateWorkingMemory({
-        currentBlocker: blocker?.action === "move_to" ? "hostile_pressure" : null,
+        currentBlocker: blocker?.action === "move_to" ? "hostile_context" : null,
         nextIntendedAction: observation.visibleActors?.[0]?.id
           ? `respond to ${observation.visibleActors[0].id}`
           : null

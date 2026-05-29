@@ -246,7 +246,7 @@ function buildBlockerHistogram(input: {
 
   for (const { judgment } of input.previousJudgments) {
     if (judgment.outcome === "blocked" || judgment.outcome === "no_progress") {
-      add(judgment.what_happened || judgment.next_goal_pressure.join(" "));
+      add(judgment.what_happened || judgment.next_goal_context.join(" "));
     }
   }
 

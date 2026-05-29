@@ -47,7 +47,7 @@ export function verifyTask(
   if (task.id === "deposit_shared_materials") {
     // Shared storage success is judged from the public chest snapshot, not from
     // the actor's private inventory. That makes the evidence reusable for later
-    // multi-actor pressure without trusting a single bot's local state.
+    // multi-actor context without trusting a single bot's local state.
     const beforeCount = countItems(
       { inventory: input.before.sharedChest?.items ?? [] },
       task.success.itemNames

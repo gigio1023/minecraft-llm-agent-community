@@ -41,7 +41,7 @@ export function createWorldEvent(input: {
     schema: "world-event/v1",
     event_id: `world-event-${randomUUID()}`,
     kind: input.kind,
-    authority: input.authority ?? "pressure_only",
+    authority: input.authority ?? "context_only",
     summary: input.summary,
     actor_refs: input.actorRefs ?? [],
     evidence_refs: [],

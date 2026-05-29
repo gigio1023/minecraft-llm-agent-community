@@ -157,8 +157,8 @@ function cycleGoalFromLlm(input: {
  * Produces the next bounded CycleGoal without granting domain strategy authority.
  *
  * @remarks The provider may prioritize any available Minecraft or social
- * affordance, but only as pressure interpreted under ActorSoul/LifeGoal and the
- * current action surface.
+ * affordance from raw observation, ActorSoul/LifeGoal, memory, relationships,
+ * and the current action surface.
  */
 export async function runSocialCycleGoalProvider(input: {
   providerId: "openai-api" | "gemini-api" | "deterministic-social";
@@ -242,14 +242,16 @@ export async function runSocialCycleGoalProvider(input: {
 
   const system = `You are the cycle goal provider for a Minecraft social simulation actor.
 ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a WorldEvent summary.
-WorldEvents are pressure only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
-Choose an ordinary Minecraft CycleGoal when the situation calls for it. A Minecraft action is only socially relevant when observation, memory, role pressure, or relationships make it relevant.
+WorldEvents are context only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
+Choose an ordinary Minecraft CycleGoal when the situation calls for it. A Minecraft action is socially relevant when observation, memory, role context, or relationships make it relevant.
+Treat observation as raw runtime evidence. Do not wait for the runtime to label what matters; inspect the raw facts, memory, blockers, relationships, and current action surface yourself.
 The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
-Use action_surface as the current actor body and affordance catalog. Direct entries are usable now; deferred entries are diagnostics about missing or non-exposed affordances.
+Use action_surface as the current actor body and affordance catalog. Direct entries are usable now; deferred entries are diagnostics about missing or non-exposed affordances. Mineflayer expansion opportunities show body capabilities that may become bounded adapters or action skill candidates later, but they are not executable authority in this cycle.
 For survival and settlement goals, reason from raw evidence and the available action surface. Do not use fixed material-family, station-family, construction-readiness, or tech-tree categories as mandatory planning headings.
-Use settlement_state and settlement_checklist as runtime-owned pressure/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
-Do not make any single domain activity an always-on CycleGoal. Building is one possible social pressure among many, selected only when ActorSoul/LifeGoal, WorldEvent pressure, memory, or observation makes it relevant.
+Use settlement_state and settlement_checklist as runtime-owned observation/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Do not make any single domain activity an always-on CycleGoal. Building is one possible action among many, selected only when ActorSoul/LifeGoal, WorldEvents, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
+If runtime_retry_constraints are present, treat them as hard evidence that the exact target plus structured args should not be selected again until context changes.
 If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
@@ -372,7 +374,7 @@ If observation or previous judgments include blocked evidence, use that context 
     summary:
       typeof update.summary === "string" && update.summary.trim().length > 0
         ? update.summary.trim()
-        : "Strategic pressure from LifeGoal and world state",
+        : "Strategic context from LifeGoal and world state",
     rationale:
       typeof update.rationale === "string" && update.rationale.trim().length > 0
         ? update.rationale.trim()

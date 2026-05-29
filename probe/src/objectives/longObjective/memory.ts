@@ -26,6 +26,7 @@ export async function writeLongObjectivePhaseMemory(input: {
     schema: "actor-memory-record/v1",
     memory_id: `long-phase-${input.runId}-${input.phase.phaseId}`,
     actor_id: input.actorId,
+    kind: "long_objective_phase",
     layer: "episodic",
     status: "active",
     confidence: "observed",
