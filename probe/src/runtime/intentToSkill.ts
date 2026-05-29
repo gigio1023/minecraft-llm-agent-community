@@ -15,6 +15,7 @@ export type ActionSkillCandidate = {
 // skills before the runtime has enough state to verify them safely.
 const BOOTSTRAP_ACTION_SKILLS: ReadonlySet<SeedActionSkillId> = new Set([
   "collectLogs",
+  "runBoundedMineflayerProgram",
   "craftPlanksAndSticks",
   "craftCraftingTable",
   "craftWoodenPickaxe",
@@ -28,6 +29,7 @@ const BOOTSTRAP_ACTION_SKILLS: ReadonlySet<SeedActionSkillId> = new Set([
 
 const RECOVERY_ACTION_SKILLS: ReadonlySet<SeedActionSkillId> = new Set([
   "collectLogs",
+  "runBoundedMineflayerProgram",
   "craftPlanksAndSticks",
   "craftCraftingTable",
   "craftWoodenPickaxe",

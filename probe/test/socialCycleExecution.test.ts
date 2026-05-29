@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import type { Bot } from "mineflayer";
 
 import {
   compileSocialAllowedPrimitives,
@@ -19,17 +20,41 @@ import {
 } from "../src/runtime/socialCycleProgress.js";
 import type { ActionIntent, CycleJudgment } from "../src/runtime/goals/types.js";
 import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
-import { evaluateSocialActionSkillPostcondition } from "../src/runtime/settlement/settlementState.js";
+import {
+  buildSettlementState,
+  evaluateSocialActionSkillPostcondition
+} from "../src/runtime/settlement/settlementState.js";
 import {
   buildRuntimeRetryAttempt,
   deriveRuntimeRetryConstraints,
   findMatchingRuntimeRetryConstraint
 } from "../src/runtime/retryConstraints.js";
 
+function fakeObserveBot(): Bot {
+  const position = {
+    x: 0,
+    y: 64,
+    z: 0,
+    distanceTo: () => 0
+  };
+  return {
+    username: "npc_b",
+    entity: { position },
+    inventory: { items: () => [] },
+    findBlocks: () => [],
+    blockAt: (pos: { x: number; y: number; z: number }) => ({
+      name: "air",
+      position: pos
+    })
+  } as unknown as Bot;
+}
+
 test("gatherer social affordances expose the role-safe runtime body", () => {
   const allowed = compileSocialAllowedPrimitives("gatherer");
   assert.ok(allowed.includes("collect_logs"));
   assert.ok(allowed.includes("move_to"));
+  assert.ok(allowed.includes("consume_item"));
+  assert.ok(allowed.includes("run_mineflayer_program"));
   assert.ok(allowed.includes("say"));
   assert.ok(allowed.includes("observe"));
 });
@@ -110,6 +135,8 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
     ["mine_block", "mined"],
     ["craft_item", "crafted"],
     ["craft_with_table", "crafted"],
+    ["consume_item", "consumed"],
+    ["run_mineflayer_program", "completed_with_evidence"],
     ["place_block", "placed"],
     ["place_block", "already_present"],
     ["build_pattern", "built"],
@@ -126,6 +153,15 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
       `${tool}=${status} should count as verified progress`
     );
   }
+});
+
+test("run_mineflayer_program completion without helper evidence does not pass progress", () => {
+  assert.equal(
+    deriveProgressVerifierStatus({
+      toolAttempts: [{ tool: "run_mineflayer_program", status: "completed" }]
+    }),
+    "failed"
+  );
 });
 
 test("deriveProgressVerifierStatus keeps partial build patterns below full verifier success", () => {
@@ -262,6 +298,118 @@ test("direct primitive intent cannot smuggle action-skill fallback authority", (
   assert.match(resolved.blockedReason ?? "", /Direct primitive intents cannot carry action_skill_id/);
 });
 
+test("executor records missing direct primitive args as contract evidence", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-contract-block-"));
+  const result = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0001",
+      status: "active",
+      source: "llm_planner",
+      summary: "record invalid direct primitive args",
+      rationale: "The runtime should preserve contract failures as evidence.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime_primitive_or_evidence",
+        evidence_required: ["tool_attempt"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["craft_item"],
+      stop_conditions: ["gate_blocked"]
+    },
+    intent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "use_primitive",
+      primitive_id: "craft_item",
+      args: {},
+      why_this_action: "Gemini forgot itemName",
+      expected_evidence: ["action_intent_contract_failure"],
+      fallback_if_blocked: "observe"
+    },
+    bot: fakeObserveBot(),
+    activeActionSkills: [
+      testActionSkillRecord("craftPlanksAndSticks", ["craft_item"], "npc_b")
+    ]
+  });
+
+  assert.equal(result.contractBlocked, true);
+  assert.equal(result.gateBlocked, true);
+  assert.deepEqual(result.executedTools, ["craft_item"]);
+  assert.match(JSON.stringify(result.runtimeResult), /craft_item requires itemName/);
+  assert.match(result.evidenceRefs[0] ?? "", /args-contract-blocked/);
+});
+
+test("executor rejects direct primitive args actionSkillId fallback", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-direct-fallback-"));
+  const result = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0001",
+      status: "active",
+      source: "llm_planner",
+      summary: "reject direct fallback smuggling",
+      rationale: "Direct primitive authority is not actor-owned action skill authority.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime_primitive_or_evidence",
+        evidence_required: ["tool_attempt"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["craft_item"],
+      stop_conditions: ["gate_blocked"]
+    },
+    intent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "use_primitive",
+      primitive_id: "craft_item",
+      args: { actionSkillId: "craftPlanksAndSticks" },
+      why_this_action: "try to borrow action skill fallback from direct primitive args",
+      expected_evidence: ["action_intent_contract_failure"],
+      fallback_if_blocked: "observe"
+    },
+    bot: fakeObserveBot(),
+    activeActionSkills: [
+      testActionSkillRecord("craftPlanksAndSticks", ["craft_item"], "npc_b")
+    ]
+  });
+
+  assert.equal(result.contractBlocked, true);
+  assert.deepEqual(result.executedTools, ["craft_item"]);
+  assert.match(JSON.stringify(result.runtimeResult), /Direct primitive intents cannot carry args.actionSkillId/);
+});
+
 test("wait and remember still pass through CycleGoal and active action-skill gates", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-control-gate-"));
   const result = await executeSocialActionIntent({
@@ -314,6 +462,58 @@ test("wait and remember still pass through CycleGoal and active action-skill gat
   assert.equal(result.contractBlocked, false);
   assert.deepEqual(result.executedTools, ["wait"]);
   assert.match(JSON.stringify(result.runtimeResult), /not backed by active action skills/);
+});
+
+test("executor treats CycleGoal primitive lists as advisory and keeps active action-skill gate authority", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-open-body-"));
+  const result = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0001",
+      status: "active",
+      source: "llm_planner",
+      summary: "Do not narrow the runtime body",
+      rationale: "CycleGoal allowed lists are compatibility fields.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime_primitive_or_evidence",
+        evidence_required: ["tool_attempt"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["observe"],
+      stop_conditions: ["gate_blocked"]
+    },
+    intent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "wait",
+      args: { ticks: 1 },
+      why_this_action: "prove CycleGoal does not shrink the body",
+      expected_evidence: ["tool_attempt"],
+      fallback_if_blocked: "remember"
+    },
+    activeActionSkills: [
+      testActionSkillRecord("runtimeObserveAndRemember", ["observe", "wait", "remember"], "npc_b")
+    ]
+  });
+
+  assert.equal(result.gateBlocked, false);
+  assert.deepEqual(result.executedTools, ["wait"]);
 });
 
 test("runtime retry constraints group exact repeated blocker target and args", () => {
@@ -496,6 +696,26 @@ test("social action skill postcondition accepts verified shelter evidence", () =
   assert.deepEqual(result.checklist_item_ids, ["starter_shelter_verified"]);
 });
 
+test("social action skill postcondition accepts verified consumption evidence", () => {
+  const result = evaluateSocialActionSkillPostcondition({
+    actionSkillId: "eatFoodWhenHungry",
+    evidenceRefs: ["evidence/cycle-0001-consume_item.json"],
+    toolResults: [
+      {
+        tool: "consume_item",
+        status: "consumed",
+        evidence_ref: "evidence/cycle-0001-consume_item.json",
+        result: {
+          status: "consumed",
+          itemName: "bread"
+        }
+      }
+    ]
+  });
+
+  assert.equal(result.status, "passed");
+});
+
 test("social action skill postcondition rejects table placement without placed table evidence", () => {
   const result = evaluateSocialActionSkillPostcondition({
     actionSkillId: "placeCraftingTable",
@@ -516,4 +736,41 @@ test("social action skill postcondition rejects table placement without placed t
 
   assert.equal(result.status, "failed");
   assert.deepEqual(result.checklist_item_ids, ["crafting_table_known_or_placed"]);
+});
+
+test("settlement state carries direct primitive crafting-table placement forward", () => {
+  const state = buildSettlementState({
+    actorId: "npc_b",
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      visibleActors: [],
+      memory: [],
+      inventory: []
+    },
+    activeActionSkills: [],
+    previousJudgments: [],
+    recentToolResults: [
+      {
+        tool: "place_block",
+        status: "placed",
+        evidence_ref: "evidence/cycle-0001-place_block.json",
+        result: {
+          status: "placed",
+          itemName: "crafting_table",
+          targetPosition: { x: 1, y: 64, z: 0 }
+        }
+      }
+    ],
+    evidenceRefs: []
+  });
+
+  assert.equal(state.progress.has_crafting_table, true);
+  assert.equal(state.known_positions.crafting_table?.status, "placed");
+  assert.deepEqual(state.known_positions.crafting_table?.position, { x: 1, y: 64, z: 0 });
+  assert.deepEqual(
+    state.checklist.items.find((item) => item.id === "crafting_table_known_or_placed")?.evidence_refs,
+    ["evidence/cycle-0001-place_block.json"]
+  );
 });

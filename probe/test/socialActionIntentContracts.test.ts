@@ -107,6 +107,8 @@ test("physical primitives reject hidden executor defaults", () => {
     ["place_block", { targetPosition: { x: 1, y: 64, z: 0 } }, "itemName or blockName"],
     ["build_pattern", {}, "anchor, position, or targetPosition"],
     ["mine_block", {}, "blockName"],
+    ["consume_item", {}, "itemName"],
+    ["run_mineflayer_program", {}, "requires generated source"],
     ["deposit_shared", { itemName: "minecraft_item" }, "count or targetCount"],
     ["withdraw_shared", {}, "itemName"],
     ["withdraw_shared", { itemName: "minecraft_item" }, "count or targetCount"],
@@ -171,6 +173,40 @@ test("craft primitives require itemName unless actionSkillId fallback is present
   }
 });
 
+test("generated Mineflayer program primitive requires source authority", () => {
+  assert.equal(
+    validatePrimitiveActionIntentArgs({
+      primitiveId: "run_mineflayer_program",
+      args: {
+        source: "export async function run(ctx) { return ctx.observe(); }",
+        purpose: "refresh observation through generated helper source"
+      }
+    }).ok,
+    true
+  );
+});
+
+test("consume_item requires itemName unless action-skill fallback is present", () => {
+  assertRejected(
+    validatePrimitiveActionIntentArgs({ primitiveId: "consume_item", args: {} }),
+    "requires itemName"
+  );
+  assert.equal(
+    validatePrimitiveActionIntentArgs({
+      primitiveId: "consume_item",
+      args: { itemName: "bread" }
+    }).ok,
+    true
+  );
+  assert.equal(
+    validatePrimitiveActionIntentArgs({
+      primitiveId: "consume_item",
+      args: { actionSkillId: "eatFoodWhenHungry" }
+    }).ok,
+    true
+  );
+});
+
 test("provider-direct primitive validation cannot spoof action-skill fallback args", () => {
   assertRejected(
     validateDirectPrimitiveActionIntentArgs(
@@ -195,6 +231,16 @@ test("provider-direct primitive validation cannot spoof action-skill fallback ar
       primitiveIntent({
         primitiveId: "deposit_shared",
         args: { actionSkillId: "depositSharedItems" }
+      })
+    ),
+    "itemName"
+  );
+
+  assertRejected(
+    validateDirectPrimitiveActionIntentArgs(
+      primitiveIntent({
+        primitiveId: "consume_item",
+        args: { actionSkillId: "eatFoodWhenHungry" }
       })
     ),
     "itemName"

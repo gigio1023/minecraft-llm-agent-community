@@ -207,12 +207,13 @@ it off the default port.
 ## Gemini Planner For Long Objectives
 
 For long-objective and direct-generated planner calls, use REST `text-genai`
-with Gemini 2.5 Flash as the current primary path:
+with Gemini 2.5 Flash as the current primary path. The planner returns a
+structured JSON envelope whose `source` field contains the TypeScript program:
 
 ```text
 GEMINI_API_KEY=...                         # ignored local only
 GEMINI_PLANNER_PRIMARY=text-genai
-PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai,live-transcription
+PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai
 ```
 
 Behavior:
@@ -221,9 +222,11 @@ Behavior:
   tracks, not the social-life runtime;
 - objective reports must distinguish LLM output from builtin fallback and helper
   expansion;
-- text-genai calls also append provider usage ledger records;
-- Native Audio Dialog remains dialog/smoke only. It is not the primary path for
-  generating `export async function run(ctx)` code.
+- text-genai calls use `@google/genai` structured output
+  (`responseMimeType: "application/json"` plus `responseJsonSchema`) and append
+  provider usage ledger records;
+- Native Audio Dialog is not a fallback or recovery path for generating
+  `export async function run(ctx)` code.
 
 Real validation command (preferred over smoke-only checks):
 
@@ -233,7 +236,7 @@ bun run server:ready
 bun run probe:long-objective -- \
   --objective craft_current_run_stone_pickaxe_1 \
   --actor npc_b \
-  --provider gemini-live-planner \
+  --provider gemini-planner \
   --force-path text-genai \
   --report ../tmp/long-stone-pickaxe-gemini.json
 ```

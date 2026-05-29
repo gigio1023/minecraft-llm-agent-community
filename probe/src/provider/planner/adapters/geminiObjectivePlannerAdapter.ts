@@ -8,7 +8,7 @@ import type {
 } from "../types.js";
 
 export class GeminiObjectivePlannerAdapter implements ObjectivePhasePlannerPort {
-  readonly plannerId = "gemini-live-planner" as const;
+  readonly plannerId = "gemini-planner" as const;
 
   constructor(private readonly forcePath?: ObjectivePlannerPathId) {}
 

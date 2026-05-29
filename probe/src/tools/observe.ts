@@ -14,6 +14,11 @@ type DialogueState = ReturnType<typeof createDialogueState>;
 type MemoryStore = ReturnType<typeof createMemory>;
 type PositionedActor = {
   username: string;
+  health?: number;
+  food?: number;
+  foodSaturation?: number;
+  heldItem?: { name: string; count?: number } | null;
+  registry?: unknown;
   entity: {
     position: {
       x: number;
@@ -44,6 +49,18 @@ export type ObserveResult = {
   }>;
   memory: string[];
   inventory?: Array<{ name: string; count: number }>;
+  vitals?: {
+    health?: number;
+    food?: number;
+    food_saturation?: number;
+    held_item?: { name: string; count?: number };
+    food_candidates: Array<{
+      name: string;
+      count: number;
+      food_points?: number;
+      saturation?: number;
+    }>;
+  };
   nearbyBlocks?: Array<{ name: string; distance: number }>;
   sharedChest?: {
     chestId: string;
@@ -76,6 +93,56 @@ function inspectInventory(actor: PositionedActor) {
     name: item.name,
     count: item.count
   }));
+}
+
+function inspectVitals(
+  actor: PositionedActor,
+  inventory: Array<{ name: string; count: number }> | undefined
+) {
+  const hasVitals =
+    typeof actor.health === "number" ||
+    typeof actor.food === "number" ||
+    typeof actor.foodSaturation === "number" ||
+    Boolean(actor.heldItem);
+  const foodCandidates = (inventory ?? [])
+    .map((item) => {
+      const registry = actor.registry && typeof actor.registry === "object"
+        ? actor.registry as { foodsByName?: unknown }
+        : {};
+      const foodsByName = registry.foodsByName && typeof registry.foodsByName === "object"
+        ? registry.foodsByName as Record<string, { foodPoints?: number; saturation?: number } | undefined>
+        : {};
+      const food = foodsByName[item.name];
+      if (!food) {
+        return null;
+      }
+      return {
+        name: item.name,
+        count: item.count,
+        ...(typeof food.foodPoints === "number" ? { food_points: food.foodPoints } : {}),
+        ...(typeof food.saturation === "number" ? { saturation: food.saturation } : {})
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  if (!hasVitals && foodCandidates.length === 0) {
+    return undefined;
+  }
+
+  return {
+    ...(typeof actor.health === "number" ? { health: actor.health } : {}),
+    ...(typeof actor.food === "number" ? { food: actor.food } : {}),
+    ...(typeof actor.foodSaturation === "number" ? { food_saturation: actor.foodSaturation } : {}),
+    ...(actor.heldItem
+      ? {
+          held_item: {
+            name: actor.heldItem.name,
+            count: actor.heldItem.count
+          }
+        }
+      : {}),
+    food_candidates: foodCandidates
+  };
 }
 
 function roundPosition(position: { x: number; y: number; z: number }) {
@@ -115,6 +182,7 @@ export async function observe({
   sharedChest
 }: ObserveArgs): Promise<ObserveResult> {
   const inventory = inspectInventory(actor);
+  const vitals = inspectVitals(actor, inventory);
   const nearbyBlocks = scanNearbyBlocks(actor);
   const worldStateSummary = summarizeWorldStateScan(
     scanWorldState({
@@ -150,6 +218,7 @@ export async function observe({
           ],
     memory: memory.list(),
     ...(inventory ? { inventory } : {}),
+    ...(vitals ? { vitals } : {}),
     ...(nearbyBlocks ? { nearbyBlocks } : {}),
     worldStateSummary,
     ...(sharedChest && sharedChestItems

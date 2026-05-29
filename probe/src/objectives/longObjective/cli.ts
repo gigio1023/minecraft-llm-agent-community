@@ -2,7 +2,7 @@ import type { ObjectivePlannerPathId } from "../../provider/planner/types.js";
 import { runLongObjective } from "./runner.js";
 
 function parseForcePlannerPath(raw: string | undefined): ObjectivePlannerPathId | undefined {
-  if (raw === "text-genai" || raw === "live-transcription") {
+  if (raw === "text-genai") {
     return raw;
   }
   return undefined;

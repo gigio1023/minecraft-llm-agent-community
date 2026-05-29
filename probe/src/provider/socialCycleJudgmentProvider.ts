@@ -87,6 +87,61 @@ export type CycleJudgmentProviderResult =
   | { ok: true; judgment: CycleJudgment; judgmentRef: string; inputRef: string; outputRef: string }
   | { ok: false; error: string; inputRef: string; outputRef: string };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function extractCycleJudgmentPayload(payload: Record<string, unknown>) {
+  const nested = payload.cycle_judgment;
+  if (isRecord(nested)) {
+    return nested;
+  }
+
+  if (
+    typeof payload.outcome === "string" ||
+    typeof payload.what_happened === "string" ||
+    typeof payload.why_it_mattered_for_life_goal === "string"
+  ) {
+    return payload;
+  }
+
+  return {};
+}
+
+function buildRuntimeFallbackJudgmentBody(input: {
+  actionIntent: ActionIntent;
+  executedTools: string[];
+  toolStatuses?: Array<{ tool: string; status: string }>;
+  verifierStatus: CycleJudgment["verifier_status"];
+  validationErrors: readonly string[];
+}): Omit<CycleJudgment, "schema" | "actor_id" | "cycle_id" | "cycle_goal_id" | "evidence_refs"> {
+  const tools = input.executedTools.length > 0
+    ? input.executedTools.join(", ")
+    : input.actionIntent.kind;
+  return {
+    outcome: deterministicJudgmentOutcome({
+      verifierStatus: input.verifierStatus,
+      executedTools: input.executedTools,
+      toolStatuses: input.toolStatuses
+    }),
+    what_happened: `Runtime recorded ${input.verifierStatus} evidence for ${tools}; the provider judgment payload was malformed.`,
+    why_it_mattered_for_life_goal:
+      "The cycle keeps truthful continuity by using verifier evidence instead of accepting malformed provider judgment text.",
+    verifier_status: input.verifierStatus,
+    memory_writes: [
+      {
+        layer: "guardrail",
+        summary: `Provider judgment payload was malformed: ${input.validationErrors.join("; ")}`,
+        confidence: "observed"
+      }
+    ],
+    relationship_event_proposals: [],
+    next_goal_context: [
+      "Use runtime evidence from the previous action; do not rely on the malformed provider judgment text."
+    ]
+  };
+}
+
 /**
  * Writes CycleJudgment from runtime evidence and clamps provider overclaims.
  *
@@ -149,6 +204,8 @@ export async function runSocialCycleJudgmentProvider(input: {
 
   let judgmentBody: Omit<CycleJudgment, "schema" | "actor_id" | "cycle_id" | "cycle_goal_id" | "evidence_refs">;
   let usageRecord: ProviderUsageRecord | undefined;
+  let providerRawOutputText = "";
+  let providerParsedPayload: JsonValue | undefined;
 
   if (input.providerId === "deterministic-social") {
     judgmentBody = {
@@ -178,7 +235,7 @@ export async function runSocialCycleJudgmentProvider(input: {
       schemaName: "social_cycle_judgment",
       schema: judgmentSchema,
       system: `Write CycleJudgment from runtime evidence only. Treat observation as raw evidence; decide what mattered from ActorSoul, LifeGoal, role context, relationships, memory, blockers, and runtime facts.
-Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
+Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item, consume_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
 Use partial_verified_progress only when runtime_result/tool_statuses show current-run world, inventory, movement, container, or block mutation but the final verifier or action-skill postcondition did not pass.
 observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
       user: JSON.stringify(providerInput),
@@ -240,7 +297,9 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
 
     const payload = normalizeOpenAiJsonPayload(result.parsed as Record<string, unknown>);
     usageRecord = result.usageRecord;
-    const raw = (payload.cycle_judgment ?? {}) as Record<string, unknown>;
+    providerRawOutputText = result.rawText;
+    providerParsedPayload = payload as unknown as JsonValue;
+    const raw = extractCycleJudgmentPayload(payload);
     judgmentBody = {
       outcome: raw.outcome as CycleJudgment["outcome"],
       what_happened: String(raw.what_happened ?? ""),
@@ -271,13 +330,60 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
     toolStatuses: input.toolStatuses
   });
 
-  const validated = validateCycleJudgment(judgment);
+  let validated = validateCycleJudgment(judgment);
+  let providerInvalidErrors: string[] | undefined;
+  let providerInvalidJudgment: CycleJudgment | undefined;
+
+  if (!validated.ok && input.providerId !== "deterministic-social") {
+    providerInvalidErrors = validated.errors;
+    providerInvalidJudgment = judgment;
+    const fallbackJudgment: CycleJudgment = clampCycleJudgmentOutcome({
+      judgment: {
+        schema: "cycle-judgment/v1",
+        actor_id: input.actorId,
+        cycle_id: input.cycleId,
+        cycle_goal_id: input.cycleGoal.goal_id,
+        evidence_refs: [...input.evidenceRefs],
+        ...(input.runId ? { run_id: input.runId } : {}),
+        ...buildRuntimeFallbackJudgmentBody({
+          actionIntent: input.actionIntent,
+          executedTools: input.executedTools,
+          toolStatuses: input.toolStatuses,
+          verifierStatus: input.verifierStatus,
+          validationErrors: validated.errors
+        })
+      },
+      actionIntent: input.actionIntent,
+      executedTools: input.executedTools,
+      toolStatuses: input.toolStatuses
+    });
+    validated = validateCycleJudgment(fallbackJudgment);
+  }
+
   if (!validated.ok) {
+    const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
+      schema: "provider-output-snapshot/v1",
+      snapshot_id: `${snapshotId}-out`,
+      actor_id: input.actorId,
+      turn_id: turnId,
+      provider_id: input.providerId,
+      model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
+      created_at: new Date().toISOString(),
+      raw_output_text: providerRawOutputText || JSON.stringify(judgment),
+      parsed_output: {
+        error: validated.errors.join("; "),
+        invalid_judgment: judgment as unknown as JsonValue,
+        provider_parsed_payload: providerParsedPayload ?? null
+      } as unknown as JsonValue,
+      proposal: { error: validated.errors.join("; ") },
+      usage: usageRecord
+    });
+
     return {
       ok: false,
       error: validated.errors.join("; "),
       inputRef: inputPath,
-      outputRef: ""
+      outputRef: outputPath
     };
   }
 
@@ -296,9 +402,19 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
     provider_id: input.providerId,
     model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
-    raw_output_text: JSON.stringify(validated.judgment),
-    parsed_output: validated.judgment as unknown as JsonValue,
-    proposal: { judgment_ref: judgmentRef },
+    raw_output_text: providerRawOutputText || JSON.stringify(validated.judgment),
+    parsed_output: providerInvalidErrors
+      ? {
+          provider_invalid_errors: providerInvalidErrors,
+          provider_invalid_judgment: providerInvalidJudgment as unknown as JsonValue,
+          provider_parsed_payload: providerParsedPayload ?? null,
+          fallback_judgment: validated.judgment as unknown as JsonValue
+        } as unknown as JsonValue
+      : validated.judgment as unknown as JsonValue,
+    proposal: {
+      judgment_ref: judgmentRef,
+      ...(providerInvalidErrors ? { runtime_fallback_judgment: true } : {})
+    },
     usage: usageRecord
   });
 

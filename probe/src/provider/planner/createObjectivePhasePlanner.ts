@@ -22,7 +22,7 @@ export function createObjectivePhasePlanner(input: {
       return new BuiltinPhasePlannerAdapter();
     case "openai-codex-planner":
       return new OpenAICodexPlannerAdapter(input.config);
-    case "gemini-live-planner":
+    case "gemini-planner":
       return new GeminiObjectivePlannerAdapter(input.forceGeminiPath);
   }
 }

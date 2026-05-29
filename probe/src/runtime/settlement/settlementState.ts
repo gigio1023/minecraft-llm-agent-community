@@ -198,6 +198,67 @@ function sharedChestFromToolResults(results: readonly ToolResultRecord[] = []): 
   };
 }
 
+function isCraftingTablePlacementResult(value: unknown) {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const expectedBlockNames = Array.isArray(value.expectedBlockNames)
+    ? value.expectedBlockNames.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  return (
+    (value.status === "placed" || value.status === "already_present") &&
+    (
+      value.itemName === "crafting_table" ||
+      value.blockName === "crafting_table" ||
+      value.afterBlockName === "crafting_table" ||
+      expectedBlockNames.includes("crafting_table")
+    )
+  );
+}
+
+function placementPosition(value: unknown) {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return (
+    readPosition(value.targetPosition) ??
+    readPosition(value.position) ??
+    readPosition(value)
+  );
+}
+
+function craftingTablePlacementFromToolResults(results: readonly ToolResultRecord[] = []) {
+  for (const entry of [...results].reverse()) {
+    if (entry.tool === "place_block" && isCraftingTablePlacementResult(entry.result)) {
+      return {
+        position: placementPosition(entry.result),
+        evidence_refs: entry.evidence_ref ? [entry.evidence_ref] : []
+      };
+    }
+
+    if (entry.tool !== "run_mineflayer_program" || !isRecord(entry.result)) {
+      continue;
+    }
+    const helperEvents = entry.result.helperEvents;
+    if (!Array.isArray(helperEvents)) {
+      continue;
+    }
+    const helperPlacement = [...helperEvents].reverse().find((event) =>
+      isRecord(event) &&
+      event.name === "placeBlock" &&
+      isCraftingTablePlacementResult(event.result)
+    );
+    if (helperPlacement && isRecord(helperPlacement)) {
+      return {
+        position: placementPosition(helperPlacement.result),
+        evidence_refs: entry.evidence_ref ? [entry.evidence_ref] : []
+      };
+    }
+  }
+
+  return undefined;
+}
+
 function findNearbyBlock(observation: ObserveResult | Record<string, unknown>, blockName: string) {
   const nearbyBlocks = (observation as { nearbyBlocks?: unknown }).nearbyBlocks;
   if (!Array.isArray(nearbyBlocks)) {
@@ -369,6 +430,10 @@ export function evaluateSocialActionSkillPostcondition(input: {
       return statusFor("mine_block") === "mined"
         ? passed("mineCobblestone verified mined inventory progress.")
         : failed("mineCobblestone did not produce mined block evidence.");
+    case "eatFoodWhenHungry":
+      return statusFor("consume_item") === "consumed"
+        ? passed("eatFoodWhenHungry verified food consumption evidence.")
+        : failed("eatFoodWhenHungry did not produce consumption evidence.");
     case "placeCraftingTable": {
       const result = resultFor("place_block");
       const placedTable =
@@ -471,11 +536,13 @@ export function buildSettlementState(input: {
   const actorPosition = readPosition((input.observation as { position?: unknown }).position);
   const nearbyCraftingTable = findNearbyBlock(input.observation, "crafting_table");
   const tableNearby = Boolean(nearbyCraftingTable);
+  const toolCraftingTable = craftingTablePlacementFromToolResults(input.recentToolResults);
   const tableEvidenceRefs =
     craftingTablePostcondition?.evidence_refs ??
+    toolCraftingTable?.evidence_refs ??
     (tableNearby ? evidenceRefs : []);
   const progress: SettlementProgressVector = {
-    has_crafting_table: tableNearby || Boolean(craftingTablePostcondition),
+    has_crafting_table: tableNearby || Boolean(craftingTablePostcondition) || Boolean(toolCraftingTable),
     has_verified_shelter: Boolean(shelterPostcondition),
     has_shared_storage_contribution:
       Boolean(storagePostcondition) || toolSharedStorage.status === "contributed",
@@ -490,6 +557,8 @@ export function buildSettlementState(input: {
   for (const item of checklist.items) {
     if (item.id === "crafting_table_known_or_placed" && craftingTablePostcondition) {
       item.evidence_refs = [...craftingTablePostcondition.evidence_refs];
+    } else if (item.id === "crafting_table_known_or_placed" && toolCraftingTable) {
+      item.evidence_refs = [...toolCraftingTable.evidence_refs];
     } else if (item.id === "crafting_table_known_or_placed" && tableNearby) {
       item.evidence_refs = [...tableEvidenceRefs];
     }
@@ -526,8 +595,8 @@ export function buildSettlementState(input: {
     known_positions: {
       ...(actorPosition ? { actor_position: actorPosition } : {}),
       crafting_table: {
-        status: craftingTablePostcondition ? "placed" : tableNearby ? "nearby" : "unknown",
-        position: positionFromNearbyBlock(nearbyCraftingTable),
+        status: craftingTablePostcondition || toolCraftingTable ? "placed" : tableNearby ? "nearby" : "unknown",
+        position: toolCraftingTable?.position ?? positionFromNearbyBlock(nearbyCraftingTable),
         evidence_refs: tableEvidenceRefs
       },
       shared_chest: {

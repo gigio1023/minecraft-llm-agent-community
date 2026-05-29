@@ -5,7 +5,7 @@ import type { GeminiPlannerPathId } from "./config.js";
 import { callGeminiLivePlanner } from "./geminiLivePlanner.js";
 
 type SmokeReport = {
-  schema: "gemini-live-smoke-report/v1";
+  schema: "gemini-planner-smoke-report/v1";
   ok: boolean;
   providerId: string;
   selectedPath?: string;
@@ -38,7 +38,7 @@ function parseArgs(argv: string[]) {
       index += 1;
     } else if (arg === "--force-path") {
       const value = argv[index + 1];
-      if (value === "text-genai" || value === "live-transcription") {
+      if (value === "text-genai") {
         options.forcePath = value;
       }
       index += 1;
@@ -71,7 +71,7 @@ async function main() {
       : "provider_empty";
 
   const report: SmokeReport = {
-    schema: "gemini-live-smoke-report/v1",
+    schema: "gemini-planner-smoke-report/v1",
     ok: !result.errorKind && result.text.length > 0,
     providerId: result.providerId,
     selectedPath: result.selectedPath,

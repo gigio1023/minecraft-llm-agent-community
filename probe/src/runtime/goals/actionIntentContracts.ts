@@ -259,6 +259,20 @@ function validatePhysicalPrimitiveArgs(
             primitiveId: input.primitiveId,
             error: `${input.primitiveId} requires itemName unless an actionSkillId fallback is present`
           });
+    case "consume_item":
+      return hasNonEmptyArg(args, "itemName") || hasActionSkillFallback(input, args)
+        ? passed({ primitiveId: input.primitiveId })
+        : failed({
+            primitiveId: input.primitiveId,
+            error: "consume_item requires itemName unless an actionSkillId fallback is present"
+          });
+    case "run_mineflayer_program":
+      return hasNonEmptyArg(args, "source")
+        ? passed({ primitiveId: input.primitiveId })
+        : failed({
+            primitiveId: input.primitiveId,
+            error: "run_mineflayer_program requires generated source with export async function run(ctx)"
+          });
     case "deposit_shared":
     case "withdraw_shared":
       return validateSharedTransferArgs(input, args);
@@ -357,6 +371,24 @@ export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgs
         ...base,
         required_structured_args: ["text"],
         accepted_forms: ["{text:string}"]
+      };
+    case "consume_item":
+      return {
+        ...base,
+        required_structured_args: ["itemName"],
+        accepted_forms: [
+          "{itemName:string}",
+          "resolved actor-owned action skill primitive args"
+        ]
+      };
+    case "run_mineflayer_program":
+      return {
+        ...base,
+        required_structured_args: ["source"],
+        accepted_forms: [
+          "{source:string,purpose?:string,expectedObservation?:string,timeoutMs?:number}",
+          "source must export async function run(ctx) and use runtime helper calls for evidence"
+        ]
       };
     default:
       return {

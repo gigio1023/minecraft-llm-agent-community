@@ -14,7 +14,6 @@ import type { JsonValue } from "./inputSnapshot.js";
 import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import { writeActorGoalArtifact } from "../runtime/goals/goalJsonStore.js";
 import { isSocialExecutablePrimitive } from "../runtime/socialCycleExecution.js";
-import { validateDirectPrimitiveActionIntentArgs } from "../runtime/goals/actionIntentContracts.js";
 
 const actionPlannerSchema = {
   type: "object",
@@ -45,46 +44,54 @@ export type ActionPlannerProviderResult =
   | { ok: true; intent: ActionIntent; intentRef: string; inputRef: string; outputRef: string }
   | { ok: false; error: string; inputRef: string; outputRef: string };
 
-function executableOwnedActionSkills(
-  context: SocialCycleContextPacket,
-  cycleGoal: ActorCycleGoal
-) {
-  const allowedPrimitiveIds = new Set(cycleGoal.allowed_primitive_ids);
+function executableOwnedActionSkills(context: SocialCycleContextPacket) {
+  const directPrimitiveIds = new Set(
+    context.action_surface.direct_primitives.map((primitive) => primitive.primitive_id)
+  );
   return context.owned_action_skills.filter((skill) =>
     skill.required_primitives.length > 0 &&
     skill.required_primitives.every((primitive) =>
-      isSocialExecutablePrimitive(primitive) && allowedPrimitiveIds.has(primitive)
+      isSocialExecutablePrimitive(primitive) && directPrimitiveIds.has(primitive)
     )
   );
 }
 
 /**
- * Keeps deferred affordances diagnostic-only by intersecting the CycleGoal with
- * the direct action surface before provider output can become an ActionIntent.
+ * Mirrors the direct action surface into CycleGoal fields kept for schema
+ * compatibility. CycleGoal text guides intent, but the actor body comes from
+ * action_surface plus runtime gates rather than an LLM-authored narrow allowlist.
  */
-function constrainCycleGoalForSocialExecutor(
+function cycleGoalWithOpenActionBody(
   cycleGoal: ActorCycleGoal,
   context: SocialCycleContextPacket
 ): ActorCycleGoal {
-  const directPrimitiveIds = new Set(
-    context.action_surface.direct_primitives.map((primitive) => primitive.primitive_id)
-  );
-  const allowedPrimitiveIds = cycleGoal.allowed_primitive_ids.filter((primitiveId) =>
-    isSocialExecutablePrimitive(primitiveId) && directPrimitiveIds.has(primitiveId)
-  );
-  const cycleGoalWithExecutablePrimitives = {
-    ...cycleGoal,
-    allowed_primitive_ids: allowedPrimitiveIds
-  };
-  const ownedSkillIds = new Set(
-    executableOwnedActionSkills(context, cycleGoalWithExecutablePrimitives).map((skill) => skill.skill_id)
-  );
+  const allowedPrimitiveIds = context.action_surface.direct_primitives
+    .map((primitive) => primitive.primitive_id)
+    .filter(isSocialExecutablePrimitive);
+  const ownedSkillIds = executableOwnedActionSkills(context).map((skill) => skill.skill_id);
   return {
-    ...cycleGoalWithExecutablePrimitives,
-    allowed_action_skill_ids: cycleGoal.allowed_action_skill_ids.filter((skillId) =>
-      ownedSkillIds.has(skillId)
-    )
+    ...cycleGoal,
+    allowed_primitive_ids: allowedPrimitiveIds,
+    allowed_action_skill_ids: ownedSkillIds
   };
+}
+
+function directActionSkillSurface(
+  context: SocialCycleContextPacket,
+  ownedActionSkills: readonly { skill_id: string }[]
+) {
+  const ownedSkillIds = new Set(ownedActionSkills.map((skill) => skill.skill_id));
+  return context.action_surface.direct_action_skills.filter((skill) =>
+    ownedSkillIds.has(skill.action_skill_id)
+  );
+}
+
+function hasDirectPrimitiveActionSkillFallback(intent: ActionIntent) {
+  return Boolean(
+    intent.action_skill_id ||
+      (typeof intent.args.actionSkillId === "string" && intent.args.actionSkillId.trim()) ||
+      (typeof intent.args.action_skill_id === "string" && intent.args.action_skill_id.trim())
+  );
 }
 
 /** Performs the final provider-output guard before an intent is persisted. */
@@ -96,9 +103,8 @@ function validateExecutableIntent(
     if (!intent.primitive_id || !cycleGoal.allowed_primitive_ids.includes(intent.primitive_id)) {
       return `Primitive ${intent.primitive_id ?? "<missing>"} is not executable in this social cycle`;
     }
-    const argsContract = validateDirectPrimitiveActionIntentArgs(intent);
-    if (!argsContract.ok) {
-      return `ActionIntent args contract failed for ${intent.primitive_id}: ${argsContract.error}`;
+    if (hasDirectPrimitiveActionSkillFallback(intent)) {
+      return "Direct primitive intents cannot carry action_skill_id or args.actionSkillId; use use_action_skill for actor-owned action skill execution";
     }
   }
 
@@ -137,8 +143,18 @@ export async function runSocialActionPlannerProvider(input: {
 }): Promise<ActionPlannerProviderResult> {
   const turnId = input.turnId ?? input.cycleId;
   const snapshotId = `action-planner-${turnId}-${randomUUID()}`;
-  const plannerCycleGoal = constrainCycleGoalForSocialExecutor(input.cycleGoal, input.context);
-  const ownedActionSkills = executableOwnedActionSkills(input.context, plannerCycleGoal);
+  const plannerCycleGoal = cycleGoalWithOpenActionBody(input.cycleGoal, input.context);
+  const ownedActionSkills = executableOwnedActionSkills(input.context);
+  const directActionSkills = directActionSkillSurface(input.context, ownedActionSkills);
+  const runtimeAffordances = input.context.action_surface.direct_primitives
+    .filter((primitive) =>
+      plannerCycleGoal.allowed_primitive_ids.includes(primitive.primitive_id)
+    )
+    .map((primitive) => ({
+      primitive_id: primitive.primitive_id,
+      description: primitive.description,
+      args_contract: primitive.args_contract
+    }));
   const providerInput = {
     stage: "action_planner",
     turn_id: turnId,
@@ -149,19 +165,11 @@ export async function runSocialActionPlannerProvider(input: {
     observation: input.context.observation,
     owned_action_skills: ownedActionSkills,
     action_surface: input.context.action_surface,
-    direct_action_skills: input.context.action_surface.direct_action_skills.filter((skill) =>
-      plannerCycleGoal.allowed_action_skill_ids.includes(skill.action_skill_id)
-    ),
+    direct_action_skills: directActionSkills,
     allowed_primitive_ids: plannerCycleGoal.allowed_primitive_ids,
-    runtime_affordances: input.context.action_surface.direct_primitives
-      .filter((primitive) =>
-        plannerCycleGoal.allowed_primitive_ids.includes(primitive.primitive_id)
-      )
-      .map((primitive) => ({
-        primitive_id: primitive.primitive_id,
-        description: primitive.description,
-        args_contract: primitive.args_contract
-      })),
+    cycle_goal_allowed_primitive_ids_as_advisory: input.cycleGoal.allowed_primitive_ids,
+    cycle_goal_allowed_action_skill_ids_as_advisory: input.cycleGoal.allowed_action_skill_ids,
+    runtime_affordances: runtimeAffordances,
     world_events: input.context.world_events,
     relationship_context: input.context.relationship_context,
     memory_packet: input.context.memory_packet,
@@ -209,8 +217,11 @@ export async function runSocialActionPlannerProvider(input: {
 ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
 Select from action_surface and runtime_affordances based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface is the actor's current body, not a strategy checklist.
 Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
-Deferred primitives or action skills explain missing affordances; do not choose them unless the active CycleGoal already allows the required primitive ids.
+Vitals and food candidates are observation fields, not runtime priorities. If consuming food is useful, choose consume_item with an explicit itemName from inventory evidence.
+Deferred primitives or action skills explain missing affordances; do not choose them in this ActionIntent. Direct primitives and direct action skills are the executable body for this turn.
 Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not executable in this ActionIntent until exposed as direct primitives or direct action skills.
+When run_mineflayer_program is direct, you may generate a short TypeScript program for a situation that is better expressed as Mineflayer helper code. Its args.source must export async function run(ctx) and use ctx helper calls such as observe, inventoryItems, collectLogs, mineBlock, craftItem, craftWithTable, consumeItem, placeBlock, buildPattern, say, wait, or mineflayer(method,args). Keep expected_evidence tied to helper results and post-observation, not to the returned text alone.
+Treat CycleGoal allowed_* lists as compatibility mirrors/advisory context. They must not shrink the action surface; runtime_affordances and direct_action_skills define what can be selected.
 If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different valid affordance based on the current action surface and evidence.
 runtime_retry_constraints are hard runtime suppressions over exact target plus structured args. Do not choose an ActionIntent that matches one; pivot to a different valid affordance, repair the structured args, observe current state, or record a truthful blocker.
 Do not treat fixed material families, stations, construction readiness, or any other gameplay taxonomy as mandatory planning headings. Use raw observed Minecraft names and runtime evidence; decide relevance from the current CycleGoal.
@@ -218,7 +229,7 @@ Use settlement_state, settlement_checklist, and blocker_histogram as observation
 If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
 If a primitive reports a concrete required position in runtime_result, use structured move_to toward that explicit position or observe current state before retrying. Do not retry the same primitive from outside its reported interaction range.
 Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvents, observation, or memory makes building relevant; never treat a construction target as always-on architecture.
-use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough.
+use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough. For a generated Mineflayer program, prefer a single use_primitive run_mineflayer_program intent so the source, helper events, result, and post-observation stay attached to one artifact.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {

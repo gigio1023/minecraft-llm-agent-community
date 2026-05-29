@@ -53,6 +53,7 @@ export type ActionSurfacePacket = {
     runtime_verification_required: true;
     mineflayer_is_capability_substrate: true;
     raw_mineflayer_api_not_provider_authority: true;
+    generated_programs_require_helper_evidence: true;
   };
 };
 
@@ -63,6 +64,8 @@ const primitiveDescriptions: Record<string, string> = {
   mine_block: "Mine an explicitly requested block when tool and reachability evidence allow it.",
   craft_item: "Craft an inventory recipe when ingredients exist.",
   craft_with_table: "Craft a table-bound recipe when a crafting table is nearby.",
+  consume_item: "Consume an explicit edible inventory item and verify inventory or vitals changed.",
+  run_mineflayer_program: "Run a bounded generated Mineflayer helper program and record source, helper calls, result, and post-observation evidence.",
   place_block: "Place one explicit inventory block and verify the world block afterward.",
   build_pattern: "Run one bounded block-pattern executor only when current context makes building relevant.",
   inspect_chest: "Inspect a nearby shared chest and record a container snapshot.",
@@ -83,12 +86,12 @@ const mineflayerExpansionCatalog: MineflayerExpansionOpportunity[] = [
     reason: "Mineflayer exposes inventory and equipment control, but this runtime has no verified equipment primitive yet."
   },
   {
-    capability_id: "item_use_and_consumption",
+    capability_id: "item_use_beyond_food_consumption",
     category: "survival",
     status: "unadapted_mineflayer_capability",
-    opens_affordance: "eat food, use selected items, or interact with usable inventory items",
+    opens_affordance: "use selected non-food items or interact with usable inventory items",
     required_boundary: "bounded_runtime_adapter",
-    reason: "Item use can change survival state and must be wrapped with typed args, timeout, and verifier evidence before providers may choose it."
+    reason: "Food consumption is now a bounded primitive; broader item use still needs typed args, timeout, and verifier evidence before providers may choose it."
   },
   {
     capability_id: "entity_interaction",
@@ -238,7 +241,8 @@ export function buildActionSurfacePacket(input: {
       domain_goals_are_context_not_core_architecture: true,
       runtime_verification_required: true,
       mineflayer_is_capability_substrate: true,
-      raw_mineflayer_api_not_provider_authority: true
+      raw_mineflayer_api_not_provider_authority: true,
+      generated_programs_require_helper_evidence: true
     }
   };
 }

@@ -150,6 +150,8 @@ Implemented skills to map:
 - `craftCraftingTable`;
 - `craftWoodenPickaxe`;
 - `mineCobblestone`;
+- `placeCraftingTable`;
+- `eatFoodWhenHungry`;
 - `inspectSharedChest`;
 - `depositSharedItems`;
 - `approachAndRequestItem`;
@@ -165,14 +167,12 @@ Planned skills to map:
 - `smeltRawIron`;
 - `collectDroppedItems`;
 - `exploreForMaterials`;
-- `placeCraftingTable`;
 - `equipBestTool`;
 - `placeTorchLightArea`;
-- `eatFoodWhenHungry`;
 - `sleepAtNight`;
 - `fleeDanger`;
 - `setupSharedStash`;
-- hostile pressure skills only after the survival and utility layer is solid.
+- hostile action skills only after the survival and utility layer is solid.
 
 ## Current File Layout
 

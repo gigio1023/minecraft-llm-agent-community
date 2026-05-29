@@ -123,8 +123,8 @@ output, not active actor-owned action skill memory.
 ## Runtime Primitive
 
 A **runtime primitive** is a small, trusted game operation such as `observe`,
-`collect_logs`, `craft_item`, `move_to`, `say`, `wait`, `place_block`, or
-`build_pattern`.
+`collect_logs`, `craft_item`, `move_to`, `consume_item`,
+`run_mineflayer_program`, `say`, `wait`, `place_block`, or `build_pattern`.
 
 Runtime primitives are lower-level than action skills. Action skills compose
 runtime primitives.

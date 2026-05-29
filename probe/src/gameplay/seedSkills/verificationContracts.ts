@@ -26,6 +26,21 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     protectedBy: ["test/runtimeLogic.test.ts", "test/transcript.test.ts"]
   },
   {
+    skillId: "runBoundedMineflayerProgram",
+    primitiveIds: ["observe", "run_mineflayer_program", "observe", "remember"],
+    evidence: [
+      "generated source is stored under the actor workspace direct-trial artifacts",
+      "helper calls are recorded with args, completion status, result, or error",
+      "runtime classifies success only when a helper produces verifier-classified evidence",
+      "post-observation evidence is written for the next closed-loop action"
+    ],
+    protectedBy: [
+      "test/directGeneratedActionSkillExecutor.test.ts",
+      "test/runMineflayerProgram.test.ts",
+      "test/socialCycleExecution.test.ts"
+    ]
+  },
+  {
     skillId: "collectLogs",
     primitiveIds: ["observe", "collect_logs", "wait"],
     evidence: [
@@ -84,6 +99,17 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     ],
     protectedBy: ["test/mineBlock.test.ts", "test/actionSkillProbeRunner.test.ts"],
     liveProbe: "bun run probe:skill -- --actor npc_b --skill mineCobblestone --max-actions 8 --init-actor-workspace baseline --no-dashboard"
+  },
+  {
+    skillId: "eatFoodWhenHungry",
+    primitiveIds: ["observe", "consume_item"],
+    evidence: [
+      "observation exposes health, food, held item, and edible inventory candidates as raw evidence",
+      "consume_item equips an edible inventory item before calling Mineflayer consume",
+      "consumption is verified through inventory count, food, or health delta",
+      "blocked and failed consumption attempts keep truthful vitals and inventory evidence"
+    ],
+    protectedBy: ["test/consumeItem.test.ts", "test/socialCycleExecution.test.ts"]
   },
   {
     skillId: "placeCraftingTable",

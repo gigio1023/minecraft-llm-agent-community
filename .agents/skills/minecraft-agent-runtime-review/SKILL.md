@@ -2,13 +2,13 @@
 name: minecraft-agent-runtime-review
 description: >
   Review real Minecraft LLM agent runs from transcript files, canonical runtime
-  artifacts, logs, human-visible behavior notes, Langfuse traces, and code
-  diffs, then infer concrete implementation flaws and next fixes. Use for
-  prompts like "agent 행동 리뷰해줘", "실행 결과에서 인사이트 뽑아줘",
-  "나무 캐는 시늉만 해", "NPC가 멀리 가", "review this probe artifact",
-  "why did the NPC stall?", "matrix 12/12 깨졌어", "collectLogs 3/4에서 멈춰",
-  "mine_block 실패 봐줘", "Langfuse trace까지 보고 구현 개선해줘", or after
-  running probe:v0/probe:v1/live NPC smoke tests in this repo.
+  artifacts, social-cycle reports, actor workspaces, logs, Langfuse traces,
+  human-visible behavior notes, and code diffs, then infer concrete
+  implementation flaws and next fixes. Use for prompts like "agent 행동
+  리뷰해줘", "실행 결과에서 인사이트 뽑아줘", "NPC 행동 패턴 분석",
+  "100 cycle 결과 봐줘", "관찰-행동-목표 루프 분석", "why did the NPC stall?",
+  "matrix 12/12 깨졌어", "collectLogs 3/4에서 멈춰", or "Langfuse trace까지 보고
+  구현 개선해줘" after Minecraft runtime, action-skill, or social-cycle runs.
 ---
 
 # Minecraft Agent Runtime Review
@@ -20,27 +20,36 @@ the repo term **action skill**.
 ## Quick Start
 
 1. Identify the exact run under review: transcript path, canonical artifact,
-   terminal output, human-visible behavior note, Langfuse trace/session, and
-   current git diff.
+   `social-cycle-run-report/v1`, terminal output, human-visible behavior note,
+   Langfuse trace/session, and current git diff.
 2. Read artifacts before code. Treat `final.status`, optimistic messages, and
    test passes as claims to verify, not evidence.
-3. Reconstruct the actual behavior loop. Include what the human saw, for
+3. For `social-cycle-run-report/v1`, run the bundled summarizer first:
+
+   ```bash
+   node .agents/skills/minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.mjs <report.json>
+   ```
+
+4. Reconstruct the actual behavior loop. Include what the human saw, for
    example "pretends to chop", "walks away in one direction", or "keeps retrying
    empty space".
-4. Build an evidence table: actor, task, observation before/after, tool call,
+5. Build an evidence table: actor, task, observation before/after, tool call,
    tool result, verification, timeout/stall/reconnect evidence, final label, and
    behavior mismatch.
-5. Decide the behavior verdict:
+6. Decide the behavior verdict:
    - `VALID_PROGRESS`: world or inventory state proves progress.
    - `DIAGNOSABLE_FAILURE`: no success, but artifacts explain the next fix.
    - `MISLEADING_SUCCESS`: final status says success while evidence says stall.
    - `LIVE_BEHAVIOR_FAILURE`: human-visible behavior proves the primitive is not
      doing the task, even if artifacts are incomplete.
+   - `PASSED_RUNTIME_BUT_BEHAVIOR_LOOP_WEAK`: the run completed and made
+     verified low-level progress, but observation/action choices collapsed into
+     narrow loops or failed to update durable settlement/social state.
    - `UNDIAGNOSABLE`: artifacts are missing the facts needed to improve code.
-6. Map each finding to a small implementation target: verifier, tool primitive,
+7. Map each finding to a small implementation target: verifier, tool primitive,
    action runner, session/reconnect, transcript/artifact, provider proposal, or
    setup/auth.
-7. Report findings first, then propose or apply narrow fixes if the user asked
+8. Report findings first, then propose or apply narrow fixes if the user asked
    for implementation.
 
 ## Evidence Sources
@@ -64,6 +73,14 @@ depends on generated fixture state.
 Read `references/skill-creation-review.md` when reviewing proposals to create,
 promote, supersede, or retire an action skill from runtime evidence.
 
+Read `references/social-cycle-report-schema.md` before analyzing
+`social-cycle-run-report/v1` shape, actor workspace refs, provider usage,
+judgments, retry constraints, settlement state, or memory reuse.
+
+Read `references/social-cycle-analysis-rubric.md` before claiming that the
+observation -> action -> long-term goal loop is strong or weak. It defines the
+loop-diagnostic metrics and interpretation traps.
+
 ## Review Workflow
 
 ### 1. Establish Run Identity
@@ -73,6 +90,8 @@ Use the newest artifact only if the user did not name one.
 Collect:
 - terminal command and output;
 - user or reviewer observation of visible in-game behavior;
+- `tmp/social-cycle-*.json` and matching actor workspace when reviewing
+  social-cycle runs;
 - `data/evidence/*probe*.json`;
 - matching `*-canonical-*.json`;
 - any generated checkpoint/debug timeline;
@@ -87,6 +106,10 @@ If human-visible behavior and artifacts disagree, treat that as a first-class
 finding. The likely issue is either missing artifact evidence or a primitive that
 reports the wrong thing.
 
+For social-cycle runs, do not stop at `runtime_status`. Resolve the actor
+workspace refs and compare low-level verified progress against durable
+settlement/social state.
+
 ### 2. Inspect Behavior, Not Intent
 
 For each actor, answer:
@@ -100,6 +123,17 @@ For each actor, answer:
 - Did verification use the observed change, or just trust tool status?
 - Did the final label match the evidence?
 - Which implementation mechanism best explains the visible failure?
+
+For `social-cycle-run-report/v1`, also answer:
+- Did observation change the next action, and how often did that next action
+  produce verified progress?
+- How much of the exposed action surface was used as top-level intent and as
+  executed tools?
+- Did action choices concentrate into a narrow gather/craft/place loop?
+- Did verified primitive evidence update settlement checklist/state?
+- Were there social signals: visible actors, `say`, shared storage, relationship
+  events, or obligations?
+- Did retry constraints stop repeated exact target/args failures?
 
 Do not count these as success by themselves:
 - `remember` notes;
@@ -133,6 +167,17 @@ Prefer concrete classifications:
   later than the primitive or verifier expected.
 - `current-run-proof-gap`: a historical transcript or single-skill pass exists,
   but the full implemented action-skill matrix does not pass in the current run.
+- `loop-constriction`: observations produce actions, but choices collapse into a
+  narrow subset such as observe/collect/craft/place despite a broader action
+  surface.
+- `state-consolidation-gap`: runtime evidence proves a world/inventory/container
+  change, but settlement state, checklist, memory, or relationship state does
+  not absorb it.
+- `harness-narrowing`: prompts, fixtures, allowed actions, success criteria, or
+  deterministic tests over-shape behavior so the NPC optimizes the harness
+  instead of using the Mineflayer body broadly.
+- `social-surface-gap`: a social-cycle run has little or no visible actor,
+  `say`, shared-storage, relationship, obligation, or conversation evidence.
 
 ### 4. Turn Review Into Code Work
 
@@ -147,6 +192,11 @@ Every implementation recommendation should name:
 Keep fixes narrow. Do not expand toward persona richness, raw eval, Voyager-style
 loops, or broad multi-bot society behavior while single-bot competence and
 observability are still weak.
+
+When the finding is loop constriction, do not "fix" it by adding a more
+deterministic planner. Prefer widening raw observation, exposing more bounded
+Mineflayer-backed action choices, reducing domain-specific prompt rails, and
+making durable state consolidation truthful.
 
 ## Output Shape
 
@@ -187,3 +237,14 @@ If there are no blocking issues, say so and list remaining evidence gaps.
   smoke-result only.
 - Keep review and implementation separate in the report. If you patch during the
   review, disclose exactly what changed and why.
+- For social-cycle reports, "observation is useful" and "the loop is weak" can
+  both be true. Check observation-to-next-action metrics before claiming
+  observation failed.
+- A high `verified_progress` count can still be weak when progress repeatedly
+  creates disposable local items or never updates settlement/social state.
+- If a report shows verified `place_block`, `craft_item`, or container evidence
+  but the checklist remains pending, classify that as `state-consolidation-gap`
+  before blaming the NPC.
+- Be skeptical of narrow deterministic harness success. The project wants raw
+  observation plus broad Mineflayer-backed agency, not a bot that merely learns
+  the smallest scripted path through a test.

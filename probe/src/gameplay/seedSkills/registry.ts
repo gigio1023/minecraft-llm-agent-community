@@ -8,6 +8,7 @@ import type { RuntimePrimitiveId } from "../primitives/registry.js";
 
 export type SeedActionSkillId =
   | "runtimeObserveAndRemember"
+  | "runBoundedMineflayerProgram"
   // Core progression (12)
   | "collectLogs"
   | "craftPlanksAndSticks"
@@ -65,6 +66,24 @@ const runtimeControlActionSkills: SeedActionSkill[] = [
     validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: [],
     primitiveIds: ["observe", "wait", "remember"]
+  },
+  {
+    id: "runBoundedMineflayerProgram",
+    summary: "Run a bounded generated Mineflayer helper program with source, helper-call, and post-observation evidence",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Executes provider-generated TypeScript through the direct generated executor with blocked Node escape hatches, bounded helper API calls, timeout cleanup, and post-action observation.",
+    intentKinds: [
+      "bootstrap_progress",
+      "claim_nearby_opportunity",
+      "inspect_settlement_state",
+      "recover_basic_tools",
+      "resupply_shared_storage",
+      "wait_or_defer"
+    ],
+    validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
+    preconditions: ["provider supplies generated source using the runtime helper API"],
+    primitiveIds: ["observe", "run_mineflayer_program", "observe", "remember"]
   }
 ];
 
@@ -267,14 +286,13 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
   {
     id: "eatFoodWhenHungry",
     summary: "Eat available food when hunger blocks safe work",
-    runtimeStatus: "planned",
+    runtimeStatus: "implemented",
     implementationNotes:
-      "References Voyager hunger-aware eating, mindcraft-ce consume, and yearn_for_mines interact:eat. Needs vitals observation and consume verification.",
+      "Uses raw vitals observation and the bounded consume_item primitive. The runtime exposes food, health, and edible inventory evidence; the model decides whether eating matters.",
     intentKinds: ["avoid_or_retreat", "recover_basic_tools"],
     validRoles: ["gatherer", "crafter", "quartermaster", "settler"],
     preconditions: ["food below safe threshold", "inventory has edible item"],
-    primitiveIds: ["observe", "wait"],
-    missingPrimitives: ["consume_item", "vitals_observation"]
+    primitiveIds: ["observe", "consume_item"]
   },
   {
     id: "sleepAtNight",
