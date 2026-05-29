@@ -50,7 +50,7 @@ The minimum bar is:
 
 The minimal probe is the substrate for later work on:
 
-- role pressure;
+- role context;
 - shared/private memory;
 - per-actor action skill ownership;
 - bounded action skill evolution;

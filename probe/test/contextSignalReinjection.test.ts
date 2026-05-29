@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPressureIntentContext } from "../src/runtime/pressureIntent.js";
+import { buildContextIntentState } from "../src/runtime/contextIntent.js";
 
 test("reinjection triggers recovery mode when recent death count is positive", () => {
-  const context = buildPressureIntentContext({
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 5,
     observation: {
@@ -27,7 +27,7 @@ test("reinjection triggers recovery mode when recent death count is positive", (
 });
 
 test("reinjection triggers scarcity when shared essentials are below floor", () => {
-  const context = buildPressureIntentContext({
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 8,
     observation: {
@@ -45,11 +45,11 @@ test("reinjection triggers scarcity when shared essentials are below floor", () 
 
   assert.equal(context.lifecycleMode, "scarcity");
   assert.equal(context.currentIntent.kind, "resupply_shared_storage");
-  assert.ok(context.pressures.some((p) => p.kind === "shared_shortage"));
+  assert.ok(context.contextSignals.some((p) => p.kind === "shared_shortage"));
 });
 
-test("external pressures from obligation router merge into context", () => {
-  const context = buildPressureIntentContext({
+test("external context signals from obligation router merge into context", () => {
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 3,
     observation: {
@@ -59,7 +59,7 @@ test("external pressures from obligation router merge into context", () => {
     },
     currentTask: null,
     completedTaskIds: [],
-    externalPressures: [
+    externalContextSignals: [
       {
         id: "ext-1",
         actorId: "npc_a",
@@ -67,7 +67,7 @@ test("external pressures from obligation router merge into context", () => {
         summary: "npc_b is waiting for logs",
         source: "bulletin",
         relatedActorId: "npc_b",
-        urgency: 0.85,
+        salience: 0.85,
         roleRelevance: 0.9,
         sharedImportance: 0.9,
         personalImportance: 0.4,
@@ -79,12 +79,12 @@ test("external pressures from obligation router merge into context", () => {
     ]
   });
 
-  assert.ok(context.pressures.some((p) => p.kind === "blocked_teammate"));
-  assert.ok(context.pressures.some((p) => p.id === "ext-1"), "external pressure should appear in context");
+  assert.ok(context.contextSignals.some((p) => p.kind === "blocked_teammate"));
+  assert.ok(context.contextSignals.some((p) => p.id === "ext-1"), "external context signal should appear in context");
 });
 
-test("station missing pressure fires when no crafting table in non-recovery mode", () => {
-  const context = buildPressureIntentContext({
+test("station missing context signal fires when no crafting table in non-recovery mode", () => {
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 2,
     observation: {
@@ -101,5 +101,5 @@ test("station missing pressure fires when no crafting table in non-recovery mode
     }
   });
 
-  assert.ok(context.pressures.some((p) => p.kind === "station_missing"));
+  assert.ok(context.contextSignals.some((p) => p.kind === "station_missing"));
 });

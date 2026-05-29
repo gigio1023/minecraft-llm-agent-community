@@ -22,7 +22,7 @@ Each actor turn should do only this:
 
 ```text
 observe
--> select pressure/task from current state
+-> select task from current observation and context
 -> select active action skill or primitive from actor workspace active records
 -> execute with timeout and cancellation
 -> verify from world, position, inventory, container, or transcript evidence

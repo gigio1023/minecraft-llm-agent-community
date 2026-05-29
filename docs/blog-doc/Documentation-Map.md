@@ -32,7 +32,7 @@ long-term direction, get explicit user approval first.
 ## Repo-Internal Documents
 
 These files are managed in the project root because they guide contributors,
-agents, reviewers, or branch-local review. They are not ordinary Docusaurus
+agents, reviewers, or implementation review. They are not ordinary Docusaurus
 content.
 
 - `README.md`
@@ -44,8 +44,8 @@ content.
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 
 The current implementation review document lives at the repo root because it is
-for direct branch review. Keep large review diagrams there instead of making
-`README.md` or the public docs landing page noisy.
+an internal whole-project implementation map. Keep large review diagrams there
+instead of making `README.md` or the public docs landing page noisy.
 
 ## Docusaurus-Exposed Documents
 
@@ -88,6 +88,7 @@ Architecture:
 - `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
 - `docs/blog-doc/Architecture/Action-Skill-Verification.md`
 - `docs/blog-doc/Architecture/Bounded-Action-Skill-Creation.md`
+- `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
 - `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
 
 Current state and operations:
@@ -158,6 +159,5 @@ like the product goal.
   `docs/research-archive/2026-05-19-public-docs/`.
 - Root paper dumps were moved into `docs/research-archive/external-paper-dumps/`.
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` was moved to the project root
-  for branch review.
+  as an internal implementation review map.
 - Default Docusaurus template markdown/components/assets were deleted.
-

@@ -13,11 +13,11 @@ import { writeRelationshipEdge } from "../src/npc/relationships/relationshipStor
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-test("provider context includes relationship action pressure without granting tools", async () => {
+test("provider context includes relationship action context without granting tools", async () => {
   const rootDir = path.resolve(
     here,
     "test-artifacts",
-    `actor-provider-relationship-pressure-${process.pid}-${Date.now()}`
+    `actor-provider-relationship-context-${process.pid}-${Date.now()}`
   );
 
   try {
@@ -42,45 +42,45 @@ test("provider context includes relationship action pressure without granting to
       actorId: "npc_a",
       activeActionSkills: []
     });
-    const pressure = (
-      context.relationship_pressures as Array<Record<string, unknown>>
+    const signal = (
+      context.relationship_context_signals as Array<Record<string, unknown>>
     )[0];
     const relationship = (
       context.relationships as Array<{
-        action_pressure: Record<string, unknown> | null;
+        action_context_signal: Record<string, unknown> | null;
       }>
     )[0];
     const goalStack = context.goal_stack as {
       relationship_goal?: Record<string, unknown>;
     };
 
-    assert.equal(pressure.kind, "recovery_social_caution");
-    assert.equal(pressure.priority, "urgent");
-    assert.deepEqual(pressure.derived_from, {
+    assert.equal(signal.kind, "recovery_social_caution");
+    assert.equal(signal.priority, "urgent");
+    assert.deepEqual(signal.derived_from, {
       trust: "distrusted",
       obligation: "overdue",
       dependency: "independent",
       friction: "resentful",
       familiarity: "stranger"
     });
-    assert.equal(pressure.action_boundary, "intent_pressure_only");
-    assert.equal(pressure.active_action_skill_required, true);
-    assert.equal(pressure.role_contract_boundary, "unchanged");
-    assert.equal(Object.hasOwn(pressure, "allowed_tools"), false);
-    assert.equal(relationship.action_pressure?.kind, "recovery_social_caution");
+    assert.equal(signal.action_boundary, "intent_context_only");
+    assert.equal(signal.active_action_skill_required, true);
+    assert.equal(signal.role_contract_boundary, "unchanged");
+    assert.equal(Object.hasOwn(signal, "allowed_tools"), false);
+    assert.equal(relationship.action_context_signal?.kind, "recovery_social_caution");
     assert.equal(goalStack.relationship_goal?.kind, "recover_from_failure");
     assert.equal(
-      goalStack.relationship_goal?.source_pressure_kind,
+      goalStack.relationship_goal?.source_context_signal_kind,
       "recovery_social_caution"
     );
-    assert.equal(goalStack.relationship_goal?.action_boundary, "intent_pressure_only");
+    assert.equal(goalStack.relationship_goal?.action_boundary, "intent_context_only");
     assert.equal(goalStack.relationship_goal?.active_action_skill_required, true);
     assert.equal(
-      (context.rules as Record<string, unknown>).relationship_pressure_changes_intent_only,
+      (context.rules as Record<string, unknown>).relationship_context_changes_intent_only,
       true
     );
     assert.equal(
-      (context.rules as Record<string, unknown>).relationship_pressure_does_not_grant_tools,
+      (context.rules as Record<string, unknown>).relationship_context_does_not_grant_tools,
       true
     );
     assert.equal((context.rules as Record<string, unknown>).active_action_skill_required, true);

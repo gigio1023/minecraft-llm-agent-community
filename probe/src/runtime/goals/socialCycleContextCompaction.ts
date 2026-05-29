@@ -60,7 +60,7 @@ export type SocialCycleSummaryFactScope =
   | "runtime_evidence_refs"
   | "prior_judgment_context"
   | "memory_context"
-  | "world_event_pressure"
+  | "world_event_context"
   | "relationship_context"
   | "settlement_state"
   | "runtime_retry_constraints";
@@ -388,6 +388,7 @@ function summarizeActionSurface(actionSurface: ActionSurfacePacket) {
     `direct action skills=${describeList(directActionSkills)}`,
     `deferred=${describeList(deferred)}`,
     `missing affordances=${describeList(actionSurface.missing_affordances)}`,
+    `mineflayer expansion opportunities=${actionSurface.mineflayer_expansion_opportunities.length}`,
     "runtime verification remains required"
   ].join("; ");
 }
@@ -517,7 +518,7 @@ function buildInputManifest(input: {
         retention: "full",
         refs: context.previous_cycle_judgments?.map((entry) => entry.ref) ?? [],
         estimatedValue: context.previous_cycle_judgments ?? [],
-        reason: "Prior judgments provide pressure but do not become new physical facts."
+        reason: "Prior judgments provide context but do not become new physical facts."
       }),
       manifestEntry({
         contextName: "memory packet",
@@ -533,7 +534,7 @@ function buildInputManifest(input: {
         retention: "full",
         refs: [refs.inputContextRef],
         estimatedValue: context.relationship_context,
-        reason: "Relationship pressure informs goals under ActorSoul/LifeGoal."
+        reason: "Relationship context informs goals under ActorSoul/LifeGoal."
       }),
       manifestEntry({
         contextName: "world events",
@@ -541,7 +542,7 @@ function buildInputManifest(input: {
         retention: "full",
         refs: [refs.inputContextRef],
         estimatedValue: context.world_events ?? [],
-        reason: "WorldEvents are pressure only and do not replace LifeGoal."
+        reason: "WorldEvents provide context and do not replace LifeGoal."
       }),
       manifestEntry({
         contextName: "settlement state",
@@ -667,8 +668,8 @@ function buildReplacementManifest(input: {
         present: (input.context.world_events?.length ?? 0) > 0,
         retention: "summary_and_ref",
         refs: [input.refs.inputContextRef],
-        estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "world_event_pressure"),
-        reason: "WorldEvents remain pressure only under ActorSoul/LifeGoal."
+        estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "world_event_context"),
+        reason: "WorldEvents remain context under ActorSoul/LifeGoal."
       }),
       manifestEntry({
         contextName: "settlement state",
@@ -803,7 +804,7 @@ function buildCompactSummary(input: {
     facts.push(buildFact({
       label: "relationship context",
       scope: "relationship_context",
-      summary: `Relationship context retained counts: relationships=${countArray(context.relationship_context.relationships)}, incoming=${countArray(context.relationship_context.incoming_relationships)}, pressures=${countArray(context.relationship_context.relationship_pressures)}.`,
+      summary: `Relationship context retained counts: relationships=${countArray(context.relationship_context.relationships)}, incoming=${countArray(context.relationship_context.incoming_relationships)}, context signals=${countArray(context.relationship_context.relationship_context_signals)}.`,
       evidenceRefs: [refs.inputContextRef]
     }));
   }
@@ -812,8 +813,8 @@ function buildCompactSummary(input: {
     const summaries = context.world_events!.slice(-4).map((event) => event.summary);
     facts.push(buildFact({
       label: "world events",
-      scope: "world_event_pressure",
-      summary: `WorldEvents remain pressure only: ${describeList(summaries)}.`,
+      scope: "world_event_context",
+      summary: `WorldEvents retained as context: ${describeList(summaries)}.`,
       evidenceRefs: [refs.inputContextRef, ...context.world_events!.flatMap((event) => event.evidence_refs)]
     }));
   }

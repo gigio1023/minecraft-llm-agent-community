@@ -67,7 +67,7 @@ const judgmentSchema = {
             required: ["target_actor_id", "kind", "evidence_refs"]
           }
         },
-        next_goal_pressure: { type: "array", items: { type: "string" } }
+        next_goal_context: { type: "array", items: { type: "string" } }
       },
       required: [
         "outcome",
@@ -76,7 +76,7 @@ const judgmentSchema = {
         "verifier_status",
         "memory_writes",
         "relationship_event_proposals",
-        "next_goal_pressure"
+        "next_goal_context"
       ]
     }
   },
@@ -169,7 +169,7 @@ export async function runSocialCycleJudgmentProvider(input: {
         }
       ],
       relationship_event_proposals: [],
-      next_goal_pressure: input.context.previous_cycle_judgments.length
+      next_goal_context: input.context.previous_cycle_judgments.length
         ? ["Consider prior judgment when choosing the next CycleGoal"]
         : ["Continue settlement contribution under LifeGoal"]
     };
@@ -177,9 +177,10 @@ export async function runSocialCycleJudgmentProvider(input: {
     const providerCall = {
       schemaName: "social_cycle_judgment",
       schema: judgmentSchema,
-      system: `Write CycleJudgment from runtime evidence only. Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
+      system: `Write CycleJudgment from runtime evidence only. Treat observation as raw evidence; decide what mattered from ActorSoul, LifeGoal, role context, relationships, memory, blockers, and runtime facts.
+Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
 Use partial_verified_progress only when runtime_result/tool_statuses show current-run world, inventory, movement, container, or block mutation but the final verifier or action-skill postcondition did not pass.
-observe-only cycles are no_progress, not verified_progress. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
+observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {
         runId: input.runId,
@@ -196,7 +197,7 @@ observe-only cycles are no_progress, not verified_progress. ActorSoul, ActorLife
         verifier_status: CycleJudgment["verifier_status"];
         memory_writes: CycleJudgment["memory_writes"];
         relationship_event_proposals: CycleJudgment["relationship_event_proposals"];
-        next_goal_pressure: string[];
+        next_goal_context: string[];
       };
     }>({
       config: input.gemini!,
@@ -209,7 +210,7 @@ observe-only cycles are no_progress, not verified_progress. ActorSoul, ActorLife
         verifier_status: CycleJudgment["verifier_status"];
         memory_writes: CycleJudgment["memory_writes"];
         relationship_event_proposals: CycleJudgment["relationship_event_proposals"];
-        next_goal_pressure: string[];
+        next_goal_context: string[];
       };
     }>({
       config: input.openAi!,
@@ -251,7 +252,7 @@ observe-only cycles are no_progress, not verified_progress. ActorSoul, ActorLife
       relationship_event_proposals: Array.isArray(raw.relationship_event_proposals)
         ? (raw.relationship_event_proposals as CycleJudgment["relationship_event_proposals"])
         : [],
-      next_goal_pressure: asStringArray(raw.next_goal_pressure)
+      next_goal_context: asStringArray(raw.next_goal_context)
     };
   }
 

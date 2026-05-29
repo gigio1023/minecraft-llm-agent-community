@@ -33,7 +33,7 @@ import {
   type ActiveActionSkillGate
 } from "./activeActionSkillGate.js";
 import { createAntiRepeatPolicy } from "./antiRepeat.js";
-import { buildPressureIntentContext, type IntentRecord, type PressureIntentContext } from "./pressureIntent.js";
+import { buildContextIntentState, type IntentRecord, type ContextIntentState } from "./contextIntent.js";
 
 type JsonValue =
   | string
@@ -70,7 +70,7 @@ type TranscriptRecorder = {
     actor: string;
     observation: JsonValue;
     task?: JsonValue;
-    pressureContext?: JsonValue;
+    contextIntentState?: JsonValue;
     tool: AllowedTool | "provider_error";
     args?: Record<string, JsonValue>;
     providerOutputRef?: string;
@@ -387,10 +387,10 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       recentFailure
     });
 
-    // Pressure/intent context is recorded even while the provider remains
-    // deterministic so future runtime-loop changes can explain why a primitive
-    // was allowed, continued, or interrupted.
-    const pressureContext = buildPressureIntentContext({
+    // Context-signal intent state is recorded for deterministic probes so the
+    // transcript explains fallback continuity without classifying world meaning
+    // as provider-facing strategy.
+    const contextIntentState = buildContextIntentState({
       actorId: actor.username,
       turn: step + 1,
       observation,
@@ -398,7 +398,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       completedTaskIds: [...completedTaskIds],
       previousIntent
     });
-    previousIntent = pressureContext.currentIntent;
+    previousIntent = contextIntentState.currentIntent;
 
     const turnId = `turn-${String(step + 1).padStart(4, "0")}`;
     if (
@@ -491,7 +491,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
         actor: actor.username,
         observation: toJsonValue(observation),
         ...(currentTask ? { task: toJsonValue(currentTask) } : {}),
-        pressureContext: toJsonValue(pressureContext),
+        contextIntentState: toJsonValue(contextIntentState),
         tool: "provider_error",
         result: toJsonValue(result)
       });
@@ -563,7 +563,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       actor,
       turnId,
       currentTask,
-      pressureContext,
+      contextIntentState,
       tool: validated.tool,
       args: validated.args,
       before: observation,
@@ -579,7 +579,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       actor,
       turnId,
       currentTask,
-      pressureContext,
+      contextIntentState,
       tool: validated.tool,
       args: validated.args,
       before: observation,
@@ -607,7 +607,7 @@ export async function runAgentLoop<TActor extends RuntimeActor>({
       actor: actor.username,
       observation: toJsonValue(observation),
       ...(currentTask ? { task: toJsonValue(currentTask) } : {}),
-      pressureContext: toJsonValue(pressureContext),
+      contextIntentState: toJsonValue(contextIntentState),
       tool: validated.tool,
       args: Object.keys(validated.args).length > 0 ? toJsonRecord(validated.args) : undefined,
       ...(providerOutputSnapshotPath
@@ -878,7 +878,7 @@ async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeAct
   actor: TActor;
   turnId: string;
   currentTask: ReturnType<typeof selectDeterministicTask>;
-  pressureContext: PressureIntentContext;
+  contextIntentState: ContextIntentState;
   tool: AllowedTool;
   args: Record<string, unknown>;
   before: ObserveResult;
@@ -898,7 +898,7 @@ async function recordTurnAndAttemptEvidenceIfRequested<TActor extends RuntimeAct
       : input.currentTask?.id;
   const data = toJsonValue({
     task: input.currentTask,
-    pressureContext: input.pressureContext,
+    contextIntentState: input.contextIntentState,
     tool: input.tool,
     args: toJsonRecord(input.args),
     before: input.before,
@@ -975,7 +975,7 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
   actor: TActor;
   turnId: string;
   currentTask: ReturnType<typeof selectDeterministicTask>;
-  pressureContext: PressureIntentContext;
+  contextIntentState: ContextIntentState;
   tool: AllowedTool;
   args: Record<string, unknown>;
   before: ObserveResult;
@@ -1019,7 +1019,7 @@ async function recordVerificationEvidenceIfNeeded<TActor extends RuntimeActor>(i
     missing_delta: toJsonValue(input.verification.progress),
     data: toJsonValue({
       task: input.currentTask,
-      pressureContext: input.pressureContext,
+      contextIntentState: input.contextIntentState,
       tool: input.tool,
       args: toJsonRecord(input.args),
       before: input.before,

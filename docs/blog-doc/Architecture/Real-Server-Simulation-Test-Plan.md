@@ -15,7 +15,7 @@ The target behavior is one or more actors that:
 
 - connect to a real local Minecraft server;
 - choose bounded actions from `ActorSoul`, active `LifeGoal`, `WorldEvent`
-  pressure, memory, previous `CycleJudgment`, and owned action skill records;
+  context, memory, previous `CycleJudgment`, and owned action skill records;
 - execute runtime-owned Minecraft primitives through Mineflayer;
 - store evidence, judgment, and memory after each cycle;
 - use prior judgment or memory in a later cycle;
@@ -90,7 +90,7 @@ bun run server:stop
 | T1 | Fresh live action skill contracts | deterministic | one actor/bot | implemented action skills pass with current-run evidence |
 | T2 | Live Gemini social cycle | Gemini API `gemma-4-31b-it` | one actor | real action attempt, evidence, judgment, memory, later-cycle context, provider usage summary |
 | T3 | Multi-actor connection smoke | deterministic | two actors | both actors connect and produce causal transcript artifacts |
-| T4 | Live Gemini social cycle under concrete world pressure | Gemini API `gemma-4-31b-it` | one actor | attempts evidence-backed Minecraft progress without fake pass and stays within usage guard |
+| T4 | Live Gemini social cycle under concrete world context | Gemini API `gemma-4-31b-it` | one actor | attempts evidence-backed Minecraft progress without fake pass and stays within usage guard |
 | T5 | Explicit target readiness gate | selected provider | one actor | passes only with current-run primitive/action-skill evidence, otherwise blocks |
 | T6 | Long-horizon social-cycle stress test | selected live provider with budget guard | one actor | context continuity, truthful blocked state, partial or complete verifier-backed evidence |
 
@@ -242,10 +242,10 @@ Pass criteria:
 This test does not prove live-provider social agency. It proves multi-actor server
 connection and causal transcript shape.
 
-## T4: Concrete-Pressure Social Cycle
+## T4: Concrete-Context Social Cycle
 
 Run the same live Gemini social cycle with explicit but query-neutral world
-pressure.
+context.
 
 ```bash
 bun run probe:social-cycle -- \
@@ -255,8 +255,8 @@ bun run probe:social-cycle -- \
   --cycles 4 \
   --max-actions-per-cycle 3 \
   --isolate-workspace \
-  --world-event "The actor should make one useful Minecraft change selected from current evidence and available action_surface affordances. Treat this as pressure, not a guaranteed goal. Record blockers honestly." \
-  --report ../tmp/live-social-cycle-resource-pressure.json \
+  --world-event "The actor should make one useful Minecraft change selected from current evidence and available action_surface affordances. Treat this as context, not a guaranteed goal. Record blockers honestly." \
+  --report ../tmp/live-social-cycle-resource-context.json \
   --no-dashboard
 ```
 
@@ -303,9 +303,9 @@ bun run probe:social-cycle -- \
   --isolate-workspace \
   --fresh-world \
   --prepare-spawn-access \
-  --world-seed social-pressure-100cycle-20260524 \
-  --world-event "Long-horizon settlement pressure: help npc_b make useful Minecraft progress selected from current observation, memory, prior judgment, and action_surface affordances. Progress should be incremental and evidence-first. Do not claim the broader goal is complete without verifier evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
-  --report ../tmp/live-social-cycle-gemini-social-pressure-100.json \
+  --world-seed social-context-100cycle-20260524 \
+  --world-event "Long-horizon settlement context: help npc_b make useful Minecraft progress selected from current observation, memory, prior judgment, and action_surface affordances. Progress should be incremental and evidence-first. Do not claim the broader goal is complete without verifier evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
+  --report ../tmp/live-social-cycle-gemini-social-context-100.json \
   --no-dashboard
 ```
 

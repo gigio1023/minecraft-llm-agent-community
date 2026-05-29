@@ -1,6 +1,6 @@
 import type { DeterministicTask } from "../gameplay/curriculum/deterministicCurriculum.js";
 
-/** Runtime mode used to decide which pressures may interrupt the current task. */
+/** Runtime mode used by deterministic probe loops before provider planning. */
 export type LifecycleMode =
   | "bootstrap"
   | "normal"
@@ -9,8 +9,15 @@ export type LifecycleMode =
   | "danger"
   | "social_obligation";
 
-/** A scored reason for the actor to keep, switch, or defer its current intent. */
-export type PressureKind =
+/**
+ * Runtime-observed context that can explain deterministic intent continuity.
+ *
+ * These signals are not architectural "needs" or provider commands. They are
+ * compact evidence markers derived from observations, lifecycle state, or social
+ * artifacts so transcripts can explain why a deterministic fallback intent was
+ * kept, switched, or deferred.
+ */
+export type ContextSignalKind =
   | "bootstrap_missing_progress"
   | "recovery_after_death"
   | "shared_shortage"
@@ -24,16 +31,16 @@ export type PressureKind =
   | "conversation_backlog"
   | "exploration_gap";
 
-export type PressureRecord = {
+export type ContextSignalRecord = {
   id: string;
   actorId: string;
-  kind: PressureKind;
+  kind: ContextSignalKind;
   summary: string;
   source: "world" | "memory" | "bulletin" | "mailbox" | "lifecycle" | "runtime";
   relatedActorId?: string;
   relatedTaskId?: string;
   relatedItemNames?: string[];
-  urgency: number;
+  salience: number;
   roleRelevance: number;
   sharedImportance: number;
   personalImportance: number;
@@ -43,7 +50,7 @@ export type PressureRecord = {
   interruptsCurrentIntent: boolean;
 };
 
-/** The compact, provider-facing intent chosen from runtime pressure records. */
+/** The compact intent chosen for deterministic probe fallback. */
 export type IntentKind =
   | "bootstrap_progress"
   | "resupply_shared_storage"
@@ -61,7 +68,7 @@ export type IntentRecord = {
   actorId: string;
   kind: IntentKind;
   summary: string;
-  chosenFromPressureIds: string[];
+  chosenFromContextSignalIds: string[];
   lifecycleMode: LifecycleMode;
   status: "active" | "completed" | "abandoned" | "interrupted";
   source: "llm" | "runtime_default";
@@ -74,11 +81,11 @@ export type IntentRecord = {
 
 export type IntentTransition = "selected" | "continued" | "interrupted" | "replaced";
 
-export type PressureIntentContext = {
+export type ContextIntentState = {
   actorId: string;
   turn: number;
   lifecycleMode: LifecycleMode;
-  pressures: PressureRecord[];
+  contextSignals: ContextSignalRecord[];
   currentIntent: IntentRecord;
   intentTransition: IntentTransition;
 };
@@ -101,15 +108,15 @@ type Observation = {
   memory: unknown[];
 };
 
-export type BuildPressureIntentContextArgs = {
+export type BuildContextIntentStateArgs = {
   actorId: string;
   turn: number;
   observation: Observation;
   currentTask: DeterministicTask | null;
   completedTaskIds: string[];
   previousIntent?: IntentRecord;
-  /** External pressures injected by obligation router, hostile system, etc. */
-  externalPressures?: PressureRecord[];
+  /** External context signals injected by obligation router, hostile system, etc. */
+  externalContextSignals?: ContextSignalRecord[];
   /** Reinjection triggers from settlement state */
   reinjectionHints?: {
     hasPickaxe?: boolean;
@@ -148,7 +155,7 @@ function resolveLifecycleMode(
   currentTask: DeterministicTask | null,
   completedTaskIds: string[],
   previousIntent?: IntentRecord,
-  reinjectionHints?: BuildPressureIntentContextArgs["reinjectionHints"]
+  reinjectionHints?: BuildContextIntentStateArgs["reinjectionHints"]
 ): LifecycleMode {
   // External reinjection hints outrank intent continuity because death, lost
   // tools, and shared scarcity need to interrupt stale plans.
@@ -183,32 +190,31 @@ function resolveLifecycleMode(
   return "normal";
 }
 
-let pressureIdCounter = 0;
+let contextSignalIdCounter = 0;
 
-function nextPressureId() {
-  pressureIdCounter += 1;
-  return `pressure-${pressureIdCounter}`;
+function nextContextSignalId() {
+  contextSignalIdCounter += 1;
+  return `context-signal-${contextSignalIdCounter}`;
 }
 
-function computePressures(
+function computeContextSignals(
   actorId: string,
   observation: Observation,
   currentTask: DeterministicTask | null,
   lifecycleMode: LifecycleMode,
-  reinjectionHints?: BuildPressureIntentContextArgs["reinjectionHints"]
-): PressureRecord[] {
-  const pressures: PressureRecord[] = [];
+  reinjectionHints?: BuildContextIntentStateArgs["reinjectionHints"]
+): ContextSignalRecord[] {
+  const contextSignals: ContextSignalRecord[] = [];
 
-  // Bootstrap missing progress
   if (currentTask && lifecycleMode === "bootstrap") {
-    pressures.push({
-      id: nextPressureId(),
+    contextSignals.push({
+      id: nextContextSignalId(),
       actorId,
       kind: "bootstrap_missing_progress",
       summary: `${currentTask.id}: ${currentTask.reason}`,
       source: "lifecycle",
       relatedTaskId: currentTask.id,
-      urgency: 0.9,
+      salience: 0.9,
       roleRelevance: 0.9,
       sharedImportance: 0.8,
       personalImportance: 0.7,
@@ -219,10 +225,9 @@ function computePressures(
     });
   }
 
-  // Recovery after death / gear loss
   if (lifecycleMode === "recovery") {
-    pressures.push({
-      id: nextPressureId(),
+    contextSignals.push({
+      id: nextContextSignalId(),
       actorId,
       kind: "recovery_after_death",
       summary: currentTask
@@ -230,7 +235,7 @@ function computePressures(
         : "Recovery needed: previously completed progression is missing",
       source: "lifecycle",
       relatedTaskId: currentTask?.id,
-      urgency: 0.95,
+      salience: 0.95,
       roleRelevance: 0.9,
       sharedImportance: 0.85,
       personalImportance: 0.9,
@@ -241,15 +246,14 @@ function computePressures(
     });
   }
 
-  // Scarcity pressure from reinjection
   if (lifecycleMode === "scarcity" && reinjectionHints?.sharedEssentialsBelowFloor) {
-    pressures.push({
-      id: nextPressureId(),
+    contextSignals.push({
+      id: nextContextSignalId(),
       actorId,
       kind: "shared_shortage",
       summary: "Shared essential resources are below minimum threshold",
       source: "lifecycle",
-      urgency: 0.85,
+      salience: 0.85,
       roleRelevance: 0.8,
       sharedImportance: 0.95,
       personalImportance: 0.6,
@@ -260,15 +264,14 @@ function computePressures(
     });
   }
 
-  // Station missing pressure
   if (reinjectionHints?.hasCraftingTable === false && lifecycleMode !== "recovery") {
-    pressures.push({
-      id: nextPressureId(),
+    contextSignals.push({
+      id: nextContextSignalId(),
       actorId,
       kind: "station_missing",
       summary: "No crafting table available - progression blocked",
       source: "world",
-      urgency: 0.7,
+      salience: 0.7,
       roleRelevance: 0.8,
       sharedImportance: 0.7,
       personalImportance: 0.6,
@@ -279,20 +282,19 @@ function computePressures(
     });
   }
 
-  // Nearby opportunity
   const nearActors = observation.visibleActors.filter(
     (actor) => actor.distance <= 3 && !actor.busy
   );
 
   if (nearActors.length > 0 && !currentTask) {
-    pressures.push({
-      id: nextPressureId(),
+    contextSignals.push({
+      id: nextContextSignalId(),
       actorId,
       kind: "nearby_opportunity",
       summary: `${nearActors[0].id} is nearby and available`,
       source: "world",
       relatedActorId: nearActors[0].id,
-      urgency: 0.55,
+      salience: 0.55,
       roleRelevance: 0.7,
       sharedImportance: 0.5,
       personalImportance: 0.45,
@@ -305,13 +307,13 @@ function computePressures(
 
   // Inventory overload (more than 27 slots used is close to full)
   if (observation.inventory && observation.inventory.length > 27) {
-    pressures.push({
-      id: nextPressureId(),
+    contextSignals.push({
+      id: nextContextSignalId(),
       actorId,
       kind: "inventory_overload",
       summary: "Inventory is nearly full, need to deposit items",
       source: "world",
-      urgency: 0.6,
+      salience: 0.6,
       roleRelevance: 0.7,
       sharedImportance: 0.5,
       personalImportance: 0.8,
@@ -322,7 +324,7 @@ function computePressures(
     });
   }
 
-  return pressures;
+  return contextSignals;
 }
 
 let intentIdCounter = 0;
@@ -335,15 +337,15 @@ function nextIntentId() {
 function selectIntent(
   actorId: string,
   turn: number,
-  pressures: PressureRecord[],
+  contextSignals: ContextSignalRecord[],
   lifecycleMode: LifecycleMode,
   currentTask: DeterministicTask | null,
   previousIntent?: IntentRecord
 ): { intent: IntentRecord; transition: IntentTransition } {
   if (previousIntent && previousIntent.status === "active") {
-    const interruptingPressure = pressures.find((p) => p.interruptsCurrentIntent);
+    const interruptingSignal = contextSignals.find((signal) => signal.interruptsCurrentIntent);
 
-    if (!interruptingPressure) {
+    if (!interruptingSignal) {
       // Preserve the intent ID across turns so transcripts distinguish real
       // continuity from repeatedly selecting the same-looking goal.
       return {
@@ -356,9 +358,10 @@ function selectIntent(
     }
   }
 
-  // Runtime defaults pick the highest urgency pressure; provider reasoning can
-  // later enrich this, but the transcript should already expose the source.
-  const topPressure = [...pressures].sort((a, b) => b.urgency - a.urgency)[0];
+  // Deterministic fallback picks the most salient signal only to keep the probe
+  // moving and the transcript explainable. Provider paths still interpret raw
+  // observation themselves.
+  const topSignal = [...contextSignals].sort((a, b) => b.salience - a.salience)[0];
 
   if (lifecycleMode === "recovery") {
     return {
@@ -366,8 +369,8 @@ function selectIntent(
         id: nextIntentId(),
         actorId,
         kind: "recover_basic_tools",
-        summary: topPressure?.summary ?? "recover lost gear and resume progression",
-        chosenFromPressureIds: topPressure ? [topPressure.id] : [],
+        summary: topSignal?.summary ?? "recover lost gear and resume progression",
+        chosenFromContextSignalIds: topSignal ? [topSignal.id] : [],
         lifecycleMode,
         status: "active",
         source: "runtime_default",
@@ -386,8 +389,8 @@ function selectIntent(
         id: nextIntentId(),
         actorId,
         kind: "resupply_shared_storage",
-        summary: topPressure?.summary ?? "shared resources critically low",
-        chosenFromPressureIds: topPressure ? [topPressure.id] : [],
+        summary: topSignal?.summary ?? "shared resources critically low",
+        chosenFromContextSignalIds: topSignal ? [topSignal.id] : [],
         lifecycleMode,
         status: "active",
         source: "runtime_default",
@@ -407,7 +410,7 @@ function selectIntent(
         actorId,
         kind: "bootstrap_progress",
         summary: currentTask.reason,
-        chosenFromPressureIds: topPressure ? [topPressure.id] : [],
+        chosenFromContextSignalIds: topSignal ? [topSignal.id] : [],
         lifecycleMode,
         status: "active",
         source: "runtime_default",
@@ -420,8 +423,7 @@ function selectIntent(
     };
   }
 
-  // Normal mode: infer from the top pressure or continue previous intent kind
-  if (topPressure?.kind === "nearby_opportunity" && previousIntent?.kind === "request_or_handoff") {
+  if (topSignal?.kind === "nearby_opportunity" && previousIntent?.kind === "request_or_handoff") {
     return {
       intent: {
         ...previousIntent,
@@ -431,19 +433,19 @@ function selectIntent(
     };
   }
 
-  const intentKind = mapPressureToIntentKind(topPressure?.kind);
+  const intentKind = mapContextSignalToIntentKind(topSignal?.kind);
 
   return {
     intent: {
       id: nextIntentId(),
       actorId,
       kind: intentKind,
-      summary: topPressure?.summary ?? "no strong pressure detected, waiting for opportunity",
-      chosenFromPressureIds: topPressure ? [topPressure.id] : [],
+      summary: topSignal?.summary ?? "no salient context signal detected, waiting for opportunity",
+      chosenFromContextSignalIds: topSignal ? [topSignal.id] : [],
       lifecycleMode,
       status: "active",
       source: "runtime_default",
-      successCondition: "pressure resolved or a better opportunity arises",
+      successCondition: "context changes or a better opportunity arises",
       interruptible: true,
       createdAtTurn: turn,
       lastUpdatedTurn: turn
@@ -452,8 +454,8 @@ function selectIntent(
   };
 }
 
-function mapPressureToIntentKind(pressureKind?: PressureKind): IntentKind {
-  switch (pressureKind) {
+function mapContextSignalToIntentKind(signalKind?: ContextSignalKind): IntentKind {
+  switch (signalKind) {
     case "bootstrap_missing_progress":
       return "bootstrap_progress";
     case "recovery_after_death":
@@ -481,29 +483,29 @@ function mapPressureToIntentKind(pressureKind?: PressureKind): IntentKind {
 }
 
 /**
- * Builds the pressure and intent context recorded by each runtime-loop turn.
+ * Builds the context-signal and intent state recorded by each runtime-loop turn.
  *
  * This is runtime-owned scaffolding, not a social-simulation model by itself:
  * it explains why the loop chose or continued an intent before any provider
  * proposal is accepted.
  */
-export function buildPressureIntentContext({
+export function buildContextIntentState({
   actorId,
   turn,
   observation,
   currentTask,
   completedTaskIds,
   previousIntent,
-  externalPressures = [],
+  externalContextSignals = [],
   reinjectionHints
-}: BuildPressureIntentContextArgs): PressureIntentContext {
+}: BuildContextIntentStateArgs): ContextIntentState {
   const lifecycleMode = resolveLifecycleMode(currentTask, completedTaskIds, previousIntent, reinjectionHints);
-  const corePressures = computePressures(actorId, observation, currentTask, lifecycleMode, reinjectionHints);
-  const pressures = [...corePressures, ...externalPressures];
+  const coreSignals = computeContextSignals(actorId, observation, currentTask, lifecycleMode, reinjectionHints);
+  const contextSignals = [...coreSignals, ...externalContextSignals];
   const { intent, transition } = selectIntent(
     actorId,
     turn,
-    pressures,
+    contextSignals,
     lifecycleMode,
     currentTask,
     previousIntent
@@ -513,7 +515,7 @@ export function buildPressureIntentContext({
     actorId,
     turn,
     lifecycleMode,
-    pressures,
+    contextSignals,
     currentIntent: intent,
     intentTransition: transition
   };

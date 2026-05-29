@@ -109,7 +109,7 @@ The canonical runtime-loop contract is:
 
 1. Observe actor and world state.
 2. Assemble provider context from actor workspace, memory, active action skills,
-   recent evidence, and goal pressure.
+   recent evidence, and goal context.
 3. Ask the provider for a bounded proposal.
 4. Validate the proposal against runtime-owned action skill and primitive gates.
 5. Execute one bounded primitive or an action skill execution unit.
@@ -242,7 +242,7 @@ High-level flow in `probe/src/runtime/socialCycleRunner.ts`:
 1. Load probe config and choose workspace root.
 2. Initialize actor workspace and seed action skill ownership.
 3. Ensure ActorSoul and active LifeGoal.
-4. Persist WorldEvent pressure, if provided.
+4. Persist WorldEvent context, if provided.
 5. Optionally connect to a live or fresh Minecraft server.
 6. Optionally prepare spawn access with a flat area, chest, and crafting table.
 7. For each cycle:
@@ -264,7 +264,7 @@ remains valid.
 The current goal stack is:
 
 - ActorSoul: stable actor identity and tendencies;
-- ActorLifeGoal: durable top-level pressure that is not completed by one user
+- ActorLifeGoal: durable top-level context that is not completed by one user
   prompt;
 - StrategicGoal: rolling direction;
 - CycleGoal: current bounded cycle target;
@@ -273,7 +273,7 @@ The current goal stack is:
 
 This hierarchy is aligned with the current direction. It prevents user prompts
 from becoming the actor's top-level goal, while still allowing scenario/world
-events to apply pressure.
+events to apply context.
 
 ## Context Packet
 
@@ -292,7 +292,7 @@ events to apply pressure.
 - runtime-owned settlement state and checklist progress;
 - recent blocker histogram;
 - max-action and cycle-index limits;
-- hard rules: world events are pressure, no user prompt, runtime verifies
+- hard rules: world events are context, no user prompt, runtime verifies
   success.
 
 This is a solid context core. It is already better than raw transcript stuffing.
@@ -453,7 +453,7 @@ Cycle estimates:
   nearby terrain cooperate.
 - LLM social-cycle path at `maxActionsPerCycle=3` is more realistically 18-35
   cycles because observe, failed attempts, movement, blocked table/crafting
-  retries, and judgment pressure consume turns.
+  retries, and judgment context consume turns.
 - A vague "build a settlement" open-world prompt can easily go 40-60+ cycles
   without converging, because the current context lacks a typed settlement
   checklist and the action surface still lacks exploration/site-selection

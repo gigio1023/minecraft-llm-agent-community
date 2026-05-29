@@ -33,7 +33,7 @@ run a second cycle that can cite the previous judgment
 
 The near-term proof is a bounded social-life simulation seed. One actor should
 act in Minecraft, reason from `ActorSoul`, `LifeGoal`, and `WorldEvent`
-pressure, store or refine memory from evidence, and use prior judgment or memory
+context, store or refine memory from evidence, and use prior judgment or memory
 in later cycles. It is not full human-like personhood, long-run autonomy, or a
 Voyager clone.
 
@@ -84,7 +84,7 @@ Key rule:
 
 ```text
 WorldEvent is not a prompt.
-WorldEvent is a world fact or pressure that the actor may accept, defer, reject,
+WorldEvent is a world fact or context that the actor may accept, defer, reject,
 or transform based on ActorSoul and LifeGoal.
 ```
 
@@ -252,7 +252,7 @@ type ActorCycleGoal = {
   life_goal_id: string;
   cycle_id: string;
   status: "active" | "satisfied" | "blocked" | "stalled" | "abandoned" | "interrupted" | "superseded";
-  source: "llm_planner" | "llm_authored_policy" | "runtime_rule" | "world_event_pressure";
+  source: "llm_planner" | "llm_authored_policy" | "runtime_rule" | "world_event_context";
   summary: string;
   rationale: string;
   derived_from: {
@@ -278,7 +278,7 @@ type WorldEvent = {
   schema: "world-event/v1";
   event_id: string;
   kind: "environment_event" | "actor_event" | "scenario_event" | "operator_event";
-  authority: "pressure_only" | "scenario_rule" | "debug_override";
+  authority: "context_only" | "scenario_rule" | "debug_override";
   summary: string;
   actor_refs: string[];
   evidence_refs: string[];
@@ -323,7 +323,7 @@ type CycleJudgment = {
     kind: "request_made" | "request_accepted" | "fulfilled" | "blocked" | "helped" | "failed_obligation";
     evidence_refs: string[];
   }>;
-  next_goal_pressure: string[];
+  next_goal_context: string[];
 };
 ```
 
@@ -425,7 +425,7 @@ Expected JSON output:
 - `CycleJudgment`;
 - memory write proposals;
 - relationship event proposals;
-- next pressure hints.
+- next context hints.
 
 ## Runtime Runner
 
@@ -492,7 +492,7 @@ Implementation rules:
 - A direct-generated trial records generated source, helper calls, action
   attempts, timeout/error, verifier output, and memory writes before any cleanup
   into an action skill candidate.
-- A social-cycle `WorldEvent` may create pressure to mine coal or prepare
+- A social-cycle `WorldEvent` may create context to mine coal or prepare
   shelter, but the actor must still choose a CycleGoal from ActorSoul, LifeGoal,
   memory, relationship context, and previous CycleJudgment.
 - Primitive proofs are acceptable when the artifact says what was primitive.
@@ -523,7 +523,7 @@ type SocialCycleRunReport = {
   agency_status: {
     life_goal_source: "actor_soul" | "scenario" | "operator_override";
     strategic_goal_source: "llm_planner" | "runtime_rule";
-    cycle_goal_source: "llm_planner" | "runtime_rule" | "world_event_pressure";
+    cycle_goal_source: "llm_planner" | "runtime_rule" | "world_event_context";
     used_soul: boolean;
     used_life_goal: boolean;
     used_previous_judgment: boolean;
@@ -568,7 +568,7 @@ bun run typecheck
 Test requirements:
 
 - `ActorSoul` and LifeGoal are always present in cycle goal provider input.
-- WorldEvent is represented as pressure, not objective replacement.
+- WorldEvent is represented as context, not objective replacement.
 - A second cycle can cite the first CycleJudgment.
 - Stale `expected_goal_id` cannot overwrite a newer goal.
 - Deterministic baseline report sets `builtin_goal_authority: true` or
@@ -601,7 +601,7 @@ Purpose: prove the data model and stores cannot lie.
 Required checks:
 
 - `ActorSoul` and LifeGoal are always present in cycle goal provider input.
-- WorldEvent is pressure, not objective replacement.
+- WorldEvent is context, not objective replacement.
 - A second cycle can cite the first CycleJudgment.
 - Stale `expected_goal_id` cannot overwrite a newer goal.
 - Provider errors write provider output artifacts and never fake pass.
@@ -694,7 +694,7 @@ OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
   --provider openai-api \
   --cycles 2 \
   --max-actions-per-cycle 3 \
-  --world-event "The settlement needs useful gathered materials. Treat this as a world pressure, not as a command." \
+  --world-event "The settlement needs useful gathered materials. Treat this as a world context, not as a command." \
   --world-event-kind scenario_event \
   --report ../tmp/social-cycle-openai-real-action.json \
   --no-dashboard
@@ -706,7 +706,7 @@ Pass criteria:
 - each attempted action has verifier evidence or a truthful blocked reason;
 - if inventory/chest/world state changes, evidence refs prove it;
 - if no world progress happens, CycleJudgment explains the blocker and next
-  pressure;
+  context;
 - synthetic no-progress, provider text, or a terminal memory note cannot produce
   `runtime_status: "passed"`;
 - objective-phase/direct-generated exploration, such as coal or shelter, is
@@ -775,7 +775,7 @@ OPENAI_MODEL=gpt-5.4-mini bun run probe:social-cycle -- \
   --no-dashboard
 ```
 
-WorldEvent pressure:
+WorldEvent context:
 
 ```bash
 cd probe

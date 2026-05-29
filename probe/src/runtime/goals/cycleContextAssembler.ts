@@ -30,15 +30,15 @@ import type { ToolResultRecord } from "../settlement/settlementState.js";
 export type SocialCycleRelationshipContext = {
   relationships: unknown[];
   incoming_relationships: unknown[];
-  relationship_pressures: unknown[];
-  incoming_relationship_pressures: unknown[];
+  relationship_context_signals: unknown[];
+  incoming_relationship_context_signals: unknown[];
 };
 
 /**
  * Provider-facing social-cycle context assembled from runtime-owned artifacts.
  *
  * @remarks `action_surface` is the actor's executable body, while
- * `settlement_state` remains pressure/evidence context; neither is a domain
+ * `settlement_state` remains observation/evidence context; neither is a domain
  * strategy that can replace ActorSoul or LifeGoal.
  */
 export type SocialCycleContextPacket = {
@@ -53,7 +53,7 @@ export type SocialCycleContextPacket = {
     outcome: string;
     what_happened: string;
     why_it_mattered_for_life_goal: string;
-    next_goal_pressure: string[];
+    next_goal_context: string[];
   }>;
   observation: ObserveResult | Record<string, unknown>;
   owned_action_skills: Array<{
@@ -73,7 +73,7 @@ export type SocialCycleContextPacket = {
     cycle_index: number;
   };
   rules: {
-    world_event_is_pressure_not_life_goal: true;
+    world_event_is_context_not_life_goal: true;
     no_user_prompt: true;
     runtime_verifies_success: true;
   };
@@ -180,7 +180,7 @@ export async function assembleSocialCycleContext(input: {
       outcome: judgment.outcome,
       what_happened: judgment.what_happened,
       why_it_mattered_for_life_goal: judgment.why_it_mattered_for_life_goal,
-      next_goal_pressure: [...judgment.next_goal_pressure]
+      next_goal_context: [...judgment.next_goal_context]
     })),
     observation: input.observation,
     owned_action_skills: input.activeActionSkills.map((record) => ({
@@ -199,11 +199,13 @@ export async function assembleSocialCycleContext(input: {
       incoming_relationships: Array.isArray(providerContext.incoming_relationships)
         ? providerContext.incoming_relationships
         : [],
-      relationship_pressures: Array.isArray(providerContext.relationship_pressures)
-        ? providerContext.relationship_pressures
+      relationship_context_signals: Array.isArray(providerContext.relationship_context_signals)
+        ? providerContext.relationship_context_signals
         : [],
-      incoming_relationship_pressures: Array.isArray(providerContext.incoming_relationship_pressures)
-        ? providerContext.incoming_relationship_pressures
+      incoming_relationship_context_signals: Array.isArray(
+        providerContext.incoming_relationship_context_signals
+      )
+        ? providerContext.incoming_relationship_context_signals
         : []
     },
     memory_packet: memoryPacket,
@@ -213,7 +215,7 @@ export async function assembleSocialCycleContext(input: {
       cycle_index: input.cycleIndex
     },
     rules: {
-      world_event_is_pressure_not_life_goal: true,
+      world_event_is_context_not_life_goal: true,
       no_user_prompt: true,
       runtime_verifies_success: true
     }

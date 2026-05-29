@@ -22,7 +22,7 @@ Immediate target:
 
 North star:
 
-- actors, represented by Mineflayer bots, with role pressure, action skill
+- actors, represented by Mineflayer bots, with role context, action skill
   ownership, memory, and later human-in-the-loop social play.
 
 Not current delivery targets:
@@ -43,9 +43,9 @@ the product direction is a Soul-grounded social simulation seed.
 
 When `soul.md` or an ActorSoul artifact defines an actor, treat it as the actor's
 identity seed. Short-, mid-, and long-term goals should be derived under that
-Soul/LifeGoal frame, with social pressure, memory, relationships, role pressure,
+Soul/LifeGoal frame, with social context, memory, relationships, role context,
 shared/private inventory, obligations, trust, conflict, and settlement state in
-view. Gameplay progress matters because it creates real pressure and evidence
+view. Gameplay progress matters because it creates observations, consequences, and evidence
 for social life, not because the top-level objective is to optimize a Minecraft
 benchmark.
 
@@ -53,7 +53,7 @@ Use external references by translating their mechanisms into this project:
 
 - skill-library papers imply evidence-backed, actor-owned action skill promotion,
   not raw eval loops or global skill reuse detached from the actor;
-- curriculum papers imply bounded goal pressure and capability scaffolding, not a
+- curriculum papers imply bounded capability scaffolding under ActorSoul/LifeGoal, not a
   universal benchmark objective;
 - reasoning/action papers imply CycleGoal -> ActionIntent -> evidence ->
   CycleJudgment loops, not unconstrained chain-of-thought as authority;
@@ -74,11 +74,11 @@ or reframe it.
 
 Do not turn one domain goal into core architecture. House, shelter, base,
 storage, mining, farming, travel, repair, conversation, and conflict are
-possible social pressures, not mandatory CycleGoal phases. Do not add
+possible context sources, not mandatory CycleGoal phases. Do not add
 `StructurePlacementPlan`, `ShelterBlueprint`, `HomeBasePlan`, or similar
 building-first planning artifacts as always-on runtime context. If such an
 artifact is useful, keep it local to a bounded action skill, fixture, or offline
-design tool and make the current Soul/LifeGoal pressure justify its use.
+design tool and make the current Soul/LifeGoal context justify its use.
 
 Codex/MCP-style references should be adapted as autonomy substrate: action
 surface, direct/deferred tool exposure, hooks, permission gates, event streams,
@@ -227,7 +227,7 @@ observations on common LLM coding mistakes:
   skills, or domain planners that were not requested or directly required by the
   current runtime contract.
 - Avoid speculative flexibility. If an abstraction has one use and no immediate
-  pressure, keep the implementation direct.
+  need, keep the implementation direct.
 - If a change grows beyond the smallest clear shape, simplify before proceeding.
   Large files should be split by responsibility, but not converted into a
   framework.
@@ -328,7 +328,7 @@ Important search tokens:
   - `transcript/` for transcript and artifact persistence.
 - Do not let quick probes become permanent monoliths.
 - Do not expect social simulation from persona text alone.
-- Add Minecraft task pressure first: resource gathering, crafting, storage,
+- Add concrete Minecraft observations and consequences first: resource gathering, crafting, storage,
   movement, scarcity, and shared/private inventory.
 - Mineflayer provides the game client API.
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
@@ -354,7 +354,7 @@ Important search tokens:
 - It is acceptable for a specific action skill implementation to query a
   specific Minecraft block or item family as part of its own primitive contract.
   It is not acceptable to turn those families into always-present planner
-  context, summary headings, or goal pressure.
+  context, summary headings, or goal interpretation.
 - Treat physical `ActionIntent` arguments as a contract. For actions such as
   `move_to`, `mine_block`, `place_block`, `craft_item`, `inspect_chest`,
   `deposit_shared`, or structure/building primitives, required target/item/count
@@ -405,7 +405,7 @@ Important search tokens:
   candidate actor-owned action skill memory.
 - Prefer structured domain models, typed records, discriminated unions, schemas,
   and validators over ad hoc dictionary blobs. Runtime state, action evidence,
-  actor memory, provider packets, relationship pressure, and verifier results
+  actor memory, provider packets, relationship context signal, and verifier results
   should be machine-auditable and hard to misread.
 - Keep tests small and Detroit-style. Use them to protect real owned behavior,
   not to simulate a fake feeling of coverage.
@@ -449,7 +449,7 @@ practice.
   artifact locations, and destructive-vs-non-destructive behavior. Do not label
   obvious scalar defaults.
 - Prefer TSDoc `@remarks` for invariants that must survive refactors (for example,
-  “WorldEvent is pressure, not LifeGoal”). Use `@see` to link architecture docs
+  “WorldEvent is context, not LifeGoal”). Use `@see` to link architecture docs
   when a module implements a written contract.
 - Keep JSDoc tags sparse: `@param` only when the name is not self-explanatory;
   avoid `@returns` on obvious `Promise<void>` helpers.

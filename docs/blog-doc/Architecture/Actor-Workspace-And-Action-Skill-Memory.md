@@ -270,6 +270,16 @@ type ActorMemoryRecord = {
   schema: "actor-memory-record/v1";
   memory_id: string;
   actor_id: string;
+  kind:
+    | "cycle_judgment"
+    | "world_observation"
+    | "relationship_event"
+    | "inventory_fact"
+    | "action_skill_note"
+    | "blocker"
+    | "operator_note"
+    | "direct_objective_episode"
+    | "long_objective_phase";
   layer:
     | "working"
     | "episodic"
@@ -304,14 +314,18 @@ type ActorMemoryRecord = {
 
 Current implementation writes:
 
-- `episodic` records for every direct generated objective report;
-- `procedural` candidate records for verified direct trials;
-- `guardrail` candidate records for failed direct trials.
+- `direct_objective_episode` / `episodic` records for every direct generated
+  objective report;
+- `action_skill_note` / `procedural` candidate records for verified direct
+  trials;
+- `blocker` / `guardrail` candidate records for failed direct trials;
+- `cycle_judgment`, `world_observation`, `relationship_event`, or `blocker`
+  records for social-cycle memory writes, depending on the source evidence.
 
-Provider context receives a bounded `typed_memory` packet. Retrieval is symbolic
-first: objective id, objective category, target items, action-skill ids, layer,
-and status. Embedding/vector retrieval can come later, but it must not replace
-objective and causality signals.
+Provider context receives a bounded `memory_packet`. Retrieval is symbolic
+first: objective id, objective category, memory kind, target items, action-skill
+ids, layer, and status. Embedding/vector retrieval can come later, but it must
+not replace objective and causality signals.
 
 Memory is never proof. It is a hint substrate for future bounded actor action
 and direct-trial planning.

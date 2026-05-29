@@ -39,7 +39,7 @@ The near-term proof is a bounded social-life simulation seed for one actor.
 That actor must:
 
 - act in Minecraft through the runtime gate;
-- reason from `ActorSoul`, `LifeGoal`, and `WorldEvent` pressure;
+- reason from `ActorSoul`, `LifeGoal`, observation, and `WorldEvent` context;
 - store or refine memory from verifier-backed evidence;
 - use prior CycleJudgment or memory in a later cycle;
 - leave artifacts that explain success, failure, stall, and no progress.
@@ -248,7 +248,7 @@ type ActorCycleGoal = {
   life_goal_id: string;
   cycle_id: string;
   status: "active" | "satisfied" | "blocked" | "stalled" | "abandoned" | "interrupted" | "superseded";
-  source: "llm_planner" | "llm_authored_policy" | "runtime_rule" | "world_event_pressure";
+  source: "llm_planner" | "llm_authored_policy" | "runtime_rule" | "world_event_context";
   summary: string;
   rationale: string;
   derived_from: {
@@ -282,7 +282,7 @@ type WorldEvent = {
   schema: "world-event/v1";
   event_id: string;
   kind: "environment_event" | "actor_event" | "scenario_event" | "operator_event";
-  authority: "pressure_only" | "scenario_rule" | "debug_override";
+  authority: "context_only" | "scenario_rule" | "debug_override";
   summary: string;
   actor_refs: string[];
   evidence_refs: string[];
@@ -291,7 +291,8 @@ type WorldEvent = {
 ```
 
 `operator_event`도 LifeGoal이 아니다. 예를 들어 사람이 `다이아몬드를 확보해 봐`
-라고 넣으면, actor는 그것을 `pressure_only` WorldEvent로 받고 다음을 판단한다.
+라고 넣으면, actor는 그것을 WorldEvent context로 받고 다음을 판단한다. 현재
+schema의 `context_only` 값은 "context only, not command"라는 현재 canonical 의미다.
 
 - 내 LifeGoal과 역할상 이 요청을 받아들이는가?
 - 현재 능력과 owned action skill로 가능한가?
@@ -316,7 +317,7 @@ type CycleJudgment = {
   verifier_status: "passed" | "failed" | "not_applicable";
   evidence_refs: string[];
   memory_writes: string[];
-  next_goal_pressure: string[];
+  next_goal_context: string[];
 };
 ```
 
@@ -341,7 +342,7 @@ flowchart TB
   Intent --> Gate["Runtime Gate<br/>role, ownership, allowlist, safety"]
   Gate --> Runner["Mineflayer Runtime<br/>bounded action"]
   Runner --> Verifier["Verifier / Evidence<br/>world truth, not LLM claim"]
-  Verifier --> Judgment["CycleJudgment<br/>outcome, meaning, next pressure"]
+  Verifier --> Judgment["CycleJudgment<br/>outcome, meaning, next context"]
   Judgment --> Memory
   Judgment --> Relations
   Judgment --> LifeGoal
@@ -468,7 +469,7 @@ type CycleJudgmentOutput = {
     kind: "request_made" | "request_accepted" | "fulfilled" | "blocked" | "helped" | "failed_obligation";
     evidence_refs: string[];
   }[];
-  next_goal_pressure: string[];
+  next_goal_context: string[];
 };
 ```
 
@@ -479,8 +480,8 @@ type CycleJudgmentOutput = {
 | `probe/src/npc/profiles.ts` | static profile seed | become bootstrap input to `ActorSoul`, not full soul |
 | `probe/src/runtime/actorWorkspacePaths.ts` | memory/evidence/action skill dirs | add `soul`, `goals/life`, `goals/cycles`, `judgments` paths |
 | `probe/src/runtime/actorWorkspace.ts` | rewrites `actor.json` per run, preserves memory/action skills | preserve/load soul and life goal across runs |
-| `probe/src/npc/goals/goalStack.ts` | mirrors `DeterministicTask` into provider frames | build from `ActorCycleGoal` + relationship pressure |
-| `probe/src/runtime/pressureIntent.ts` | computes runtime_default pressure from deterministic task | accept CycleGoal-derived intent source; include needs, obligations, scarcity, social memory |
+| `probe/src/npc/goals/goalStack.ts` | mirrors `DeterministicTask` into provider frames | build from `ActorCycleGoal` + relationship context |
+| `probe/src/runtime/contextIntent.ts` | deterministic context-signal helper | accept CycleGoal-derived intent source; include needs, obligations, scarcity, social memory |
 | `probe/src/runtime/intentToSkill.ts` | tested candidate compiler, not wired | compile candidates from CycleGoal intent and actor-owned action skills |
 | `probe/src/gameplay/seedSkills/registry.ts` | seed capability catalog | remain capability inventory, never motive source |
 | `probe/src/provider/actorProviderContext.ts` | exposes profile, relationships, active action skills, memory | include ActorSoul, LifeGoal, active CycleGoal, previous CycleJudgment |
@@ -493,7 +494,7 @@ type CycleJudgmentOutput = {
 | Path | Current authority | Why it misses the intent | Target authority |
 |---|---|---|---|
 | Live runtime loop | `selectDeterministicTask()` chooses task; provider chooses primitive | actor is following repo ladder, not living from soul/memory | CycleGoal provider chooses current goal from soul, life goal, state, memory, relationships |
-| Short objective | CLI objective registry or generated runner | external objective behaves like top-level task | operator/scenario input becomes pressure/event; LifeGoal remains actor-owned |
+| Short objective | CLI objective registry or generated runner | external objective behaves like top-level task | operator/scenario input becomes event/context; LifeGoal remains actor-owned |
 | Long objective | fixed phase ladder plus generated/builtin `run(ctx)` | “passed” can mean builtin/helper chain worked | separate evaluation harness from social runtime; builtin opt-in only |
 
 ## Exploration And Propagation
@@ -507,7 +508,7 @@ Accepted paths:
   passes only from world, inventory, container, position, or transcript evidence;
 - direct-generated trial: generated TypeScript attempts one objective, records
   source, helper calls, timeout/error, verifier output, and actor memory writes;
-- social-cycle pressure: a `WorldEvent` may make coal or shelter relevant, but
+- social-cycle context: a `WorldEvent` may make coal or shelter relevant, but
   the actor still chooses a CycleGoal from soul, life goal, memory, relationship,
   and previous judgment context.
 
@@ -553,7 +554,7 @@ Use separate fields:
 type RuntimeStatus = "passed" | "failed" | "blocked" | "timeout";
 type AgencyStatus = {
   life_goal_source: "actor_soul" | "scenario" | "operator_override";
-  cycle_goal_source: "llm_planner" | "llm_authored_policy" | "runtime_rule" | "world_event_pressure";
+  cycle_goal_source: "llm_planner" | "llm_authored_policy" | "runtime_rule" | "world_event_context";
   used_previous_judgment: boolean;
   used_memory_refs: number;
   used_relationship_refs: number;
@@ -570,7 +571,7 @@ Good social runtime metrics:
 - `life_goal_continuity`: same LifeGoal persists across cycles/runs.
 - `cycle_goal_grounding`: CycleGoal cites observation, memory, relationship, or previous judgment refs.
 - `memory_reuse_rate`: later CycleGoal uses prior CycleJudgment or typed memory.
-- `relationship_pressure_resolution`: obligations move from requested/accepted to fulfilled/blocked with evidence.
+- `relationship_obligation_resolution`: obligations move from requested/accepted to fulfilled/blocked with evidence.
 - `goal_churn`: actor does not randomly abandon goals without evidence.
 - `verified_social_value`: shared chest delta, chat request, handoff, or relationship event is backed by evidence.
 - `non_builtin_source_ratio`: % CycleGoals and actions not sourced from builtin fallback.
@@ -606,7 +607,7 @@ Success:
 
 ### Experiment 2 - Social Obligation Handoff
 
-Purpose: prove social pressure can generate a goal.
+Purpose: prove relationship context can generate a goal.
 
 Setup:
 
@@ -616,7 +617,7 @@ Setup:
 
 Success:
 
-- `npc_b` CycleGoal cites relationship pressure and request evidence;
+- `npc_b` CycleGoal cites relationship context and request evidence;
 - action deposits or attempts shared value with current-run evidence;
 - relationship event is updated only from verifier-backed evidence.
 
@@ -669,7 +670,7 @@ Files likely touched:
 
 - `probe/src/runtime/agentLoop.ts`
 - `probe/src/npc/goals/goalStack.ts`
-- `probe/src/runtime/pressureIntent.ts`
+- `probe/src/runtime/contextIntent.ts`
 - `probe/src/runtime/intentToSkill.ts`
 - `probe/src/provider/actorProviderContext.ts`
 

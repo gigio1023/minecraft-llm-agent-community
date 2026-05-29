@@ -41,7 +41,11 @@ import {
   type RuntimeRetryAttempt
 } from "./retryConstraints.js";
 import { writeJson, type ActorActionSkillRecord } from "./actorWorkspaceStore.js";
-import { listActorMemoryRefs, writeActorMemoryRecords } from "../memory/actorMemory.js";
+import {
+  listActorMemoryRefs,
+  writeActorMemoryRecords,
+  type ActorMemoryKind
+} from "../memory/actorMemory.js";
 import { getActorProfile } from "../npc/profiles.js";
 import {
   isMeaningfulProgressVerifier,
@@ -97,15 +101,15 @@ function countRelationshipContextRefs(context: {
   relationship_context: {
     relationships: unknown[];
     incoming_relationships: unknown[];
-    relationship_pressures: unknown[];
-    incoming_relationship_pressures: unknown[];
+    relationship_context_signals: unknown[];
+    incoming_relationship_context_signals: unknown[];
   };
 }) {
   return (
     context.relationship_context.relationships.length +
     context.relationship_context.incoming_relationships.length +
-    context.relationship_context.relationship_pressures.length +
-    context.relationship_context.incoming_relationship_pressures.length
+    context.relationship_context.relationship_context_signals.length +
+    context.relationship_context.incoming_relationship_context_signals.length
   );
 }
 
@@ -176,6 +180,26 @@ export type SocialCycleRunResult = {
   reportPath: string;
 };
 
+function memoryKindForJudgmentWrite(input: {
+  layer: CycleJudgment["memory_writes"][number]["layer"];
+  judgment: CycleJudgment;
+  actionIntent: ActionIntent;
+}): ActorMemoryKind {
+  if (input.layer === "procedural") {
+    return "action_skill_note";
+  }
+  if (input.layer === "social") {
+    return "relationship_event";
+  }
+  if (input.layer === "guardrail" || input.judgment.outcome === "blocked") {
+    return "blocker";
+  }
+  if (input.actionIntent.kind === "use_primitive" && input.actionIntent.primitive_id === "observe") {
+    return "world_observation";
+  }
+  return "cycle_judgment";
+}
+
 async function persistJudgmentMemoryWrites(
   rootDir: string,
   actorId: string,
@@ -198,6 +222,11 @@ async function persistJudgmentMemoryWrites(
       memory_id: `social-${judgment.cycle_id}-${sanitizeWorkspaceFileId(judgmentRef)}-${index}`,
       actor_id: actorId,
       layer: write.layer === "belief" ? "belief" : write.layer,
+      kind: memoryKindForJudgmentWrite({
+        layer: write.layer,
+        judgment,
+        actionIntent
+      }),
       status: "active",
       confidence:
         judgment.verifier_status === "passed" || write.confidence !== "observed"

@@ -25,7 +25,7 @@ Runtime code owns Minecraft truth: schema validation, structured args,
 permission gates, Mineflayer execution, verifier evidence, artifacts, actor
 workspace state, and provider usage records.
 
-Do not turn one domain pressure, such as shelter, mining, storage, travel, or
+Do not turn one domain activity, such as shelter, mining, storage, travel, or
 conversation, into always-on architecture. Improve autonomy substrate:
 `action_surface`, hooks, gates, diagnostics, context compaction, verification,
 and review artifacts.

@@ -1,11 +1,11 @@
 import type { DeterministicTask } from "../../gameplay/curriculum/deterministicCurriculum.js";
 import type { ActorProfile } from "../profiles.js";
 import {
-  deriveRelationshipActionPressures,
-  selectDominantRelationshipActionPressure,
-  type RelationshipActionPressure,
-  type RelationshipActionPressureKind
-} from "../relationships/actionPressure.js";
+  deriveRelationshipActionContextSignals,
+  selectDominantRelationshipActionContextSignal,
+  type RelationshipActionContextSignal,
+  type RelationshipActionContextSignalKind
+} from "../relationships/actionContextSignal.js";
 import type { RelationshipEdge } from "../relationships/relationshipLedger.js";
 
 export type GoalKind =
@@ -38,8 +38,8 @@ export type GoalFrame = {
   summary: string;
   target_actor_id?: string;
   target_item?: string;
-  source_pressure_kind?: RelationshipActionPressureKind;
-  action_boundary?: "intent_pressure_only";
+  source_context_signal_kind?: RelationshipActionContextSignalKind;
+  action_boundary?: "intent_context_only";
   active_action_skill_required?: true;
   role_contract_boundary?: "unchanged";
   evidence_refs: string[];
@@ -98,12 +98,12 @@ export function buildActorGoalStack(input: {
   currentTask?: DeterministicTask | null;
   recentFailure?: boolean;
   relationshipEdges?: readonly RelationshipEdge[];
-  relationshipPressure?: RelationshipActionPressure | null;
+  relationshipContextSignal?: RelationshipActionContextSignal | null;
 }): ActorGoalStack {
-  const relationshipPressure =
-    input.relationshipPressure ??
-    selectDominantRelationshipActionPressure(
-      deriveRelationshipActionPressures(input.relationshipEdges ?? [])
+  const relationshipContextSignal =
+    input.relationshipContextSignal ??
+    selectDominantRelationshipActionContextSignal(
+      deriveRelationshipActionContextSignals(input.relationshipEdges ?? [])
     );
   const publicObligation = input.currentTask
     ? {
@@ -132,8 +132,8 @@ export function buildActorGoalStack(input: {
   return {
     ...(publicObligation ? { public_obligation: publicObligation } : {}),
     private_goal: privateGoal,
-    ...(relationshipPressure
-      ? { relationship_goal: buildRelationshipGoalFrame(relationshipPressure) }
+    ...(relationshipContextSignal
+      ? { relationship_goal: buildRelationshipGoalFrame(relationshipContextSignal) }
       : {}),
     ...(input.recentFailure
       ? {
@@ -150,24 +150,24 @@ export function buildActorGoalStack(input: {
 }
 
 export function buildRelationshipGoalFrame(
-  pressure: RelationshipActionPressure
+  signal: RelationshipActionContextSignal
 ): GoalFrame {
   return {
-    kind: relationshipPressureGoalKind(pressure.kind),
-    priority: pressure.priority,
+    kind: relationshipContextSignalGoalKind(signal.kind),
+    priority: signal.priority,
     status: "in_progress",
-    summary: pressure.summary,
-    target_actor_id: pressure.target_actor_id,
-    source_pressure_kind: pressure.kind,
-    action_boundary: pressure.action_boundary,
-    active_action_skill_required: pressure.active_action_skill_required,
-    role_contract_boundary: pressure.role_contract_boundary,
-    evidence_refs: pressure.evidence_refs
+    summary: signal.summary,
+    target_actor_id: signal.target_actor_id,
+    source_context_signal_kind: signal.kind,
+    action_boundary: signal.action_boundary,
+    active_action_skill_required: signal.active_action_skill_required,
+    role_contract_boundary: signal.role_contract_boundary,
+    evidence_refs: signal.evidence_refs
   };
 }
 
-function relationshipPressureGoalKind(
-  kind: RelationshipActionPressureKind
+function relationshipContextSignalGoalKind(
+  kind: RelationshipActionContextSignalKind
 ): GoalKind {
   switch (kind) {
     case "recovery_social_caution":

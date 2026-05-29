@@ -123,7 +123,7 @@ Implemented surfaces:
 
 - actor-provider-context builder;
 - active action skills, candidates, recent evidence, reviews, memory, profile,
-  goals, and relationship pressure in provider-facing context;
+  goals, and relationship context signal in provider-facing context;
 - social-cycle context now includes `action_surface`, a direct/deferred
   affordance packet for the actor's current body. It is not a domain strategy or
   single-domain checklist;
@@ -175,7 +175,7 @@ Important files:
 - `probe/src/tools/worldStateScan.ts`;
 - `probe/src/runtime/goals/actionIntentContracts.ts`;
 - `probe/test/runtimeArtifacts.test.ts`;
-- `probe/test/actorProviderContext.relationshipPressure.test.ts`.
+- `probe/test/actorProviderContext.relationshipContext.test.ts`.
 
 ### Runtime Retry Constraints
 
@@ -219,7 +219,7 @@ Implemented surfaces:
 - role-aligned goal stacks;
 - enum-first relationship state;
 - directional relationship ledger;
-- relationship-derived pressure injected into provider context without granting
+- relationship-derived context injected into provider context without granting
   new tools.
 - social-cycle `relationship_event_proposals` now route through a guarded
   applier path and are recorded as applied, already applied, or rejected instead
@@ -233,7 +233,7 @@ Important files:
 - `probe/test/actorProfiles.test.ts`;
 - `probe/test/goalStack.test.ts`;
 - `probe/test/relationshipLedger.test.ts`;
-- `probe/test/relationshipActionPressure.test.ts`.
+- `probe/test/relationshipActionContext.test.ts`.
 
 ### Local Server, CLI, And Dashboard
 
@@ -377,7 +377,7 @@ Latest fresh action-skill matrix:
 Latest long-horizon OpenAI social-cycle stress test:
 
 - command target: one actor, `gpt-5.4-mini`, fresh world, 100 cycles, broad
-  settlement WorldEvent pressure;
+  settlement WorldEvent context;
 - recorded result: 54 cycles before cleanup hit a host file-permission blocker;
 - report audit: passed;
 - `builtin_goal_authority=false`, `builtin_execution_source=false`,

@@ -1,4 +1,4 @@
-import type { LifecycleMode, IntentRecord, PressureRecord } from "../../runtime/pressureIntent.js";
+import type { LifecycleMode, IntentRecord, ContextSignalRecord } from "../../runtime/contextIntent.js";
 
 type JsonValue =
   | string
@@ -43,7 +43,7 @@ export type CheckpointAgentSummary = {
   lifecycleMode: LifecycleMode;
   currentTask: string | null;
   currentIntent: IntentRecord | null;
-  topPressures: PressureRecord[];
+  topContextSignals: ContextSignalRecord[];
   workingMemory: Record<string, unknown>;
   privateMemorySummary: string[];
 };
@@ -54,12 +54,12 @@ export function buildCheckpointSummary(input: {
   lifecycleMode: LifecycleMode;
   currentTask: string | null;
   currentIntent: IntentRecord | null;
-  topPressures: PressureRecord[];
+  topContextSignals: ContextSignalRecord[];
   workingMemory: Record<string, unknown>;
   privateMemorySummary: string[];
   sharedSettlement: Record<string, unknown>;
 }) {
-  // Keep only the strongest pressures so checkpoint context stays small and
+  // Keep only the strongest context signals so checkpoint context stays small and
   // does not crowd out recent raw transcript evidence.
   return {
     agentId: input.agentId,
@@ -67,7 +67,7 @@ export function buildCheckpointSummary(input: {
     lifecycleMode: input.lifecycleMode,
     currentTask: input.currentTask,
     currentIntent: input.currentIntent ? toJsonValue(input.currentIntent) : null,
-    topPressures: toJsonValue(input.topPressures.slice(0, 3)),
+    topContextSignals: toJsonValue(input.topContextSignals.slice(0, 3)),
     workingMemory: toJsonValue(input.workingMemory),
     privateMemorySummary: [...input.privateMemorySummary],
     sharedSettlement: toJsonValue(input.sharedSettlement)

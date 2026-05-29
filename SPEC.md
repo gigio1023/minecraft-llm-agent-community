@@ -5,9 +5,11 @@ Updated: 2026-05-25
 This is the canonical gateway spec for the current rebuild.
 
 The long-term product direction is a **Soul-grounded Minecraft social
-simulation seed**. Minecraft is the pressure/evidence substrate. The project is
-not a generic Minecraft LLM benchmark, a race-to-diamond agent, a fastest-tech
-tree contest, or a Voyager clone.
+simulation seed**. Minecraft is the observation/evidence substrate: raw world
+state, inventory, entities, positions, chat, blocks, tool results, and artifact
+refs should be preserved richly enough for the model to decide what matters.
+The project is not a generic Minecraft LLM benchmark, a race-to-diamond agent,
+a fastest-tech tree contest, or a Voyager clone.
 
 ## 1. Spec Authority And Governance
 
@@ -39,12 +41,12 @@ The actor is not just an LLM controller attached to Mineflayer.
 
 When `soul.md` or an ActorSoul artifact defines an actor, it is the actor's
 identity seed. Short-, mid-, and long-term goals are derived under the
-Soul/LifeGoal frame and constrained by world pressure, role pressure, memory,
+Soul/LifeGoal frame and informed by observed world state, role context, memory,
 relationships, obligations, trust, conflict, shared/private inventory, and
 settlement state.
 
-Gameplay progress matters because it creates real pressure and evidence for
-social life. It is not the top-level objective by itself.
+Gameplay progress matters because it creates observations, evidence, and social
+consequences. It is not the top-level objective by itself.
 
 Read the product identity spec:
 
@@ -57,10 +59,11 @@ action surface, verifier-backed feedback, hook points, and artifact-grounded
 memory. It must not turn one example goal into core runtime strategy.
 
 House, shelter, base, storage, mining, farming, travel, repair, conversation,
-and conflict are possible social pressures. None of them should become an
-always-on CycleGoal phase, privileged planner object, or universal checklist
-unless the active ActorSoul, LifeGoal, WorldEvent, memory, relationship state,
-or observation makes that pressure relevant in the current cycle.
+and conflict are possible things the actor may notice or care about. None of
+them should become an always-on CycleGoal phase, privileged planner object, or
+universal checklist unless the active ActorSoul, LifeGoal, WorldEvent, memory,
+relationship state, or observation makes that activity relevant in the current
+cycle.
 
 Concrete rules:
 
@@ -74,9 +77,9 @@ Concrete rules:
 - The runtime may expose an `action_surface` packet, direct/deferred
   affordances, pre/post action hooks, approval-like gates, verifier status,
   event streams, and review artifacts. Those are substrate capabilities.
-- A provider may choose building only when current pressure makes building a
-  reasonable action. The system should not push every social goal through house
-  construction.
+- A provider may choose building only when current observation, memory,
+  relationship context, or CycleGoal makes building a reasonable action. The
+  system should not push every social situation through house construction.
 
 This mirrors the useful lesson from Codex-style tool runtimes: the core system
 does not hard-code a strategy for every programming language. It exposes tools,
@@ -132,7 +135,7 @@ Read these documents to understand the full spec:
 1. `SPEC.md`
    - entrypoint, authority, project identity, non-negotiable rules.
 2. `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
-   - Soul/ActorSoul identity, LifeGoal continuity, social pressure, and what
+   - Soul/ActorSoul identity, LifeGoal continuity, social context, and what
      counts as social simulation progress.
 3. `docs/blog-doc/Specification/Runtime-Evidence-And-Action-Skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
@@ -154,11 +157,12 @@ Read these documents to understand the full spec:
 10. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
 11. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-    - actor profiles, role pressure, and relationship state.
+    - actor profiles, role context, and relationship state.
 12. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
     - current implementation state and next work.
 13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-    - branch-review guide for current implementation boundaries and risks.
+    - repo-internal whole-project implementation map for current boundaries,
+      runtime flow, evidence, and risks.
 14. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
     - latest architecture/implementation cross-check.
 15. `docs/blog-doc/Agent-Search-Index.md`
@@ -174,7 +178,8 @@ Setup docs:
 ## 4. Non-Negotiable Direction
 
 - Soul/LifeGoal continuity is the top-level simulation frame.
-- WorldEvents are pressure, not direct replacement for LifeGoal.
+- WorldEvents are event/context records, not raw observation and not a direct
+  replacement for LifeGoal.
 - Runtime owns physical truth: validation, timeout, cancellation, execution,
   verification, transcript, artifacts, and lifecycle guards.
 - Providers propose goals and actions. They do not decide success.
@@ -212,8 +217,8 @@ The first meaningful proof is small:
 - real Minecraft actions such as gathering, crafting, storage, movement,
   block placement, communication, or settlement maintenance;
 - action attempts recorded whether passed, blocked, failed, or no-progress;
-- CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, world pressure,
-  memory, relationships, and prior judgments;
+- CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, observation,
+  world events, memory, relationships, and prior judgments;
 - CycleJudgment written from runtime evidence;
 - later cycles retrieve and use prior memory or judgment;
 - failures explainable from artifacts without immediate reproduction.
@@ -231,7 +236,7 @@ The proof is not:
 The runtime shape is:
 
 ```text
-ActorSoul + LifeGoal + world/social pressure + memory
+ActorSoul + LifeGoal + observation + world events + memory
 -> CycleGoal
 -> ActionIntent
 -> active action skill / primitive gate
@@ -279,8 +284,8 @@ External research is used for mechanisms, not for product identity.
 Reference mechanisms must be translated into this project:
 
 - skill-library work -> actor-owned, evidence-backed action skill promotion;
-- curriculum work -> bounded Soul/LifeGoal-compatible pressure, not benchmark
-  optimization;
+- curriculum work -> bounded capability scaffolding under ActorSoul/LifeGoal,
+  not benchmark optimization;
 - reasoning/action work -> CycleGoal, ActionIntent, evidence, CycleJudgment;
 - memory/reflection work -> artifact-grounded memory and review, not claimed
   progress;

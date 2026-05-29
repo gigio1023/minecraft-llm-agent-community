@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPressureIntentContext } from "../src/runtime/pressureIntent.js";
+import { buildContextIntentState } from "../src/runtime/contextIntent.js";
 
-test("buildPressureIntentContext selects bootstrap progression from the current task", () => {
-  const context = buildPressureIntentContext({
+test("buildContextIntentState selects bootstrap progression from the current task", () => {
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 1,
     observation: {
@@ -30,12 +30,12 @@ test("buildPressureIntentContext selects bootstrap progression from the current 
 
   assert.equal(context.lifecycleMode, "bootstrap");
   assert.equal(context.currentIntent.kind, "bootstrap_progress");
-  assert.equal(context.pressures[0]?.kind, "bootstrap_missing_progress");
+  assert.equal(context.contextSignals[0]?.kind, "bootstrap_missing_progress");
   assert.equal(context.intentTransition, "selected");
 });
 
-test("buildPressureIntentContext re-enters recovery when progression regresses after completed bootstrap work", () => {
-  const context = buildPressureIntentContext({
+test("buildContextIntentState re-enters recovery when progression regresses after completed bootstrap work", () => {
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 4,
     observation: {
@@ -61,11 +61,11 @@ test("buildPressureIntentContext re-enters recovery when progression regresses a
 
   assert.equal(context.lifecycleMode, "recovery");
   assert.equal(context.currentIntent.kind, "recover_basic_tools");
-  assert.equal(context.pressures[0]?.kind, "recovery_after_death");
+  assert.equal(context.contextSignals[0]?.kind, "recovery_after_death");
 });
 
-test("buildPressureIntentContext can select a non-bootstrap social intent when no bootstrap task is active", () => {
-  const context = buildPressureIntentContext({
+test("buildContextIntentState can select a non-bootstrap social intent when no bootstrap task is active", () => {
+  const context = buildContextIntentState({
     actorId: "npc_a",
     turn: 2,
     observation: {
@@ -80,7 +80,7 @@ test("buildPressureIntentContext can select a non-bootstrap social intent when n
       actorId: "npc_a",
       kind: "request_or_handoff",
       summary: "approach npc_b and check whether they are available to coordinate",
-      chosenFromPressureIds: ["pressure-1"],
+      chosenFromContextSignalIds: ["context-signal-1"],
       lifecycleMode: "normal",
       status: "active",
       source: "runtime_default",
@@ -93,6 +93,6 @@ test("buildPressureIntentContext can select a non-bootstrap social intent when n
 
   assert.equal(context.lifecycleMode, "normal");
   assert.equal(context.currentIntent.kind, "request_or_handoff");
-  assert.equal(context.pressures.some((pressure) => pressure.kind === "nearby_opportunity"), true);
+  assert.equal(context.contextSignals.some((signal) => signal.kind === "nearby_opportunity"), true);
   assert.equal(context.intentTransition, "continued");
 });

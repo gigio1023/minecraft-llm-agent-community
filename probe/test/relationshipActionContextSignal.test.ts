@@ -2,65 +2,65 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  deriveRelationshipActionPressure,
-  selectDominantRelationshipActionPressure
-} from "../src/npc/relationships/actionPressure.js";
+  deriveRelationshipActionContextSignal,
+  selectDominantRelationshipActionContextSignal
+} from "../src/npc/relationships/actionContextSignal.js";
 import {
   createDefaultRelationshipEdge,
   createRelationshipEventRef,
   type RelationshipEdge
 } from "../src/npc/relationships/relationshipLedger.js";
 
-test("relationship pressure is derived from relationship enums, not personality floats", () => {
-  const pressure = deriveRelationshipActionPressure({
+test("relationship context signal is derived from relationship enums, not personality floats", () => {
+  const signal = deriveRelationshipActionContextSignal({
     ...edge("npc_a", "npc_b"),
     trust: "distrusted",
     obligation: "overdue",
     friction: "resentful"
   });
 
-  assert.equal(pressure?.kind, "recovery_social_caution");
-  assert.equal(pressure?.priority, "urgent");
-  assert.deepEqual(pressure?.derived_from, {
+  assert.equal(signal?.kind, "recovery_social_caution");
+  assert.equal(signal?.priority, "urgent");
+  assert.deepEqual(signal?.derived_from, {
     trust: "distrusted",
     obligation: "overdue",
     dependency: "independent",
     friction: "resentful",
     familiarity: "stranger"
   });
-  assert.equal(pressure?.action_boundary, "intent_pressure_only");
-  assert.equal(pressure?.active_action_skill_required, true);
-  assert.equal(pressure?.role_contract_boundary, "unchanged");
-  assert.equal(hasNumericProjection(pressure), false);
+  assert.equal(signal?.action_boundary, "intent_context_only");
+  assert.equal(signal?.active_action_skill_required, true);
+  assert.equal(signal?.role_contract_boundary, "unchanged");
+  assert.equal(hasNumericProjection(signal), false);
 });
 
-test("fulfilled reliable relationships produce cooperative confidence pressure", () => {
-  const pressure = deriveRelationshipActionPressure({
+test("fulfilled reliable relationships produce cooperative confidence context", () => {
+  const signal = deriveRelationshipActionContextSignal({
     ...edge("npc_a", "npc_b"),
     trust: "reliable",
     obligation: "fulfilled",
     friction: "none"
   });
 
-  assert.equal(pressure?.kind, "cooperative_confidence");
-  assert.equal(pressure?.priority, "background");
-  assert.equal(pressure?.target_actor_id, "npc_b");
+  assert.equal(signal?.kind, "cooperative_confidence");
+  assert.equal(signal?.priority, "background");
+  assert.equal(signal?.target_actor_id, "npc_b");
 });
 
-test("dominant relationship pressure prefers blocking obligations over background confidence", () => {
-  const dominant = selectDominantRelationshipActionPressure([
-    deriveRelationshipActionPressure({
+test("dominant relationship context signal prefers blocking obligations over background confidence", () => {
+  const dominant = selectDominantRelationshipActionContextSignal([
+    deriveRelationshipActionContextSignal({
       ...edge("npc_a", "npc_b"),
       trust: "trusted",
       obligation: "fulfilled",
       friction: "none"
     }),
-    deriveRelationshipActionPressure({
+    deriveRelationshipActionContextSignal({
       ...edge("npc_a", "npc_c"),
       obligation: "accepted",
       dependency: "critical_path"
     })
-  ].filter((pressure) => pressure !== null));
+  ].filter((signal) => signal !== null));
 
   assert.equal(dominant?.kind, "obligation_repair");
   assert.equal(dominant?.priority, "blocking");

@@ -6,10 +6,10 @@ sidebar_position: 1
 
 **minecraft-llm-agent-community** is a headless Mineflayer runtime for
 Soul/LifeGoal-grounded social-cycle experiments, where Minecraft provides live
-pressure and evidence.
+observation and evidence.
 
 The project is intentionally small. It tests whether an actor can act from
-ActorSoul, LifeGoal, memory, relationship pressure, and world state while
+ActorSoul, LifeGoal, memory, relationship context, and world state while
 leaving enough runtime evidence to explain the result.
 
 ## What It Does
@@ -86,7 +86,8 @@ the autonomy substrate, not turn one domain activity into the architecture.
 
 ```mermaid
 flowchart LR
-  Goal["WorldEvent pressure"]
+  Observation["Observation/evidence"]
+  Event["WorldEvent context"]
   Context["Soul/LifeGoal + memory + prior judgment"]
   Surface["action_surface"]
   Action["bounded Minecraft actions"]
@@ -94,7 +95,8 @@ flowchart LR
   Verifier["verifier"]
   Future["future work: partial-progress reporting and richer diagnostics"]
 
-  Goal --> Context
+  Observation --> Context
+  Event --> Context
   Context --> Surface
   Surface --> Action
   Action --> Evidence

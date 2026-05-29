@@ -22,7 +22,7 @@ export function compileActorSoulFromProfile(actorId: string, societyId = "settle
     values: ["evidence_before_claims", "shared_settlement_contribution"],
     needs: {
       survival: ["stay alive", "avoid reckless resource waste"],
-      social: ["maintain trust through delivery", "acknowledge settlement pressure"],
+      social: ["maintain trust through delivery", "acknowledge settlement context"],
       learning: [profile.learning_bias]
     },
     boundaries: {

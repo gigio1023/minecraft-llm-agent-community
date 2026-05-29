@@ -31,7 +31,7 @@ runtime-owned fixtures and current-run postcondition evidence.
 ### Long-Horizon Social-Cycle Stress Test
 
 The long-horizon OpenAI social-cycle test used one actor, one fresh world, and a
-broad settlement WorldEvent pressure. The scenario is historical evidence for
+broad settlement WorldEvent context. The scenario is historical evidence for
 runtime substrate gaps, not a product architecture.
 
 Run artifact. The file name is historical and should not be copied as a future
@@ -70,7 +70,7 @@ Verdict: `DIAGNOSABLE_FAILURE`.
 
 The current runtime is good at rejecting fake success and preserving context.
 The current planner/control surface is not yet good at turning a long-horizon
-pressure packet into a reliable precondition-aware action sequence.
+context packet into a reliable precondition-aware action sequence.
 
 Repeated blockers from the 54 recorded cycles:
 
@@ -161,11 +161,11 @@ The long-horizon run should not create a domain-specific architecture. It showed
 a broader substrate gap: the provider needs a clearer actor body, recent
 blockers, malformed-argument feedback, and partial-progress semantics.
 
-Future context should expose `action_surface` plus pressure-specific state:
+Future context should expose `action_surface` plus context-specific state:
 
 ```mermaid
 flowchart TD
-  Pressure["ActorSoul/LifeGoal + current pressure"]
+  Context["ActorSoul/LifeGoal + current context"]
   Surface["action_surface: direct and deferred affordances"]
   Blockers["recent blockers and missing affordances"]
   Context["provider context"]
@@ -174,7 +174,7 @@ flowchart TD
   Evidence["Minecraft evidence"]
   Judgment["CycleJudgment"]
 
-  Pressure --> Context
+  Context --> Context
   Surface --> Context
   Blockers --> Context
   Context --> Intent
@@ -196,7 +196,7 @@ mandatory:
   no progress.
 
 If a WorldEvent or CycleGoal makes a specific domain activity relevant, local
-state for that activity may appear as pressure-specific context. That local
+state for that activity may appear as context-specific context. That local
 state must not become the general cycle architecture or a standing planner
 checklist.
 
@@ -314,7 +314,7 @@ flowchart LR
   Gates["role and action-skill gates"]
   Evidence["world/inventory/container evidence"]
   Judgment["CycleJudgment"]
-  Soul["Soul/LifeGoal pressure"]
+  Soul["Soul/LifeGoal context"]
 
   References --> Surface
   References --> Hooks
@@ -340,7 +340,7 @@ Ideas to adapt:
   equipment, and container access;
 - recipe affordance summaries with exact item id, table requirement, missing
   ingredients, result count, and nearest crafting table;
-- bounded chat history as social pressure/evidence, not as free authority;
+- bounded chat history as social context/evidence, not as free authority;
 - optional offline design artifacts only when a specific action skill needs
   them.
 
@@ -360,7 +360,7 @@ Seed action skill and primitive implications:
 - Do not add `buildHouseFromDescription`, `StructurePlacementPlan`, or a
   building-first planner as core runtime architecture.
 - Keep `buildBasicShelter` and `build_pattern` as bounded affordances selected
-  only when current pressure makes building relevant.
+  only when current context makes building relevant.
 - Promote small, general affordances before larger domain behaviors:
   `collectDroppedItems`, `equipBestTool`, `findReachableBlocks`,
   `checkPathToBlock`, `recipe_affordance`/`can_craft`, `use_furnace`, richer
@@ -382,7 +382,7 @@ or bypassing embodied Mineflayer work.
 3. Add partial-progress status to social-cycle reports and review summaries.
 4. Fix fresh-world cleanup ownership.
 5. Expand `action_surface` with direct/deferred affordances, missing-argument
-   diagnostics, and pressure-specific state.
+   diagnostics, and context-specific state.
 6. Add bounded target-discovery and equipment affordances only after
    blocker-aware pivot logic is in place.
 7. Consider domain-local design artifacts only when a specific action skill

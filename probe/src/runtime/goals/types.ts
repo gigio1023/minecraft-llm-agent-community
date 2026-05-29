@@ -99,7 +99,7 @@ export type CycleGoalSource =
   | "llm_planner"
   | "llm_authored_policy"
   | "runtime_rule"
-  | "world_event_pressure";
+  | "world_event_context";
 
 export type ActorCycleGoal = {
   schema: "actor-cycle-goal/v1";
@@ -134,7 +134,7 @@ export type WorldEventKind =
   | "scenario_event"
   | "operator_event";
 
-export type WorldEventAuthority = "pressure_only" | "scenario_rule" | "debug_override";
+export type WorldEventAuthority = "context_only" | "scenario_rule" | "debug_override";
 
 export type WorldEvent = {
   schema: "world-event/v1";
@@ -247,7 +247,7 @@ export type CycleJudgment = {
       | "failed_obligation";
     evidence_refs: string[];
   }>;
-  next_goal_pressure: string[];
+  next_goal_context: string[];
 };
 
 export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
@@ -484,7 +484,7 @@ export function validateCycleJudgment(
   assertString(value, "what_happened", errors);
   assertString(value, "why_it_mattered_for_life_goal", errors);
   assertStringArray(value, "evidence_refs", errors);
-  assertStringArray(value, "next_goal_pressure", errors);
+  assertStringArray(value, "next_goal_context", errors);
   if (!includesString(cycleJudgmentOutcomes, value.outcome)) {
     errors.push("outcome must be a known CycleJudgment outcome");
   }

@@ -125,9 +125,9 @@ evidence.
 
 Action skills are available behaviors, not strategic goals. A shelter-building
 action skill, chest action skill, mining action skill, or conversation action
-skill should be selected because the current Soul/LifeGoal pressure and runtime
-evidence make it relevant, not because the core runtime always routes cycles
-through that activity.
+skill should be selected because current observation, memory, relationship
+context, CycleGoal, and runtime evidence make it relevant, not because the core
+runtime always routes cycles through that activity.
 
 Action skill requirements:
 
@@ -177,7 +177,7 @@ The provider-visible action surface is the actor's current body. It should show:
 The action surface is substrate. It is not a domain strategy. For example,
 `build_pattern` may appear as a direct primitive for a settler, but that does
 not mean every CycleGoal should consider building. It only means building is
-available if current pressure justifies it.
+available if the model chooses it from current context.
 
 ## Transcript And Artifacts
 
@@ -198,13 +198,13 @@ reproducing the world.
 ## Settlement State
 
 For Soul-grounded social simulation, settlement state is not background flavor.
-It is pressure.
+It is model-visible context.
 
 The runtime should move toward a compressed settlement state packet containing:
 
 - current inventory counts;
 - shared chest snapshot;
-- known positions that are relevant to current pressure, such as actor, table,
+- known positions that may be relevant to the model, such as actor, table,
   chest, shelter, or other work sites;
 - verifier status for relevant domain-specific action skills;
 - pending obligations and handoffs;
@@ -213,7 +213,8 @@ The runtime should move toward a compressed settlement state packet containing:
 - available action skills and missing primitive blockers.
 
 This packet should be computed from runtime artifacts, not hallucinated by the
-provider. It is a pressure/evidence packet, not a universal domain checklist.
+provider. It is an observation/evidence/context packet, not a universal domain
+checklist.
 
 ## Context Compaction
 

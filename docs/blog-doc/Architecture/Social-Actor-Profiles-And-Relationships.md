@@ -100,7 +100,7 @@ Obligation answers: "How much does this actor currently owe the other actor?"
 |----------|-------|---------|
 | `none` | 0 | No current debt or request. |
 | `requested` | 1 | A request exists but has not been accepted. |
-| `accepted` | 2 | Actor agreed or role pressure assigned the work. |
+| `accepted` | 2 | Actor agreed or role context assigned the work. |
 | `overdue` | 3 | Accepted work is stalled or blocking another actor. |
 | `fulfilled` | 4 | Obligation was recently completed. |
 
@@ -108,7 +108,7 @@ Rules:
 
 - `fulfilled` is transient; it should decay to `none` after it has been recorded
   into memory or relationship trust.
-- `overdue` should generate pressure, not direct punishment.
+- `overdue` should generate context, not direct punishment.
 
 ### DependencyCategory
 
@@ -253,7 +253,7 @@ type GoalStatus =
 ```
 
 This lets the provider see "why this matters" without relying on ambiguous
-numeric pressure values.
+numeric context values.
 
 ## Scaling Rule
 
@@ -274,31 +274,31 @@ Store:
 
 The score is a projection of the category, not a separate source of truth.
 
-## Relationship Action Pressure
+## Relationship Action Context Signal
 
 Relationship state can influence intent, but it must not grant new tools.
 
-The runtime projects relationship edges into bounded pressure records such as:
+The runtime projects relationship edges into bounded context signal records such as:
 
 ```ts
-type RelationshipActionPressureKind =
+type RelationshipActionContextSignalKind =
   | "recovery_social_caution"
   | "obligation_repair"
   | "friction_reduction"
   | "cooperative_confidence";
 ```
 
-Every pressure record carries these guardrails:
+Every context signal record carries these guardrails:
 
 ```json
 {
-  "action_boundary": "intent_pressure_only",
+  "action_boundary": "intent_context_only",
   "active_action_skill_required": true,
   "role_contract_boundary": "unchanged"
 }
 ```
 
-That means relationship pressure can make a provider prefer a cautious request,
+That means relationship context signal can make a provider prefer a cautious request,
 repair an overdue obligation, or coordinate with a reliable actor, but it cannot
 bypass active action skill records or role contracts.
 
@@ -322,5 +322,5 @@ For a review of `npc_b` with `target_actor_id: "npc_a"`, the applied edge is
 reviewed actor changed.
 
 Unapplied `relationship_event_proposals` remain visible in recent reviewer
-context as proposal-only records. They do not become relationship pressure until
+context as proposal-only records. They do not become relationship context signal until
 the guarded applier writes the relationship edge.

@@ -1,4 +1,4 @@
-import type { IntentKind, LifecycleMode } from "./pressureIntent.js";
+import type { IntentKind, LifecycleMode } from "./contextIntent.js";
 import type { RoleId } from "../npc/roles/contracts.js";
 import { canRoleUseTool } from "../npc/roles/contracts.js";
 import { listSeedActionSkills, type SeedActionSkill, type SeedActionSkillId } from "../gameplay/seedSkills/registry.js";

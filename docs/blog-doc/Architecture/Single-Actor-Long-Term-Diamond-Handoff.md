@@ -19,7 +19,7 @@ Can one actor repeatedly complete increasingly long Minecraft objectives with
 real current-run evidence?
 ```
 
-That question is useful because social simulation needs real gameplay pressure,
+That question is useful because social simulation needs real gameplay context,
 but it is not the product goal by itself. Diamond is a stress test for long
 dependency chains, not a north-star achievement.
 

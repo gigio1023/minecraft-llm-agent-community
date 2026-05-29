@@ -11,7 +11,7 @@ without immediate reruns.
 
 Artifacts should answer:
 
-- what task or pressure the actor was responding to;
+- what task or context the actor was responding to;
 - what active action skill or primitive was selected;
 - what the provider saw, when a provider was involved;
 - what the runtime attempted;
@@ -40,7 +40,7 @@ Each runtime step should record:
 
 - actor id;
 - turn id;
-- selected task or pressure;
+- selected task or context;
 - selected active action skill or primitive;
 - pre-observation;
 - validated args;

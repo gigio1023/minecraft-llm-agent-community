@@ -9,7 +9,7 @@ the current runtime surface.
 
 The goal is still not to finish every historical plan. The active goal is to keep
 actor workspace, action skill lifecycle, hot-path evidence, provider snapshots,
-relationship pressure, and per-actor async reviewers coherent without blocking
+relationship context signal, and per-actor async reviewers coherent without blocking
 gameplay turns.
 
 ## Delivered Runtime Surface
@@ -27,7 +27,7 @@ The current implementation now includes:
    helpers;
 9. phase-one active action-skill gate for provider gameplay proposals;
 10. actor profiles, goal stacks, relationships, and relationship-derived action
-    pressure;
+    context;
 11. guarded relationship proposal application from reviewer evidence;
 12. managed local live-smoke server readiness without provider auth.
 13. objective-scoped direct generated TypeScript action skill trials with
@@ -79,7 +79,7 @@ As of the first implementation pass:
 - The social feedback slice has landed canonical actor profiles, goal stacks,
   directional relationship ledgers, reviewer relationship event proposals, a
   guarded runtime-owned proposal applier, and relationship-derived action
-  pressure in provider context.
+  context in provider context.
 - The managed live-smoke server CLI now starts or reports a local Docker
   endpoint without provider auth and can be used by `runProbe` when `MC_PORT` is
   not set.

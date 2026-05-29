@@ -25,7 +25,7 @@ export function decideHostileAction(input: HostilePolicyInput): HostileDecision 
     return { action: "wait", reason: "no valid hostile target is available" };
   }
 
-  // Hostile pressure is deliberately leashed; this branch prevents a social
+  // Hostile behavior is deliberately leashed; this branch prevents a social
   // stressor from becoming open-ended pursuit or combat autonomy.
   if (input.homeDistance > hostileRoleContract.homeRadius) {
     return { action: "retreat", reason: "hostile actor exceeded its home radius" };

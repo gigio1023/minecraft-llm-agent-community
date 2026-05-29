@@ -130,7 +130,7 @@ test("stale alphabetically later judgment is not used as previous context", asyn
     evidence_refs: [],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   });
 
   const reportPath = path.join(isolatedRoot, "stale-report.json");

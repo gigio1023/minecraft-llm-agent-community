@@ -7,7 +7,10 @@ sidebar_position: 1
 This is the product-identity spec.
 
 The project is not "an LLM in Minecraft." It is a Soul-grounded social
-simulation seed that uses Minecraft as a live pressure and evidence substrate.
+simulation seed that uses Minecraft as a live observation/evidence substrate.
+The runtime should preserve raw world facts, evidence refs, memory, and
+Mineflayer affordances so the model can decide what matters under ActorSoul and
+LifeGoal.
 
 ## Core Claim
 
@@ -16,9 +19,10 @@ An actor's behavior must be understandable as the result of:
 ```text
 Soul / ActorSoul
 + LifeGoal
-+ WorldEvent pressure
-+ role pressure
-+ relationship pressure
++ observation and evidence
++ WorldEvent context
++ role context
++ relationship context
 + memory
 + shared/private inventory
 + settlement state
@@ -41,7 +45,7 @@ When `soul.md` or an ActorSoul artifact exists, treat it as the actor's identity
 seed. It should influence:
 
 - what the actor notices;
-- what kinds of pressure matter;
+- what kinds of evidence and context matter;
 - how obligations and conflict are interpreted;
 - which memories are salient;
 - how short-, mid-, and long-term goals are framed;
@@ -58,15 +62,16 @@ Goal authority should remain layered:
 |-------|------|
 | ActorSoul | identity seed and long-lived behavioral frame |
 | LifeGoal | durable direction for the actor's social life |
-| WorldEvent | external pressure; never a LifeGoal replacement |
-| StrategicGoal | medium-horizon interpretation of current life pressure |
+| observation | raw runtime evidence and world facts |
+| WorldEvent | event/context record; never a LifeGoal replacement |
+| StrategicGoal | medium-horizon interpretation of current evidence and context |
 | CycleGoal | bounded current-cycle objective |
 | ActionIntent | one proposed action or action skill |
 | CycleJudgment | evidence-based interpretation of what happened |
 
 The implementation may start with one actor, but the structure must not erase
 future social dynamics. A single actor can still have obligations, shared
-storage pressure, role duty, remembered conflict, and settlement commitments.
+storage context, role duty, remembered conflict, and settlement commitments.
 
 ## What Counts As Progress
 
@@ -84,8 +89,8 @@ Examples:
 - Placing blocks while updating memory about a shared safety concern is
   social-simulation progress.
 
-These examples are not a priority order. Shelter is one possible pressure source
-among many, not the architecture. A cycle about storage, request fulfillment,
+These examples are not a priority order. Shelter is one possible activity among
+many, not the architecture. A cycle about storage, request fulfillment,
 scarcity, repair, movement, or conflict should not be forced through a building
 plan.
 
@@ -104,9 +109,10 @@ Do not count these as social-simulation success:
 - a successful unit test that never exercises the live runtime path being
   claimed.
 
-## Social Pressure Vocabulary
+## Social Context Vocabulary
 
-The spec expects these pressure sources to become first-class context over time:
+The spec expects these context sources to become first-class model-visible inputs
+over time:
 
 - role duty;
 - shared storage shortage;
@@ -125,9 +131,9 @@ The spec expects these pressure sources to become first-class context over time:
 These are not permission grants. They shape intent only. Runtime gates and
 active action skills still decide what can execute.
 
-No pressure source should become a universal cycle phase. The actor should see
-the current pressure and the current action surface, then choose within
-Soul/LifeGoal continuity.
+No context source should become a universal cycle phase. The actor should see
+current observations, memory, relationship context, and the current action
+surface, then choose within Soul/LifeGoal continuity.
 
 ## First Useful Social Slice
 
@@ -136,7 +142,7 @@ The first useful slice is not a full society.
 It is one actor that can:
 
 1. load ActorSoul and LifeGoal;
-2. observe world and settlement pressure;
+2. observe world and settlement context;
 3. choose a bounded CycleGoal;
 4. execute or truthfully block a real action;
 5. write CycleJudgment from evidence;

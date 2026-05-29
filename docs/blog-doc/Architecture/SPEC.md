@@ -26,7 +26,7 @@ Detailed long-term spec pages live under `../Specification/`.
 
 The active architecture is defined by boundaries more than feature count:
 
-- **Soul-grounded social simulation**: Minecraft is the pressure/evidence
+- **Soul-grounded social simulation**: Minecraft is the observation/evidence
   substrate for actors whose goals are derived from ActorSoul, LifeGoal, memory,
   relationships, obligations, and settlement state.
 - **Runtime-owned truth**: model proposals are gated, executed, verified, and
@@ -38,8 +38,8 @@ The active architecture is defined by boundaries more than feature count:
 - **Soul/life/cycle goal authority**: for social-agency experiments, durable
   ActorSoul and LifeGoal should steer per-cycle goals before runtime action
   selection.
-- **Bounded social pressure**: profiles, goals, obligations, and relationships
-  shape intent without granting tools or bypassing action-skill gates.
+- **Bounded social context**: profiles, goals, obligations, and relationships
+  inform intent without granting tools or bypassing action-skill gates.
 - **Async repair**: reviewers diagnose from immutable artifacts after the turn;
   runtime guards own mutation and promotion.
 

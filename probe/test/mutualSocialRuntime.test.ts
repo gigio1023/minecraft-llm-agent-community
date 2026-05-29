@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createMutualRuntimeState } from "../src/mutual/runtimeState.js";
 
-test("mutual runtime social context tracks thread state, mailbox, and bounded hostile pressure", () => {
+test("mutual runtime social context tracks thread state, mailbox, and bounded hostile context", () => {
   const state = createMutualRuntimeState({
     busyRepliesBeforeAvailable: 0,
     markerItemName: "paper",

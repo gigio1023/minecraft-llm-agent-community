@@ -21,7 +21,7 @@ If one global critic owns repair decisions, the system loses the distinction
 between:
 
 - `npc_a` failed because its local action skill is weak;
-- `npc_b` failed because its role pressure selected the wrong task;
+- `npc_b` failed because its role context selected the wrong task;
 - all actors are failing because the shared seed primitive is wrong.
 
 Per-actor reviewers keep repair ownership local while still allowing a later global
@@ -54,7 +54,7 @@ Allowed outputs:
 
 - failure explanation;
 - fake-progress diagnosis;
-- pressure/task hint;
+- context/task hint;
 - candidate action skill proposal;
 - relationship event proposal with evidence refs;
 - recipe revision suggestion;

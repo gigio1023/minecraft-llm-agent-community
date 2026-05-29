@@ -48,7 +48,7 @@ Avoid:
 - hidden global state;
 - ad hoc dictionary/object blobs when a domain model is needed;
 - broad mocks that pass while real behavior breaks;
-- speculative abstractions detached from current runtime pressure;
+- speculative abstractions detached from current runtime evidence and context;
 - burying product intent in prompts only.
 - hidden physical-action defaults that turn invalid provider output into
   misleading movement or gameplay.
@@ -92,7 +92,7 @@ Use comments to explain:
 - which invariant is being protected;
 - which fake-progress mode is being rejected;
 - why a Minecraft/Mineflayer behavior is non-obvious;
-- how Soul/LifeGoal/social pressure affects an implementation boundary;
+- how Soul/LifeGoal/social context affects an implementation boundary;
 - how evidence should be interpreted.
 
 Do not use comments to narrate obvious code. Prefer extracting a named helper

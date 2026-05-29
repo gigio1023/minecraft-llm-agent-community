@@ -95,7 +95,7 @@ function previousJudgment(): CycleJudgment {
     evidence_refs: ["evidence/cycle-0002-action.json"],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: ["Continue only with current evidence"]
+    next_goal_context: ["Continue only with current evidence"]
   };
 }
 
@@ -161,7 +161,7 @@ function contextPacket(): SocialCycleContextPacketLike {
         outcome: judgment.outcome,
         what_happened: judgment.what_happened,
         why_it_mattered_for_life_goal: judgment.why_it_mattered_for_life_goal,
-        next_goal_pressure: judgment.next_goal_pressure
+        next_goal_context: judgment.next_goal_context
       }
     ],
     observation,
@@ -174,14 +174,15 @@ function contextPacket(): SocialCycleContextPacketLike {
     relationship_context: {
       relationships: [],
       incoming_relationships: [],
-      relationship_pressures: [],
-      incoming_relationship_pressures: []
+      relationship_context_signals: [],
+      incoming_relationship_context_signals: []
     },
     memory_packet: {
       schema: "actor-memory-retrieval/v1",
       actor_id: "npc_b",
       retrieval_policy: {
         objective_category: "social_cycle",
+        kinds: [],
         item_names: ["oak_log"],
         action_skill_ids: ["collectLogs"],
         limit: 8,
@@ -190,6 +191,7 @@ function contextPacket(): SocialCycleContextPacketLike {
       retrieved_episodic: [
         {
           memory_id: "social-cycle-0002",
+          kind: "blocker",
           layer: "episodic",
           status: "active",
           confidence: "observed",
@@ -245,7 +247,7 @@ function contextPacket(): SocialCycleContextPacketLike {
         schema: "world-event/v1",
         event_id: "world-event-1",
         kind: "scenario_event",
-        authority: "pressure_only",
+        authority: "context_only",
         summary: "Settlement wants useful materials, but LifeGoal remains authoritative.",
         actor_refs: ["npc_b"],
         evidence_refs: ["evidence/world-event-1.json"],

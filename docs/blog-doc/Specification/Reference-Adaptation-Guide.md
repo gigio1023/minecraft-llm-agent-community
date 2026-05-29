@@ -48,7 +48,7 @@ Adaptation:
 
 - build a repo-local Minecraft knowledge layer and explicit verifier contracts;
 - do not let "open-ended" become unbounded runtime authority;
-- keep tasks meaningful under Soul/LifeGoal pressure.
+- keep tasks meaningful under Soul/LifeGoal context.
 
 ### Embodied Agent Interface
 
@@ -108,7 +108,7 @@ Mechanism:
 Adaptation:
 
 - active action skills and role-safe primitives are the actor's body;
-- social pressure may choose among allowed actions, but cannot grant tools.
+- social context may influence allowed actions, but cannot grant tools.
 
 ### SWE-agent
 
@@ -216,10 +216,10 @@ Mechanism:
 
 Adaptation:
 
-- put Soul and environment pressure in the same context packet;
+- put Soul and environment context in the same context packet;
 - include scarcity, shelter, chest, obligations, trust, conflict, and settlement
   state when relevant;
-- never privilege one pressure source, such as shelter, as the default
+- never privilege one context source, such as shelter, as the default
   architecture for all cycles.
 
 ### Social Simulation Realism
@@ -238,10 +238,10 @@ Mechanism:
 Adaptation:
 
 - start with local realism metrics:
-  - did the actor follow Soul/LifeGoal pressure?
+  - did the actor follow Soul/LifeGoal context?
   - did relationships or obligations change action selection?
   - did memory retrieval affect later cycles?
-  - did settlement state create social pressure?
+  - did settlement state affect action selection?
   - did evidence contradict the actor's stated rationale?
 
 ## Memory References

@@ -26,7 +26,7 @@ without losing the core discipline:
   relevant action surface.
 - Mineflayer helpers and verifiers remain the dense runtime substrate.
 - Success is accepted only from current-run Minecraft evidence.
-- Actor social behavior comes from role pressure, shared resources, relationship
+- Actor social behavior comes from role context, shared resources, relationship
   events, and memory, not persona text alone.
 - Review and repair run asynchronously after actor turns.
 
@@ -90,7 +90,7 @@ This slice tests the real architecture:
 - direct generated action skills as the fast propagation path;
 - shared storage as social state;
 - memory retrieval as practical context, not a transcript dump;
-- relationship events as evidence-backed pressure;
+- relationship events as evidence-backed context;
 - dashboard as observer;
 - reviewer sidecars as post-turn critics.
 
@@ -152,7 +152,7 @@ Implement or harden provider context fields for:
 - actor role and current social responsibility;
 - relevant shared chest state;
 - current requests and obligations;
-- relationship pressure derived from enums;
+- relationship context signal derived from enums;
 - objective-specific allowed helper surface;
 - recent failed helper calls and guardrail memory.
 
@@ -194,7 +194,7 @@ Implement or harden:
 - reviewer queue creation from failed social objective reports;
 - per-actor reviewer jobs that read only immutable artifacts;
 - findings that distinguish action skill failure, missing helper, bad provider
-  context, stale memory, relationship pressure error, and environment blocker;
+  context, stale memory, relationship context signal error, and environment blocker;
 - candidate repair proposals that cite exact evidence.
 
 Do not make the reviewer block actor turns.

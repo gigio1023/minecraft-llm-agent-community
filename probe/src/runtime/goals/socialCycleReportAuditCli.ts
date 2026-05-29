@@ -603,7 +603,7 @@ function collectJudgmentClaimKinds(judgment: unknown) {
   const texts = [
     judgment.what_happened,
     judgment.why_it_mattered_for_life_goal,
-    ...(Array.isArray(judgment.next_goal_pressure) ? judgment.next_goal_pressure : []),
+    ...(Array.isArray(judgment.next_goal_context) ? judgment.next_goal_context : []),
     ...(Array.isArray(judgment.memory_writes)
       ? judgment.memory_writes.map((write) => isRecord(write) ? write.summary : undefined)
       : [])

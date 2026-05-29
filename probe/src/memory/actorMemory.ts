@@ -16,6 +16,17 @@ type JsonRecord = Record<string, JsonValue>;
 
 export type ActorMemoryLayer = ActorMemoryLayerPath;
 
+export type ActorMemoryKind =
+  | "cycle_judgment"
+  | "world_observation"
+  | "relationship_event"
+  | "inventory_fact"
+  | "action_skill_note"
+  | "blocker"
+  | "operator_note"
+  | "direct_objective_episode"
+  | "long_objective_phase";
+
 export type ActorMemoryStatus =
   | "candidate"
   | "active"
@@ -55,6 +66,7 @@ export type ActorMemoryRecord = {
   schema: "actor-memory-record/v1";
   memory_id: string;
   actor_id: string;
+  kind: ActorMemoryKind;
   layer: ActorMemoryLayer;
   status: ActorMemoryStatus;
   confidence: ActorMemoryConfidence;
@@ -70,6 +82,7 @@ export type ActorMemoryRecord = {
 
 export type ActorMemoryRef = {
   memory_id: string;
+  kind: ActorMemoryKind;
   layer: ActorMemoryLayer;
   status: ActorMemoryStatus;
   confidence: ActorMemoryConfidence;
@@ -85,6 +98,7 @@ export type ActorMemoryRetrievalPacket = {
   retrieval_policy: {
     objective_id?: string;
     objective_category?: string;
+    kinds: ActorMemoryKind[];
     item_names: string[];
     action_skill_ids: string[];
     limit: number;
@@ -101,6 +115,7 @@ export type ActorMemoryRetrievalPacket = {
 export type ActorMemoryQuery = {
   objectiveId?: string;
   objectiveCategory?: string;
+  kinds?: readonly ActorMemoryKind[];
   itemNames?: readonly string[];
   actionSkillIds?: readonly string[];
   limit?: number;
@@ -116,8 +131,8 @@ const actorMemoryLayers: ActorMemoryLayer[] = [
   "guardrail"
 ];
 
-function unique(values: readonly (string | undefined | null)[]) {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
+function unique<T extends string>(values: readonly (T | undefined | null)[]): T[] {
+  return [...new Set(values.filter((value): value is T => Boolean(value)))].sort();
 }
 
 function toJsonValue(value: unknown): JsonValue {
@@ -157,6 +172,47 @@ function emptyIndex(overrides: Partial<ActorMemoryIndex> = {}): ActorMemoryIndex
     verifier_statuses: [],
     causal_refs: [],
     ...overrides
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function inferLegacyMemoryKind(record: ActorMemoryRecord): ActorMemoryKind {
+  const contentKind = isRecord(record.content) && typeof record.content.kind === "string"
+    ? record.content.kind
+    : "";
+  const diagnoses = Array.isArray(record.index?.diagnoses) ? record.index.diagnoses : [];
+  const verifierStatuses = Array.isArray(record.index?.verifier_statuses)
+    ? record.index.verifier_statuses
+    : [];
+  const itemNames = Array.isArray(record.index?.item_names) ? record.index.item_names : [];
+  if (contentKind === "direct_generated_objective_episode") {
+    return "direct_objective_episode";
+  }
+  if (
+    contentKind === "direct_generated_procedural_candidate" ||
+    record.layer === "procedural"
+  ) {
+    return "action_skill_note";
+  }
+  if (record.layer === "guardrail" || diagnoses.includes("blocked")) {
+    return "blocker";
+  }
+  if (record.layer === "social") {
+    return "relationship_event";
+  }
+  if (verifierStatuses.includes("passed") && itemNames.length > 0) {
+    return "inventory_fact";
+  }
+  return "cycle_judgment";
+}
+
+function normalizeActorMemoryRecord(record: ActorMemoryRecord): ActorMemoryRecord {
+  return {
+    ...record,
+    kind: record.kind ?? inferLegacyMemoryKind(record)
   };
 }
 
@@ -240,6 +296,7 @@ export function buildDirectGeneratedObjectiveMemoryRecords(input: {
     schema: "actor-memory-record/v1",
     memory_id: `episode-${report.runId}`,
     layer: "episodic",
+    kind: "direct_objective_episode",
     status: "active",
     confidence: "observed",
     summary:
@@ -272,6 +329,7 @@ export function buildDirectGeneratedObjectiveMemoryRecords(input: {
       schema: "actor-memory-record/v1",
       memory_id: `procedure-candidate-${report.runId}`,
       layer: "procedural",
+      kind: "action_skill_note",
       status: "candidate",
       confidence: "observed",
       summary: `Candidate procedure: generate and execute a Mineflayer TypeScript plan for ${report.objectiveId}.`,
@@ -298,6 +356,7 @@ export function buildDirectGeneratedObjectiveMemoryRecords(input: {
     schema: "actor-memory-record/v1",
     memory_id: `guardrail-candidate-${report.runId}`,
     layer: "guardrail",
+    kind: "blocker",
     status: "candidate",
     confidence: "observed",
     summary: `Guardrail candidate: do not treat ${report.objectiveId} as successful without current-run ${report.evidence.itemName} inventory evidence.`,
@@ -372,7 +431,9 @@ async function listLayerRecords(rootDir: string, actorId: string, layer: ActorMe
       .map((entry) => readJsonIfExists<ActorMemoryRecord>(path.join(dir, entry)))
   );
 
-  return records.filter((record): record is ActorMemoryRecord => Boolean(record));
+  return records
+    .filter((record): record is ActorMemoryRecord => Boolean(record))
+    .map(normalizeActorMemoryRecord);
 }
 
 export async function listActorMemoryRecords(
@@ -400,6 +461,11 @@ function recordScore(record: ActorMemoryRecord, query: ActorMemoryQuery) {
   if (query.objectiveCategory && record.index.objective_categories.includes(query.objectiveCategory)) {
     score += 4;
     reasons.push(`category:${query.objectiveCategory}`);
+  }
+
+  if (query.kinds?.includes(record.kind)) {
+    score += 6;
+    reasons.push(`kind:${record.kind}`);
   }
 
   const itemMatches = (query.itemNames ?? []).filter((itemName) =>
@@ -438,6 +504,7 @@ function recordScore(record: ActorMemoryRecord, query: ActorMemoryQuery) {
 function toMemoryRef(record: ActorMemoryRecord, score: number, reason: string): ActorMemoryRef {
   return {
     memory_id: record.memory_id,
+    kind: record.kind,
     layer: record.layer,
     status: record.status,
     confidence: record.confidence,
@@ -493,6 +560,7 @@ export async function retrieveActorMemoryForObjective(
     retrieval_policy: {
       ...(query.objectiveId ? { objective_id: query.objectiveId } : {}),
       ...(query.objectiveCategory ? { objective_category: query.objectiveCategory } : {}),
+      kinds: unique(query.kinds ?? []),
       item_names: unique(query.itemNames ?? []),
       action_skill_ids: unique(query.actionSkillIds ?? []),
       limit,
@@ -500,6 +568,7 @@ export async function retrieveActorMemoryForObjective(
         "actor_scope",
         "objective_id",
         "objective_category",
+        "memory_kind",
         "item_names",
         "action_skill_ids",
         "status",

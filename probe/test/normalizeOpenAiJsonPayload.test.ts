@@ -8,12 +8,12 @@ test("unwraps schema-shaped OpenAI payloads", () => {
   const normalized = normalizeOpenAiJsonPayload({
     type: "object",
     properties: {
-      cycle_goal: { summary: "observe settlement pressure" }
+      cycle_goal: { summary: "observe settlement context" }
     }
   });
 
   const cycleGoal = (normalized as { cycle_goal?: { summary: string } }).cycle_goal;
-  assert.equal(cycleGoal?.summary, "observe settlement pressure");
+  assert.equal(cycleGoal?.summary, "observe settlement context");
 });
 
 test("parses the first JSON value when a schema response duplicates the object", () => {

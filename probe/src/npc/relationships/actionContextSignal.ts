@@ -7,36 +7,36 @@ import type {
   TrustCategory
 } from "./relationshipLedger.js";
 
-export const RELATIONSHIP_ACTION_PRESSURE_KINDS = [
+export const RELATIONSHIP_ACTION_CONTEXT_SIGNAL_KINDS = [
   "recovery_social_caution",
   "obligation_repair",
   "friction_reduction",
   "cooperative_confidence"
 ] as const;
 
-export type RelationshipActionPressureKind =
-  (typeof RELATIONSHIP_ACTION_PRESSURE_KINDS)[number];
+export type RelationshipActionContextSignalKind =
+  (typeof RELATIONSHIP_ACTION_CONTEXT_SIGNAL_KINDS)[number];
 
-export type RelationshipActionPressurePriority =
+export type RelationshipActionContextSignalPriority =
   | "background"
   | "normal"
   | "urgent"
   | "blocking";
 
-export type RelationshipActionPressure = {
+export type RelationshipActionContextSignal = {
   actor_id: string;
   target_actor_id: string;
-  kind: RelationshipActionPressureKind;
-  priority: RelationshipActionPressurePriority;
+  kind: RelationshipActionContextSignalKind;
+  priority: RelationshipActionContextSignalPriority;
   summary: string;
   evidence_refs: string[];
-  derived_from: RelationshipPressureDerivation;
-  action_boundary: "intent_pressure_only";
+  derived_from: RelationshipContextSignalDerivation;
+  action_boundary: "intent_context_only";
   active_action_skill_required: true;
   role_contract_boundary: "unchanged";
 };
 
-export type RelationshipPressureDerivation = {
+export type RelationshipContextSignalDerivation = {
   trust: TrustCategory;
   obligation: ObligationCategory;
   dependency: DependencyCategory;
@@ -54,12 +54,12 @@ const repairFrictionCategories = new Set<FrictionCategory>([
 ]);
 
 /**
- * Converts durable relationship enums into action pressure without granting any
- * primitive, action skill, or role-contract permission.
+ * Converts durable relationship enums into bounded action context without
+ * granting any primitive, action skill, or role-contract permission.
  */
-export function deriveRelationshipActionPressure(
+export function deriveRelationshipActionContextSignal(
   edge: RelationshipEdge
-): RelationshipActionPressure | null {
+): RelationshipActionContextSignal | null {
   const derived_from = relationshipDerivation(edge);
   const latestEvidenceRefs = latestRelationshipEvidenceRefs(edge);
 
@@ -68,7 +68,7 @@ export function deriveRelationshipActionPressure(
     edge.obligation === "overdue" ||
     urgentFrictionCategories.has(edge.friction)
   ) {
-    return pressure(edge, {
+    return contextSignal(edge, {
       kind: "recovery_social_caution",
       priority: "urgent",
       summary:
@@ -79,7 +79,7 @@ export function deriveRelationshipActionPressure(
   }
 
   if (edge.obligation === "requested" || edge.obligation === "accepted") {
-    return pressure(edge, {
+    return contextSignal(edge, {
       kind: "obligation_repair",
       priority: edge.dependency === "critical_path" ? "blocking" : "normal",
       summary:
@@ -90,7 +90,7 @@ export function deriveRelationshipActionPressure(
   }
 
   if (repairFrictionCategories.has(edge.friction)) {
-    return pressure(edge, {
+    return contextSignal(edge, {
       kind: "friction_reduction",
       priority: edge.friction === "frustrated" ? "urgent" : "normal",
       summary:
@@ -105,7 +105,7 @@ export function deriveRelationshipActionPressure(
     edge.obligation === "fulfilled" &&
     edge.friction === "none"
   ) {
-    return pressure(edge, {
+    return contextSignal(edge, {
       kind: "cooperative_confidence",
       priority: "background",
       summary:
@@ -118,44 +118,44 @@ export function deriveRelationshipActionPressure(
   return null;
 }
 
-export function deriveRelationshipActionPressures(
+export function deriveRelationshipActionContextSignals(
   edges: readonly RelationshipEdge[]
-): RelationshipActionPressure[] {
+): RelationshipActionContextSignal[] {
   return edges
-    .map(deriveRelationshipActionPressure)
-    .filter((pressure): pressure is RelationshipActionPressure => pressure !== null);
+    .map(deriveRelationshipActionContextSignal)
+    .filter((signal): signal is RelationshipActionContextSignal => signal !== null);
 }
 
-export function selectDominantRelationshipActionPressure(
-  pressures: readonly RelationshipActionPressure[]
-): RelationshipActionPressure | null {
-  return [...pressures].sort(
+export function selectDominantRelationshipActionContextSignal(
+  signals: readonly RelationshipActionContextSignal[]
+): RelationshipActionContextSignal | null {
+  return [...signals].sort(
     (left, right) => priorityRank(right.priority) - priorityRank(left.priority)
   )[0] ?? null;
 }
 
-function pressure(
+function contextSignal(
   edge: RelationshipEdge,
   input: Omit<
-    RelationshipActionPressure,
+    RelationshipActionContextSignal,
     | "actor_id"
     | "target_actor_id"
     | "action_boundary"
     | "active_action_skill_required"
     | "role_contract_boundary"
   >
-): RelationshipActionPressure {
+): RelationshipActionContextSignal {
   return {
     actor_id: edge.from_actor_id,
     target_actor_id: edge.to_actor_id,
     ...input,
-    action_boundary: "intent_pressure_only",
+    action_boundary: "intent_context_only",
     active_action_skill_required: true,
     role_contract_boundary: "unchanged"
   };
 }
 
-function relationshipDerivation(edge: RelationshipEdge): RelationshipPressureDerivation {
+function relationshipDerivation(edge: RelationshipEdge): RelationshipContextSignalDerivation {
   return {
     trust: edge.trust,
     obligation: edge.obligation,
@@ -169,7 +169,7 @@ function latestRelationshipEvidenceRefs(edge: RelationshipEdge) {
   return edge.recent_events.at(-1)?.evidence_refs.slice() ?? [];
 }
 
-function priorityRank(priority: RelationshipActionPressurePriority) {
+function priorityRank(priority: RelationshipActionContextSignalPriority) {
   switch (priority) {
     case "background":
       return 0;

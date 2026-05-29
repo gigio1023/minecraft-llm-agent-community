@@ -29,6 +29,7 @@ const sidebars = {
         'Architecture/Social-Actor-Profiles-And-Relationships',
         'Architecture/Action-Skill-Verification',
         'Architecture/Bounded-Action-Skill-Creation',
+        'Architecture/Actor-Memory-Observation-And-Action-Space-Plan',
         'Architecture/Async-Reviewer-Sidecars',
         'Architecture/Future-Works',
       ],

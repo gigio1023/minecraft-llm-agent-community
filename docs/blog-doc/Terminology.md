@@ -284,13 +284,14 @@ not replaced directly by a user request or WorldEvent.
 
 ## WorldEvent
 
-A **WorldEvent** is external world/social pressure recorded for an actor. It can
-influence CycleGoal selection, but it is not the actor's LifeGoal.
+A **WorldEvent** is an event/context record given to an actor. It may come from
+scenario input, relationship state, role context, or observed runtime state. It
+can influence CycleGoal selection, but it is not the actor's LifeGoal.
 
 ## StrategicGoal
 
 A **StrategicGoal** is a medium-horizon interpretation of ActorSoul, LifeGoal,
-memory, world state, and social pressure.
+memory, world state, and social context.
 
 ## CycleGoal
 
@@ -334,7 +335,7 @@ verifier or action-skill postcondition. It is not completion.
 
 ## Role
 
-A **role** is a runtime permission and pressure contract, such as `gatherer`,
+A **role** is a runtime permission and context contract, such as `gatherer`,
 `crafter`, `settler`, or `quartermaster`.
 
 Roles are not persona flavor. They gate which primitives and action skills an
@@ -343,7 +344,7 @@ actor can use.
 ## Relationship
 
 A **relationship** is structured actor-to-actor state derived from evidence,
-review, and guarded runtime updates. Do not model relationship pressure as vague
+review, and guarded runtime updates. Do not model relationship state as vague
 personality floats when an enum or typed relationship event is available.
 
 ## Shared Storage
@@ -361,8 +362,8 @@ prior runtime work.
 
 Settlement state is not a provider-facing strategy taxonomy and not a hidden
 single-domain checklist. If a field mentions a concrete Minecraft activity, it
-must be interpreted as retained evidence or pressure, not as a mandatory
-CycleGoal phase.
+must be interpreted as retained evidence or context, not as a mandatory CycleGoal
+phase.
 
 ## Context Compaction
 
@@ -417,7 +418,7 @@ replacement terms instead.
 | AI brain, LLM brain, agent mind | provider, cycle goal provider, action planner provider |
 | Goal Mind in new prose | cycle goal provider |
 | magic, magical, just works | runtime contract, helper, preflight, verifier |
-| vibes, feels right, believable vibes | evidence, artifact, transcript, role pressure |
+| vibes, feels right, believable vibes | evidence, artifact, transcript, role context |
 | smart NPC, intelligent NPC | actor, provider-backed actor, Mineflayer bot |
 | autonomous as a broad claim | bounded runtime execution, current-run objective, social-cycle run |
 | learned skill | promoted action skill, candidate action skill, direct-generated action skill trial |

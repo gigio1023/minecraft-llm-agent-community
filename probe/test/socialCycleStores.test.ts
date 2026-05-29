@@ -56,7 +56,7 @@ test("stores persist soul, life goal, cycle goal, judgment, and world events", a
     evidence_refs: ["evidence/cycle-0001-observe.json"],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: ["Try collection when safe"]
+    next_goal_context: ["Try collection when safe"]
   });
 
   assert.ok(await readActorSoul(rootDir, actorId));
@@ -144,7 +144,7 @@ test("cycle judgment lookup falls back to latest action-attempt judgment", async
     evidence_refs: [],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   };
   await writeCycleJudgment(rootDir, actorId, judgment, "cycle-0099-action-01");
   await writeCycleJudgment(

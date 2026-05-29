@@ -128,7 +128,7 @@ async function writeActorWorkspaceFixture(
       evidence_refs: cycle.evidence_refs,
       memory_writes: [],
       relationship_event_proposals: [],
-      next_goal_pressure: []
+      next_goal_context: []
     });
     await writeJson(path.join(actorDir, cycle.provider_input_refs[0]!), {
       schema: "provider-input-snapshot/v1",
@@ -352,7 +352,7 @@ test("rejects physical absence claims without scan-backed evidence when evidence
     evidence_refs: report.cycles[0]!.evidence_refs,
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   });
   await writeJson(reportPath, report);
 
@@ -382,7 +382,7 @@ test("rejects physical absence claims backed only by non-exhaustive scan evidenc
     evidence_refs: report.cycles[0]!.evidence_refs,
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   });
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.evidence_refs[0]!), {
     schema: "actor-evidence/v1",

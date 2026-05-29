@@ -113,7 +113,7 @@ export function createTranscript({
           lifecycleMode: "normal",
           currentTask: null,
           currentIntent: null,
-          topPressures: [],
+          topContextSignals: [],
           workingMemory: {},
           privateMemorySummary: [],
           sharedSettlement: {}

@@ -153,7 +153,7 @@ test("clampCycleJudgmentOutcome rejects verified_progress without meaningful too
     evidence_refs: [],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   };
   const intent: ActionIntent = {
     schema: "action-intent/v1",
@@ -189,7 +189,7 @@ test("clampCycleJudgmentOutcome downgrades unpassed verified progress to partial
     evidence_refs: [],
     memory_writes: [],
     relationship_event_proposals: [],
-    next_goal_pressure: []
+    next_goal_context: []
   };
   const intent: ActionIntent = {
     schema: "action-intent/v1",
@@ -199,7 +199,7 @@ test("clampCycleJudgmentOutcome downgrades unpassed verified progress to partial
     kind: "use_primitive",
     primitive_id: "build_pattern",
     args: {},
-    why_this_action: "respond to shelter pressure",
+    why_this_action: "respond to shelter context",
     expected_evidence: [],
     fallback_if_blocked: "remember"
   };
