@@ -293,6 +293,26 @@ can influence CycleGoal selection, but it is not the actor's LifeGoal.
 A **StrategicGoal** is a medium-horizon interpretation of ActorSoul, LifeGoal,
 memory, world state, and social context.
 
+## PlanBead
+
+A **PlanBead** is checkpointed actor-owned state for a large, living,
+multi-cycle plan such as securing food, preparing shelter materials, repairing a
+repeated blocker, or fulfilling an obligation.
+
+PlanBeads are planning memory. They preserve what the actor is carrying forward,
+why it matters under LifeGoal, what is currently understood, what remains open,
+and which evidence or judgments changed the plan.
+
+A PlanBead is not executable authority, not physical proof, and not a hidden
+domain planner. It must not grant runtime primitive permissions, supply missing
+ActionIntent args, or mark progress without runtime evidence. If a PlanBead
+claims that a subtask is satisfied or blocked, that transition must cite
+evidence refs.
+
+`StrategicGoal` is the legacy-adjacent medium-horizon term. New architecture
+work should treat PlanBead as the checkpointed successor for living multi-cycle
+plan state, while keeping compatibility with existing StrategicGoal records.
+
 ## CycleGoal
 
 A **CycleGoal** is the bounded current-cycle objective. It must be specific

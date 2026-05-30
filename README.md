@@ -202,10 +202,11 @@ Read these first:
 10. `docs/blog-doc/Terminology.md`
 11. `docs/blog-doc/Architecture/Minimal-Probe.md`
 12. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-14. `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
-15. `docs/blog-doc/Architecture/Future-Works.md`
-16. `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+13. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+15. `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
+16. `docs/blog-doc/Architecture/Future-Works.md`
+17. `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 
 Historical plans, research pages, and raw paper dumps live under
 `docs/research-archive/`. They are preserved for context, but they are not

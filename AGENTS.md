@@ -103,14 +103,15 @@ Read these first:
 13. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
 14. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
 15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-16. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-17. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-18. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-19. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-20. `docs/blog-doc/Architecture/Minimal-Probe.md`
-21. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-22. `docs/blog-doc/Setup/Headless-Server.md`
-23. `docs/blog-doc/Setup/Provider-Setup.md`
+16. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+17. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+18. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+19. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+20. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+21. `docs/blog-doc/Architecture/Minimal-Probe.md`
+22. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+23. `docs/blog-doc/Setup/Headless-Server.md`
+24. `docs/blog-doc/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -284,6 +285,7 @@ Important search tokens:
 - `PROVIDER_USAGE_GUARD`
 - `GEMINI_API_SOCIAL_PROVIDER`
 - `WORLD_STATE_DIAGNOSTICS`
+- `ACTOR_PERSISTENT_STATE_PLAN_BEADS`
 - `ACTION_INTENT_CONTRACT`
 - `RUNTIME_RETRY_CONSTRAINT`
 - `CONTEXT_COMPACTION`
