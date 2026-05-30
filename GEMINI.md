@@ -13,6 +13,7 @@ user has approved an operating-rule change.
 4. `docs/blog-doc/Documentation-Map.md`
 5. `docs/blog-doc/Agent-Search-Index.md`
 6. `docs/blog-doc/Terminology.md`
+7. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 
 ## Project Direction
 

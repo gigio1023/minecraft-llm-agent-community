@@ -128,6 +128,13 @@ world-state diagnostics, action-surface contracts, and artifact refs. It must
 not convert provider prose, memory notes, or weak observation into claimed
 physical progress.
 
+Actor-owned state that is required for continuity must survive process restarts.
+This includes identity, LifeGoal, living multi-cycle plans, memory,
+relationships, action skill ownership, evidence, retry gates, provider
+snapshots, and checkpoint-ready context. PlanBeads are the checkpointed
+multi-cycle plan records between LifeGoal and CycleGoal; they carry living plan
+state without becoming executable authority or physical proof.
+
 ## 3. Complete Spec Reading Map
 
 Read these documents to understand the full spec:
@@ -156,18 +163,20 @@ Read these documents to understand the full spec:
    - transcript and artifact persistence contract.
 10. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
-11. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+11. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+   - restart-safe actor state and checkpointed multi-cycle PlanBeads.
+12. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
     - actor profiles, role context, and relationship state.
-12. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+13. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
     - current implementation state and next work.
-13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
     - repo-internal whole-project implementation map for current boundaries,
       runtime flow, evidence, and risks.
-14. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
+15. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
     - latest architecture/implementation cross-check.
-15. `docs/blog-doc/Agent-Search-Index.md`
+16. `docs/blog-doc/Agent-Search-Index.md`
     - routing map and search tokens.
-16. `docs/blog-doc/Terminology.md`
+17. `docs/blog-doc/Terminology.md`
     - canonical terms such as `agent skill` and `action skill`.
 
 Setup docs:
@@ -189,6 +198,9 @@ Setup docs:
 - Actor workspace is the source of truth for actor-owned memory, evidence,
   active/candidate/retired action skills, goals, provider snapshots, reviews,
   and relationships.
+- Actor-owned continuity state must be restart-safe. Living multi-cycle plans
+  should be represented as checkpointed PlanBeads between LifeGoal and
+  CycleGoal, not as free-form memory notes or hidden domain planners.
 - Progress must be backed by world, inventory, position, block, container, chat,
   transcript, or verifier evidence.
 - Do not confuse animation, partial motion, optimistic text, reflection, or a
@@ -236,7 +248,7 @@ The proof is not:
 The runtime shape is:
 
 ```text
-ActorSoul + LifeGoal + observation + world events + memory
+ActorSoul + LifeGoal + PlanBeads + observation + world events + memory
 -> CycleGoal
 -> ActionIntent
 -> active action skill / primitive gate

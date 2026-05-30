@@ -89,6 +89,7 @@ Architecture:
 - `docs/blog-doc/Architecture/Action-Skill-Verification.md`
 - `docs/blog-doc/Architecture/Bounded-Action-Skill-Creation.md`
 - `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+- `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 - `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
 
 Current state and operations:
