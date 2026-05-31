@@ -61,6 +61,7 @@ export type ProviderUsageRecord = {
   provider_id: string;
   model: string;
   created_at: string;
+  quota_day_utc?: string;
   pacific_day: string;
   utc_minute: string;
   status: "succeeded" | "failed";
@@ -258,6 +259,10 @@ function selectBudget(
   return [...budgets].reverse().find((budget) => matchesBudget(budget, providerId, model));
 }
 
+function utcDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function pacificDay(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -289,7 +294,7 @@ async function readUsageRecords(ledgerPath: string): Promise<ProviderUsageRecord
 
 function totalMatchingRecords(
   records: readonly ProviderUsageRecord[],
-  input: { providerId: string; model: string; pacificDay: string; utcMinute: string }
+  input: { providerId: string; model: string; quotaDayUtc: string; utcMinute: string }
 ) {
   const minute = cloneCounts();
   const day = cloneCounts();
@@ -297,7 +302,8 @@ function totalMatchingRecords(
     if (record.provider_id !== input.providerId || record.model !== input.model) {
       continue;
     }
-    if (record.pacific_day === input.pacificDay) {
+    const recordQuotaDayUtc = record.quota_day_utc ?? record.created_at.slice(0, 10) ?? record.pacific_day;
+    if (recordQuotaDayUtc === input.quotaDayUtc) {
       Object.assign(day, addCounts(day, record.usage));
     }
     if (record.utc_minute === input.utcMinute) {
@@ -379,7 +385,7 @@ export async function guardProviderUsageRequest(input: {
   const windows = totalMatchingRecords(records, {
     providerId: input.providerId,
     model: input.model,
-    pacificDay: pacificDay(now),
+    quotaDayUtc: utcDay(now),
     utcMinute: utcMinute(now)
   });
   const existingDay = addCounts(windows.day, budget.already_used ?? {});
@@ -445,8 +451,9 @@ export async function appendProviderUsageRecord(input: {
   elapsedMs?: number;
   rawUsage?: JsonValue;
   budgetDecision?: ProviderUsageBudgetDecision;
+  now?: Date;
 }): Promise<ProviderUsageRecord> {
-  const now = new Date();
+  const now = input.now ?? new Date();
   const ledgerPath = resolveProviderUsageLedgerPath({
     repoRoot: input.context?.repoRoot,
     ledgerPath: input.context?.ledgerPath
@@ -461,6 +468,7 @@ export async function appendProviderUsageRecord(input: {
     provider_id: input.providerId,
     model: input.model,
     created_at: now.toISOString(),
+    quota_day_utc: utcDay(now),
     pacific_day: pacificDay(now),
     utc_minute: utcMinute(now),
     status: input.status,

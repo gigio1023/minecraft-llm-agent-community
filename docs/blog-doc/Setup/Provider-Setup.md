@@ -87,6 +87,11 @@ run. Use it when AI Studio or another provider dashboard says the project has
 already consumed part of the free-tier pool. This is intentionally local and
 ignored; do not commit personal usage state.
 
+Daily provider budget windows are tracked by `quota_day_utc`, because OpenAI's
+complimentary-token counter refreshes at 00:00 UTC. The ledger still preserves
+older `pacific_day` rows for compatibility, but budget decisions use UTC quota
+days.
+
 The built-in `gemma-4-31b-it` budget is an operator guardrail, not an official
 quota guarantee. Google documents that Gemini API limits vary by project, tier,
 and model, and that active limits should be checked in AI Studio.

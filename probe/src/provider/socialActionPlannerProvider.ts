@@ -14,6 +14,7 @@ import type { JsonValue } from "./inputSnapshot.js";
 import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import { writeActorGoalArtifact } from "../runtime/goals/goalJsonStore.js";
 import { isSocialExecutablePrimitive } from "../runtime/socialCycleExecution.js";
+import { buildActionPlannerProviderInput } from "./socialCycleProviderInputs.js";
 
 const actionPlannerSchema = {
   type: "object",
@@ -155,32 +156,16 @@ export async function runSocialActionPlannerProvider(input: {
       description: primitive.description,
       args_contract: primitive.args_contract
     }));
-  const providerInput = {
-    stage: "action_planner",
-    turn_id: turnId,
-    action_index: input.actionIndex,
-    ActorSoul: input.context.ActorSoul,
-    ActorLifeGoal: input.context.ActorLifeGoal,
-    cycle_goal: plannerCycleGoal,
-    observation: input.context.observation,
-    owned_action_skills: ownedActionSkills,
-    action_surface: input.context.action_surface,
-    direct_action_skills: directActionSkills,
-    allowed_primitive_ids: plannerCycleGoal.allowed_primitive_ids,
-    cycle_goal_allowed_primitive_ids_as_advisory: input.cycleGoal.allowed_primitive_ids,
-    cycle_goal_allowed_action_skill_ids_as_advisory: input.cycleGoal.allowed_action_skill_ids,
-    runtime_affordances: runtimeAffordances,
-    world_events: input.context.world_events,
-    relationship_context: input.context.relationship_context,
-    memory_packet: input.context.memory_packet,
-    plan_bead_packet: input.context.plan_bead_packet ?? null,
-    settlement_state: input.context.settlement_state,
-    settlement_checklist: input.context.settlement_state.checklist,
-    blocker_histogram: input.context.settlement_state.blocker_histogram,
-    runtime_retry_constraints: input.context.runtime_retry_constraints,
-    previous_cycle_judgments: input.context.previous_cycle_judgments,
-    recent_action_attempts: input.recentActionAttempts ?? []
-  } as JsonValue;
+  const providerInput = buildActionPlannerProviderInput({
+    context: input.context,
+    turnId,
+    actionIndex: input.actionIndex,
+    cycleGoal: input.cycleGoal,
+    plannerCycleGoal,
+    directActionSkills: directActionSkills as unknown as JsonValue,
+    runtimeAffordances: runtimeAffordances as unknown as JsonValue,
+    recentActionAttempts: input.recentActionAttempts
+  });
 
   const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-input-snapshot/v1",
@@ -216,8 +201,8 @@ export async function runSocialActionPlannerProvider(input: {
       schema: actionPlannerSchema,
       system: `You plan one bounded ActionIntent for the active CycleGoal.
 ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
-Select from action_surface and runtime_affordances based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface is the actor's current body, not a strategy checklist.
-plan_bead_packet is read-only work-state context for continuity. If ready or in_progress beads exist, use them to avoid forgetting unfinished work, but current observation, action_surface, runtime_retry_constraints, and ActorLifeGoal can still justify a pivot. PlanBeads never add executable args, action permissions, physical success, or a requirement to follow a checklist.
+Select from runtime_affordances and direct_action_skills based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface_summary explains the actor's current body shape; it is not a strategy checklist.
+plan_bead_packet is read-only work-state context for continuity. If ready or in_progress beads exist, use them to avoid forgetting unfinished work, but current observation, action_surface_summary, runtime_retry_constraints, and ActorLifeGoal can still justify a pivot. PlanBeads never add executable args, action permissions, physical success, or a requirement to follow a checklist.
 Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
 Vitals and food candidates are observation fields, not runtime priorities. If consuming food is useful, choose consume_item with an explicit itemName from inventory evidence.
 Deferred primitives or action skills explain missing affordances; do not choose them in this ActionIntent. Direct primitives and direct action skills are the executable body for this turn.
@@ -227,7 +212,7 @@ Treat CycleGoal allowed_* lists as compatibility mirrors/advisory context. They 
 If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different valid affordance based on the current action surface and evidence.
 runtime_retry_constraints are hard runtime suppressions over exact target plus structured args. Do not choose an ActionIntent that matches one; pivot to a different valid affordance, repair the structured args, observe current state, or record a truthful blocker.
 Do not treat fixed material families, stations, construction readiness, or any other gameplay taxonomy as mandatory planning headings. Use raw observed Minecraft names and runtime evidence; decide relevance from the current CycleGoal.
-Use settlement_state, settlement_checklist, and blocker_histogram as observation/evidence/context packets before choosing an action. They are not a mandatory single-domain strategy.
+Use settlement_state and blocker_histogram as observation/evidence/context packets before choosing an action. They are not a mandatory single-domain strategy.
 If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
 If a ready PlanBead points at a blocker or action-skill followup, choose an executable affordance that repairs or investigates it; if no such affordance is currently valid, pick observe, movement, or a truthful memory action instead of pretending the bead is executable.
 remember is a continuity tool, not a substitute for acting. After a blocker has already been remembered once, do not keep selecting remember for the same blocker; choose fresh observation, a different reachable target, another useful action, or let judgment defer/update the PlanBead.

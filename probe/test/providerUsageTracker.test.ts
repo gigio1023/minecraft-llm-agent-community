@@ -98,6 +98,92 @@ test("provider usage guard blocks a request beyond the configured daily budget",
   }
 });
 
+test("provider usage guard resets daily budget on UTC day boundary", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-utc-day-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    await withUsageEnv(
+      {
+        PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS: "1",
+        PROVIDER_USAGE_LEDGER_PATH: ledgerPath,
+        PROVIDER_USAGE_BUDGETS_JSON: JSON.stringify({
+          budgets: [
+            {
+              provider_id: "openai-api",
+              model: "gpt-5.4-mini",
+              total_token_limit_per_day: 100,
+              mode: "enforce"
+            }
+          ]
+        })
+      },
+      async () => {
+        await appendProviderUsageRecord({
+          providerId: "openai-api",
+          model: "gpt-5.4-mini",
+          status: "succeeded",
+          usageSource: "estimated",
+          usage: {
+            requests: 1,
+            input_tokens: 70,
+            output_tokens: 20,
+            thinking_tokens: 0,
+            total_tokens: 90
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-01T23:59:00.000Z")
+        });
+
+        const decision = await guardProviderUsageRequest({
+          providerId: "openai-api",
+          model: "gpt-5.4-mini",
+          estimatedUsage: {
+            requests: 1,
+            input_tokens: 50,
+            output_tokens: 1,
+            thinking_tokens: 0,
+            total_tokens: 51
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-02T00:01:00.000Z"),
+          maxAutoDelayMs: 0
+        });
+
+        assert.equal(decision.status, "allowed");
+        assert.equal(decision.projected?.day.total_tokens, 51);
+      }
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("provider usage records include UTC quota day for OpenAI free-token auditing", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-record-day-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    const record = await appendProviderUsageRecord({
+      providerId: "openai-api",
+      model: "gpt-5.4-mini",
+      status: "succeeded",
+      usageSource: "estimated",
+      usage: {
+        requests: 1,
+        input_tokens: 1,
+        output_tokens: 1,
+        thinking_tokens: 0,
+        total_tokens: 2
+      },
+      context: { ledgerPath },
+      now: new Date("2026-06-02T00:01:00.000Z")
+    });
+
+    assert.equal(record.quota_day_utc, "2026-06-02");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("Gemini usage normalization counts thinking tokens as output tokens", () => {
   const normalized = normalizeGeminiUsage(
     {

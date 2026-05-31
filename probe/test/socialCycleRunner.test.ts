@@ -12,6 +12,8 @@ import { ensureActorSoul } from "../src/runtime/goals/actorSoulStore.js";
 import { ensureActiveLifeGoal } from "../src/runtime/goals/lifeGoalStore.js";
 import { assignSeedActionSkillOwnership } from "../src/skills/ownership.js";
 import { getActorProfile } from "../src/npc/profiles.js";
+import { writeStrategicGoal } from "../src/runtime/goals/strategicGoalStore.js";
+import type { StrategicGoal } from "../src/runtime/goals/types.js";
 import {
   appendPlanBeadDependency,
   readActorPlanBead,
@@ -93,6 +95,29 @@ function runnerPlanBead(input: {
   };
 }
 
+function runnerStrategicGoal(index: number): StrategicGoal {
+  const padded = String(index).padStart(2, "0");
+  return {
+    schema: "actor-strategic-goal/v1",
+    actor_id: "npc_b",
+    strategic_goal_id: `strategic-test-${padded}`,
+    life_goal_id: "life-npc_b",
+    status: "active",
+    summary: `Historical strategic goal ${padded}`,
+    rationale: "Seeded to prove provider inputs do not resend the whole strategic history.",
+    derived_from: {
+      soul_ref: "goals/soul/soul-npc_b.json",
+      world_event_refs: [],
+      memory_refs: [],
+      relationship_refs: [],
+      previous_cycle_judgment_refs: []
+    },
+    success_direction: "Keep the latest relevant goals visible without flooding the provider.",
+    current_blockers: [`historical blocker ${padded}`],
+    updated_at: `2026-05-31T00:${padded}:00.000Z`
+  };
+}
+
 test("deterministic-social run writes two cycles and cites prior judgment", async () => {
   const reportPath = path.join(rootDir, "deterministic-report.json");
   const result = await runSocialCycle({
@@ -137,6 +162,64 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   const planBeadPacket = (snapshot?.input as { plan_bead_packet?: { graph_summary?: { open_count?: number } } })
     ?.plan_bead_packet;
   assert.equal(planBeadPacket?.graph_summary?.open_count, 0);
+});
+
+test("social-cycle provider inputs are stage-specific and bounded", async () => {
+  const isolatedRoot = path.join(rootDir, "projected-provider-inputs");
+  const actorId = "npc_b";
+  for (let index = 0; index < 9; index++) {
+    await writeStrategicGoal(isolatedRoot, actorId, runnerStrategicGoal(index));
+  }
+
+  const reportPath = path.join(isolatedRoot, "projected-report.json");
+  const result = await runSocialCycle({
+    actorId,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 1,
+    maxActionsPerCycle: 1,
+    reportPath,
+    connectToWorld: false,
+    actorWorkspaceRootDir: isolatedRoot
+  });
+
+  const actorDir = path.join(isolatedRoot, actorId);
+  const refs = result.report.cycles[0]?.provider_input_refs ?? [];
+  const goalMindRef = refs.find((ref) => ref.includes("goal-mind"));
+  const actionPlannerRef = refs.find((ref) => ref.includes("action-planner"));
+  const judgmentRef = refs.find((ref) => ref.includes("cycle-judgment"));
+  assert.ok(goalMindRef);
+  assert.ok(actionPlannerRef);
+  assert.ok(judgmentRef);
+
+  const goalMind = await readJsonIfExists<{ input?: Record<string, unknown> }>(
+    path.join(actorDir, goalMindRef)
+  );
+  assert.equal(goalMind?.input?.schema, "social-goal-mind-input/v1");
+  assert.equal(Array.isArray(goalMind?.input?.strategic_goals), true);
+  assert.equal((goalMind?.input?.strategic_goals as unknown[]).length, 6);
+  assert.equal((goalMind?.input?.strategic_goal_window as { omitted_count?: number })?.omitted_count, 3);
+  assert.equal(goalMind?.input?.action_surface, undefined);
+  assert.ok(goalMind?.input?.action_surface_summary);
+
+  const actionPlanner = await readJsonIfExists<{ input?: Record<string, unknown> }>(
+    path.join(actorDir, actionPlannerRef)
+  );
+  assert.equal(actionPlanner?.input?.schema, "social-action-planner-input/v1");
+  assert.equal(actionPlanner?.input?.action_surface, undefined);
+  assert.equal(actionPlanner?.input?.owned_action_skills, undefined);
+  assert.equal(actionPlanner?.input?.settlement_checklist, undefined);
+  assert.ok(actionPlanner?.input?.runtime_affordances);
+  assert.ok(actionPlanner?.input?.direct_action_skills);
+
+  const judgment = await readJsonIfExists<{ input?: Record<string, unknown> }>(
+    path.join(actorDir, judgmentRef)
+  );
+  assert.equal(judgment?.input?.schema, "social-cycle-judgment-input/v1");
+  assert.equal(judgment?.input?.action_surface, undefined);
+  assert.equal(judgment?.input?.settlement_checklist, undefined);
+  assert.ok(judgment?.input?.runtime_result);
+  assert.ok(judgment?.input?.action_surface_summary);
 });
 
 test("deterministic-social maxActionsPerCycle=2 report keeps observe and wait attempts", async () => {

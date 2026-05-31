@@ -17,6 +17,7 @@ import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import type { ProviderUsageRecord } from "./providerUsageTracker.js";
+import { buildCycleJudgmentProviderInput } from "./socialCycleProviderInputs.js";
 
 const planBeadOperationSchema = {
   type: "object",
@@ -404,7 +405,7 @@ function buildPlanBeadOperationGuidance(input: {
           "runtime evidence that the blocker was repaired, the work became irrelevant, or a better path was chosen"
         ],
         notes_next: [
-          "Use current observation, action_surface, memory, and retry constraints before retrying this work."
+          "Use current observation, action_surface_summary, memory, and retry constraints before retrying this work."
         ],
         priority: blockedLike ? 1 : 2
       }
@@ -496,24 +497,18 @@ export async function runSocialCycleJudgmentProvider(input: {
 }): Promise<CycleJudgmentProviderResult> {
   const turnId = input.turnId ?? input.cycleId;
   const snapshotId = `cycle-judgment-${turnId}-${randomUUID()}`;
-  const providerInput = {
-    stage: "cycle_judgment",
-    turn_id: turnId,
-    action_index: input.actionIndex,
-    ActorSoul: input.context.ActorSoul,
-    ActorLifeGoal: input.context.ActorLifeGoal,
-    cycle_goal: input.cycleGoal,
-    action_intent: input.actionIntent,
-    runtime_result: input.runtimeResult,
-    evidence_refs: input.evidenceRefs,
-    executed_tools: input.executedTools,
-    tool_statuses: input.toolStatuses ?? [],
-    verifier_status: input.verifierStatus,
-    world_events: input.context.world_events,
-    relationship_context: input.context.relationship_context,
-    memory_packet: input.context.memory_packet,
-    plan_bead_packet: input.context.plan_bead_packet ?? null,
-    plan_bead_operation_guidance: buildPlanBeadOperationGuidance({
+  const providerInput = buildCycleJudgmentProviderInput({
+    context: input.context,
+    turnId,
+    actionIndex: input.actionIndex,
+    cycleGoal: input.cycleGoal,
+    actionIntent: input.actionIntent,
+    runtimeResult: input.runtimeResult,
+    evidenceRefs: input.evidenceRefs,
+    executedTools: input.executedTools,
+    toolStatuses: input.toolStatuses,
+    verifierStatus: input.verifierStatus,
+    planBeadOperationGuidance: buildPlanBeadOperationGuidance({
       actorId: input.actorId,
       cycleGoal: input.cycleGoal,
       actionIntent: input.actionIntent,
@@ -523,18 +518,14 @@ export async function runSocialCycleJudgmentProvider(input: {
       executedTools: input.executedTools,
       toolStatuses: input.toolStatuses,
       verifierStatus: input.verifierStatus
-    }),
-    action_skill_feedback_guidance: buildActionSkillFeedbackGuidance({
+    }) as unknown as JsonValue,
+    actionSkillFeedbackGuidance: buildActionSkillFeedbackGuidance({
       actionIntent: input.actionIntent,
       executedTools: input.executedTools,
       toolStatuses: input.toolStatuses,
       verifierStatus: input.verifierStatus
-    }),
-    action_surface: input.context.action_surface,
-    previous_cycle_judgments: input.context.previous_cycle_judgments,
-    settlement_state: input.context.settlement_state,
-    settlement_checklist: input.context.settlement_state.checklist
-  } as JsonValue;
+    }) as unknown as JsonValue
+  });
 
   const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-input-snapshot/v1",
@@ -591,7 +582,7 @@ Use partial_verified_progress only when runtime_result/tool_statuses show curren
 observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks.
 plan_bead_packet is always present and read-only continuity context, even when the graph is empty. Use plan_bead_operation_guidance as an affordance hint, not as a command. When an action reveals an unfinished multi-cycle concern, a repeated blocker, an action-skill followup, or evidence that selected work is satisfied, propose bead_op_proposals so the actor can remember, update, block, defer, link, close, or replace the work item. Use [] when no useful PlanBead update is justified; do not create beads for every observe/wait/remember cycle. Prefer updating an existing ready or in_progress PlanBead over creating duplicates. If repeated remember-only cycles add no new evidence, update the existing bead once and consider set_status {status:"deferred"} or a next note that requires fresh observation before retry; do not keep making the same memory note look like progress. For update_notes or set_status, copy the target bead's current checkpoint_version into expected_checkpoint_version; omit expected_checkpoint_version for create operations. Use these operation shapes: create.patch={kind,title,description,acceptance_evidence_required,notes_next,priority}; update_notes.patch may include completed,in_progress,blockers,next,key_decisions string arrays; set_status.patch={status,close_kind?,close_reason?}; add_dependency.patch={bead_id,depends_on_bead_id,type,rationale,evidence_refs}. Every operation evidence_refs entry must cite current actor-workspace artifacts. A closed/satisfied PlanBead needs runtime evidence, guarded relationship evidence, or settlement evidence; provider prose, memory, judgment text, or plan_bead_packet alone cannot satisfy it.
 Use action_skill_feedback_guidance when writing memory_writes. If an action skill or reusable primitive fails, add a concise procedural memory write with the repair lesson or blocker. If it passed, record only reusable evidence-backed lessons, not generic praise. Procedural memory and PlanBeads help future choices but never grant execution authority.
-ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
+ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface_summary, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {
         runId: input.runId,
