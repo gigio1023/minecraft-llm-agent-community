@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "../../actorWorkspacePaths.js";
@@ -66,6 +67,84 @@ function operationBeadId(operation: PlanBeadOperation) {
 
 function dependencyRef(dependency: PlanBeadDependency) {
   return `plan-bead-dependency:${dependency.actor_id}:${dependency.bead_id}:${dependency.type}:${dependency.depends_on_bead_id}`;
+}
+
+function resolveActorRelativeRef(input: {
+  rootDir: string;
+  actorId: string;
+  ref: string;
+}) {
+  if (input.ref.trim().length === 0) {
+    throw new Error("PlanBead operation evidence ref cannot be empty");
+  }
+  if (path.isAbsolute(input.ref)) {
+    throw new Error(`PlanBead operation evidence ref must be actor-relative: ${input.ref}`);
+  }
+
+  const paths = getActorWorkspacePaths(input.rootDir, input.actorId);
+  const normalized = path.normalize(input.ref);
+  if (normalized === "." || normalized.startsWith("..") || path.isAbsolute(normalized)) {
+    throw new Error(`PlanBead operation evidence ref escapes actor workspace: ${input.ref}`);
+  }
+
+  const filePath = path.resolve(paths.actorDir, normalized);
+  const relative = path.relative(paths.actorDir, filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`PlanBead operation evidence ref escapes actor workspace: ${input.ref}`);
+  }
+  return filePath;
+}
+
+async function assertActorRelativeRefsExist(input: {
+  rootDir: string;
+  actorId: string;
+  refs: readonly string[];
+  label: string;
+}) {
+  if (input.refs.length === 0) {
+    throw new Error(`${input.label} are required`);
+  }
+
+  for (const ref of input.refs) {
+    const filePath = resolveActorRelativeRef({
+      rootDir: input.rootDir,
+      actorId: input.actorId,
+      ref
+    });
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new Error(`${input.label} missing actor artifact: ${ref}`);
+      }
+      throw error;
+    }
+  }
+}
+
+function isStrongSatisfiedCloseEvidenceRef(ref: string) {
+  return (
+    ref.startsWith("evidence/") ||
+    ref.startsWith("relationships/") ||
+    ref.startsWith("reviews/applied-relationship-proposals/") ||
+    ref.startsWith("settlement/")
+  );
+}
+
+function assertSatisfiedCloseHasStrongEvidence(operation: PlanBeadOperation) {
+  if (
+    operation.op !== "set_status" ||
+    operation.patch.status !== "closed" ||
+    operation.patch.close_kind !== "satisfied"
+  ) {
+    return;
+  }
+
+  if (!operation.evidence_refs.some(isStrongSatisfiedCloseEvidenceRef)) {
+    throw new Error(
+      "closing a satisfied PlanBead requires runtime evidence, guarded relationship evidence, or settlement evidence refs"
+    );
+  }
 }
 
 async function writeOperationResult(input: {
@@ -273,9 +352,12 @@ async function applyOneOperation(input: {
   if (operation.actor_id !== input.actorId) {
     throw new Error(`operation actor_id mismatch: expected ${input.actorId}, got ${operation.actor_id}`);
   }
-  if (operation.evidence_refs.length === 0) {
-    throw new Error("operation evidence_refs are required");
-  }
+  await assertActorRelativeRefsExist({
+    rootDir: input.rootDir,
+    actorId: input.actorId,
+    refs: operation.evidence_refs,
+    label: "operation evidence_refs"
+  });
 
   if (operation.op === "create") {
     const beadId = `bead-${randomUUID()}`;
@@ -398,13 +480,7 @@ async function applyOneOperation(input: {
       throw new Error(`unknown bead ${operation.bead_id}`);
     }
     assertCheckpointVersion(operation, existing);
-    if (
-      operation.patch.status === "closed" &&
-      operation.patch.close_kind === "satisfied" &&
-      operation.evidence_refs.length === 0
-    ) {
-      throw new Error("closing a satisfied PlanBead requires evidence_refs");
-    }
+    assertSatisfiedCloseHasStrongEvidence(operation);
     const updated = touchBead({
       bead: existing,
       operation,
@@ -437,6 +513,12 @@ async function applyOneOperation(input: {
     return result;
   }
 
+  await assertActorRelativeRefsExist({
+    rootDir: input.rootDir,
+    actorId: input.actorId,
+    refs: operation.patch.evidence_refs,
+    label: "dependency evidence_refs"
+  });
   const existingBeads = await listActorPlanBeads(input.rootDir, input.actorId);
   const beadIds = new Set(existingBeads.map((bead) => bead.bead_id));
   if (!beadIds.has(operation.patch.bead_id)) {

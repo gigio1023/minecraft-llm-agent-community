@@ -133,7 +133,9 @@ This includes identity, LifeGoal, actor work graph state, memory, relationships,
 action skill ownership, evidence, retry gates, provider snapshots, and
 checkpoint-ready context. PlanBeads are checkpointed actor-owned issue-like work
 items under LifeGoal. The PlanBeadGraph and its ready front guide CycleGoal
-selection without becoming executable authority or physical proof.
+selection without becoming executable authority or physical proof. PlanBeads are
+repo-owned actor-workspace records, not a dependency on external `bd`, `br`,
+`beads-mcp`, `.beads`, or downloaded Beads binaries.
 
 ## 3. Complete Spec Reading Map
 

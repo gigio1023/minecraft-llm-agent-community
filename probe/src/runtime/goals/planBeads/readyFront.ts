@@ -169,17 +169,20 @@ function blockingExplanation(input: {
   bead: ActorPlanBead;
   dependencies: readonly PlanBeadDependency[];
   beadByKey: ReadonlyMap<string, ActorPlanBead>;
+  relevantBeadKeys?: ReadonlySet<string>;
   nowIso?: string;
 }): PlanBeadBlockingDependencyExplanation[] {
   return input.dependencies
     .filter((dependency) => isBlockingDependencyType(dependency.type))
     .filter((dependency) => {
-      const blocker = input.beadByKey.get(
-        beadKey({
-          actor_id: dependency.actor_id,
-          bead_id: dependency.depends_on_bead_id
-        })
-      );
+      const dependencyKey = beadKey({
+        actor_id: dependency.actor_id,
+        bead_id: dependency.depends_on_bead_id
+      });
+      if (input.relevantBeadKeys && !input.relevantBeadKeys.has(dependencyKey)) {
+        return false;
+      }
+      const blocker = input.beadByKey.get(dependencyKey);
       return isActiveBlockingDependency({ dependency, blocker, nowIso: input.nowIso });
     })
     .map((dependency) => {
@@ -232,6 +235,7 @@ export function computeReadyPlanBeads(input: ComputeReadyPlanBeadsInput): PlanBe
     ? input.beads.filter((bead) => bead.life_goal_id === input.lifeGoalId)
     : [...input.beads];
   const beadByKey = new Map(input.beads.map((bead) => [beadKey(bead), bead]));
+  const relevantBeadKeys = new Set(relevantBeads.map((bead) => beadKey(bead)));
   const dependenciesByBead = new Map<string, PlanBeadDependency[]>();
 
   for (const dependency of input.dependencies) {
@@ -254,6 +258,7 @@ export function computeReadyPlanBeads(input: ComputeReadyPlanBeadsInput): PlanBe
       bead,
       dependencies,
       beadByKey,
+      relevantBeadKeys,
       nowIso: input.nowIso
     });
     const dependency_ref_values = dependencyRefs(dependencies);

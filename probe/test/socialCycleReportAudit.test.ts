@@ -561,6 +561,77 @@ test("audits PlanBead ready fronts, provider packets, and operation results", as
   );
 });
 
+test("rejects accepted satisfied PlanBead closes without strong evidence", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-planbeads-satisfied-close");
+  const report = baseReport();
+  report.actor_workspace_root_dir = workspaceRoot;
+  report.plan_bead_operation_results = [
+    {
+      cycle_id: "cycle-0001",
+      turn_id: "cycle-0001-action-01",
+      ref: "plan-beads/events/operation-results/plan-bead-op-cycle-0001-action-01-01.json",
+      op: "set_status",
+      status: "accepted",
+      bead_id: "bead-b",
+      reason: "accepted fixture"
+    }
+  ];
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  const actorDir = path.join(workspaceRoot, actorId);
+  await writeJson(
+    path.join(actorDir, report.plan_bead_operation_results[0]!.ref),
+    {
+      schema: "plan-bead-operation-result/v1",
+      operation_result_id: "plan-bead-op-cycle-0001-action-01-01",
+      actor_id: actorId,
+      cycle_id: "cycle-0001",
+      turn_id: "cycle-0001-action-01",
+      op: "set_status",
+      status: "accepted",
+      reason: "accepted fixture",
+      bead_id: "bead-b",
+      evidence_refs: ["judgments/cycle-0001-judgment.json"],
+      operation: {
+        schema: "plan-bead-operation/v1",
+        actor_id: actorId,
+        op: "set_status",
+        bead_id: "bead-b",
+        rationale: "fixture incorrectly treats judgment text as satisfaction proof",
+        evidence_refs: ["judgments/cycle-0001-judgment.json"],
+        confidence: "observed",
+        patch: {
+          status: "closed",
+          close_kind: "satisfied",
+          close_reason: "judgment text said it was done"
+        }
+      },
+      created_at: "2026-05-31T00:00:00.000Z"
+    }
+  );
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+  const artifact = await buildPlanBeadAuditArtifact(
+    reportPath,
+    "2026-05-31T00:00:00.000Z"
+  );
+
+  assert.ok(
+    errors.some((error) =>
+      error.includes("Accepted satisfied PlanBead close") &&
+      error.includes("lacks runtime, guarded relationship, or settlement evidence refs")
+    )
+  );
+  assert.ok(
+    artifact.checks.some((check) =>
+      check.subject === "operation_result" &&
+      check.status === "NOT_DONE" &&
+      check.reason.includes("accepted satisfied PlanBead close lacks strong")
+    )
+  );
+});
+
 test("rejects PlanBead provider packets that claim physical progress", async () => {
   const workspaceRoot = await makeWorkspaceRoot("social-audit-planbeads-progress");
   const report = baseReport();

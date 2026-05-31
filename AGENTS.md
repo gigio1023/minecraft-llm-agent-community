@@ -70,6 +70,19 @@ runtime retry constraints, or replace ActionIntent validation. If an
 implementation pushes PlanBeads toward deterministic domain planning, reject or
 reframe it.
 
+CycleJudgment may carry raw PlanBead operation proposal candidates, including
+malformed candidates. Do not make the entire judgment fail only because one
+candidate is invalid. The guarded PlanBead applier owns per-operation
+validation, acceptance, rejection, and operation-result artifacts. This keeps
+LLM proposal freedom visible while preventing unguarded state mutation.
+
+PlanBeads are Beads-inspired, not Beads CLI integration. The runtime must not
+shell out to `bd`, `br`, `beads-mcp`, `.beads`, or downloaded Beads binaries for
+NPC state. Actor PlanBeads are repo-owned TypeScript/JSON actor-workspace
+records under each actor directory. External Beads-style tools may be used only
+for repo implementation campaign management, never as Minecraft runtime state
+or as a required device-level dependency.
+
 Parallel GPT-5.5-xhigh workers may be used for speed and context isolation, but
 parallelism does not change runtime authority. Workers operate under lane
 contracts, produce artifacts or patches, and coordinator verification decides

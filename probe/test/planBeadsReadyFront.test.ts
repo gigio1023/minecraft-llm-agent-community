@@ -210,6 +210,30 @@ test("lifeGoalId filters out beads from another LifeGoal", () => {
   assert.equal(result.graph_summary.open_count, 1);
 });
 
+test("cross-LifeGoal dependencies remain context but do not block the current ready front", () => {
+  const result = computeReadyPlanBeads({
+    beads: [
+      makeBead({ bead_id: "bead-current", status: "open", life_goal_id: "life-1" }),
+      makeBead({ bead_id: "bead-old-life", status: "open", life_goal_id: "life-2" })
+    ],
+    dependencies: [
+      makeDependency({
+        bead_id: "bead-current",
+        depends_on_bead_id: "bead-old-life",
+        type: "blocks"
+      })
+    ],
+    nowIso,
+    lifeGoalId: "life-1"
+  });
+
+  assert.deepEqual(result.ready_beads.map((bead) => bead.bead_id), ["bead-current"]);
+  assert.deepEqual(result.blocked_beads, []);
+  assert.deepEqual(result.ready_beads[0]?.dependency_refs, [
+    "plan-bead-dependency:npc_b:bead-current:blocks:bead-old-life"
+  ]);
+});
+
 test("checkpoint refs use actor workspace sanitized bead file ids", () => {
   const result = computeReadyPlanBeads({
     beads: [makeBead({ bead_id: "concern:A", status: "open" })],

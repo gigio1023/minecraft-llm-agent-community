@@ -747,6 +747,33 @@ function auditSettlementEvidence(report: SocialCycleRunReport, errors: string[])
   }
 }
 
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+    : [];
+}
+
+function isStrongSatisfiedPlanBeadEvidenceRef(ref: string) {
+  return (
+    ref.startsWith("evidence/") ||
+    ref.startsWith("relationships/") ||
+    ref.startsWith("reviews/applied-relationship-proposals/") ||
+    ref.startsWith("settlement/")
+  );
+}
+
+function isSatisfiedPlanBeadCloseOperation(operation: unknown) {
+  if (!isRecord(operation) || operation.op !== "set_status") {
+    return false;
+  }
+  const patch = operation.patch;
+  return (
+    isRecord(patch) &&
+    patch.status === "closed" &&
+    patch.close_kind === "satisfied"
+  );
+}
+
 async function auditPlanBeadReport(input: {
   actorDir: string;
   report: SocialCycleRunReport;
@@ -802,9 +829,26 @@ async function auditPlanBeadReport(input: {
       input.errors.push(`PlanBead operation result artifact ${result.ref} has invalid schema`);
     }
     if (artifact.status === "accepted") {
-      const evidenceRefs = Array.isArray(artifact.evidence_refs) ? artifact.evidence_refs : [];
+      const evidenceRefs = asStringArray(artifact.evidence_refs);
       if (evidenceRefs.length === 0) {
         input.errors.push(`Accepted PlanBead operation result ${result.ref} has no evidence refs`);
+      }
+      for (const ref of evidenceRefs) {
+        await auditRequiredActorRef({
+          actorDir: input.actorDir,
+          errors: input.errors,
+          cycleNumber: resultNumber,
+          label: "PlanBead accepted operation evidence",
+          ref
+        });
+      }
+      if (
+        isSatisfiedPlanBeadCloseOperation(artifact.operation) &&
+        !evidenceRefs.some(isStrongSatisfiedPlanBeadEvidenceRef)
+      ) {
+        input.errors.push(
+          `Accepted satisfied PlanBead close ${result.ref} lacks runtime, guarded relationship, or settlement evidence refs`
+        );
       }
     }
   }
@@ -912,9 +956,7 @@ async function buildOperationResultAuditChecks(input: {
       });
       continue;
     }
-    const evidenceRefs = Array.isArray(artifact.evidence_refs)
-      ? artifact.evidence_refs.filter((ref): ref is string => typeof ref === "string" && ref.length > 0)
-      : [];
+    const evidenceRefs = asStringArray(artifact.evidence_refs);
     if (artifact.status === "rejected") {
       checks.push({
         ...baseCheck,
@@ -929,6 +971,18 @@ async function buildOperationResultAuditChecks(input: {
         ...baseCheck,
         status: "NOT_DONE",
         reason: "operation-result artifact has an invalid status",
+        evidence_refs: evidenceRefs
+      });
+      continue;
+    }
+    if (
+      isSatisfiedPlanBeadCloseOperation(artifact.operation) &&
+      !evidenceRefs.some(isStrongSatisfiedPlanBeadEvidenceRef)
+    ) {
+      checks.push({
+        ...baseCheck,
+        status: "NOT_DONE",
+        reason: "accepted satisfied PlanBead close lacks strong runtime, guarded relationship, or settlement evidence",
         evidence_refs: evidenceRefs
       });
       continue;

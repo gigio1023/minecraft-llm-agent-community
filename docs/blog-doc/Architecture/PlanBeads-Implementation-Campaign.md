@@ -17,13 +17,19 @@ Implementation result, 2026-05-31:
 - PlanBead types, validators, actor workspace paths/store, dependency logs,
   events, and history snapshots are implemented under
   `probe/src/runtime/goals/planBeads/`.
-- Social-cycle context now receives a bounded read-only `plan_bead_packet` with
-  `physical_progress_claim: false`; action execution still comes only from the
-  action surface and `ActionIntent`.
+- Social-cycle context receives a bounded read-only `plan_bead_packet` with
+  `physical_progress_claim: false` when an actor has PlanBead graph records;
+  action execution still comes only from the action surface and `ActionIntent`.
 - Deterministic ready fronts are computed from stored graph state and written as
   actor-workspace index artifacts.
 - `CycleJudgment` can propose typed PlanBead operations, but runtime-owned
   guarded appliers accept or reject every mutation and write operation-result
+  artifacts.
+- Live provider judgment JSON schema includes `bead_op_proposals`;
+  deterministic and live providers use the same runtime applier, so the model
+  can suggest work-state changes without gaining action authority.
+- Malformed PlanBead proposal candidates do not invalidate the whole judgment;
+  they are carried to the guarded applier and recorded as rejected operation
   artifacts.
 - Social-cycle reports include graph summary, ready-front refs, selected bead
   refs, and operation result refs. The report audit CLI checks these refs and
@@ -46,6 +52,11 @@ long period without losing the repo's core loop.
 The goal is not to import a generic orchestration system into this repo. The
 goal is to use proven harness patterns as operating discipline while keeping the
 Minecraft runtime small, evidence-backed, and Soul/LifeGoal aligned.
+
+This is not `bd`, `br`, `beads-mcp`, `.beads`, or binary download integration.
+The campaign adapted Beads-style issue graph mechanics into repo-owned
+TypeScript/JSON actor workspace records. External task tools may help manage
+implementation campaigns, but they are not NPC runtime dependencies.
 
 ## Core Loop Reminder
 
@@ -232,6 +243,8 @@ Runtime invariants:
   physical_progress_claim: false.
 - Runtime-approved operation appliers own all PlanBead mutations and must
   record accepted and rejected operations.
+- Satisfied close operations require strong actor-workspace evidence such as
+  runtime evidence, guarded relationship evidence, or settlement evidence.
 - Compaction may preserve PlanBead refs and summaries but must never close a
   bead or turn provider text into evidence.
 
@@ -478,8 +491,9 @@ Workers should not edit coordinator-owned files unless explicitly assigned.
 The runtime applier must reject and record artifacts for:
 
 - stale `expected_checkpoint_version`;
-- missing `evidence_refs` for status changes that require evidence;
-- `closed` with `satisfied` without verifier-backed or guarded social evidence;
+- missing or non-actor-relative operation `evidence_refs`;
+- `closed` with `satisfied` without runtime evidence, guarded relationship
+  evidence, or settlement evidence;
 - dependency cycles;
 - unknown dependency target;
 - executable primitive args in PlanBeads;
@@ -492,7 +506,8 @@ Rejected operations are useful evidence. Do not discard them.
 
 ## Provider Packet Rules
 
-The provider receives a compact, read-only packet:
+When an actor has PlanBead graph records, the provider receives a compact,
+read-only packet:
 
 - one to three ready PlanBeads by default;
 - small in-progress and blocked summaries only when they explain the choice;
@@ -712,9 +727,11 @@ Owner: worker after PB-C1 and PB-C2.
 
 Deliverables:
 
-- `CycleJudgment` bead op proposal field or sidecar record;
+- `CycleJudgment.bead_op_proposals` field;
 - runtime applier with version/evidence/status/dependency guards;
 - accepted and rejected operation artifacts.
+- malformed proposal candidates remain visible as rejected operation artifacts,
+  not as disappeared provider text.
 
 Success:
 
@@ -775,8 +792,8 @@ The campaign is successful when:
   history;
 - ready fronts are computed deterministically from stored graph state;
 - provider packets expose bounded, read-only PlanBead context;
-- `CycleJudgment` or a runtime-approved sidecar can propose typed bead
-  operations;
+- `CycleJudgment.bead_op_proposals` can carry typed bead operations from
+  deterministic or live providers;
 - the runtime applier accepts valid operations and rejects invalid ones with
   artifacts;
 - reports and audits explain graph state, ready front, operation results, and

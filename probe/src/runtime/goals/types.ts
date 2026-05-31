@@ -7,7 +7,6 @@ import type {
 } from "../settlement/settlementState.js";
 import type { ProviderUsageSummary } from "../../provider/providerUsageTracker.js";
 import type { RuntimeRetryConstraint } from "../retryConstraints.js";
-import { validatePlanBeadOperation, type PlanBeadOperation } from "./planBeads/index.js";
 
 export type ActorSoul = {
   schema: "actor-soul/v1";
@@ -250,7 +249,8 @@ export type CycleJudgment = {
     evidence_refs: string[];
   }>;
   next_goal_context: string[];
-  bead_op_proposals?: PlanBeadOperation[];
+  /** Proposal candidates are validated by the guarded PlanBead applier per item. */
+  bead_op_proposals?: unknown[];
 };
 
 export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
@@ -561,15 +561,6 @@ export function validateCycleJudgment(
   if (value.bead_op_proposals !== undefined) {
     if (!Array.isArray(value.bead_op_proposals)) {
       errors.push("bead_op_proposals must be an array when present");
-    } else {
-      for (const [index, operation] of value.bead_op_proposals.entries()) {
-        const result = validatePlanBeadOperation(operation);
-        if (!result.ok) {
-          errors.push(
-            `bead_op_proposals[${index}] invalid: ${result.errors.join("; ")}`
-          );
-        }
-      }
     }
   }
   if (errors.length > 0) {

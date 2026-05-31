@@ -51,6 +51,15 @@ beads than acting, or if they grant executable authority. PlanBeads never supply
 missing primitive args, action permissions, physical success, or retry-constraint
 clearance.
 
+CycleJudgment may carry raw PlanBead operation proposal candidates. A malformed
+candidate should be rejected by the guarded PlanBead applier with an
+operation-result artifact, not silently dropped by failing the whole judgment.
+
+PlanBeads are Beads-inspired repo runtime state, not `bd`, `br`, `beads-mcp`,
+`.beads`, or a downloaded binary dependency. Do not add external Beads CLI calls
+to Minecraft actor state. Campaign work may use external task tools separately,
+but NPC PlanBeads live under actor workspace JSON records.
+
 ## Karpathy Guidelines
 
 Search token: `KARPATHY_GUIDELINES`.

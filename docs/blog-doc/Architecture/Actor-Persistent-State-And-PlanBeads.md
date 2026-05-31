@@ -34,6 +34,12 @@ ActorSoul + LifeGoal
 -> guarded PlanBead updates
 ```
 
+PlanBeads are Beads-inspired, not Beads CLI integration. The game runtime does
+not require `bd`, `br`, `beads-mcp`, `.beads`, or downloaded Beads binaries.
+Actor PlanBeads are repo-owned TypeScript/JSON records in each actor workspace.
+External task tools may still help implementation campaigns, but they must stay
+separate from NPC runtime state.
+
 ## Beads Reference Lessons
 
 Mechanically, Beads teaches these ideas:
@@ -105,6 +111,13 @@ A PlanBead does not answer:
 - whether physical Minecraft progress happened;
 - whether a runtime retry constraint should be created or cleared;
 - what the actor's durable identity or LifeGoal is.
+
+Satisfied closure is intentionally stricter than ordinary updates. The LLM may
+freely create, defer, block, link, and update PlanBeads as context changes, but
+`closed` with `close_kind: "satisfied"` must cite runtime evidence, guarded
+relationship evidence, or settlement evidence. Provider prose, memory notes, and
+judgment text alone can explain a proposed transition; they cannot prove that a
+tracked concern is satisfied.
 
 ## Separation Of Records
 
@@ -393,23 +406,30 @@ plus a small blocked/in-progress summary when it explains current choice.
 
 ## Provider Proposal Boundary
 
-Providers may propose `bead_ops` only through runtime-approved stages. The first
-implementation should accept them from `CycleJudgment`, because judgment has the
-latest evidence interpretation. The CycleGoal provider may select bead refs but
-should not directly mutate the PlanBeadGraph.
+Providers may propose `bead_op_proposals` only through runtime-approved stages.
+The first implementation accepts them from `CycleJudgment`, because judgment has
+the latest evidence interpretation. The CycleGoal provider may select bead refs
+but should not directly mutate the PlanBeadGraph.
 
-Allowed operation families:
+Allowed operation families for the implemented vertical slice:
 
 - create a bead;
-- update notes/design/acceptance criteria;
+- update notes;
 - claim or release a bead for current-cycle work;
 - block, unblock, defer, or close a bead;
-- add or remove dependency edges;
-- add evidence, memory, relationship, world-event, or judgment refs;
-- supersede or duplicate a bead.
+- add dependency edges.
+
+Future operation families such as richer design/acceptance edits, ref-only
+updates, supersession, duplicate marking, or dependency removal should still go
+through the same typed, guarded operation path rather than broad state patches.
 
 Operation records must be typed. Avoid broad `Record<string, unknown>` patches
 for durable actor state.
+
+`CycleJudgment.bead_op_proposals` is a transport field for proposal candidates.
+The judgment should survive malformed candidates so the guarded applier can
+reject each bad operation with an operation-result artifact instead of silently
+dropping the model's attempted work-state update.
 
 ```ts
 type PlanBeadOperationBase = {
@@ -461,8 +481,9 @@ Runtime application rules:
   work. It does not imply success.
 - `blocked` requires concrete blocker evidence or a dependency edge to an open
   blocking bead.
-- `closed` with `satisfied` requires verifier-backed evidence or guarded social
-  evidence.
+- `closed` with `satisfied` requires actor-relative runtime evidence, guarded
+  relationship evidence, or settlement evidence. Provider prose, memory, or
+  judgment text alone cannot satisfy a bead.
 - `closed` with `abandoned`, `not_relevant`, `duplicate`, or `superseded` needs
   a reason and should preserve history.
 - PlanBead blockers may cite runtime retry constraints, but PlanBead operations
@@ -595,7 +616,7 @@ Success: the runtime can produce a truthful ready front without provider help.
 
 ### Slice 4 - Provider Packet
 
-1. Add `bead_packet` to social-cycle context assembly.
+1. Add `plan_bead_packet` to social-cycle context assembly.
 2. Inject bounded ready/in-progress/blocked summaries, not full checkpoint
    records.
 3. Add context manifest entries for PlanBeads with `physical_progress_claim:
@@ -607,7 +628,7 @@ runtime state remains protected.
 
 ### Slice 5 - Guarded Bead Operations
 
-1. Let `CycleJudgment` propose typed `bead_ops`.
+1. Let `CycleJudgment` carry `bead_op_proposals` candidates.
 2. Add a runtime applier that validates:
    - expected checkpoint version;
    - evidence requirements;

@@ -88,10 +88,17 @@ function dependency(beadId: string, dependsOnBeadId: string): PlanBeadDependency
   };
 }
 
+async function writeActorArtifact(rootDir: string, ref: string, value: unknown = {}) {
+  const filePath = path.join(rootDir, actorId, ref);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
 test("applies a status operation through the guarded applier", async () => {
   const rootDir = testRoot("status");
   try {
     await writeActorPlanBead(rootDir, bead("bead-b"));
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-observe.json");
 
     const applied = await applyPlanBeadOperations({
       rootDir,
@@ -131,6 +138,7 @@ test("rejects stale checkpoint operations without mutating the bead", async () =
   const rootDir = testRoot("stale");
   try {
     await writeActorPlanBead(rootDir, bead("bead-b"));
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-observe.json");
 
     const applied = await applyPlanBeadOperations({
       rootDir,
@@ -170,6 +178,7 @@ test("rejects dependency cycles and accepts non-cyclic dependencies", async () =
     await writeActorPlanBead(rootDir, bead("bead-a"));
     await writeActorPlanBead(rootDir, bead("bead-b"));
     await appendPlanBeadDependency(rootDir, dependency("bead-b", "bead-a"));
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-observe.json");
 
     const applied = await applyPlanBeadOperations({
       rootDir,
@@ -200,6 +209,144 @@ test("rejects dependency cycles and accepts non-cyclic dependencies", async () =
     assert.equal(applied.results[0]?.status, "rejected");
     assert.match(applied.results[0]?.reason ?? "", /cycle/);
     assert.equal((await listPlanBeadDependencies(rootDir, actorId)).length, 1);
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("rejects missing operation evidence refs before mutating state", async () => {
+  const rootDir = testRoot("missing-evidence");
+  try {
+    await writeActorPlanBead(rootDir, bead("bead-b"));
+
+    const applied = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-01",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "set_status",
+          bead_id: "bead-b",
+          rationale: "Missing evidence should be rejected.",
+          evidence_refs: ["evidence/missing.json"],
+          confidence: "observed",
+          patch: { status: "in_progress" }
+        }
+      ]
+    });
+
+    assert.equal(applied.results[0]?.status, "rejected");
+    assert.match(applied.results[0]?.reason ?? "", /missing actor artifact/);
+    const unchanged = await readActorPlanBead(rootDir, actorId, "bead-b");
+    assert.equal(unchanged?.status, "open");
+    assert.equal(unchanged?.checkpoint.version, 1);
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("records malformed operation proposals as rejected artifacts", async () => {
+  const rootDir = testRoot("malformed-operation");
+  try {
+    const applied = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-01",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "set_status",
+          patch: { status: "in_progress" }
+        }
+      ]
+    });
+
+    assert.equal(applied.results[0]?.status, "rejected");
+    assert.equal(applied.results[0]?.op, "invalid");
+    assert.match(applied.results[0]?.reason ?? "", /Invalid PlanBeadOperation/);
+    assert.equal(applied.result_refs.length, 1);
+    const resultPath = path.join(rootDir, actorId, applied.result_refs[0]!);
+    const stored = JSON.parse(await fs.readFile(resultPath, "utf8")) as { status?: string };
+    assert.equal(stored.status, "rejected");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("satisfied close requires strong runtime or guarded relationship evidence", async () => {
+  const rootDir = testRoot("satisfied-close");
+  try {
+    await writeActorPlanBead(rootDir, bead("bead-b"));
+    await writeActorArtifact(rootDir, "judgments/cycle-0001-judgment.json");
+
+    const rejected = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-01",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "set_status",
+          bead_id: "bead-b",
+          rationale: "Judgment context alone cannot satisfy a bead.",
+          evidence_refs: ["judgments/cycle-0001-judgment.json"],
+          confidence: "observed",
+          patch: {
+            status: "closed",
+            close_kind: "satisfied",
+            close_reason: "Judgment text said it was done."
+          }
+        }
+      ]
+    });
+
+    assert.equal(rejected.results[0]?.status, "rejected");
+    assert.match(rejected.results[0]?.reason ?? "", /satisfied PlanBead requires runtime evidence/);
+    assert.equal((await readActorPlanBead(rootDir, actorId, "bead-b"))?.status, "open");
+
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-verified.json");
+    const accepted = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-02",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "set_status",
+          bead_id: "bead-b",
+          rationale: "Runtime evidence supports satisfied closure.",
+          evidence_refs: ["evidence/cycle-0001-verified.json"],
+          confidence: "observed",
+          patch: {
+            status: "closed",
+            close_kind: "satisfied",
+            close_reason: "Runtime evidence verified the tracked concern."
+          }
+        }
+      ]
+    });
+
+    assert.equal(accepted.results[0]?.status, "accepted");
+    const closed = await readActorPlanBead(rootDir, actorId, "bead-b");
+    assert.equal(closed?.status, "closed");
+    assert.equal(closed?.checkpoint.close_kind, "satisfied");
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

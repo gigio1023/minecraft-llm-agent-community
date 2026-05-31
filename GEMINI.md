@@ -32,6 +32,15 @@ flexible under changing Minecraft/social context, not checklist-bound. Do not
 let PlanBeads grant executable authority, action permissions, physical success,
 or retry-constraint clearance.
 
+CycleJudgment may carry raw PlanBead operation proposal candidates. A malformed
+candidate should remain visible as a rejected operation-result artifact from the
+guarded PlanBead applier, not disappear by failing the whole judgment.
+
+PlanBeads are Beads-inspired TypeScript/JSON runtime records in actor
+workspaces. They are not external Beads CLI integration, and this runtime must
+not require `bd`, `br`, `beads-mcp`, `.beads`, or downloaded Beads binaries for
+NPC state.
+
 ## Change Discipline
 
 Follow `KARPATHY_GUIDELINES` from `AGENTS.md`:

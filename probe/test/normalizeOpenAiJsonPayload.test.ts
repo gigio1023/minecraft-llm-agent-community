@@ -3,7 +3,10 @@ import test from "node:test";
 
 import { normalizeOpenAiJsonPayload } from "../src/provider/normalizeOpenAiJsonPayload.js";
 import { parseOpenAiJsonText } from "../src/provider/openaiApiJsonProvider.js";
-import { extractCycleJudgmentPayload } from "../src/provider/socialCycleJudgmentProvider.js";
+import {
+  buildCycleJudgmentBodyFromPayload,
+  extractCycleJudgmentPayload
+} from "../src/provider/socialCycleJudgmentProvider.js";
 
 test("unwraps schema-shaped OpenAI payloads", () => {
   const normalized = normalizeOpenAiJsonPayload({
@@ -34,4 +37,34 @@ test("cycle judgment payload extraction accepts direct judgment objects", () => 
 
   assert.equal(raw.outcome, "blocked");
   assert.equal(raw.what_happened, "collect_logs timed out without inventory progress");
+});
+
+test("cycle judgment payload preserves live provider PlanBead operation proposals", () => {
+  const body = buildCycleJudgmentBodyFromPayload({
+    outcome: "partial_verified_progress",
+    what_happened: "The actor found logs but did not complete the full gather step.",
+    why_it_mattered_for_life_goal: "The actor can continue from an evidence-backed blocker.",
+    memory_writes: [],
+    relationship_event_proposals: [],
+    bead_op_proposals: [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: "npc_b",
+        op: "set_status",
+        bead_id: "bead-log-search",
+        rationale: "The selected work item is now in active context.",
+        evidence_refs: ["evidence/cycle-0001-observe.json"],
+        confidence: "observed",
+        patch: {
+          status: "in_progress"
+        }
+      }
+    ],
+    next_goal_context: ["Continue from the selected work item."]
+  }, "failed");
+
+  const proposal = body.bead_op_proposals?.[0] as { op?: string; bead_id?: string } | undefined;
+  assert.equal(body.verifier_status, "failed");
+  assert.equal(proposal?.op, "set_status");
+  assert.equal(proposal?.bead_id, "bead-log-search");
 });

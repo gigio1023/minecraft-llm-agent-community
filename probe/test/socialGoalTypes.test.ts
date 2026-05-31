@@ -118,3 +118,67 @@ test("validateCycleJudgment accepts partial verified progress as a bounded evide
 
   assert.equal(result.ok, true);
 });
+
+test("validateCycleJudgment accepts typed PlanBead operation proposals", () => {
+  const result = validateCycleJudgment({
+    schema: "cycle-judgment/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    outcome: "no_progress",
+    what_happened: "Observed a blocker that should stay in work-state context.",
+    why_it_mattered_for_life_goal: "The next cycle should not forget the blocker.",
+    verifier_status: "not_applicable",
+    evidence_refs: ["evidence/cycle-0001-observe.json"],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    bead_op_proposals: [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: "npc_b",
+        op: "create",
+        rationale: "Track the blocker as context, not as executable authority.",
+        evidence_refs: ["evidence/cycle-0001-observe.json"],
+        confidence: "observed",
+        patch: {
+          kind: "blocker_repair",
+          title: "Resolve unreachable log target",
+          description: "The actor needs a different route or target before trying again.",
+          acceptance_evidence_required: ["runtime evidence of a reachable target or successful collection"],
+          notes_next: ["Choose a different visible log or inspect nearby terrain."],
+          priority: 2
+        }
+      }
+    ],
+    next_goal_context: ["Pick an action that repairs or avoids the blocker."]
+  });
+
+  assert.equal(result.ok, true);
+});
+
+test("validateCycleJudgment lets guarded PlanBead applier reject malformed proposals", () => {
+  const result = validateCycleJudgment({
+    schema: "cycle-judgment/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    outcome: "no_progress",
+    what_happened: "The model proposed a malformed work-state update.",
+    why_it_mattered_for_life_goal: "The judgment should survive so the applier can record a rejected operation artifact.",
+    verifier_status: "not_applicable",
+    evidence_refs: ["evidence/cycle-0001-observe.json"],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    bead_op_proposals: [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: "npc_b",
+        op: "set_status",
+        patch: { status: "in_progress" }
+      }
+    ],
+    next_goal_context: ["Continue without trusting the malformed proposal."]
+  });
+
+  assert.equal(result.ok, true);
+});
