@@ -166,6 +166,12 @@ export function getRequiredActorWorkspaceDirs(rootDir: string, actorId: string) 
     paths.strategicGoalsDir,
     paths.cycleGoalsDir,
     paths.judgmentsDir,
-    paths.worldEventsDir
+    paths.worldEventsDir,
+    paths.planBeads.rootDir,
+    paths.planBeads.beadsDir,
+    paths.planBeads.dependenciesDir,
+    paths.planBeads.eventsDir,
+    paths.planBeads.historyDir,
+    paths.planBeads.indexesDir
   ];
 }

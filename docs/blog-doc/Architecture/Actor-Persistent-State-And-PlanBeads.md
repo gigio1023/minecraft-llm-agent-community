@@ -11,6 +11,9 @@ and social-cycle continuity.
 
 Recorded: 2026-05-31 10:11:10 UTC (`Etc/UTC`).
 
+Implementation campaign spec:
+`docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`.
+
 This document records the current plan after reviewing the upstream Beads issue
 tracker concept (`steveyegge/beads`, redirected publicly as `gastownhall/beads`).
 The important correction is that a PlanBead should not be treated as a vague

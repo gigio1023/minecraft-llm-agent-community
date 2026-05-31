@@ -16,6 +16,7 @@ import type {
   ActorLifeGoal,
   CycleJudgment
 } from "../src/runtime/goals/types.js";
+import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
 
 const createdAt = "2026-05-25T00:00:00.000Z";
 
@@ -96,6 +97,62 @@ function previousJudgment(): CycleJudgment {
     memory_writes: [],
     relationship_event_proposals: [],
     next_goal_context: ["Continue only with current evidence"]
+  };
+}
+
+function planBeadPacket(): PlanBeadPacket {
+  return {
+    schema: "plan-bead-packet/v1",
+    physical_progress_claim: false,
+    ready_beads: [
+      {
+        bead_id: "bead-b",
+        kind: "concern",
+        status: "open",
+        priority: 1,
+        title: "Investigate new storage concern",
+        description_summary: "Concern B appeared while concern A remains in progress.",
+        acceptance_evidence_required: ["runtime storage evidence"],
+        notes_next: ["Observe the shared chest before acting."],
+        blockers: [],
+        labels: ["context-change"],
+        evidence_refs: ["plan-beads/beads/bead-b.json"],
+        dependency_refs: ["plan-bead-dependency:npc_b:bead-b:discovered_from:bead-a"],
+        checkpoint_ref: "plan-beads/beads/bead-b.json"
+      }
+    ],
+    in_progress_beads: [
+      {
+        bead_id: "bead-a",
+        kind: "concern",
+        status: "in_progress",
+        priority: 2,
+        title: "Continue prior resource concern",
+        description_summary: "Concern A remains preserved across the context change.",
+        acceptance_evidence_required: ["runtime resource evidence"],
+        notes_next: ["Do not forget the prior concern."],
+        blockers: [],
+        labels: ["context-change"],
+        evidence_refs: ["plan-beads/beads/bead-a.json"],
+        dependency_refs: [],
+        checkpoint_ref: "plan-beads/beads/bead-a.json"
+      }
+    ],
+    blocked_beads: [],
+    recently_closed_beads: [],
+    graph_summary: {
+      open_count: 2,
+      ready_count: 1,
+      blocked_count: 0,
+      deferred_count: 0,
+      closed_recent_count: 0
+    },
+    rules: {
+      beads_are_context_not_authority: true,
+      ready_front_guides_goal_selection: true,
+      action_surface_controls_execution: true,
+      runtime_verifies_physical_progress: true
+    }
   };
 }
 
@@ -207,6 +264,7 @@ function contextPacket(): SocialCycleContextPacketLike {
       guardrails: [],
       beliefs: []
     },
+    plan_bead_packet: planBeadPacket(),
     settlement_state: buildSettlementState({
       actorId: "npc_b",
       observation,
@@ -279,6 +337,8 @@ test("social-cycle context checkpoint preserves authority names and compact refs
       verifierRefs: ["verifier/cycle-0002-collect_logs.json"],
       judgmentRefs: ["judgments/cycle-0002-action-01-judgment.json"],
       memoryRefs: ["memory/episodic/social-cycle-0002.json"],
+      planBeadPacketRef: "provider-inputs/plan-bead-packet-cycle-0003.json",
+      planBeadRefs: ["plan-beads/beads/bead-a.json", "plan-beads/beads/bead-b.json"],
       providerOutputRefs: ["provider-outputs/goal-mind-cycle-0003-out.json"]
     }
   });
@@ -308,6 +368,18 @@ test("social-cycle context checkpoint preserves authority names and compact refs
     entry.context_name === "runtime retry constraints"
   );
   assert.equal(retryEntry?.retention, "summary_and_ref");
+
+  const planBeadInputEntry = checkpoint.input_context_manifest.entries.find((entry) =>
+    entry.context_name === "plan bead packet"
+  );
+  assert.equal(planBeadInputEntry?.retention, "full");
+  assert.equal(planBeadInputEntry?.authority_bearing, false);
+  assert.ok(planBeadInputEntry?.refs.includes("plan-beads/beads/bead-a.json"));
+
+  const planBeadReplacementEntry = checkpoint.replacement_context_manifest.entries.find((entry) =>
+    entry.context_name === "plan bead packet"
+  );
+  assert.equal(planBeadReplacementEntry?.retention, "summary_and_ref");
 });
 
 test("compact summary facts are ref-backed and cannot claim physical progress", () => {
@@ -352,6 +424,14 @@ test("compact summary facts are ref-backed and cannot claim physical progress", 
   );
   assert.ok(retryFact);
   assert.match(retryFact.summary, /exact target\/args gates/);
+
+  const planBeadFact = checkpoint.compact_summary.facts.find((fact) =>
+    fact.label === "plan bead packet"
+  );
+  assert.ok(planBeadFact);
+  assert.equal(planBeadFact.physical_progress_claim, false);
+  assert.equal(planBeadFact.scope, "plan_bead_context");
+  assert.match(planBeadFact.summary, /context only/);
 });
 
 test("builder rejects compact summaries without required evidence refs", () => {

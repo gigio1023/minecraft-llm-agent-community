@@ -31,6 +31,7 @@ const sidebars = {
         'Architecture/Bounded-Action-Skill-Creation',
         'Architecture/Actor-Memory-Observation-And-Action-Space-Plan',
         'Architecture/Actor-Persistent-State-And-PlanBeads',
+        'Architecture/PlanBeads-Implementation-Campaign',
         'Architecture/Async-Reviewer-Sidecars',
         'Architecture/Future-Works',
       ],

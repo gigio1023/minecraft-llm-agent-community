@@ -14,6 +14,7 @@ user has approved an operating-rule change.
 5. `docs/blog-doc/Agent-Search-Index.md`
 6. `docs/blog-doc/Terminology.md`
 7. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+8. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
 
 ## Project Direction
 
@@ -24,6 +25,12 @@ benchmark project, or a house-building architecture.
 Providers propose goals, actions, and judgments. Runtime code owns Minecraft
 truth: schemas, structured args, permission gates, Mineflayer execution,
 verification, artifacts, actor workspace state, and provider usage records.
+
+PlanBeads are structured actor-owned work state for concerns an LLM actor would
+otherwise forget or blur in free-form prose. They should make the NPC more
+flexible under changing Minecraft/social context, not checklist-bound. Do not
+let PlanBeads grant executable authority, action permissions, physical success,
+or retry-constraint clearance.
 
 ## Change Discipline
 

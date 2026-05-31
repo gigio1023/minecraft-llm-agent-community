@@ -14,6 +14,7 @@ has approved an operating-rule change.
 5. `docs/blog-doc/Agent-Search-Index.md`
 6. `docs/blog-doc/Terminology.md`
 7. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+8. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
 
 ## Project Direction
 
@@ -30,6 +31,25 @@ Do not turn one domain activity, such as shelter, mining, storage, travel, or
 conversation, into always-on architecture. Improve autonomy substrate:
 `action_surface`, hooks, gates, diagnostics, context compaction, verification,
 and review artifacts.
+
+## PlanBeads Intent
+
+PlanBeads are not a planning ritual. They are structured actor-owned work state
+for concerns the LLM actor would otherwise forget or blur in free-form prose.
+
+Use PlanBeads to make actor behavior more flexible, not less. A good PlanBeads
+implementation lets the NPC keep concern A open when concern B appears, link or
+defer work honestly, and choose a CycleGoal from current observation plus the
+ready front without becoming a checklist executor.
+
+Do not over-rotate this slice into verification for its own sake. Verification
+must catch silent errors, fake completion, and progress laundering, but the main
+purpose is state continuity under changing Minecraft/social context.
+
+Treat it as a failure if PlanBeads make the actor spend more time maintaining
+beads than acting, or if they grant executable authority. PlanBeads never supply
+missing primitive args, action permissions, physical success, or retry-constraint
+clearance.
 
 ## Karpathy Guidelines
 

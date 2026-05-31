@@ -13,6 +13,7 @@ import type {
   StrategicGoal,
   WorldEvent
 } from "./types.js";
+import type { PlanBeadPacket } from "./planBeads/index.js";
 import type { RuntimeRetryConstraint } from "../retryConstraints.js";
 import {
   buildActionSurfacePacket,
@@ -67,6 +68,7 @@ export type SocialCycleContextPacket = {
   runtime_retry_constraints: RuntimeRetryConstraint[];
   relationship_context: SocialCycleRelationshipContext;
   memory_packet: ActorMemoryRetrievalPacket;
+  plan_bead_packet?: PlanBeadPacket;
   settlement_state: SettlementState;
   limits: {
     max_actions_per_cycle: number;
@@ -119,6 +121,7 @@ export async function assembleSocialCycleContext(input: {
   judgmentRefs?: readonly string[];
   memoryWriteCount?: number;
   runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
+  planBeadPacket?: PlanBeadPacket;
 }): Promise<SocialCycleContextPacket> {
   const actionSkillIds = input.activeActionSkills.map((record) => record.skill_id);
   const itemNames = [
@@ -209,6 +212,7 @@ export async function assembleSocialCycleContext(input: {
         : []
     },
     memory_packet: memoryPacket,
+    ...(input.planBeadPacket ? { plan_bead_packet: input.planBeadPacket } : {}),
     settlement_state: settlementState,
     limits: {
       max_actions_per_cycle: input.maxActionsPerCycle,

@@ -40,6 +40,7 @@ guidance.
 | `ACTION_SURFACE` | Provider-visible direct/deferred affordance packet for the current actor body | `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md`, `probe/src/runtime/actionSurface.ts` |
 | `ACTOR_MEMORY_OBSERVATION_ACTION_SPACE` | Memory IO, raw observation, and Mineflayer action-space expansion plan | `Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`, `docs/research-archive/hermes-memory-system/`, `probe/src/memory/actorMemory.ts`, `probe/src/runtime/actionSurface.ts` |
 | `ACTOR_PERSISTENT_STATE_PLAN_BEADS` | Restart-safe actor work graph: PlanBeads, dependency edges, and ready fronts under LifeGoal | `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Terminology.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
+| `PLANBEADS_IMPLEMENTATION_CAMPAIGN` | Long-running parallel implementation campaign contract for PlanBeads work | `Architecture/PlanBeads-Implementation-Campaign.md`, `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Architecture/Implementation-Workstreams.md` |
 | `ACTION_INTENT_CONTRACT` | Physical actions require structured executable args; prose is not executable authority | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/test/socialActionIntentContracts.test.ts` |
 | `RUNTIME_RETRY_CONSTRAINT` | Exact repeated target/args blockers become runtime gates before another Mineflayer call | `Terminology.md`, `Architecture/Future-Works.md`, `probe/src/runtime/retryConstraints.ts` |
 | `WORLD_STATE_DIAGNOSTICS` | World scans must be query-neutral and scoped by loaded-world limits | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/src/tools/worldStateScan.ts` |
@@ -87,9 +88,10 @@ For any onboarding developer or agent, read in this order:
 14. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 15. `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
 16. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-17. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-18. `docs/blog-doc/Setup/Headless-Server.md`
-19. `docs/blog-doc/Setup/Provider-Setup.md`
+17. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+18. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+19. `docs/blog-doc/Setup/Headless-Server.md`
+20. `docs/blog-doc/Setup/Provider-Setup.md`
 
 ## Active vs Archived
 

@@ -31,6 +31,50 @@ Not current delivery targets:
 - long-run autonomy as a product goal;
 - large multi-actor society behavior before single-actor competence is trustworthy.
 
+## PlanBeads Intent Rule
+
+PlanBeads exist because free-form strings are too weak to manage what an actor is
+trying to do, why it matters, what remains open, and how work should survive
+context changes. They are a structured state/work-management substrate for
+LLM-based actors, not a replacement for actor freedom.
+
+The intended effect is to give the LLM actor more room to behave naturally in
+Minecraft and social simulation, because important concerns, blockers,
+dependencies, and resumable work are explicit instead of buried in prose.
+
+The primary pain PlanBeads address is forgetting or muddying multi-cycle work
+state. Execution and verification remain important, but the first PlanBeads
+implementation should not become a verification project for its own sake. It
+must prevent silent error hiding, fake completion, and progress laundering, while
+keeping the main emphasis on clear state continuity.
+
+The first meaningful proof is context-change behavior:
+
+- the actor is working on concern A;
+- a new concern B appears through observation, relationship pressure, blocker,
+  or runtime evidence;
+- the runtime preserves A's open/in-progress/blocked/deferred state;
+- B can be added, prioritized, deferred, or linked without erasing A;
+- the next CycleGoal can choose from current observation and the ready front
+  without becoming a checklist executor.
+
+Treat it as a design failure if the actor spends more effort maintaining
+PlanBeads than acting in the world, or if PlanBeads make the NPC stiff,
+checklist-bound, or less capable of free LLM-based behavior. Bead updates should
+be small, evidence-linked, and in service of Minecraft action and social
+simulation, not a new activity that displaces them.
+
+PlanBeads must never become executable authority. They do not supply missing
+primitive args, grant action-skill permissions, decide physical success, clear
+runtime retry constraints, or replace ActionIntent validation. If an
+implementation pushes PlanBeads toward deterministic domain planning, reject or
+reframe it.
+
+Parallel GPT-5.5-xhigh workers may be used for speed and context isolation, but
+parallelism does not change runtime authority. Workers operate under lane
+contracts, produce artifacts or patches, and coordinator verification decides
+what lands.
+
 ## Project Identity vs External References
 
 External Minecraft-agent and LLM-agent papers are references, not product specs.
@@ -104,14 +148,15 @@ Read these first:
 14. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
 15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 16. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-17. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-18. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-19. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-20. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-21. `docs/blog-doc/Architecture/Minimal-Probe.md`
-22. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-23. `docs/blog-doc/Setup/Headless-Server.md`
-24. `docs/blog-doc/Setup/Provider-Setup.md`
+17. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+18. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+19. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+20. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+21. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+22. `docs/blog-doc/Architecture/Minimal-Probe.md`
+23. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+24. `docs/blog-doc/Setup/Headless-Server.md`
+25. `docs/blog-doc/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -403,6 +448,9 @@ Important search tokens:
   `bot.dig(...)` resolves or fails; do not stop to check progress mid-dig,
   because that resets block-breaking progress.
 - Actor workspace is the source of truth for actor-owned action skill state.
+- Actor workspace should also become the source of truth for actor-owned
+  PlanBead work graph state when that slice is implemented. The purpose is
+  state continuity under changing circumstances, not more planning prose.
 - Treat `build/generated-skills` as legacy exploratory output, not as active or
   candidate actor-owned action skill memory.
 - Prefer structured domain models, typed records, discriminated unions, schemas,

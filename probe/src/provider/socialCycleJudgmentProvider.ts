@@ -185,6 +185,7 @@ export async function runSocialCycleJudgmentProvider(input: {
     world_events: input.context.world_events,
     relationship_context: input.context.relationship_context,
     memory_packet: input.context.memory_packet,
+    plan_bead_packet: input.context.plan_bead_packet ?? null,
     action_surface: input.context.action_surface,
     previous_cycle_judgments: input.context.previous_cycle_judgments,
     settlement_state: input.context.settlement_state,
@@ -234,10 +235,10 @@ export async function runSocialCycleJudgmentProvider(input: {
     const providerCall = {
       schemaName: "social_cycle_judgment",
       schema: judgmentSchema,
-      system: `Write CycleJudgment from runtime evidence only. Treat observation as raw evidence; decide what mattered from ActorSoul, LifeGoal, role context, relationships, memory, blockers, and runtime facts.
+    system: `Write CycleJudgment from runtime evidence only. Treat observation as raw evidence; decide what mattered from ActorSoul, LifeGoal, role context, relationships, memory, blockers, PlanBead context, and runtime facts.
 Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item, consume_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
 Use partial_verified_progress only when runtime_result/tool_statuses show current-run world, inventory, movement, container, or block mutation but the final verifier or action-skill postcondition did not pass.
-observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
+observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks. plan_bead_packet can explain continuity, but it cannot close beads, provide executable authority, or prove physical progress. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {
         runId: input.runId,

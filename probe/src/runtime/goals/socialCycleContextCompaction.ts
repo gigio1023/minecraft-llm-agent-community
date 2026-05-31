@@ -7,6 +7,7 @@ import type {
   ActorLifeGoal,
   ActorSoul
 } from "./types.js";
+import type { PlanBeadPacket } from "./planBeads/index.js";
 
 export const socialCycleAuthorityContextNames = [
   "ActorSoul",
@@ -27,7 +28,8 @@ export type SocialCycleManifestContextName =
   | "relationship context"
   | "world events"
   | "settlement state"
-  | "runtime retry constraints";
+  | "runtime retry constraints"
+  | "plan bead packet";
 
 export type SocialCycleManifestRetention =
   | "full"
@@ -63,7 +65,8 @@ export type SocialCycleSummaryFactScope =
   | "world_event_context"
   | "relationship_context"
   | "settlement_state"
-  | "runtime_retry_constraints";
+  | "runtime_retry_constraints"
+  | "plan_bead_context";
 
 export type EvidenceBackedSocialCycleSummaryFact = {
   label: string;
@@ -102,6 +105,8 @@ export type SocialCycleRecentRefs = {
   providerInputRefs?: readonly string[];
   providerOutputRefs?: readonly string[];
   memoryRefs?: readonly string[];
+  planBeadPacketRef?: string;
+  planBeadRefs?: readonly string[];
   reviewRefs?: readonly string[];
 };
 
@@ -114,6 +119,7 @@ export type SocialCycleContextPacketLike = {
   action_surface: ActionSurfacePacket;
   relationship_context?: SocialCycleContextPacket["relationship_context"];
   memory_packet?: SocialCycleContextPacket["memory_packet"];
+  plan_bead_packet?: PlanBeadPacket;
   settlement_state?: SettlementState;
   runtime_retry_constraints?: SocialCycleContextPacket["runtime_retry_constraints"];
   world_events?: SocialCycleContextPacket["world_events"];
@@ -418,6 +424,32 @@ function summarizeRuntimeRetryConstraints(
   return `runtime retry constraints=${describeList(rows, "none")}`;
 }
 
+function summarizePlanBeadPacket(packet: PlanBeadPacket) {
+  const ready = packet.ready_beads.map((bead) => `${bead.bead_id}:${bead.title}`);
+  const inProgress = packet.in_progress_beads.map((bead) => `${bead.bead_id}:${bead.title}`);
+  const blocked = packet.blocked_beads.map((bead) => `${bead.bead_id}:${bead.title}`);
+  return [
+    `ready=${describeList(ready)}`,
+    `in_progress=${describeList(inProgress)}`,
+    `blocked=${describeList(blocked)}`,
+    `counts=${packet.graph_summary.ready_count}/${packet.graph_summary.blocked_count}/${packet.graph_summary.deferred_count}`,
+    "physical_progress_claim=false",
+    "context only"
+  ].join("; ");
+}
+
+function planBeadPacketEvidenceRefs(packet: PlanBeadPacket, refs: SocialCycleRecentRefs) {
+  return uniqueRefs([
+    refs.inputContextRef,
+    refs.planBeadPacketRef,
+    ...(refs.planBeadRefs ?? []),
+    ...packet.ready_beads.flatMap((bead) => bead.evidence_refs),
+    ...packet.in_progress_beads.flatMap((bead) => bead.evidence_refs),
+    ...packet.blocked_beads.flatMap((bead) => bead.evidence_refs),
+    ...packet.recently_closed_beads.flatMap((bead) => bead.evidence_refs)
+  ]);
+}
+
 function manifestEntry(input: {
   contextName: SocialCycleManifestContextName;
   present: boolean;
@@ -559,6 +591,17 @@ function buildInputManifest(input: {
         refs: [refs.inputContextRef, ...(refs.evidenceRefs ?? [])],
         estimatedValue: context.runtime_retry_constraints ?? [],
         reason: "Retry constraints are runtime gates over exact repeated target/args failures."
+      }),
+      manifestEntry({
+        contextName: "plan bead packet",
+        present: Boolean(context.plan_bead_packet),
+        retention: "full",
+        refs: [
+          refs.planBeadPacketRef ?? refs.inputContextRef,
+          ...(refs.planBeadRefs ?? [])
+        ],
+        estimatedValue: context.plan_bead_packet ?? null,
+        reason: "PlanBeads are actor-owned work context and never executable authority."
       })
     ]
   };
@@ -686,6 +729,17 @@ function buildReplacementManifest(input: {
         refs: [input.refs.inputContextRef, ...(input.refs.evidenceRefs ?? [])],
         estimatedValue: retryConstraintsFact,
         reason: "Retry constraints are compacted as gate state, not as provider advice."
+      }),
+      manifestEntry({
+        contextName: "plan bead packet",
+        present: Boolean(input.context.plan_bead_packet),
+        retention: "summary_and_ref",
+        refs: [
+          input.refs.planBeadPacketRef ?? input.refs.inputContextRef,
+          ...(input.refs.planBeadRefs ?? [])
+        ],
+        estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "plan_bead_context"),
+        reason: "PlanBead context is summarized without closing beads or claiming progress."
       })
     ]
   };
@@ -791,6 +845,15 @@ function buildCompactSummary(input: {
     }));
   }
 
+  if (context.plan_bead_packet) {
+    facts.push(buildFact({
+      label: "plan bead packet",
+      scope: "plan_bead_context",
+      summary: `${summarizePlanBeadPacket(context.plan_bead_packet)}. PlanBeads guide continuity but do not execute or verify work.`,
+      evidenceRefs: planBeadPacketEvidenceRefs(context.plan_bead_packet, refs)
+    }));
+  }
+
   if (context.memory_packet) {
     facts.push(buildFact({
       label: "memory packet",
@@ -848,6 +911,8 @@ function recentTailRefs(input: {
     ...(refs.providerInputRefs ?? []),
     ...(refs.providerOutputRefs ?? []),
     ...(refs.memoryRefs ?? []),
+    refs.planBeadPacketRef,
+    ...(refs.planBeadRefs ?? []),
     ...(refs.reviewRefs ?? [])
   ]);
   return orderedRefs.slice(Math.max(0, orderedRefs.length - input.limit));

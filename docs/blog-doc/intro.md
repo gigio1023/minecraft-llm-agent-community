@@ -130,6 +130,7 @@ transcript evidence.
 - [Documentation Map](Documentation-Map.md)
 - Repo-root review doc: `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 - [Actor Persistent State And PlanBeads](Architecture/Actor-Persistent-State-And-PlanBeads.md)
+- [PlanBeads Implementation Campaign](Architecture/PlanBeads-Implementation-Campaign.md)
 - [Runtime Loop And Verification](Architecture/Runtime-Loop-And-Verification.md)
 - [Actor Workspace And Action Skill Memory](Architecture/Actor-Workspace-And-Action-Skill-Memory.md)
 - [Soul Life Goal Runtime Architecture](Architecture/Soul-Life-Goal-Runtime-Architecture.md)

@@ -173,6 +173,7 @@ export async function runSocialActionPlannerProvider(input: {
     world_events: input.context.world_events,
     relationship_context: input.context.relationship_context,
     memory_packet: input.context.memory_packet,
+    plan_bead_packet: input.context.plan_bead_packet ?? null,
     settlement_state: input.context.settlement_state,
     settlement_checklist: input.context.settlement_state.checklist,
     blocker_histogram: input.context.settlement_state.blocker_histogram,
@@ -216,6 +217,7 @@ export async function runSocialActionPlannerProvider(input: {
       system: `You plan one bounded ActionIntent for the active CycleGoal.
 ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
 Select from action_surface and runtime_affordances based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface is the actor's current body, not a strategy checklist.
+plan_bead_packet, when present, is read-only work-state context for continuity. It does not add executable args, action permissions, physical success, or a requirement to follow a checklist.
 Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
 Vitals and food candidates are observation fields, not runtime priorities. If consuming food is useful, choose consume_item with an explicit itemName from inventory evidence.
 Deferred primitives or action skills explain missing affordances; do not choose them in this ActionIntent. Direct primitives and direct action skills are the executable body for this turn.
