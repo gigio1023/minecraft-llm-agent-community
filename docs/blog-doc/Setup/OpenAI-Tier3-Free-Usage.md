@@ -1,7 +1,8 @@
 # OpenAI API — Tier 3 data-sharing free daily usage
 
 Status: supporting reference. Active provider guard commands live in
-`docs/blog-doc/Setup/Provider-Setup.md`.
+`docs/blog-doc/Setup/Provider-Setup.md`. Daily reset windows and Korea-time
+conversions live in `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`.
 
 Recorded for this repo’s **`openai` provider** experiments (not `openai-codex` / ChatGPT Codex backend).
 

@@ -341,6 +341,7 @@ Important search tokens:
 - `GAME_RUNTIME_CODEX_AUTH`
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
 - `PROVIDER_USAGE_GUARD`
+- `PROVIDER_FREE_TIER_RESET_WINDOWS`
 - `GEMINI_API_SOCIAL_PROVIDER`
 - `WORLD_STATE_DIAGNOSTICS`
 - `ACTOR_PERSISTENT_STATE_PLAN_BEADS`
@@ -639,6 +640,14 @@ Live provider calls must be explicit and auditable.
   `PROVIDER_USAGE_BUDGETS_JSON` or
   `build/provider-usage/free-tier-budgets.json` as `already_used` before running
   long or repeated live provider tests.
+- Before long OpenAI or Gemini API free-tier runs, read
+  `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` and use its reset
+  windows when deciding whether the budget has refreshed:
+  - OpenAI API data-sharing complimentary tokens reset at `00:00 UTC`, which is
+    `09:00 KST`.
+  - Gemini API `RPD` quotas reset at midnight Pacific time, which is `16:00 KST`
+    during PDT and `17:00 KST` during PST. Convert from
+    `America/Los_Angeles`; do not assume a fixed KST calendar-day boundary.
 - Treat a usage-budget block as a provider setup/budget blocker, not as actor
   behavior or action-skill failure.
 

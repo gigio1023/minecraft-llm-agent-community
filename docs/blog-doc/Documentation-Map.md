@@ -102,6 +102,7 @@ Current state and operations:
 - `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `docs/blog-doc/Setup/Headless-Server.md`
 - `docs/blog-doc/Setup/Provider-Setup.md`
+- `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 - `docs/blog-doc/Setup/OpenAI-Tier3-Free-Usage.md`
 
 Knowledge:

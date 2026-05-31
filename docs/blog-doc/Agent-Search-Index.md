@@ -64,6 +64,7 @@ guidance.
 |--------------|---------|--------------------|
 | `HEADLESS_MINEFLAYER_PROBE` | Local server and headless Mineflayer runtime setup | `Setup/Headless-Server.md`, `Architecture/Minimal-Probe.md` |
 | `PROVIDER_USAGE_GUARD` | Provider usage ledger, budget guard, and post-run usage summaries | `Setup/Provider-Setup.md`, `Architecture/Transcript-And-Runtime-Artifacts.md`, `probe/src/provider/providerUsageTracker.ts` |
+| `PROVIDER_FREE_TIER_RESET_WINDOWS` | OpenAI and Gemini API free-tier daily reset windows and KST conversion rules | `Setup/Provider-Free-Tier-Reset-Windows.md`, `Setup/Provider-Setup.md`, `probe/src/provider/providerUsageTracker.ts` |
 | `GEMINI_API_SOCIAL_PROVIDER` | Lightweight live social-cycle provider path using Gemini API / Gemma | `Setup/Provider-Setup.md`, `README.md`, `probe/src/provider/geminiApiJsonProvider.ts` |
 | `OPENAI_CODEX_PROVIDER` | Game-runtime provider auth for `openai-codex`, not Codex CLI login | `Setup/Provider-Setup.md`, `AGENTS.md` |
 | `GAME_RUNTIME_CODEX_AUTH` | Repo-local ignored gameplay auth store | `Setup/Provider-Setup.md`, `AGENTS.md` |
@@ -94,6 +95,7 @@ For any onboarding developer or agent, read in this order:
 19. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
 20. `docs/blog-doc/Setup/Headless-Server.md`
 21. `docs/blog-doc/Setup/Provider-Setup.md`
+22. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Active vs Archived
 

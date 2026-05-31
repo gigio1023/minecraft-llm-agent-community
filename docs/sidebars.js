@@ -42,6 +42,7 @@ const sidebars = {
       items: [
         'Setup/Headless-Server',
         'Setup/Provider-Setup',
+        'Setup/Provider-Free-Tier-Reset-Windows',
       ],
     },
     {

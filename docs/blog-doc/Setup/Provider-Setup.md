@@ -50,6 +50,12 @@ Provider-backed calls must be auditable before and after a run:
 - the ignored global ledger appends one JSONL row per provider request;
 - the social-cycle report includes `provider_usage` totals for the run.
 
+For daily free-tier reset windows and Korea-time conversions, read
+`docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` before long live
+runs. In short: OpenAI API complimentary-token budgets reset at `00:00 UTC`
+(`09:00 KST`), while Gemini API daily `RPD` budgets reset at midnight Pacific
+time (`16:00 KST` during PDT, `17:00 KST` during PST).
+
 Default ignored ledger path:
 
 ```text
