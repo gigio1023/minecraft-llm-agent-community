@@ -7,6 +7,7 @@ import type {
 } from "../settlement/settlementState.js";
 import type { ProviderUsageSummary } from "../../provider/providerUsageTracker.js";
 import type { RuntimeRetryConstraint } from "../retryConstraints.js";
+import { validatePlanBeadOperation, type PlanBeadOperation } from "./planBeads/index.js";
 
 export type ActorSoul = {
   schema: "actor-soul/v1";
@@ -118,6 +119,7 @@ export type ActorCycleGoal = {
     memory_refs: string[];
     relationship_refs: string[];
     previous_cycle_judgment_refs: string[];
+    plan_bead_refs?: string[];
   };
   success_condition: {
     verifier: string;
@@ -248,6 +250,7 @@ export type CycleJudgment = {
     evidence_refs: string[];
   }>;
   next_goal_context: string[];
+  bead_op_proposals?: PlanBeadOperation[];
 };
 
 export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
@@ -301,6 +304,9 @@ export type SocialCycleRunReport = {
     evidence_refs: string[];
     judgment_ref: string;
     verifier_status: "passed" | "failed" | "not_applicable";
+    plan_bead_packet_ref?: string;
+    selected_plan_bead_refs?: string[];
+    plan_bead_operation_result_refs?: string[];
     action_attempts?: Array<{
       attempt_id: string;
       action_index: number;
@@ -317,6 +323,7 @@ export type SocialCycleRunReport = {
       runtime_status: string;
       retry_constraint_blocked?: boolean;
       postcondition_results?: ActionSkillPostconditionResult[];
+      plan_bead_operation_result_refs?: string[];
     }>;
   }>;
   provider_error?: string;
@@ -325,6 +332,34 @@ export type SocialCycleRunReport = {
   settlement_checklist?: SettlementChecklist;
   postcondition_results?: ActionSkillPostconditionResult[];
   runtime_retry_constraints?: RuntimeRetryConstraint[];
+  plan_bead_graph_summary?: {
+    schema: "plan-bead-graph-summary/v1";
+    actor_id: string;
+    open_count: number;
+    ready_count: number;
+    blocked_count: number;
+    deferred_count: number;
+    closed_recent_count: number;
+    last_ready_front_ref?: string;
+  };
+  plan_bead_ready_fronts?: Array<{
+    schema: "plan-bead-ready-front/v1";
+    cycle_id: string;
+    ref: string;
+    ready_bead_ids: string[];
+    in_progress_bead_ids: string[];
+    blocked_bead_ids: string[];
+    physical_progress_claim: false;
+  }>;
+  plan_bead_operation_results?: Array<{
+    cycle_id: string;
+    turn_id: string;
+    ref: string;
+    op: string;
+    status: "accepted" | "rejected";
+    bead_id?: string;
+    reason?: string;
+  }>;
   relationship_application_results?: Array<{
     event_id: string;
     from_actor_id: string;
@@ -521,6 +556,20 @@ export function validateCycleJudgment(
         errors.push(`relationship_event_proposals[${index}].kind must be a known proposal kind`);
       }
       assertStringArray(proposal, "evidence_refs", errors);
+    }
+  }
+  if (value.bead_op_proposals !== undefined) {
+    if (!Array.isArray(value.bead_op_proposals)) {
+      errors.push("bead_op_proposals must be an array when present");
+    } else {
+      for (const [index, operation] of value.bead_op_proposals.entries()) {
+        const result = validatePlanBeadOperation(operation);
+        if (!result.ok) {
+          errors.push(
+            `bead_op_proposals[${index}] invalid: ${result.errors.join("; ")}`
+          );
+        }
+      }
     }
   }
   if (errors.length > 0) {

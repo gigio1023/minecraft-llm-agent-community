@@ -35,6 +35,8 @@ export function createEmptySocialCycleReport(input: {
     },
     cycles: [],
     postcondition_results: [],
+    plan_bead_ready_fronts: [],
+    plan_bead_operation_results: [],
     relationship_application_results: [],
     memory_reuse: {
       retrieved_memory_refs: 0,

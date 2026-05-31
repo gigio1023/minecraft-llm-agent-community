@@ -12,7 +12,8 @@ import { listJsonFilesSorted, readJsonIfExists } from "../goalJsonStore.js";
 import type {
   ActorPlanBead,
   PlanBeadDependency,
-  PlanBeadMetadataValue
+  PlanBeadMetadataValue,
+  PlanBeadPacket
 } from "./types.js";
 import {
   assertValidActorPlanBead,
@@ -49,6 +50,13 @@ export type PlanBeadGraphSnapshot = {
   actor_id: string;
   beads: ActorPlanBead[];
   dependencies: PlanBeadDependency[];
+};
+
+export type PlanBeadReadyFrontSnapshot = PlanBeadPacket & {
+  snapshot_id: string;
+  actor_id: string;
+  cycle_id: string;
+  created_at: string;
 };
 
 const authorityKeys = new Set([
@@ -387,6 +395,32 @@ export async function writePlanBeadHistorySnapshot(
   );
   await writeJson(filePath, validSnapshot);
   return filePath;
+}
+
+export async function writePlanBeadReadyFrontSnapshot(input: {
+  rootDir: string;
+  actorId: string;
+  cycleId: string;
+  packet: PlanBeadPacket;
+  createdAt?: string;
+}) {
+  const paths = getActorWorkspacePaths(input.rootDir, input.actorId);
+  const snapshot: PlanBeadReadyFrontSnapshot = {
+    ...input.packet,
+    snapshot_id: `plan-bead-ready-front-${input.cycleId}`,
+    actor_id: input.actorId,
+    cycle_id: input.cycleId,
+    created_at: input.createdAt ?? new Date().toISOString()
+  };
+  const filePath = path.join(
+    paths.planBeads.indexesDir,
+    `${snapshot.snapshot_id}.json`
+  );
+  await writeJson(filePath, snapshot);
+  return {
+    filePath,
+    ref: path.relative(paths.actorDir, filePath)
+  };
 }
 
 /**

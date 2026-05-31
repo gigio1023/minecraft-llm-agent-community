@@ -7,6 +7,17 @@ import { fileURLToPath } from "node:url";
 import { runSocialCycle } from "../src/runtime/socialCycleRunner.js";
 import { cycleGoalProviderInputIncludesSoulAndLifeGoal } from "../src/runtime/goals/types.js";
 import { readJsonIfExists } from "../src/runtime/goals/goalJsonStore.js";
+import { initializeActorWorkspaces } from "../src/runtime/actorWorkspace.js";
+import { ensureActorSoul } from "../src/runtime/goals/actorSoulStore.js";
+import { ensureActiveLifeGoal } from "../src/runtime/goals/lifeGoalStore.js";
+import { assignSeedActionSkillOwnership } from "../src/skills/ownership.js";
+import { getActorProfile } from "../src/npc/profiles.js";
+import {
+  appendPlanBeadDependency,
+  readActorPlanBead,
+  writeActorPlanBead,
+  type ActorPlanBead
+} from "../src/runtime/goals/planBeads/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "test-artifacts", `social-runner-${process.pid}-${Date.now()}`);
@@ -28,6 +39,58 @@ type ReportActionAttempt = {
 function readActionAttempts(cycle: unknown): ReportActionAttempt[] {
   const attempts = (cycle as { action_attempts?: unknown }).action_attempts;
   return Array.isArray(attempts) ? attempts as ReportActionAttempt[] : [];
+}
+
+function runnerPlanBead(input: {
+  beadId: string;
+  lifeGoalId: string;
+  status: ActorPlanBead["status"];
+  priority: ActorPlanBead["priority"];
+}): ActorPlanBead {
+  return {
+    schema: "actor-plan-bead/v1",
+    bead_id: input.beadId,
+    actor_id: "npc_b",
+    life_goal_id: input.lifeGoalId,
+    kind: "concern",
+    status: input.status,
+    priority: input.priority,
+    title: `Runner ${input.beadId}`,
+    description: "Seeded PlanBead for deterministic social-cycle continuity proof.",
+    design_notes: "Context only; not executable authority.",
+    acceptance_criteria: {
+      evidence_required: ["runtime evidence"],
+      non_physical_resolution_allowed: true
+    },
+    notes: {
+      completed: [],
+      in_progress: [],
+      blockers: [],
+      next: [`Keep ${input.beadId} visible in ready-front context.`],
+      key_decisions: []
+    },
+    labels: ["runner-proof"],
+    metadata: {},
+    refs: {
+      evidence_refs: [`plan-beads/beads/${input.beadId}.json`],
+      memory_refs: [],
+      judgment_refs: [],
+      cycle_goal_refs: [],
+      relationship_refs: [],
+      world_event_refs: [],
+      action_skill_refs: []
+    },
+    checkpoint: {
+      version: 1,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z",
+      evidence_refs: [`plan-beads/beads/${input.beadId}.json`]
+    },
+    assertion_policy: {
+      bead_is_context_not_authority: true,
+      physical_success_requires_current_evidence: true
+    }
+  };
 }
 
 test("deterministic-social run writes two cycles and cites prior judgment", async () => {
@@ -173,4 +236,80 @@ test("provider failure does not report runtime pass", async () => {
   assert.equal(result.report.runtime_status, "failed");
   assert.ok(result.report.provider_error);
   await fs.access(reportPath);
+});
+
+test("deterministic-social run carries PlanBead ready front and guarded operations", async () => {
+  const isolatedRoot = path.join(rootDir, `planbeads-vertical-${Date.now()}`);
+  const actorId = "npc_b";
+  const profile = getActorProfile(actorId);
+  await initializeActorWorkspaces({
+    rootDir: isolatedRoot,
+    actors: [{ actor_id: actorId, username: actorId, role_id: profile.gameplay_role }],
+    seedActionSkillOwnership: assignSeedActionSkillOwnership([actorId], {
+      [actorId]: profile.gameplay_role
+    })
+  });
+  const soul = await ensureActorSoul(isolatedRoot, actorId);
+  const lifeGoal = await ensureActiveLifeGoal(isolatedRoot, actorId, soul);
+  await writeActorPlanBead(
+    isolatedRoot,
+    runnerPlanBead({
+      beadId: "bead-a",
+      lifeGoalId: lifeGoal.goal_id,
+      status: "in_progress",
+      priority: 2
+    })
+  );
+  await writeActorPlanBead(
+    isolatedRoot,
+    runnerPlanBead({
+      beadId: "bead-b",
+      lifeGoalId: lifeGoal.goal_id,
+      status: "open",
+      priority: 1
+    })
+  );
+  await appendPlanBeadDependency(isolatedRoot, {
+    schema: "actor-plan-bead-dependency/v1",
+    actor_id: actorId,
+    bead_id: "bead-b",
+    depends_on_bead_id: "bead-a",
+    type: "discovered_from",
+    rationale: "Concern B appeared while concern A was in progress.",
+    evidence_refs: ["plan-beads/beads/bead-b.json"],
+    created_at: "2026-05-31T00:00:00.000Z"
+  });
+
+  const reportPath = path.join(isolatedRoot, "planbeads-report.json");
+  const result = await runSocialCycle({
+    actorId,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 2,
+    maxActionsPerCycle: 1,
+    reportPath,
+    connectToWorld: false,
+    actorWorkspaceRootDir: isolatedRoot
+  });
+
+  assert.equal(result.report.cycles.length, 2);
+  assert.deepEqual(result.report.plan_bead_ready_fronts?.[0]?.in_progress_bead_ids, ["bead-a"]);
+  assert.deepEqual(result.report.plan_bead_ready_fronts?.[0]?.ready_bead_ids, ["bead-b"]);
+  assert.deepEqual(result.report.cycles[0]?.selected_plan_bead_refs, ["plan-beads/beads/bead-b.json"]);
+  assert.ok((result.report.cycles[0]?.plan_bead_operation_result_refs ?? []).length > 0);
+  assert.equal(result.report.plan_bead_operation_results?.[0]?.status, "accepted");
+  assert.equal(result.report.plan_bead_operation_results?.[0]?.bead_id, "bead-b");
+  assert.equal(result.report.plan_bead_graph_summary?.last_ready_front_ref, result.report.plan_bead_ready_fronts?.[1]?.ref);
+
+  const beadB = await readActorPlanBead(isolatedRoot, actorId, "bead-b");
+  assert.equal(beadB?.status, "in_progress");
+  assert.ok((beadB?.checkpoint.version ?? 0) >= 2);
+
+  const actorDir = path.join(isolatedRoot, actorId);
+  const goalMindInputRef = result.report.cycles[0]?.provider_input_refs[0];
+  const snapshot = await readJsonIfExists<{ input?: { plan_bead_packet?: unknown; action_surface?: Record<string, unknown> } }>(
+    path.join(actorDir, goalMindInputRef ?? "")
+  );
+  assert.ok(snapshot?.input?.plan_bead_packet);
+  assert.equal(snapshot.input.action_surface?.plan_bead_packet, undefined);
 });

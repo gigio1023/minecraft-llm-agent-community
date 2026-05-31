@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { auditSocialCycleReport } from "../src/runtime/goals/socialCycleReportAuditCli.js";
+import {
+  auditSocialCycleReport,
+  buildPlanBeadAuditArtifact
+} from "../src/runtime/goals/socialCycleReportAuditCli.js";
 import { buildSocialCycleReviewSummary } from "../src/runtime/goals/socialCycleReviewSummary.js";
 import type { SocialCycleRunReport } from "../src/runtime/goals/types.js";
 
@@ -431,6 +434,152 @@ test("rejects physical absence claims backed only by non-exhaustive scan evidenc
       error.includes("physical absence claim") && error.includes("non-exhaustive")
     )
   );
+});
+
+test("audits PlanBead ready fronts, provider packets, and operation results", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-planbeads");
+  const report = baseReport();
+  report.actor_workspace_root_dir = workspaceRoot;
+  report.plan_bead_ready_fronts = [
+    {
+      schema: "plan-bead-ready-front/v1",
+      cycle_id: "cycle-0001",
+      ref: "plan-beads/indexes/plan-bead-ready-front-cycle-0001.json",
+      ready_bead_ids: ["bead-b"],
+      in_progress_bead_ids: ["bead-a"],
+      blocked_bead_ids: [],
+      physical_progress_claim: false
+    }
+  ];
+  report.plan_bead_graph_summary = {
+    schema: "plan-bead-graph-summary/v1",
+    actor_id: actorId,
+    open_count: 2,
+    ready_count: 1,
+    blocked_count: 0,
+    deferred_count: 0,
+    closed_recent_count: 0,
+    last_ready_front_ref: "plan-beads/indexes/plan-bead-ready-front-cycle-0001.json"
+  };
+  report.plan_bead_operation_results = [
+    {
+      cycle_id: "cycle-0001",
+      turn_id: "cycle-0001-action-01",
+      ref: "plan-beads/events/operation-results/plan-bead-op-cycle-0001-action-01-01.json",
+      op: "set_status",
+      status: "accepted",
+      bead_id: "bead-b",
+      reason: "accepted fixture"
+    }
+  ];
+  report.cycles[0] = {
+    ...report.cycles[0]!,
+    plan_bead_packet_ref: "plan-beads/indexes/plan-bead-ready-front-cycle-0001.json",
+    selected_plan_bead_refs: ["plan-beads/beads/bead-b.json"],
+    plan_bead_operation_result_refs: [
+      "plan-beads/events/operation-results/plan-bead-op-cycle-0001-action-01-01.json"
+    ]
+  };
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  const actorDir = path.join(workspaceRoot, actorId);
+  const planBeadPacket = {
+    schema: "plan-bead-packet/v1",
+    snapshot_id: "plan-bead-ready-front-cycle-0001",
+    actor_id: actorId,
+    cycle_id: "cycle-0001",
+    created_at: "2026-05-31T00:00:00.000Z",
+    physical_progress_claim: false,
+    ready_beads: [],
+    in_progress_beads: [],
+    blocked_beads: [],
+    recently_closed_beads: [],
+    graph_summary: {
+      open_count: 1,
+      ready_count: 1,
+      blocked_count: 0,
+      deferred_count: 0,
+      closed_recent_count: 0
+    },
+    rules: {
+      beads_are_context_not_authority: true,
+      ready_front_guides_goal_selection: true,
+      action_surface_controls_execution: true,
+      runtime_verifies_physical_progress: true
+    }
+  };
+  await writeJson(path.join(actorDir, "plan-beads/beads/bead-b.json"), {
+    schema: "actor-plan-bead/v1",
+    actor_id: actorId,
+    bead_id: "bead-b"
+  });
+  await writeJson(path.join(actorDir, report.plan_bead_ready_fronts[0]!.ref), planBeadPacket);
+  await writeJson(
+    path.join(actorDir, report.plan_bead_operation_results[0]!.ref),
+    {
+      schema: "plan-bead-operation-result/v1",
+      operation_result_id: "plan-bead-op-cycle-0001-action-01-01",
+      actor_id: actorId,
+      cycle_id: "cycle-0001",
+      turn_id: "cycle-0001-action-01",
+      op: "set_status",
+      status: "accepted",
+      reason: "accepted fixture",
+      bead_id: "bead-b",
+      evidence_refs: ["evidence/cycle-0001-observe.json"],
+      created_at: "2026-05-31T00:00:00.000Z"
+    }
+  );
+  const providerInputPath = path.join(actorDir, report.cycles[0]!.provider_input_refs[0]!);
+  const providerInput = JSON.parse(await fs.readFile(providerInputPath, "utf8"));
+  providerInput.input.action_surface = {};
+  providerInput.input.plan_bead_packet = planBeadPacket;
+  await writeJson(providerInputPath, providerInput);
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+  const artifact = await buildPlanBeadAuditArtifact(
+    reportPath,
+    "2026-05-31T00:00:00.000Z"
+  );
+
+  assert.deepEqual(errors, []);
+  assert.equal(artifact.schema, "plan-bead-audit/v1");
+  assert.equal(artifact.status, "passed");
+  assert.equal(artifact.summary.ready_front_count, 1);
+  assert.equal(artifact.summary.operation_result_count, 1);
+  assert.equal(artifact.summary.accepted_operation_count, 1);
+  assert.ok(
+    artifact.checks.some((check) =>
+      check.subject === "ready_front" && check.status === "DONE"
+    )
+  );
+  assert.ok(
+    artifact.checks.some((check) =>
+      check.subject === "operation_result" && check.status === "DONE"
+    )
+  );
+});
+
+test("rejects PlanBead provider packets that claim physical progress", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-planbeads-progress");
+  const report = baseReport();
+  const reportPath = path.join(workspaceRoot, "report.json");
+  await writeActorWorkspaceFixture(workspaceRoot, report);
+  const actorDir = path.join(workspaceRoot, actorId);
+  const providerInputPath = path.join(actorDir, report.cycles[0]!.provider_input_refs[0]!);
+  const snapshot = JSON.parse(await fs.readFile(providerInputPath, "utf8"));
+  snapshot.input.plan_bead_packet = {
+    schema: "plan-bead-packet/v1",
+    physical_progress_claim: true,
+    rules: { beads_are_context_not_authority: true }
+  };
+  await writeJson(providerInputPath, snapshot);
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.ok(errors.some((error) => error.includes("PlanBead packet claims physical progress")));
 });
 
 test("review summary surfaces world scan counts and movement contract status", async () => {

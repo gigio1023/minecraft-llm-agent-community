@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
 import type { ActionIntent, ActorCycleGoal, CycleJudgment } from "../runtime/goals/types.js";
+import type { PlanBeadOperation } from "../runtime/goals/planBeads/index.js";
 import { validateCycleJudgment } from "../runtime/goals/types.js";
 import { writeCycleJudgment } from "../runtime/goals/cycleJudgmentStore.js";
 import {
@@ -142,6 +143,62 @@ function buildRuntimeFallbackJudgmentBody(input: {
   };
 }
 
+function deterministicBeadOpProposals(input: {
+  actorId: string;
+  cycleGoal: ActorCycleGoal;
+  context: SocialCycleContextPacket;
+  evidenceRefs: readonly string[];
+}): PlanBeadOperation[] {
+  if (input.evidenceRefs.length === 0 || !input.context.plan_bead_packet) {
+    return [];
+  }
+
+  const selectedRefs = input.cycleGoal.derived_from.plan_bead_refs ?? [];
+  const selectedReady = input.context.plan_bead_packet.ready_beads.find((bead) =>
+    selectedRefs.includes(bead.checkpoint_ref)
+  );
+  if (selectedReady) {
+    return [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: input.actorId,
+        op: "set_status",
+        bead_id: selectedReady.bead_id,
+        rationale:
+          "The current CycleGoal selected this ready PlanBead; mark it in_progress as work-state context only.",
+        evidence_refs: [...input.evidenceRefs],
+        confidence: "observed",
+        patch: {
+          status: "in_progress"
+        }
+      }
+    ];
+  }
+
+  const current = input.context.plan_bead_packet.in_progress_beads[0];
+  if (!current) {
+    return [];
+  }
+  return [
+    {
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "update_notes",
+      bead_id: current.bead_id,
+      rationale:
+        "Preserve current in-progress PlanBead continuity after the cycle judgment.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: "observed",
+      patch: {
+        in_progress: [
+          ...current.notes_next,
+          `Cycle ${input.cycleGoal.cycle_id} kept this bead in active context.`
+        ]
+      }
+    }
+  ];
+}
+
 /**
  * Writes CycleJudgment from runtime evidence and clamps provider overclaims.
  *
@@ -229,7 +286,13 @@ export async function runSocialCycleJudgmentProvider(input: {
       relationship_event_proposals: [],
       next_goal_context: input.context.previous_cycle_judgments.length
         ? ["Consider prior judgment when choosing the next CycleGoal"]
-        : ["Continue settlement contribution under LifeGoal"]
+        : ["Continue settlement contribution under LifeGoal"],
+      bead_op_proposals: deterministicBeadOpProposals({
+        actorId: input.actorId,
+        cycleGoal: input.cycleGoal,
+        context: input.context,
+        evidenceRefs: input.evidenceRefs
+      })
     };
   } else {
     const providerCall = {

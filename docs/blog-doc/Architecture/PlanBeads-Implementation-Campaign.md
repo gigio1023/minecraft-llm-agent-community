@@ -6,10 +6,38 @@ sidebar_position: 11
 
 Search token: `PLANBEADS_IMPLEMENTATION_CAMPAIGN`.
 
-Status: active implementation campaign spec for long-running, parallel
-PlanBeads work.
+Status: implemented vertical-slice campaign spec. PB-C1 through PB-C7 are
+complete for the deterministic social-cycle proof path on
+`feat/persistent-actor-state-planbeads`.
 
 Recorded: 2026-05-31 10:28:49 UTC (`Etc/UTC`).
+
+Implementation result, 2026-05-31:
+
+- PlanBead types, validators, actor workspace paths/store, dependency logs,
+  events, and history snapshots are implemented under
+  `probe/src/runtime/goals/planBeads/`.
+- Social-cycle context now receives a bounded read-only `plan_bead_packet` with
+  `physical_progress_claim: false`; action execution still comes only from the
+  action surface and `ActionIntent`.
+- Deterministic ready fronts are computed from stored graph state and written as
+  actor-workspace index artifacts.
+- `CycleJudgment` can propose typed PlanBead operations, but runtime-owned
+  guarded appliers accept or reject every mutation and write operation-result
+  artifacts.
+- Social-cycle reports include graph summary, ready-front refs, selected bead
+  refs, and operation result refs. The report audit CLI checks these refs and
+  can emit a `plan-bead-audit/v1` artifact.
+- The final proof is a deterministic two-cycle A/B context-change run: A starts
+  `in_progress`, B appears as `open` with a `discovered_from` edge, B enters
+  the ready front without erasing A, and guarded operations move B into
+  `in_progress` with evidence-linked operation results.
+
+The proof is intentionally not a Minecraft gameplay pass. The offline
+deterministic run reports `runtime_status: "blocked"` because no live Mineflayer
+world execution occurred. That is the correct truth value for this slice:
+PlanBeads preserve and mutate work-state context without claiming physical
+progress.
 
 This document translates the PlanBeads architecture into an implementation
 campaign that can be carried by multiple high-reasoning worker agents over a
@@ -590,6 +618,10 @@ Do not treat smoke tests as proof of runtime value. The proof is artifact-backed
 continuity and truthful report/audit evidence.
 
 ## First Campaign Backlog
+
+All items in this backlog are complete for the deterministic vertical slice.
+They remain here as the implementation spec and as a reference for future
+extension work.
 
 ### PB-C0: Lock Campaign Contracts
 

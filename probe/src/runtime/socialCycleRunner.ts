@@ -62,6 +62,12 @@ import {
   type ToolResultRecord
 } from "./settlement/settlementState.js";
 import { applyCycleJudgmentRelationshipEventProposals } from "../reviewer/relationshipProposalApplier.js";
+import {
+  applyPlanBeadOperations,
+  computeReadyPlanBeads,
+  loadPlanBeadGraphSnapshot,
+  writePlanBeadReadyFrontSnapshot
+} from "./goals/planBeads/index.js";
 
 type ServerEndpoint = {
   host: string;
@@ -87,6 +93,7 @@ type SocialCycleActionAttemptReport = {
   runtime_status: string;
   retry_constraint_blocked: boolean;
   postcondition_results: ActionSkillPostconditionResult[];
+  plan_bead_operation_result_refs: string[];
 };
 
 type SocialCycleReportCycleWithAttempts = SocialCycleRunReport["cycles"][number] & {
@@ -111,6 +118,23 @@ function countRelationshipContextRefs(context: {
     context.relationship_context.relationship_context_signals.length +
     context.relationship_context.incoming_relationship_context_signals.length
   );
+}
+
+function planBeadGraphSummary(input: {
+  actorId: string;
+  packet: ReturnType<typeof computeReadyPlanBeads>;
+  readyFrontRef?: string;
+}): NonNullable<SocialCycleRunReport["plan_bead_graph_summary"]> {
+  return {
+    schema: "plan-bead-graph-summary/v1",
+    actor_id: input.actorId,
+    open_count: input.packet.graph_summary.open_count,
+    ready_count: input.packet.graph_summary.ready_count,
+    blocked_count: input.packet.graph_summary.blocked_count,
+    deferred_count: input.packet.graph_summary.deferred_count,
+    closed_recent_count: input.packet.graph_summary.closed_recent_count,
+    ...(input.readyFrontRef ? { last_ready_front_ref: input.readyFrontRef } : {})
+  };
 }
 
 function filterActionSkillsForAllowedPrimitives(
@@ -455,6 +479,35 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         actorId: input.actorId,
         attempts: runtimeRetryAttempts
       });
+      const planBeadGraph = await loadPlanBeadGraphSnapshot(rootDir, input.actorId);
+      const planBeadPacket = computeReadyPlanBeads({
+        beads: planBeadGraph.beads,
+        dependencies: planBeadGraph.dependencies,
+        lifeGoalId: lifeGoal.goal_id,
+        nowIso: new Date().toISOString(),
+        maxReady: 3
+      });
+      const readyFrontSnapshot = await writePlanBeadReadyFrontSnapshot({
+        rootDir,
+        actorId: input.actorId,
+        cycleId,
+        packet: planBeadPacket
+      });
+      report.plan_bead_ready_fronts ??= [];
+      report.plan_bead_ready_fronts.push({
+        schema: "plan-bead-ready-front/v1",
+        cycle_id: cycleId,
+        ref: readyFrontSnapshot.ref,
+        ready_bead_ids: planBeadPacket.ready_beads.map((bead) => bead.bead_id),
+        in_progress_bead_ids: planBeadPacket.in_progress_beads.map((bead) => bead.bead_id),
+        blocked_bead_ids: planBeadPacket.blocked_beads.map((bead) => bead.bead_id),
+        physical_progress_claim: false
+      });
+      report.plan_bead_graph_summary = planBeadGraphSummary({
+        actorId: input.actorId,
+        packet: planBeadPacket,
+        readyFrontRef: readyFrontSnapshot.ref
+      });
 
       if (previousJudgments.length > 0) {
         report.agency_status.used_previous_judgment = true;
@@ -479,7 +532,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
         judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
         memoryWriteCount,
-        runtimeRetryConstraints: cycleRetryConstraints
+        runtimeRetryConstraints: cycleRetryConstraints,
+        planBeadPacket
       });
       report.runtime_retry_constraints = cycleRetryConstraints;
 
@@ -666,6 +720,26 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           ref: judgmentResult.judgmentRef,
           judgment: judgmentResult.judgment
         };
+        const beadOperationApplication = await applyPlanBeadOperations({
+          rootDir,
+          actorId: input.actorId,
+          lifeGoalId: lifeGoal.goal_id,
+          cycleId,
+          turnId: actionTurnId,
+          operations: judgmentResult.judgment.bead_op_proposals ?? []
+        });
+        report.plan_bead_operation_results ??= [];
+        report.plan_bead_operation_results.push(
+          ...beadOperationApplication.results.map((result, index) => ({
+            cycle_id: cycleId,
+            turn_id: actionTurnId,
+            ref: beadOperationApplication.result_refs[index] ?? "",
+            op: result.op,
+            status: result.status,
+            bead_id: result.bead_id,
+            reason: result.reason
+          }))
+        );
         actionAttempts.push({
           attempt_id: actionTurnId,
           action_index: actionIndex,
@@ -691,7 +765,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
               ? "failed"
               : "completed",
           retry_constraint_blocked: execution.retryConstraintBlocked,
-          postcondition_results: execution.postconditionResults
+          postcondition_results: execution.postconditionResults,
+          plan_bead_operation_result_refs: beadOperationApplication.result_refs
         });
 
         const memoryWrites = await persistJudgmentMemoryWrites(
@@ -739,6 +814,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         evidence_refs: actionAttempts.flatMap((attempt) => attempt.evidence_refs),
         judgment_ref: lastJudgmentRef,
         verifier_status: lastVerifier,
+        plan_bead_packet_ref: readyFrontSnapshot.ref,
+        selected_plan_bead_refs: cycleGoalProvider.cycleGoal.derived_from.plan_bead_refs ?? [],
+        plan_bead_operation_result_refs: actionAttempts.flatMap(
+          (attempt) => attempt.plan_bead_operation_result_refs ?? []
+        ),
         action_attempts: actionAttempts
       } satisfies SocialCycleReportCycleWithAttempts);
 

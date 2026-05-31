@@ -107,6 +107,12 @@ function normalizeCycleGoalFields(
   };
 }
 
+function selectedPlanBeadRefs(context: SocialCycleContextPacket) {
+  return context.plan_bead_packet?.ready_beads
+    .slice(0, 1)
+    .map((bead) => bead.checkpoint_ref) ?? [];
+}
+
 function cycleGoalFromLlm(input: {
   context: SocialCycleContextPacket;
   cycleId: string;
@@ -135,7 +141,10 @@ function cycleGoalFromLlm(input: {
       world_event_refs: worldEventRefs,
       memory_refs: memoryRefs,
       relationship_refs: [],
-      previous_cycle_judgment_refs: judgmentRefs
+      previous_cycle_judgment_refs: judgmentRefs,
+      ...(selectedPlanBeadRefs(input.context).length > 0
+        ? { plan_bead_refs: selectedPlanBeadRefs(input.context) }
+        : {})
     },
     success_condition: {
       verifier: cg.success_verifier,
@@ -212,6 +221,10 @@ export async function runSocialCycleGoalProvider(input: {
       allowedPrimitiveIds: input.allowedPrimitiveIds,
       source: "runtime_rule"
     });
+    const planBeadRefs = selectedPlanBeadRefs(input.context);
+    if (planBeadRefs.length > 0) {
+      cycleGoal.derived_from.plan_bead_refs = planBeadRefs;
+    }
     await writeStrategicGoal(input.actorWorkspaceRootDir, input.actorId, strategic);
     const { ref: cycleGoalRef } = await writeCycleGoal(
       input.actorWorkspaceRootDir,
@@ -255,6 +268,7 @@ Use settlement_state and settlement_checklist as runtime-owned observation/evide
 Do not make any single domain activity an always-on CycleGoal. Building is one possible action among many, selected only when ActorSoul/LifeGoal, WorldEvents, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
 If runtime_retry_constraints are present, treat them as hard evidence that the exact target plus structured args should not be selected again until context changes.
+If plan_bead_packet is present, use it as read-only continuity context. You may select a ready PlanBead by referencing its checkpoint_ref in derived context, but PlanBeads do not provide executable args, action permissions, or proof of progress.
 If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);
