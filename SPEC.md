@@ -129,11 +129,11 @@ not convert provider prose, memory notes, or weak observation into claimed
 physical progress.
 
 Actor-owned state that is required for continuity must survive process restarts.
-This includes identity, LifeGoal, living multi-cycle plans, memory,
-relationships, action skill ownership, evidence, retry gates, provider
-snapshots, and checkpoint-ready context. PlanBeads are the checkpointed
-multi-cycle plan records between LifeGoal and CycleGoal; they carry living plan
-state without becoming executable authority or physical proof.
+This includes identity, LifeGoal, actor work graph state, memory, relationships,
+action skill ownership, evidence, retry gates, provider snapshots, and
+checkpoint-ready context. PlanBeads are checkpointed actor-owned issue-like work
+items under LifeGoal. The PlanBeadGraph and its ready front guide CycleGoal
+selection without becoming executable authority or physical proof.
 
 ## 3. Complete Spec Reading Map
 
@@ -164,7 +164,7 @@ Read these documents to understand the full spec:
 10. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
 11. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-   - restart-safe actor state and checkpointed multi-cycle PlanBeads.
+   - restart-safe actor state, PlanBead work graph, dependencies, and ready front.
 12. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
     - actor profiles, role context, and relationship state.
 13. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
@@ -195,12 +195,12 @@ Setup docs:
 - Reviewers explain and propose repairs. They do not mutate actor truth directly.
 - Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
   agent skills.
-- Actor workspace is the source of truth for actor-owned memory, evidence,
-  active/candidate/retired action skills, goals, provider snapshots, reviews,
-  and relationships.
-- Actor-owned continuity state must be restart-safe. Living multi-cycle plans
-  should be represented as checkpointed PlanBeads between LifeGoal and
-  CycleGoal, not as free-form memory notes or hidden domain planners.
+- Actor workspace is the source of truth for actor-owned memory, PlanBead work
+  graph state, evidence, active/candidate/retired action skills, goals, provider
+  snapshots, reviews, and relationships.
+- Actor-owned continuity state must be restart-safe. Living multi-cycle work
+  should be represented as checkpointed PlanBeads and dependency edges under
+  LifeGoal, not as free-form memory notes or hidden domain planners.
 - Progress must be backed by world, inventory, position, block, container, chat,
   transcript, or verifier evidence.
 - Do not confuse animation, partial motion, optimistic text, reflection, or a
@@ -248,7 +248,7 @@ The proof is not:
 The runtime shape is:
 
 ```text
-ActorSoul + LifeGoal + PlanBeads + observation + world events + memory
+ActorSoul + LifeGoal + PlanBeadGraph + observation + world events + memory
 -> CycleGoal
 -> ActionIntent
 -> active action skill / primitive gate

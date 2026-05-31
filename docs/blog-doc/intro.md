@@ -32,8 +32,8 @@ leaving enough runtime evidence to explain the result.
 Each actor has a workspace under `data/actors/<actor_id>/`.
 
 That workspace owns the actor's active action skills, candidate repairs, memory,
-evidence, provider inputs, reviews, and relationships. Runtime code reads from
-that workspace before it allows a primitive to execute.
+PlanBeadGraph state, evidence, provider inputs, reviews, and relationships.
+Runtime code reads from that workspace before it allows a primitive to execute.
 
 The hot path stays narrow:
 
@@ -129,6 +129,7 @@ transcript evidence.
 - [Reference Adaptation Guide](Specification/Reference-Adaptation-Guide.md)
 - [Documentation Map](Documentation-Map.md)
 - Repo-root review doc: `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+- [Actor Persistent State And PlanBeads](Architecture/Actor-Persistent-State-And-PlanBeads.md)
 - [Runtime Loop And Verification](Architecture/Runtime-Loop-And-Verification.md)
 - [Actor Workspace And Action Skill Memory](Architecture/Actor-Workspace-And-Action-Skill-Memory.md)
 - [Soul Life Goal Runtime Architecture](Architecture/Soul-Life-Goal-Runtime-Architecture.md)

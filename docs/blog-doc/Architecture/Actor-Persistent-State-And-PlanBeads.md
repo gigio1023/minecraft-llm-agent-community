@@ -6,105 +6,168 @@ sidebar_position: 10
 
 Search token: `ACTOR_PERSISTENT_STATE_PLAN_BEADS`.
 
-Status: active architecture plan for durable actor state, checkpointed
-multi-cycle plans, and restart-safe social-cycle continuity.
+Status: active architecture plan for restart-safe actor work graphs, PlanBeads,
+and social-cycle continuity.
 
-This document records the design direction from the 2026-05-29 review: actor
-state must survive process restarts, not only provider context windows. The
-runtime should preserve the actor's durable identity, living plans, memory,
-relationships, action skill ownership, evidence, and current blockers as
-checkpoint-ready actor workspace state.
+Recorded: 2026-05-31 10:11:10 UTC (`Etc/UTC`).
 
-## Background
+This document records the current plan after reviewing the upstream Beads issue
+tracker concept (`steveyegge/beads`, redirected publicly as `gastownhall/beads`).
+The important correction is that a PlanBead should not be treated as a vague
+"planning memory" blob. In Beads, the durable unit is an issue-like work item,
+and the plan emerges from issue fields, dependency edges, status, notes, and the
+ready front.
 
-The current runtime already has important pieces:
+The Minecraft adaptation is:
 
-- `ActorSoul` and `ActorLifeGoal` preserve durable identity and direction;
-- `StrategicGoal`, `ActorCycleGoal`, `ActionIntent`, and `CycleJudgment` shape
-  the social-cycle loop;
-- `ActorMemoryRecord` stores evidence-linked memories by layer and kind;
-- actor workspace records action skill state, evidence, provider snapshots,
-  relationship artifacts, goals, and reviews;
-- context compaction preserves evidence-linked state without treating summaries
-  as physical progress.
+```text
+ActorSoul + LifeGoal
+-> actor-owned PlanBeadGraph
+-> ready PlanBeads
+-> CycleGoal
+-> ActionIntent
+-> runtime execution and evidence
+-> CycleJudgment
+-> guarded PlanBead updates
+```
 
-The missing piece is a durable middle layer between LifeGoal and CycleGoal.
-`LifeGoal` is too broad to hold a concrete project such as "secure food" or
-"build a shared shelter." `CycleGoal` is too short-lived; it should describe
-the current cycle, not carry a multi-cycle plan. `StrategicGoal` is the closest
-existing concept, but it is thin: it records a summary, rationale, success
-direction, and blockers without enough checkpointed state to survive long runs
-or restarts as a living plan.
+## Beads Reference Lessons
 
-PlanBeads fill that gap.
+Mechanically, Beads teaches these ideas:
 
-## Design Intent
+- each bead is a durable issue/work item, not the whole plan;
+- issue fields preserve resumable context: title, description, design,
+  acceptance criteria, notes, status, priority, labels, metadata, and owner;
+- dependency edges define ordering and blocking;
+- `ready` is computed from open work with no active blockers;
+- epics/molecules are work graphs, and children are parallel unless dependencies
+  create sequence;
+- gates bridge external conditions into the work graph;
+- memories are separate from issues;
+- the database is the source of truth, while JSON export is an interchange view;
+- compaction summarizes old closed issues, but active work remains resumable.
 
-The goal is not to add a hidden domain planner. The goal is to let the actor
-carry forward large, revisable, evidence-linked planning context while keeping
-action selection open.
+Adapted to this repo:
 
-Examples of the right grain:
+- PlanBeads are actor-owned issue-like work items under a LifeGoal.
+- The PlanBeadGraph is the actor's living work graph, not a hidden domain
+  strategy.
+- `ready_beads` are unblocked concerns that may justify the next CycleGoal.
+- PlanBead closure requires runtime evidence, guarded relationship evidence, or
+  a truthful non-physical resolution.
+- Ordinary memory remains recall/context; it does not own active work state.
+- The actor workspace is the source of truth for PlanBead records, dependency
+  edges, events, and history.
 
-- "Find or secure food before taking on more settlement work."
-- "Prepare materials for a simple shared shelter."
+## Core Definition
+
+A **PlanBead** is one actor-owned issue-like work item for a concern that may
+span more than one cycle.
+
+Examples:
+
+- "Secure a reliable food path before taking on more settlement work."
 - "Repair the repeated blocker around unreachable logs."
 - "Fulfill a teammate obligation without draining private survival resources."
+- "Investigate why shared chest deposits are not verified."
+- "Prepare enough materials for shelter work requested by the settlement."
 
-Examples that are too small for a PlanBead:
+A **PlanBeadGraph** is the actor-owned dependency graph of PlanBeads. The graph,
+not any single PlanBead, is the actor's current multi-cycle plan.
 
-- "Move to x=12 y=64 z=-3."
-- "Mine this single oak log."
-- "Craft four planks now."
+A **ready PlanBead** is an open PlanBead that is not blocked by another open
+blocking dependency, not deferred, and still relevant under current LifeGoal,
+observation, action surface, and evidence.
 
-Those smaller executable choices belong in `CycleGoal`, `ActionIntent`, runtime
-primitive args, action skills, or verifier contracts.
+The CycleGoal provider may select from ready PlanBeads, but it may also choose a
+CycleGoal from urgent current observation when the world demands it. PlanBeads
+guide continuity; they do not force every cycle through a checklist.
 
-## State Model
+## What A PlanBead Answers
+
+A PlanBead answers:
+
+- what work item or concern is being tracked?
+- why does it matter under the actor's LifeGoal?
+- what evidence would let the runtime close it, block it, or defer it?
+- what is currently known, completed, in progress, blocked, or next?
+- which dependencies must clear before this bead is ready?
+- which runtime artifacts, memories, relationships, world events, judgments, or
+  other PlanBeads explain its current state?
+
+A PlanBead does not answer:
+
+- what primitive should execute now;
+- which action skills are permitted;
+- whether physical Minecraft progress happened;
+- whether a runtime retry constraint should be created or cleared;
+- what the actor's durable identity or LifeGoal is.
+
+## Separation Of Records
+
+| Record | Owns | Must not own |
+|--------|------|--------------|
+| `ActorSoul` | identity seed, durable values, role frame | satisfiable task progress |
+| `ActorLifeGoal` | long-running social-life direction | current Minecraft action |
+| `PlanBead` | one durable issue-like work item under LifeGoal | executable args, permissions, or physical proof |
+| `PlanBeadDependency` | ordering, blocking, and provenance edges between PlanBeads | runtime truth or broad domain strategy |
+| `PlanBeadGraph` | actor-owned ready/blocked work graph | hidden deterministic planner |
+| `ActorCycleGoal` | bounded current-cycle objective | whole multi-cycle work graph |
+| `ActionIntent` | one structured executable proposal | missing args hidden in prose |
+| `CycleJudgment` | evidence-backed interpretation and bead-op proposals | unverified success |
+| `ActorMemoryRecord` | historical evidence-linked recall | active work source of truth |
+| runtime evidence | observed game/runtime facts | provider intention |
+
+`StrategicGoal` is a legacy-adjacent medium-horizon interpretation. New
+restart-safe multi-cycle work should become PlanBeads and PlanBead dependencies,
+not a second persistent middle layer.
+
+## Target State Model
 
 ```mermaid
 flowchart LR
   Soul["ActorSoul<br/>identity seed"] --> Life["LifeGoal<br/>durable direction"]
-  Life --> Bead["PlanBead<br/>checkpointed multi-cycle plan"]
-  Memory["ActorMemoryRecord<br/>evidence-backed history"] --> Bead
-  Relationship["Relationship state<br/>guarded actor-to-actor evidence"] --> Bead
-  Bead --> Cycle["CycleGoal<br/>current-cycle objective"]
+  Life --> Graph["PlanBeadGraph<br/>actor-owned work graph"]
+  Memory["ActorMemoryRecord<br/>evidence-backed history"] --> Graph
+  Relationship["Relationship state<br/>guarded social evidence"] --> Graph
+  WorldEvent["WorldEvent<br/>context pressure"] --> Graph
+  Graph --> Ready["ready_beads<br/>unblocked work front"]
+  Ready --> Cycle["CycleGoal<br/>current-cycle objective"]
   Cycle --> Intent["ActionIntent<br/>one executable proposal"]
   Intent --> Evidence["Runtime evidence<br/>Mineflayer artifacts"]
   Evidence --> Judgment["CycleJudgment<br/>evidence interpretation"]
   Judgment --> Memory
-  Judgment --> Bead
+  Judgment --> Graph
 ```
 
-The separation is:
+## PlanBead Record Shape
 
-| Record | Owns | Must not own |
-|--------|------|--------------|
-| `ActorSoul` | identity seed and durable values | satisfiable task progress |
-| `ActorLifeGoal` | long-running social-life direction | current Minecraft action |
-| `PlanBead` | living multi-cycle plan state | executable authority or physical proof |
-| `ActorCycleGoal` | bounded current-cycle objective | whole long-running project |
-| `ActionIntent` | one structured executable proposal | missing args hidden in prose |
-| `CycleJudgment` | evidence-backed interpretation | unverified success |
-| `ActorMemoryRecord` | historical evidence-linked recall | active plan source of truth |
-| runtime evidence | observed game/runtime facts | provider intention |
-
-## PlanBead Definition
-
-A **PlanBead** is actor-owned checkpoint state for a large, living plan. It is
-planning memory, not a separate planner. It preserves what the actor is trying
-to keep alive across cycles, why it matters under LifeGoal, what is understood,
-what remains open, and which evidence or judgments changed the plan.
-
-PlanBeads should be first-class records, but they can reuse the actor memory
-envelope for compatibility:
+PlanBeads should be first-class checkpoint records. They may be indexed or
+mirrored into memory for retrieval, but the PlanBead store owns active state.
 
 ```ts
-type ActorPlanBeadRecord = ActorMemoryRecord & {
-  kind: "plan_bead";
-  layer: "working" | "semantic" | "social";
-  content: ActorPlanBead;
-};
+type PlanBeadStatus =
+  | "open"
+  | "in_progress"
+  | "blocked"
+  | "deferred"
+  | "closed";
+
+type PlanBeadCloseKind =
+  | "satisfied"
+  | "abandoned"
+  | "superseded"
+  | "duplicate"
+  | "not_relevant";
+
+type PlanBeadKind =
+  | "concern"
+  | "obligation"
+  | "blocker_repair"
+  | "investigation"
+  | "resource_project"
+  | "relationship_repair"
+  | "action_skill_followup";
 
 type ActorPlanBead = {
   schema: "actor-plan-bead/v1";
@@ -112,58 +175,126 @@ type ActorPlanBead = {
   actor_id: string;
   life_goal_id: string;
   run_id?: string;
-  status: "candidate" | "active" | "blocked" | "paused" | "satisfied" | "abandoned";
-  horizon: "few_cycles" | "long_running";
+  kind: PlanBeadKind;
+  status: PlanBeadStatus;
+  priority: 0 | 1 | 2 | 3 | 4;
   title: string;
-  intention: string;
-  why_for_life_goal: string;
-  current_understanding: string;
-  subtasks: Array<{
-    id: string;
-    summary: string;
-    status: "open" | "active" | "blocked" | "satisfied" | "abandoned";
+  description: string;
+  design_notes: string;
+  acceptance_criteria: {
     evidence_required: string[];
+    non_physical_resolution_allowed: boolean;
+  };
+  notes: {
+    completed: string[];
+    in_progress: string[];
+    blockers: string[];
+    next: string[];
+    key_decisions: string[];
+  };
+  labels: string[];
+  metadata: Record<string, string | number | boolean | string[]>;
+  refs: {
     evidence_refs: string[];
-  }>;
-  blockers: Array<{
-    summary: string;
-    evidence_refs: string[];
-    repair_hint?: string;
-  }>;
-  open_questions: string[];
-  supporting_refs: {
     memory_refs: string[];
-    evidence_refs: string[];
     judgment_refs: string[];
     cycle_goal_refs: string[];
-    action_intent_refs: string[];
     relationship_refs: string[];
     world_event_refs: string[];
     action_skill_refs: string[];
-    plan_bead_refs: string[];
   };
   checkpoint: {
     version: number;
+    created_at: string;
     updated_at: string;
     last_touched_cycle_id?: string;
-    reason: string;
+    close_kind?: PlanBeadCloseKind;
+    close_reason?: string;
     evidence_refs: string[];
   };
   assertion_policy: {
-    plan_is_context_not_success: true;
+    bead_is_context_not_authority: true;
     physical_success_requires_current_evidence: true;
   };
 };
 ```
 
-The top-level `ActorMemoryRecord.summary`, `evidence_refs`, `tags`, and `index`
-should mirror the high-signal fields for existing memory retrieval. The full
-living plan structure belongs in `content`.
+The field names intentionally echo issue trackers:
 
-## Checkpoint Requirement
+- `description` says what work/concern exists and why;
+- `design_notes` records current approach and alternatives;
+- `acceptance_criteria.evidence_required` says what must be proven before close;
+- `notes` is the resumability surface after context compaction;
+- `metadata` is for bounded implementation or review annotations that do not
+  deserve first-class schema yet.
 
-PlanBeads must behave like checkpointed actor state. A process restart must not
-erase them, and context compaction must not reduce them to vague prose.
+## Dependency Edges
+
+The PlanBead graph uses explicit dependency records:
+
+```ts
+type PlanBeadDependencyType =
+  | "blocks"
+  | "parent_child"
+  | "waits_for"
+  | "tracks"
+  | "discovered_from"
+  | "caused_by"
+  | "validates"
+  | "relates_to"
+  | "supersedes";
+
+type PlanBeadDependency = {
+  schema: "actor-plan-bead-dependency/v1";
+  actor_id: string;
+  bead_id: string;
+  depends_on_bead_id: string;
+  type: PlanBeadDependencyType;
+  rationale: string;
+  evidence_refs: string[];
+  created_at: string;
+};
+```
+
+Blocking dependency types affect readiness:
+
+| Type | Meaning |
+|------|---------|
+| `blocks` | this bead cannot be ready until the dependency closes |
+| `parent_child` | child work belongs under a parent bead; blocked parent can suppress child readiness |
+| `waits_for` | this bead waits for all required children/dependencies |
+
+Non-blocking dependency types preserve graph knowledge:
+
+| Type | Meaning |
+|------|---------|
+| `tracks` | monitors another bead without blocking it |
+| `discovered_from` | work found while handling another bead |
+| `caused_by` | blocker or failure provenance |
+| `validates` | verifier/test/audit bead validating another bead |
+| `relates_to` | useful association only |
+| `supersedes` | replacement relation |
+
+## Ready Front
+
+The runtime computes `ready_beads` before provider context assembly.
+
+A bead is ready when:
+
+- `status` is `open`;
+- no open blocking dependency remains;
+- `defer_until`, if present in metadata, is not in the future;
+- current ActorSoul/LifeGoal still makes the bead relevant;
+- current action surface has at least one plausible next affordance, or the bead
+  is ready for a non-physical resolution such as recording a truthful blocker;
+- the bead has enough context in `description`, `acceptance_criteria`, and
+  `notes.next` to support a bounded CycleGoal.
+
+The ready front is context, not a command. It helps the CycleGoal provider choose
+what concern to work on now. The provider still must produce a valid CycleGoal
+and the ActionIntent still must pass runtime gates.
+
+## Actor Workspace Layout
 
 The target actor workspace layout is:
 
@@ -171,17 +302,19 @@ The target actor workspace layout is:
 data/actors/
   <actor_id>/
     plan-beads/
-      active/
+      beads/
         <bead_id>.json
-      resolved/
-        <bead_id>.json
-      abandoned/
-        <bead_id>.json
+      dependencies/
+        dependencies.jsonl
+      events/
+        <bead_id>.jsonl
       history/
         <bead_id>/
           0001-created.json
           0002-updated.json
           0003-blocked.json
+      indexes/
+        ready-cache.json
     memory/
       working/
       episodic/
@@ -192,117 +325,164 @@ data/actors/
       guardrails/
 ```
 
-The current checkpoint lives under `active/`, `resolved/`, or `abandoned/`.
-Every accepted mutation also writes an append-only transition under
-`history/<bead_id>/`.
+The JSON record status is authoritative. Directories are storage organization,
+not status. Startup should rebuild indexes from `beads/`, `dependencies/`, and
+`events/` rather than trusting a stale cache.
 
-If the implementation initially stores PlanBeads through `ActorMemoryRecord`,
-it must still provide equivalent checkpoint behavior:
+Every accepted mutation writes:
 
-- a current-state lookup for active PlanBeads;
-- an append-only transition history;
-- evidence refs for every state change that claims progress, blockage, or
-  satisfaction;
-- restart-safe reconstruction from actor workspace files;
-- compaction support that carries active bead summaries and refs forward.
+- the updated current bead record;
+- an append-only event for audit;
+- a history snapshot when the mutation changes status, evidence, dependency
+  state, or close resolution.
 
-## Runtime Loop
+## Provider Context Packet
 
-```mermaid
-flowchart TD
-  Load["Load actor workspace<br/>Soul, LifeGoal, memory, relationships, PlanBeads, action skills"]
-  Observe["Observe raw Minecraft/runtime state"]
-  Context["Assemble provider context<br/>observation, memory_packet, bead_packet, action_surface"]
-  Goal["Cycle goal provider<br/>selects or proposes PlanBead context and CycleGoal"]
-  Action["Action planner provider<br/>chooses one ActionIntent from action_surface"]
-  Execute["Runtime execution<br/>gates, args contract, Mineflayer, verifier"]
-  Judge["CycleJudgment provider<br/>evidence interpretation and bead_ops proposal"]
-  Apply["Runtime bead applier<br/>guarded checkpoint update"]
-  Persist["Persist actor checkpoint<br/>PlanBead current state and history"]
-  Load --> Observe --> Context --> Goal --> Action --> Execute --> Judge --> Apply --> Persist --> Load
-```
-
-Provider-facing context should include a compact `bead_packet`:
+Providers should receive a compact, read-only projection:
 
 ```ts
+type PlanBeadContextSummary = {
+  bead_id: string;
+  kind: PlanBeadKind;
+  status: PlanBeadStatus;
+  priority: 0 | 1 | 2 | 3 | 4;
+  title: string;
+  description_summary: string;
+  acceptance_evidence_required: string[];
+  notes_next: string[];
+  blockers: string[];
+  labels: string[];
+  evidence_refs: string[];
+  dependency_refs: string[];
+  checkpoint_ref: string;
+};
+
 type PlanBeadPacket = {
   schema: "plan-bead-packet/v1";
-  active_beads: ActorPlanBead[];
-  recent_inactive_beads: Array<{
+  ready_beads: PlanBeadContextSummary[];
+  in_progress_beads: PlanBeadContextSummary[];
+  blocked_beads: PlanBeadContextSummary[];
+  recently_closed_beads: Array<{
     bead_id: string;
-    status: string;
     title: string;
-    summary: string;
+    close_kind: PlanBeadCloseKind;
+    close_reason: string;
     evidence_refs: string[];
   }>;
+  graph_summary: {
+    open_count: number;
+    ready_count: number;
+    blocked_count: number;
+    deferred_count: number;
+    closed_recent_count: number;
+  };
   rules: {
     beads_are_context_not_authority: true;
+    ready_front_guides_goal_selection: true;
     action_surface_controls_execution: true;
-    runtime_verifies_bead_progress: true;
+    runtime_verifies_physical_progress: true;
   };
 };
 ```
 
-Only a small number of active PlanBeads should be injected, usually one to
-three. The provider should not receive unbounded bead history.
+Do not inject unbounded bead history. Usually inject one to three ready beads,
+plus a small blocked/in-progress summary when it explains current choice.
 
 ## Provider Proposal Boundary
 
-Providers may propose `bead_ops`. They do not directly mutate PlanBeads.
+Providers may propose `bead_ops` only through runtime-approved stages. The first
+implementation should accept them from `CycleJudgment`, because judgment has the
+latest evidence interpretation. The CycleGoal provider may select bead refs but
+should not directly mutate the PlanBeadGraph.
 
-Allowed operations:
+Allowed operation families:
 
-- `create`;
-- `activate`;
-- `update_understanding`;
-- `add_subtask`;
-- `update_subtask`;
-- `add_blocker`;
-- `clear_blocker`;
-- `pause`;
-- `satisfy`;
-- `abandon`;
-- `link_memory`;
-- `link_relationship`;
+- create a bead;
+- update notes/design/acceptance criteria;
+- claim or release a bead for current-cycle work;
+- block, unblock, defer, or close a bead;
+- add or remove dependency edges;
+- add evidence, memory, relationship, world-event, or judgment refs;
+- supersede or duplicate a bead.
 
-Every operation must include:
+Operation records must be typed. Avoid broad `Record<string, unknown>` patches
+for durable actor state.
 
 ```ts
-type PlanBeadOperation = {
+type PlanBeadOperationBase = {
   schema: "plan-bead-operation/v1";
-  op: string;
-  bead_id?: string;
+  actor_id: string;
   rationale: string;
   evidence_refs: string[];
   confidence: "observed" | "reviewed" | "inferred" | "uncertain";
-  patch: Record<string, unknown>;
+  expected_checkpoint_version?: number;
 };
+
+type PlanBeadOperation =
+  | (PlanBeadOperationBase & {
+      op: "create";
+      patch: {
+        kind: PlanBeadKind;
+        title: string;
+        description: string;
+        acceptance_evidence_required: string[];
+        notes_next: string[];
+        priority: 0 | 1 | 2 | 3 | 4;
+      };
+    })
+  | (PlanBeadOperationBase & {
+      op: "update_notes";
+      bead_id: string;
+      patch: Partial<ActorPlanBead["notes"]>;
+    })
+  | (PlanBeadOperationBase & {
+      op: "set_status";
+      bead_id: string;
+      patch: {
+        status: PlanBeadStatus;
+        close_kind?: PlanBeadCloseKind;
+        close_reason?: string;
+      };
+    })
+  | (PlanBeadOperationBase & {
+      op: "add_dependency";
+      patch: Omit<PlanBeadDependency, "schema" | "actor_id" | "created_at">;
+    });
 ```
 
 Runtime application rules:
 
-- `create` may use inferred provider rationale, but it must cite current
-  LifeGoal context or a relevant evidence/judgment/memory ref.
-- `satisfy`, `clear_blocker`, and subtask satisfaction require verifier-backed
-  evidence or guarded relationship evidence.
-- `blocked` requires concrete blocker evidence, not only a provider guess.
-- `abandon` requires a reason and should preserve the bead history.
-- provider prose cannot supply missing `ActionIntent` args.
-- `wait`, `remember`, or a memory note cannot satisfy a PlanBead.
+- `create` may produce an `open` bead when there is a non-LifeGoal grounding ref;
+  otherwise it should be created as deferred or rejected.
+- `in_progress` means the current cycle or run has claimed the bead for active
+  work. It does not imply success.
+- `blocked` requires concrete blocker evidence or a dependency edge to an open
+  blocking bead.
+- `closed` with `satisfied` requires verifier-backed evidence or guarded social
+  evidence.
+- `closed` with `abandoned`, `not_relevant`, `duplicate`, or `superseded` needs
+  a reason and should preserve history.
+- PlanBead blockers may cite runtime retry constraints, but PlanBead operations
+  must not create, clear, or override runtime retry constraints.
+- PlanBead operations must not add executable primitive args, alter action-skill
+  permissions, or mutate ActorSoul/LifeGoal.
 
 ## Relationship To Memory
 
-PlanBeads are not outside memory. They are large-grain planning memory with
-checkpoint behavior. Ordinary memory records remain the evidence-linked past.
-PlanBeads are the actor's living plan state.
+PlanBeads are not ordinary memory. They are actor-owned work state.
 
-The runtime should allow these links:
+Memory records remain evidence-linked recall: what happened, what was learned,
+what risk or pattern should be remembered. PlanBeads are the current work graph:
+what remains open, what is blocked, what is ready, and what evidence would close
+the item.
+
+Allowed links:
 
 - PlanBead cites memory records as supporting history;
-- memory records cite PlanBeads when a cycle changes a living plan;
+- memory records cite PlanBeads when a cycle changes work state;
 - CycleGoal records cite selected PlanBeads in `derived_from.plan_bead_refs`;
-- CycleJudgment records cite or update PlanBeads after evidence is interpreted;
-- context compaction preserves active PlanBead refs and summaries.
+- CycleJudgment proposes typed bead operations after evidence is interpreted;
+- context compaction preserves ready/in-progress/blocked bead refs and summaries.
 
 Do not duplicate physical truth. Inventory, block, position, container, chat,
 and transcript facts remain evidence/runtime artifacts. A PlanBead can point to
@@ -310,14 +490,13 @@ those facts, but it is not the fact itself.
 
 ## Restart-Safe Actor State
 
-The broader requirement is that all actor-owned state needed for continuity
-survives process restart:
+All actor-owned state needed for continuity should survive process restart:
 
 | State | Restart-safe source |
 |-------|---------------------|
 | identity | `soul.md`, `soul.json`, actor profile bootstrap |
 | LifeGoal | `goals/life/active.json` |
-| living plans | `plan-beads/active/*.json` or equivalent `plan_bead` memory records |
+| work graph | `plan-beads/beads/*.json`, dependencies, events, history |
 | cycle history | `goals/cycle/*.json`, `judgments/*.json` |
 | memory | `memory/*/*.json` and memory indexes |
 | relationships | `relationships/*.json` and guarded relationship events |
@@ -328,65 +507,138 @@ survives process restart:
 | retry gates | runtime retry constraints written into artifacts and later checkpoint state |
 | compaction | social-cycle context checkpoints with evidence refs |
 
-Startup should load the actor workspace and reconstruct the actor's durable
-state. Initialization should restore missing directories and baseline indexes;
-it must not delete existing actor state unless an explicit cleanup operation
-requests it.
+Startup should load actor workspace state and rebuild the PlanBead ready front.
+Initialization should restore missing directories and baseline indexes; it must
+not delete existing actor state unless an explicit cleanup operation requests it.
 
 ## Compaction And Reports
 
-Context compaction must add a PlanBead scope:
+Context compaction must include a PlanBead scope:
 
-- include active PlanBead ids, titles, statuses, open subtasks, blockers, and
-  evidence refs;
+- include ready, in-progress, blocked, and recently closed bead refs;
+- include dependency edges needed to explain why work is blocked or ready;
+- include `notes.next`, blockers, acceptance evidence, and evidence refs;
 - state `physical_progress_claim: false` for PlanBead summary facts;
-- preserve refs to the current PlanBead checkpoint files;
-- never mark a PlanBead as satisfied from compaction itself.
+- preserve refs to checkpoint files;
+- never close a PlanBead from compaction itself.
 
 Run reports should expose:
 
-- active PlanBeads at run start and end;
+- PlanBeadGraph summary at run start and end;
+- ready front at each cycle, when available;
 - PlanBead refs cited by each CycleGoal and ActionIntent;
 - accepted and rejected bead operations;
-- bead transitions by status;
+- dependency edges created or cleared;
+- bead status transitions;
 - cycles that made verified or partial verified progress on a bead;
 - cycles that repeated a blocker without bead-aware pivot.
 
-Review summaries should use these metrics to judge closed-loop behavior:
+Review summaries should ask:
 
-- did the actor continue or revise a living plan after evidence changed?
+- did the actor preserve resumable work state across cycles and restarts?
+- did ready beads guide CycleGoal selection without becoming a script?
 - did the actor avoid exact repeated blockers?
-- did the actor choose actions from the broad action surface rather than a
-  deterministic plan script?
+- did dependency edges explain what was blocked and what could run in parallel?
 - did PlanBeads improve continuity without laundering provider prose into
   progress?
 
-## First Implementation Slice
+## Detailed Implementation Plan
 
-1. Add `PlanBead` terminology and `plan_bead` memory kind.
-2. Add `ActorPlanBead` and `PlanBeadOperation` types.
-3. Add a PlanBead store with current checkpoint files and append-only history.
-4. Add actor workspace directories for `plan-beads/active`, `resolved`,
-   `abandoned`, and `history`.
-5. Add `bead_packet` to `SocialCycleContextPacket`.
-6. Add optional `plan_bead_refs` to `ActorCycleGoal.derived_from` and
-   `CycleJudgment`.
-7. Add provider schema support for `bead_ops`, initially accepted only from
-   CycleJudgment.
-8. Add a guarded runtime bead applier.
-9. Add compaction, report, audit, and review-summary coverage.
-10. Run a baseline and PlanBead-enabled 100-cycle comparison with the same
-    actor, provider, seed, and action limits.
+This plan is intentionally staged so the first slice can be verified without
+building a broad planner.
+
+### Slice 1 - Documentation And Types
+
+1. Align terminology so `PlanBead` means actor-owned issue-like work item.
+2. Add `PlanBeadGraph`, `ready_beads`, and `PlanBeadDependency` terminology.
+3. Add TypeScript types for:
+   - `ActorPlanBead`;
+   - `PlanBeadDependency`;
+   - `PlanBeadContextSummary`;
+   - `PlanBeadPacket`;
+   - `PlanBeadOperation`.
+4. Add focused tests for schema validators and status categories.
+
+Success: docs and types make it impossible to confuse a PlanBead with ordinary
+memory or an executable plan script.
+
+### Slice 2 - Actor Workspace Store
+
+1. Add actor workspace paths for:
+   - `plan-beads/beads`;
+   - `plan-beads/dependencies`;
+   - `plan-beads/events`;
+   - `plan-beads/history`;
+   - `plan-beads/indexes`.
+2. Implement read/write/list helpers for current beads and dependencies.
+3. Write append-only events for every accepted mutation.
+4. Rebuild ready cache from records on startup.
+
+Success: a process restart reconstructs open, in-progress, blocked, deferred,
+and closed bead state from files.
+
+### Slice 3 - Ready Front Computation
+
+1. Implement `computeReadyPlanBeads(actorId, lifeGoal, graph, actionSurface)`.
+2. Exclude closed, blocked, future-deferred, and dependency-blocked beads.
+3. Include dependency explanation for blocked beads.
+4. Add small Detroit-style tests for:
+   - no dependencies means parallel readiness;
+   - open blocker suppresses dependent bead;
+   - closed blocker unblocks dependent bead;
+   - deferred bead stays out of ready front.
+
+Success: the runtime can produce a truthful ready front without provider help.
+
+### Slice 4 - Provider Packet
+
+1. Add `bead_packet` to social-cycle context assembly.
+2. Inject bounded ready/in-progress/blocked summaries, not full checkpoint
+   records.
+3. Add context manifest entries for PlanBeads with `physical_progress_claim:
+   false`.
+4. Keep provider packet read-only.
+
+Success: provider sees enough work graph context to choose a CycleGoal, while
+runtime state remains protected.
+
+### Slice 5 - Guarded Bead Operations
+
+1. Let `CycleJudgment` propose typed `bead_ops`.
+2. Add a runtime applier that validates:
+   - expected checkpoint version;
+   - evidence requirements;
+   - status transition rules;
+   - dependency cycle rejection;
+   - no executable args or permission mutation.
+3. Persist accepted and rejected operations as evidence/audit artifacts.
+
+Success: provider can suggest work-graph updates, but runtime owns mutation.
+
+### Slice 6 - Reports, Audits, And Comparison Runs
+
+1. Add PlanBeadGraph summary to social-cycle run reports.
+2. Add audit checks for:
+   - ready front present when beads exist;
+   - no memory-only physical completion;
+   - rejected invalid bead operations;
+   - dependency cycles rejected;
+   - repeated blockers becoming explicit work graph state.
+3. Compare baseline vs PlanBead-enabled runs with same actor, provider, seed, and
+   action limits.
+
+Success: artifacts can explain whether PlanBeads improved continuity without
+making the actor follow a deterministic domain checklist.
 
 ## Non-Goals
 
-- Do not make PlanBeads a hard-coded house, shelter, farming, mining, or storage
-  planner.
-- Do not force every cycle to serve the highest-priority PlanBead.
+- Do not embed upstream Beads or Dolt as the game runtime implementation.
+- Do not make PlanBeads a house, shelter, farming, mining, or storage planner.
+- Do not force every CycleGoal to serve the highest-priority PlanBead.
 - Do not put executable primitive args in PlanBeads.
 - Do not allow PlanBeads to grant action permissions.
-- Do not treat PlanBeads, memory notes, provider text, or compaction summaries
-  as physical progress.
+- Do not treat PlanBeads, memory notes, provider text, or compaction summaries as
+  physical progress.
 - Do not replace raw observation or broad Mineflayer action-space exposure with
   a deterministic plan checklist.
 
@@ -396,13 +648,14 @@ The design is successful when a long social-cycle run can be stopped and
 restarted while preserving:
 
 - active actor identity and LifeGoal;
-- one to three active PlanBeads with status, subtasks, blockers, and evidence
-  refs;
+- an actor-owned PlanBeadGraph with open, in-progress, blocked, deferred, and
+  recently closed work items;
+- dependency edges that explain the ready front;
 - prior judgments and memories that explain why those PlanBeads exist;
 - action skill ownership and action surface continuity;
 - enough evidence refs to audit every claimed PlanBead transition.
 
-The behavioral proof is not that the actor always completes the plan. The proof
-is that the actor carries large intentions forward, revises them from evidence,
-pivots after blockers, and keeps choosing actions from the current Mineflayer
-action surface without losing truth across restarts.
+The behavioral proof is not that the actor always completes the graph. The proof
+is that the actor carries work state forward, updates it from evidence, chooses
+bounded CycleGoals from the current ready front when appropriate, pivots after
+blockers, and keeps Minecraft truth in runtime evidence across restarts.

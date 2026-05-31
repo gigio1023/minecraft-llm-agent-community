@@ -195,8 +195,8 @@ or action skill promotion.
 
 Preferred terms:
 
-- **cycle goal provider** for the component that proposes StrategicGoal and
-  CycleGoal records;
+- **cycle goal provider** for the component that selects PlanBead context and
+  proposes CycleGoal records;
 - **action planner provider** for the component that proposes ActionIntent
   records;
 - **cycle judgment provider** for the component that summarizes evidence into a
@@ -293,25 +293,41 @@ can influence CycleGoal selection, but it is not the actor's LifeGoal.
 A **StrategicGoal** is a medium-horizon interpretation of ActorSoul, LifeGoal,
 memory, world state, and social context.
 
+`StrategicGoal` is retained as a legacy-adjacent compatibility term. New
+architecture work should not add new persistent StrategicGoal stores when the
+state being modeled is durable multi-cycle work; use PlanBeads and PlanBead
+dependencies instead.
+
 ## PlanBead
 
-A **PlanBead** is checkpointed actor-owned state for a large, living,
-multi-cycle plan such as securing food, preparing shelter materials, repairing a
-repeated blocker, or fulfilling an obligation.
+A **PlanBead** is one actor-owned checkpointed issue-like work item under
+LifeGoal, such as securing food, preparing shelter materials, repairing a
+repeated blocker, investigating a runtime failure, or fulfilling an obligation.
 
-PlanBeads are planning memory. They preserve what the actor is carrying forward,
-why it matters under LifeGoal, what is currently understood, what remains open,
-and which evidence or judgments changed the plan.
+PlanBeads are work graph state, not ordinary memory. A PlanBead records what
+work or concern exists, why it matters under LifeGoal, what evidence would close
+or block it, what is currently known, what should happen next, and which
+evidence, judgments, dependencies, or related records changed it.
 
 A PlanBead is not executable authority, not physical proof, and not a hidden
 domain planner. It must not grant runtime primitive permissions, supply missing
 ActionIntent args, or mark progress without runtime evidence. If a PlanBead
-claims that a subtask is satisfied or blocked, that transition must cite
-evidence refs.
+claims closure, satisfaction, or blockage, that transition must cite evidence
+refs or guarded non-physical resolution evidence.
+
+## PlanBeadGraph
+
+A **PlanBeadGraph** is the actor-owned dependency graph of PlanBeads. The graph,
+not a single PlanBead, is the actor's durable multi-cycle work plan.
+
+Ready PlanBeads are open PlanBeads with no open blocking dependencies. The ready
+front is context for CycleGoal selection, not a script the actor must follow.
 
 `StrategicGoal` is the legacy-adjacent medium-horizon term. New architecture
-work should treat PlanBead as the checkpointed successor for living multi-cycle
-plan state, while keeping compatibility with existing StrategicGoal records.
+work should treat PlanBeads plus PlanBeadGraph as the checkpointed successor for
+living multi-cycle work state, while keeping compatibility with existing
+StrategicGoal records as projections or migration inputs rather than a second
+active middle layer.
 
 ## CycleGoal
 
