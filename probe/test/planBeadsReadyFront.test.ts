@@ -242,6 +242,7 @@ test("checkpoint refs use actor workspace sanitized bead file ids", () => {
   });
 
   assert.equal(result.ready_beads[0]?.checkpoint_ref, "plan-beads/beads/concern_A.json");
+  assert.equal(result.ready_beads[0]?.checkpoint_version, 1);
 });
 
 test("maxReady bounds ready_beads without mutating caller input", () => {

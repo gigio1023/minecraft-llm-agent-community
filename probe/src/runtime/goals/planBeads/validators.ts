@@ -232,6 +232,7 @@ function validateContextSummary(
   assertString(value, "description_summary", path, errors);
   assertString(value, "checkpoint_ref", path, errors);
   assertPriority(value, "priority", path, errors);
+  assertNonNegativeInteger(value, "checkpoint_version", path, errors);
   assertStringArray(value, "acceptance_evidence_required", path, errors);
   assertStringArray(value, "notes_next", path, errors);
   assertStringArray(value, "blockers", path, errors);

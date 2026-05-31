@@ -9,6 +9,7 @@ import type {
   PlanBeadDependency,
   PlanBeadOperation
 } from "./types.js";
+import { planBeadKinds } from "./types.js";
 import { assertValidPlanBeadOperation } from "./validators.js";
 import {
   appendPlanBeadDependency,
@@ -45,6 +46,58 @@ export type ApplyPlanBeadOperationsResult = {
 
 function uniqueStrings(values: readonly string[]) {
   return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Normalizes harmless provider transport noise before validation.
+ *
+ * @remarks The runtime, not the provider, assigns ids for create operations.
+ * Dropping provider-supplied create.bead_id preserves the authority boundary
+ * while keeping live LLM outputs usable when they include an empty placeholder.
+ */
+function normalizeRawPlanBeadOperation(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const normalized: Record<string, unknown> = { ...value };
+
+  if (normalized.op === "create") {
+    delete normalized.bead_id;
+  }
+
+  if (normalized.op === "create" && isRecord(normalized.patch)) {
+    const patch = { ...normalized.patch };
+    if (!(planBeadKinds as readonly unknown[]).includes(patch.kind)) {
+      patch.kind = "concern";
+    }
+    normalized.patch = patch;
+  }
+
+  if (normalized.op === "update_notes" && isRecord(normalized.patch)) {
+    const patch = { ...normalized.patch };
+    if (Array.isArray(patch.blocked) && !Array.isArray(patch.blockers)) {
+      patch.blockers = patch.blocked;
+    }
+    delete patch.blocked;
+    normalized.patch = patch;
+  }
+
+  return normalized;
+}
+
+function withExpectedCheckpointVersion(
+  operation: PlanBeadOperation,
+  expectedCheckpointVersion: number
+): PlanBeadOperation {
+  return {
+    ...operation,
+    expected_checkpoint_version: expectedCheckpointVersion
+  } as PlanBeadOperation;
 }
 
 function resultId(input: {
@@ -575,8 +628,10 @@ export async function applyPlanBeadOperations(input: {
   const now = input.now ?? new Date().toISOString();
   const results: PlanBeadOperationResult[] = [];
   const resultRefs: string[] = [];
+  const currentBatchCheckpointVersions = new Map<string, number>();
 
   for (const [index, rawOperation] of input.operations.entries()) {
+    const normalizedRawOperation = normalizeRawPlanBeadOperation(rawOperation);
     const operationResultId = resultId({
       cycleId: input.cycleId,
       turnId: input.turnId,
@@ -584,20 +639,35 @@ export async function applyPlanBeadOperations(input: {
     });
     let result: PlanBeadOperationResult;
     try {
+      const parsedOperation = assertValidPlanBeadOperation(normalizedRawOperation);
+      const beadId = operationBeadId(parsedOperation);
+      const batchCheckpointVersion = beadId
+        ? currentBatchCheckpointVersions.get(beadId)
+        : undefined;
+      const operation =
+        beadId &&
+        batchCheckpointVersion !== undefined &&
+        parsedOperation.expected_checkpoint_version !== undefined &&
+        parsedOperation.expected_checkpoint_version < batchCheckpointVersion
+          ? withExpectedCheckpointVersion(parsedOperation, batchCheckpointVersion)
+          : parsedOperation;
       result = await applyOneOperation({
         rootDir: input.rootDir,
         actorId: input.actorId,
         lifeGoalId: input.lifeGoalId,
         cycleId: input.cycleId,
         turnId: input.turnId,
-        operation: assertValidPlanBeadOperation(rawOperation),
+        operation,
         operationResultId,
         now
       });
+      if (result.status === "accepted" && result.bead_id && result.after_checkpoint_version) {
+        currentBatchCheckpointVersions.set(result.bead_id, result.after_checkpoint_version);
+      }
     } catch (error) {
       const operation = (() => {
         try {
-          return assertValidPlanBeadOperation(rawOperation);
+          return assertValidPlanBeadOperation(normalizedRawOperation);
         } catch {
           return undefined;
         }

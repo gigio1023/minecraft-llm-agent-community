@@ -118,6 +118,7 @@ function planBeadPacket(): PlanBeadPacket {
         labels: ["context-change"],
         evidence_refs: ["plan-beads/beads/bead-b.json"],
         dependency_refs: ["plan-bead-dependency:npc_b:bead-b:discovered_from:bead-a"],
+        checkpoint_version: 1,
         checkpoint_ref: "plan-beads/beads/bead-b.json"
       }
     ],
@@ -135,6 +136,7 @@ function planBeadPacket(): PlanBeadPacket {
         labels: ["context-change"],
         evidence_refs: ["plan-beads/beads/bead-a.json"],
         dependency_refs: [],
+        checkpoint_version: 2,
         checkpoint_ref: "plan-beads/beads/bead-a.json"
       }
     ],

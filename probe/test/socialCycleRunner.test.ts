@@ -115,8 +115,9 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.equal(result.report.agency_status.used_previous_judgment, true);
   assert.equal(result.report.runtime_status, "blocked");
   assert.equal(result.report.agency_status.gameplay_progress_verified, false);
-  assert.deepEqual(result.report.plan_bead_ready_fronts, []);
-  assert.equal(result.report.cycles[0]?.plan_bead_packet_ref, undefined);
+  assert.equal(result.report.plan_bead_ready_fronts?.length, 2);
+  assert.equal(result.report.plan_bead_ready_fronts?.[0]?.ready_bead_ids.length, 0);
+  assert.ok(result.report.cycles[0]?.plan_bead_packet_ref);
   assert.equal(result.report.settlement_state?.schema, "settlement-state/v1");
   assert.equal(result.report.settlement_checklist?.schema, "settlement-checklist/v1");
   assert.equal(result.report.memory_reuse?.used_previous_judgment, true);
@@ -133,7 +134,9 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.ok(prior && prior.length > 0);
   assert.equal(prior.length, 1);
   assert.equal((prior[0] as { cycle_id?: string }).cycle_id, "cycle-0001");
-  assert.equal((snapshot?.input as { plan_bead_packet?: unknown })?.plan_bead_packet, undefined);
+  const planBeadPacket = (snapshot?.input as { plan_bead_packet?: { graph_summary?: { open_count?: number } } })
+    ?.plan_bead_packet;
+  assert.equal(planBeadPacket?.graph_summary?.open_count, 0);
 });
 
 test("deterministic-social maxActionsPerCycle=2 report keeps observe and wait attempts", async () => {

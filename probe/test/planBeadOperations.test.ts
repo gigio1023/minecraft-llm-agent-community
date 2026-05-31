@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   applyPlanBeadOperations,
   appendPlanBeadDependency,
+  listActorPlanBeads,
   listPlanBeadDependencies,
   readActorPlanBead,
   writeActorPlanBead,
@@ -277,6 +278,141 @@ test("records malformed operation proposals as rejected artifacts", async () => 
     const resultPath = path.join(rootDir, actorId, applied.result_refs[0]!);
     const stored = JSON.parse(await fs.readFile(resultPath, "utf8")) as { status?: string };
     assert.equal(stored.status, "rejected");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("normalizes provider create placeholders without granting id authority", async () => {
+  const rootDir = testRoot("create-placeholder");
+  try {
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-place_block.json");
+
+    const applied = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-01",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "create",
+          bead_id: "",
+          rationale: "Provider included a transport placeholder id.",
+          evidence_refs: ["evidence/cycle-0001-place_block.json"],
+          confidence: "observed",
+          expected_checkpoint_version: 1,
+          patch: {
+            kind: "progress_step",
+            title: "Resolve placement followup",
+            description: "Track a placement concern from runtime evidence.",
+            acceptance_evidence_required: ["runtime evidence"],
+            notes_next: ["Use fresh observation before retrying."],
+            priority: 1
+          }
+        }
+      ]
+    });
+
+    assert.equal(applied.results[0]?.status, "accepted");
+    assert.notEqual(applied.results[0]?.bead_id, "");
+    const beads = await listActorPlanBeads(rootDir, actorId);
+    assert.equal(beads.length, 1);
+    assert.equal(beads[0]?.kind, "concern");
+    assert.equal(beads[0]?.refs.evidence_refs[0], "evidence/cycle-0001-place_block.json");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("applies same-batch operations against the latest accepted checkpoint", async () => {
+  const rootDir = testRoot("same-batch-checkpoint");
+  try {
+    await writeActorPlanBead(rootDir, bead("bead-b"));
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-remember.json");
+
+    const applied = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-01",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "update_notes",
+          bead_id: "bead-b",
+          rationale: "First update from the same model judgment.",
+          evidence_refs: ["evidence/cycle-0001-remember.json"],
+          confidence: "observed",
+          expected_checkpoint_version: 1,
+          patch: {
+            blockers: ["No valid target was confirmed."]
+          }
+        },
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "set_status",
+          bead_id: "bead-b",
+          rationale: "Second operation was based on the same input checkpoint.",
+          evidence_refs: ["evidence/cycle-0001-remember.json"],
+          confidence: "inferred",
+          expected_checkpoint_version: 1,
+          patch: {
+            status: "open"
+          }
+        }
+      ]
+    });
+
+    assert.deepEqual(applied.results.map((result) => result.status), ["accepted", "accepted"]);
+    const updated = await readActorPlanBead(rootDir, actorId, "bead-b");
+    assert.equal(updated?.checkpoint.version, 3);
+    assert.deepEqual(updated?.notes.blockers, ["No valid target was confirmed."]);
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("normalizes provider note aliases for update operations", async () => {
+  const rootDir = testRoot("note-alias");
+  try {
+    await writeActorPlanBead(rootDir, bead("bead-b"));
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-remember.json");
+
+    const applied = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-action-01",
+      now,
+      operations: [
+        {
+          schema: "plan-bead-operation/v1",
+          actor_id: actorId,
+          op: "update_notes",
+          bead_id: "bead-b",
+          rationale: "Provider used blocked instead of blockers.",
+          evidence_refs: ["evidence/cycle-0001-remember.json"],
+          confidence: "observed",
+          expected_checkpoint_version: 1,
+          patch: {
+            blocked: ["No reachable target was found."]
+          }
+        }
+      ]
+    });
+
+    assert.equal(applied.results[0]?.status, "accepted");
+    const updated = await readActorPlanBead(rootDir, actorId, "bead-b");
+    assert.deepEqual(updated?.notes.blockers, ["No reachable target was found."]);
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

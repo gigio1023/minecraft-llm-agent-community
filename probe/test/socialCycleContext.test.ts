@@ -91,6 +91,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
         labels: ["context-change"],
         evidence_refs: ["plan-beads/beads/bead-b.json"],
         dependency_refs: [],
+        checkpoint_version: 1,
         checkpoint_ref: "plan-beads/beads/bead-b.json"
       }
     ],

@@ -161,6 +161,7 @@ function contextSummary(input: {
       ...input.bead.checkpoint.evidence_refs
     ]),
     dependency_refs: dependency_ref_values,
+    checkpoint_version: input.bead.checkpoint.version,
     checkpoint_ref: `plan-beads/beads/${sanitizeWorkspaceFileId(input.bead.bead_id)}.json`
   };
 }

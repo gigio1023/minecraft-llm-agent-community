@@ -70,6 +70,7 @@ function validContextSummary() {
     labels: ["survival"],
     evidence_refs: ["evidence/cycle-0001-observe.json"],
     dependency_refs: [],
+    checkpoint_version: 1,
     checkpoint_ref: "plan-beads/beads/bead-food-path.json"
   };
 }

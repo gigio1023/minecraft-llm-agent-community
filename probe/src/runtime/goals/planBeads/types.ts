@@ -123,6 +123,7 @@ export type PlanBeadContextSummary = {
   labels: string[];
   evidence_refs: string[];
   dependency_refs: string[];
+  checkpoint_version: number;
   checkpoint_ref: string;
 };
 

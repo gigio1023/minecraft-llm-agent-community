@@ -268,7 +268,8 @@ Use settlement_state and settlement_checklist as runtime-owned observation/evide
 Do not make any single domain activity an always-on CycleGoal. Building is one possible action among many, selected only when ActorSoul/LifeGoal, WorldEvents, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
 If runtime_retry_constraints are present, treat them as hard evidence that the exact target plus structured args should not be selected again until context changes.
-If plan_bead_packet is present, use it as read-only continuity context. You may select a ready PlanBead by referencing its checkpoint_ref in derived context, but PlanBeads do not provide executable args, action permissions, or proof of progress.
+plan_bead_packet is always present as read-only continuity context. If it has ready or in_progress beads, let them influence CycleGoal continuity when they still fit current observation, LifeGoal, and action_surface. If it is empty, that means no durable work graph exists yet; do not invent hidden plan state, but choose goals whose later judgments can create useful PlanBeads for blockers or unfinished work. PlanBeads do not provide executable args, action permissions, or proof of progress.
+If recent judgments show repeated remember-only cycles for the same blocker, choose a CycleGoal that gathers fresh evidence, repairs with a different affordance, or deliberately defers that work-state; do not make another blocker note the main goal unless new evidence appeared.
 If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);

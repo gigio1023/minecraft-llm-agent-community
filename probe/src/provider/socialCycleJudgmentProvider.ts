@@ -266,6 +266,209 @@ function deterministicBeadOpProposals(input: {
   ];
 }
 
+function actionLabel(intent: ActionIntent) {
+  return intent.kind === "use_action_skill"
+    ? intent.action_skill_id ?? "unknown_action_skill"
+    : intent.kind === "use_primitive"
+      ? intent.primitive_id ?? "unknown_primitive"
+      : intent.kind;
+}
+
+function runtimeStatusText(value: JsonValue) {
+  return isRecord(value) && typeof value.status === "string" ? value.status : undefined;
+}
+
+function toolStatusText(statuses: readonly { tool: string; status: string }[] = []) {
+  return statuses.map((entry) => `${entry.tool}:${entry.status}`);
+}
+
+function isContinuityOnlyAction(intent: ActionIntent, executedTools: readonly string[]) {
+  const action = actionLabel(intent);
+  const toolSet = new Set(executedTools);
+  return (
+    action === "observe" ||
+    action === "wait" ||
+    action === "remember" ||
+    (executedTools.length > 0 &&
+      [...toolSet].every((tool) => tool === "observe" || tool === "wait" || tool === "remember"))
+  );
+}
+
+function firstSelectedPlanBead(input: {
+  context: SocialCycleContextPacket;
+  cycleGoal: ActorCycleGoal;
+}) {
+  const packet = input.context.plan_bead_packet;
+  if (!packet) {
+    return undefined;
+  }
+  const selectedRefs = input.cycleGoal.derived_from.plan_bead_refs ?? [];
+  return (
+    packet.in_progress_beads[0] ??
+    packet.ready_beads.find((bead) => selectedRefs.includes(bead.checkpoint_ref)) ??
+    packet.ready_beads[0] ??
+    packet.blocked_beads[0]
+  );
+}
+
+function buildPlanBeadOperationGuidance(input: {
+  actorId: string;
+  cycleGoal: ActorCycleGoal;
+  actionIntent: ActionIntent;
+  context: SocialCycleContextPacket;
+  runtimeResult: JsonValue;
+  evidenceRefs: readonly string[];
+  executedTools: readonly string[];
+  toolStatuses?: readonly { tool: string; status: string }[];
+  verifierStatus: CycleJudgment["verifier_status"];
+}): JsonValue {
+  const packet = input.context.plan_bead_packet;
+  const action = actionLabel(input.actionIntent);
+  const statuses = toolStatusText(input.toolStatuses);
+  const runtimeStatus = runtimeStatusText(input.runtimeResult);
+  const hasEvidence = input.evidenceRefs.length > 0;
+  const hasExistingWork =
+    Boolean(packet) &&
+    (
+      packet!.ready_beads.length > 0 ||
+      packet!.in_progress_beads.length > 0 ||
+      packet!.blocked_beads.length > 0
+    );
+  const blockedLike =
+    input.verifierStatus === "failed" ||
+    runtimeStatus === "blocked" ||
+    runtimeStatus === "failed" ||
+    runtimeStatus === "timeout" ||
+    statuses.some((entry) =>
+      entry.includes(":blocked") || entry.includes(":failed") || entry.includes(":timeout")
+    );
+  const usefulProgress = input.verifierStatus === "passed";
+  const selected = firstSelectedPlanBead({
+    context: input.context,
+    cycleGoal: input.cycleGoal
+  });
+  const shouldConsider =
+    hasEvidence &&
+    !isContinuityOnlyAction(input.actionIntent, input.executedTools) &&
+    (blockedLike || usefulProgress || action.includes("Shelter") || action.includes("craft"));
+  const candidateOperations: PlanBeadOperation[] = [];
+
+  if (shouldConsider && usefulProgress && selected) {
+    candidateOperations.push({
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "set_status",
+      bead_id: selected.bead_id,
+      rationale:
+        "Current runtime evidence may satisfy the selected PlanBead; close only if the evidence actually matches its acceptance criteria.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: "observed",
+      expected_checkpoint_version: selected.checkpoint_version,
+      patch: {
+        status: "closed",
+        close_kind: "satisfied",
+        close_reason: `Runtime verifier passed for ${action}.`
+      }
+    });
+  } else if (shouldConsider && blockedLike && selected) {
+    candidateOperations.push({
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "update_notes",
+      bead_id: selected.bead_id,
+      rationale:
+        "The current action produced blocker evidence; update the existing PlanBead instead of losing the blocker across cycles.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: "observed",
+      expected_checkpoint_version: selected.checkpoint_version,
+      patch: {
+        blockers: [`${action} blocked or failed: ${runtimeStatus ?? statuses.join(", ")}`],
+        next: ["Choose a different valid affordance, repair structured args, or observe before retrying."]
+      }
+    });
+  } else if (shouldConsider && !hasExistingWork) {
+    candidateOperations.push({
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "create",
+      rationale:
+        "The actor hit an unfinished or blocked concern without an existing PlanBead; create a compact work item so future cycles can pivot instead of forgetting it.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: blockedLike ? "observed" : "inferred",
+      patch: {
+        kind: input.actionIntent.kind === "use_action_skill" ? "action_skill_followup" : "blocker_repair",
+        title: `Resolve ${action} continuity`,
+        description:
+          `Track the unresolved ${action} result under the LifeGoal without turning it into executable authority.`,
+        acceptance_evidence_required: [
+          "runtime evidence that the blocker was repaired, the work became irrelevant, or a better path was chosen"
+        ],
+        notes_next: [
+          "Use current observation, action_surface, memory, and retry constraints before retrying this work."
+        ],
+        priority: blockedLike ? 1 : 2
+      }
+    });
+  }
+
+  return {
+    schema: "plan-bead-operation-guidance/v1",
+    graph_summary: packet?.graph_summary ?? null,
+    should_consider_plan_bead_op: shouldConsider,
+    reasons: [
+      blockedLike ? "current action has blocker/failure/timeout evidence" : "",
+      usefulProgress ? "current verifier passed and may satisfy selected work" : "",
+      !hasExistingWork ? "no existing open PlanBead is available yet" : ""
+    ].filter(Boolean),
+    selected_or_nearest_bead_id: selected?.bead_id ?? null,
+    candidate_operations_are_examples_not_commands: true,
+    candidate_operations: candidateOperations as unknown as JsonValue,
+    rules: {
+      use_empty_array_when_no_useful_update: true,
+      create_beads_for_unfinished_multi_cycle_work_or_repeated_blockers: true,
+      update_existing_beads_before_creating_duplicates: true,
+      close_only_with_runtime_or_guarded_relationship_evidence: true,
+      never_put_executable_args_or_permissions_in_a_bead: true
+    }
+  } as JsonValue;
+}
+
+function buildActionSkillFeedbackGuidance(input: {
+  actionIntent: ActionIntent;
+  executedTools: readonly string[];
+  toolStatuses?: readonly { tool: string; status: string }[];
+  verifierStatus: CycleJudgment["verifier_status"];
+}): JsonValue {
+  const action = actionLabel(input.actionIntent);
+  const statuses = toolStatusText(input.toolStatuses);
+  const actionSkillId =
+    input.actionIntent.kind === "use_action_skill"
+      ? input.actionIntent.action_skill_id ?? null
+      : null;
+  const failed =
+    input.verifierStatus === "failed" ||
+    statuses.some((entry) =>
+      entry.includes(":blocked") || entry.includes(":failed") || entry.includes(":timeout")
+    );
+  return {
+    schema: "action-skill-feedback-guidance/v1",
+    action_or_skill: action,
+    action_skill_id: actionSkillId,
+    should_consider_procedural_memory:
+      Boolean(actionSkillId) || (!isContinuityOnlyAction(input.actionIntent, input.executedTools) && failed),
+    should_consider_action_skill_followup_plan_bead: Boolean(actionSkillId && failed),
+    memory_write_hint:
+      actionSkillId && failed
+        ? `If evidence shows why ${actionSkillId} failed, add one procedural memory_writes item with the reusable blocker or repair hint.`
+        : "Use procedural memory only for reusable action-skill or primitive execution lessons, not ordinary diary text.",
+    rules: {
+      procedural_memory_must_cite_current_evidence_refs: true,
+      action_skill_feedback_is_not_runtime_authority: true,
+      "do_not_promote_or_rewrite_action_skills_from_provider_text_alone": true
+    }
+  } as JsonValue;
+}
+
 /**
  * Writes CycleJudgment from runtime evidence and clamps provider overclaims.
  *
@@ -310,6 +513,23 @@ export async function runSocialCycleJudgmentProvider(input: {
     relationship_context: input.context.relationship_context,
     memory_packet: input.context.memory_packet,
     plan_bead_packet: input.context.plan_bead_packet ?? null,
+    plan_bead_operation_guidance: buildPlanBeadOperationGuidance({
+      actorId: input.actorId,
+      cycleGoal: input.cycleGoal,
+      actionIntent: input.actionIntent,
+      context: input.context,
+      runtimeResult: input.runtimeResult,
+      evidenceRefs: input.evidenceRefs,
+      executedTools: input.executedTools,
+      toolStatuses: input.toolStatuses,
+      verifierStatus: input.verifierStatus
+    }),
+    action_skill_feedback_guidance: buildActionSkillFeedbackGuidance({
+      actionIntent: input.actionIntent,
+      executedTools: input.executedTools,
+      toolStatuses: input.toolStatuses,
+      verifierStatus: input.verifierStatus
+    }),
     action_surface: input.context.action_surface,
     previous_cycle_judgments: input.context.previous_cycle_judgments,
     settlement_state: input.context.settlement_state,
@@ -369,7 +589,8 @@ export async function runSocialCycleJudgmentProvider(input: {
 Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item, consume_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
 Use partial_verified_progress only when runtime_result/tool_statuses show current-run world, inventory, movement, container, or block mutation but the final verifier or action-skill postcondition did not pass.
 observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks.
-plan_bead_packet is read-only continuity context. You may propose bead_op_proposals to create, defer, block, link, or update actor-owned work-state, but those proposals are not commands and runtime may reject invalid, stale, non-actor-relative, or authority-bearing operations. Use [] when no useful PlanBead update is justified. Use these operation shapes: create.patch={kind,title,description,acceptance_evidence_required,notes_next,priority}; update_notes.patch may include completed,in_progress,blockers,next,key_decisions string arrays; set_status.patch={status,close_kind?,close_reason?}; add_dependency.patch={bead_id,depends_on_bead_id,type,rationale,evidence_refs}. Every operation evidence_refs entry must cite current actor-workspace artifacts. A closed/satisfied PlanBead needs runtime evidence, guarded relationship evidence, or settlement evidence; provider prose, memory, judgment text, or plan_bead_packet alone cannot satisfy it.
+plan_bead_packet is always present and read-only continuity context, even when the graph is empty. Use plan_bead_operation_guidance as an affordance hint, not as a command. When an action reveals an unfinished multi-cycle concern, a repeated blocker, an action-skill followup, or evidence that selected work is satisfied, propose bead_op_proposals so the actor can remember, update, block, defer, link, close, or replace the work item. Use [] when no useful PlanBead update is justified; do not create beads for every observe/wait/remember cycle. Prefer updating an existing ready or in_progress PlanBead over creating duplicates. If repeated remember-only cycles add no new evidence, update the existing bead once and consider set_status {status:"deferred"} or a next note that requires fresh observation before retry; do not keep making the same memory note look like progress. For update_notes or set_status, copy the target bead's current checkpoint_version into expected_checkpoint_version; omit expected_checkpoint_version for create operations. Use these operation shapes: create.patch={kind,title,description,acceptance_evidence_required,notes_next,priority}; update_notes.patch may include completed,in_progress,blockers,next,key_decisions string arrays; set_status.patch={status,close_kind?,close_reason?}; add_dependency.patch={bead_id,depends_on_bead_id,type,rationale,evidence_refs}. Every operation evidence_refs entry must cite current actor-workspace artifacts. A closed/satisfied PlanBead needs runtime evidence, guarded relationship evidence, or settlement evidence; provider prose, memory, judgment text, or plan_bead_packet alone cannot satisfy it.
+Use action_skill_feedback_guidance when writing memory_writes. If an action skill or reusable primitive fails, add a concise procedural memory write with the repair lesson or blocker. If it passed, record only reusable evidence-backed lessons, not generic praise. Procedural memory and PlanBeads help future choices but never grant execution authority.
 ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {
