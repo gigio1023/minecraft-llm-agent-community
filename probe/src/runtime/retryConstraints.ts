@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { JsonValue } from "../provider/inputSnapshot.js";
-import type { ActionIntent, ActionIntentKind } from "./goals/types.js";
+import { actionIntentParameters, type ActionIntent, type ActionIntentKind } from "./goals/types.js";
 
 /**
  * Runtime retry constraints are exact retry gates, not planner strategy.
@@ -14,7 +14,7 @@ import type { ActionIntent, ActionIntentKind } from "./goals/types.js";
 export const RUNTIME_RETRY_ATTEMPT_SCHEMA = "runtime-retry-attempt/v1" as const;
 export const RUNTIME_RETRY_CONSTRAINT_SCHEMA = "runtime-retry-constraint/v1" as const;
 
-export type RuntimeRetryTargetKind = "primitive" | "action_skill" | "control";
+export type RuntimeRetryTargetKind = "primitive" | "action_skill" | "action_skill_candidate" | "control";
 
 export type RuntimeRetryTarget = {
   kind: RuntimeRetryTargetKind;
@@ -140,8 +140,10 @@ function normalizeJsonValue(value: unknown): JsonValue {
 }
 
 /** Normalizes only structured args; rationale/prose never contributes to retry identity. */
-export function normalizedActionIntentArgs(intent: Pick<ActionIntent, "args">): JsonValue {
-  return normalizeJsonValue(intent.args ?? {});
+export function normalizedActionIntentArgs(
+  intent: Pick<ActionIntent, "args" | "parameters">
+): JsonValue {
+  return normalizeJsonValue(actionIntentParameters(intent));
 }
 
 /** Produces a stable short id for compact provider context and report diffs. */
@@ -165,6 +167,14 @@ export function runtimeRetryTargetFromIntent(intent: ActionIntent): RuntimeRetry
       kind: "action_skill",
       id: actionSkillId,
       action_skill_id: actionSkillId
+    };
+  }
+  if (intent.kind === "author_and_trial_action_skill") {
+    const candidateId = intent.candidate?.proposed_skill_id ?? "unknown_generated_candidate";
+    return {
+      kind: "action_skill_candidate",
+      id: candidateId,
+      action_skill_id: candidateId
     };
   }
   return {

@@ -61,6 +61,53 @@ test("direct generated action skill source guard rejects Node escape hatches", (
   );
 });
 
+test("direct generated action skill executor passes schema-bound params", async () => {
+  const result = await runDirectGeneratedActionSkill({
+    actorId: "npc_b",
+    skillName: "sayParam",
+    source: `
+      export async function run(ctx: { say(text: string): Promise<{ status: string; text: string }> }, params: { text: string }) {
+        return ctx.say(params.text);
+      }
+    `,
+    ctx: {
+      async say(text: string) {
+        return { status: "delivered", text };
+      }
+    },
+    params: { text: "bring logs to the chest" },
+    helperAllowlist: ["say"]
+  });
+
+  assert.equal(result.status, "completed");
+  assert.deepEqual(result.result, { status: "delivered", text: "bring logs to the chest" });
+  assert.equal(result.helperEvents[1]?.name, "say");
+  assert.equal(result.helperEvents[1]?.status, "completed");
+});
+
+test("direct generated action skill executor enforces helper allowlist", async () => {
+  const result = await runDirectGeneratedActionSkill({
+    actorId: "npc_b",
+    skillName: "blockedHelper",
+    source: `
+      export async function run(ctx: { mineflayer(method: string): Promise<unknown> }) {
+        return ctx.mineflayer("activateItem");
+      }
+    `,
+    ctx: {
+      async mineflayer(method: string) {
+        return { status: "completed", method };
+      }
+    },
+    helperAllowlist: ["observe"]
+  });
+
+  assert.equal(result.status, "skill_error");
+  assert.match(result.errorMessage ?? "", /not in this candidate's helper_allowlist/);
+  assert.equal(result.helperEvents[0]?.name, "mineflayer");
+  assert.equal(result.helperEvents[0]?.status, "failed");
+});
+
 test("direct generated action skill executor reports timeout", async () => {
   const result = await runDirectGeneratedActionSkill({
     actorId: "npc_b",

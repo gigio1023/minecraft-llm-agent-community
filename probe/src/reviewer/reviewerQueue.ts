@@ -276,10 +276,16 @@ function evidenceRefs(job: ActorReviewJob) {
 }
 
 function shouldProposeActionSkillRepair(job: ActorReviewJob) {
+  const hasActionSelectionCandidate = job.input_refs.some(
+    (inputRef) => inputRef.kind === "action_skill_candidate"
+  );
   return (
-    job.reason === "fake_progress_rejection" ||
-    job.reason === "verification_failure" ||
-    job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial")
+    hasActionSelectionCandidate &&
+    (
+      job.reason === "fake_progress_rejection" ||
+      job.reason === "verification_failure" ||
+      job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial")
+    )
   );
 }
 

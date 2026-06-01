@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
-import type { ActionIntent, ActorCycleGoal } from "../runtime/goals/types.js";
-import { validateActionIntent } from "../runtime/goals/types.js";
+import type { ActionIntent, ActorCycleGoal, GeneratedActionSkillCandidate } from "../runtime/goals/types.js";
+import { actionIntentParameters, validateActionIntent } from "../runtime/goals/types.js";
+import { validateDirectPrimitiveActionIntentArgs } from "../runtime/goals/actionIntentContracts.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
 import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
@@ -15,6 +16,63 @@ import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import { writeActorGoalArtifact } from "../runtime/goals/goalJsonStore.js";
 import { isSocialExecutablePrimitive } from "../runtime/socialCycleExecution.js";
 import { buildActionPlannerProviderInput } from "./socialCycleProviderInputs.js";
+import { validateAuthorAndTrialActionSkillIntent } from "../skills/generated/authoringSchemas.js";
+
+const generatedActionSkillCandidateSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    schema: { type: "string", enum: ["generated-action-skill-candidate/v1"] },
+    proposed_skill_id: { type: "string" },
+    purpose: { type: "string" },
+    source_language: { type: "string", enum: ["typescript"] },
+    source: { type: "string" },
+    input_schema: { type: "object" },
+    helper_api_version: { type: "string", enum: ["mineflayer-action-skill-helper/v1"] },
+    helper_allowlist: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: [
+          "position",
+          "inventoryItems",
+          "observe",
+          "wait",
+          "collectLogs",
+          "mineBlock",
+          "craftItem",
+          "craftWithTable",
+          "consumeItem",
+          "placeBlock",
+          "buildPattern",
+          "say",
+          "mineflayer"
+        ]
+      }
+    },
+    timeout_ms: { type: "number" },
+    verifier: { type: "object" },
+    promotion_policy: {
+      type: "string",
+      enum: ["record_candidate_only", "promote_after_passed_trial"]
+    },
+    known_failure_modes: { type: "array", items: { type: "string" } }
+  },
+  required: [
+    "schema",
+    "proposed_skill_id",
+    "purpose",
+    "source_language",
+    "source",
+    "input_schema",
+    "helper_api_version",
+    "helper_allowlist",
+    "timeout_ms",
+    "verifier",
+    "promotion_policy",
+    "known_failure_modes"
+  ]
+} as const;
 
 const actionPlannerSchema = {
   type: "object",
@@ -26,16 +84,25 @@ const actionPlannerSchema = {
       properties: {
         kind: {
           type: "string",
-          enum: ["use_action_skill", "use_primitive", "wait", "remember"]
+          enum: [
+            "use_action_skill",
+            "use_primitive",
+            "author_and_trial_action_skill",
+            "wait",
+            "remember"
+          ]
         },
         action_skill_id: { type: "string" },
         primitive_id: { type: "string" },
         args: { type: "object" },
+        parameters: { type: "object" },
+        parameters_schema: { type: "object" },
+        candidate: generatedActionSkillCandidateSchema,
         why_this_action: { type: "string" },
         expected_evidence: { type: "array", items: { type: "string" } },
         fallback_if_blocked: { type: "string" }
       },
-      required: ["kind", "why_this_action", "expected_evidence", "fallback_if_blocked", "args"]
+      required: ["kind", "why_this_action", "expected_evidence", "fallback_if_blocked", "parameters"]
     }
   },
   required: ["action_intent"]
@@ -44,6 +111,19 @@ const actionPlannerSchema = {
 export type ActionPlannerProviderResult =
   | { ok: true; intent: ActionIntent; intentRef: string; inputRef: string; outputRef: string }
   | { ok: false; error: string; inputRef: string; outputRef: string };
+
+type ProviderActionIntentPayload = {
+  kind: ActionIntent["kind"];
+  action_skill_id?: string;
+  primitive_id?: string;
+  args?: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+  parameters_schema?: Record<string, unknown>;
+  candidate?: GeneratedActionSkillCandidate;
+  why_this_action: string;
+  expected_evidence: string[];
+  fallback_if_blocked: string;
+};
 
 function executableOwnedActionSkills(context: SocialCycleContextPacket) {
   const directPrimitiveIds = new Set(
@@ -87,11 +167,16 @@ function directActionSkillSurface(
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function hasDirectPrimitiveActionSkillFallback(intent: ActionIntent) {
+  const parameters = actionIntentParameters(intent);
   return Boolean(
     intent.action_skill_id ||
-      (typeof intent.args.actionSkillId === "string" && intent.args.actionSkillId.trim()) ||
-      (typeof intent.args.action_skill_id === "string" && intent.args.action_skill_id.trim())
+      (typeof parameters.actionSkillId === "string" && parameters.actionSkillId.trim()) ||
+      (typeof parameters.action_skill_id === "string" && parameters.action_skill_id.trim())
   );
 }
 
@@ -107,6 +192,10 @@ function validateExecutableIntent(
     if (hasDirectPrimitiveActionSkillFallback(intent)) {
       return "Direct primitive intents cannot carry action_skill_id or args.actionSkillId; use use_action_skill for actor-owned action skill execution";
     }
+    const argsContract = validateDirectPrimitiveActionIntentArgs(intent);
+    if (!argsContract.ok) {
+      return `ActionIntent parameters contract failed: ${argsContract.error}`;
+    }
   }
 
   if (intent.kind === "use_action_skill") {
@@ -115,6 +204,16 @@ function validateExecutableIntent(
       !cycleGoal.allowed_action_skill_ids.includes(intent.action_skill_id)
     ) {
       return `Action skill ${intent.action_skill_id ?? "<missing>"} is not executable in this social cycle`;
+    }
+  }
+
+  if (intent.kind === "author_and_trial_action_skill") {
+    if (!cycleGoal.allowed_primitive_ids.includes("run_mineflayer_program")) {
+      return "author_and_trial_action_skill requires run_mineflayer_program in the executable action surface";
+    }
+    const candidateContract = validateAuthorAndTrialActionSkillIntent(intent);
+    if (!candidateContract.ok) {
+      return `Generated action skill candidate contract failed: ${candidateContract.errors.join("; ")}`;
     }
   }
 
@@ -183,6 +282,11 @@ export async function runSocialActionPlannerProvider(input: {
 
   if (input.providerId === "deterministic-social") {
     const primitive = input.defaultPrimitive ?? "observe";
+    const parameters = primitive === "wait"
+      ? { ticks: 20 }
+      : primitive === "remember"
+        ? { note: "cycle baseline" }
+        : {};
     intent = {
       schema: "action-intent/v1",
       actor_id: input.actorId,
@@ -190,7 +294,8 @@ export async function runSocialActionPlannerProvider(input: {
       cycle_goal_id: plannerCycleGoal.goal_id,
       kind: "use_primitive",
       primitive_id: primitive,
-      args: primitive === "wait" ? { ticks: 20 } : primitive === "remember" ? { note: "cycle baseline" } : {},
+      args: parameters,
+      parameters,
       why_this_action: "Deterministic-social baseline observes before acting.",
       expected_evidence: ["tool_attempt"],
       fallback_if_blocked: "remember blockage with evidence"
@@ -206,8 +311,10 @@ plan_bead_packet is read-only work-state context for continuity. If ready or in_
 Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
 Vitals and food candidates are observation fields, not runtime priorities. If consuming food is useful, choose consume_item with an explicit itemName from inventory evidence.
 Deferred primitives or action skills explain missing affordances; do not choose them in this ActionIntent. Direct primitives and direct action skills are the executable body for this turn.
-Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not executable in this ActionIntent until exposed as direct primitives or direct action skills.
-When run_mineflayer_program is direct, you may generate a short TypeScript program for a situation that is better expressed as Mineflayer helper code. Its args.source must export async function run(ctx) and use ctx helper calls such as observe, inventoryItems, collectLogs, mineBlock, craftItem, craftWithTable, consumeItem, placeBlock, buildPattern, say, wait, or mineflayer(method,args). Keep expected_evidence tied to helper results and post-observation, not to the returned text alone.
+Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not ordinary executable actions until the selected ActionIntent is author_and_trial_action_skill.
+Use author_and_trial_action_skill when the best next step needs a new actor-owned generated action skill candidate. This is the only social-cycle stage that may originate a new generated action skill candidate. Put executable inputs in parameters, define candidate.input_schema as a JSON object schema for those parameters, and put the complete TypeScript source in candidate.source. The source must export async function run(ctx, params) and use the helper API declared in candidate.helper_allowlist. Keep helper code active and concrete; prefer actual Mineflayer helper calls over returning descriptive text.
+Do not create generated candidates from judgment, PlanBeads, memory, or reviewer text. Those surfaces may review, patch, retry, retire, or promote an existing candidate, but origin authority belongs to this ActionIntent.
+Use use_primitive run_mineflayer_program only for legacy one-off direct program execution when you are not trying to create an actor-owned candidate. For reusable behavior, choose author_and_trial_action_skill instead.
 Treat CycleGoal allowed_* lists as compatibility mirrors/advisory context. They must not shrink the action surface; runtime_affordances and direct_action_skills define what can be selected.
 If a physical action just failed, inspect its runtime_result and do not repeat it blindly; choose a different valid affordance based on the current action surface and evidence.
 runtime_retry_constraints are hard runtime suppressions over exact target plus structured args. Do not choose an ActionIntent that matches one; pivot to a different valid affordance, repair the structured args, observe current state, or record a truthful blocker.
@@ -218,7 +325,7 @@ If a ready PlanBead points at a blocker or action-skill followup, choose an exec
 remember is a continuity tool, not a substitute for acting. After a blocker has already been remembered once, do not keep selecting remember for the same blocker; choose fresh observation, a different reachable target, another useful action, or let judgment defer/update the PlanBead.
 If a primitive reports a concrete required position in runtime_result, use structured move_to toward that explicit position or observe current state before retrying. Do not retry the same primitive from outside its reported interaction range.
 Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvents, observation, or memory makes building relevant; never treat a construction target as always-on architecture.
-use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough. For a generated Mineflayer program, prefer a single use_primitive run_mineflayer_program intent so the source, helper events, result, and post-observation stay attached to one artifact.
+use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough. Prefer author_and_trial_action_skill when code generation should become an actor-owned candidate with source, schema, parameters, helper events, result, and post-observation attached to actor workspace artifacts.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {
@@ -229,28 +336,12 @@ Do not claim success through text. Pick actions whose evidence can be verified b
       }
     };
     const result = input.providerId === "gemini-api" ? await callGeminiJsonSchema<{
-      action_intent: {
-        kind: ActionIntent["kind"];
-        action_skill_id?: string;
-        primitive_id?: string;
-        args: Record<string, unknown>;
-        why_this_action: string;
-        expected_evidence: string[];
-        fallback_if_blocked: string;
-      };
+      action_intent: ProviderActionIntentPayload;
     }>({
       config: input.gemini!,
       ...providerCall
     }) : await callOpenAiJsonSchema<{
-      action_intent: {
-        kind: ActionIntent["kind"];
-        action_skill_id?: string;
-        primitive_id?: string;
-        args: Record<string, unknown>;
-        why_this_action: string;
-        expected_evidence: string[];
-        fallback_if_blocked: string;
-      };
+      action_intent: ProviderActionIntentPayload;
     }>({
       config: input.openAi!,
       ...providerCall
@@ -279,15 +370,12 @@ Do not claim success through text. Pick actions whose evidence can be verified b
 
     const payload = normalizeOpenAiJsonPayload(result.parsed as Record<string, unknown>);
     usageRecord = result.usageRecord;
-    const actionIntent = payload.action_intent as {
-      kind: ActionIntent["kind"];
-      action_skill_id?: string;
-      primitive_id?: string;
-      args: Record<string, unknown>;
-      why_this_action: string;
-      expected_evidence: string[];
-      fallback_if_blocked: string;
-    };
+    const actionIntent = payload.action_intent as ProviderActionIntentPayload;
+    const parameters = isRecord(actionIntent.parameters)
+      ? actionIntent.parameters
+      : isRecord(actionIntent.args)
+        ? actionIntent.args
+        : {};
     intent = {
       schema: "action-intent/v1",
       actor_id: input.actorId,
@@ -296,7 +384,12 @@ Do not claim success through text. Pick actions whose evidence can be verified b
       kind: actionIntent.kind,
       action_skill_id: actionIntent.action_skill_id,
       primitive_id: actionIntent.primitive_id,
-      args: actionIntent.args ?? {},
+      args: parameters,
+      parameters,
+      ...(isRecord(actionIntent.parameters_schema)
+        ? { parameters_schema: actionIntent.parameters_schema }
+        : {}),
+      ...(isRecord(actionIntent.candidate) ? { candidate: actionIntent.candidate } : {}),
       why_this_action: actionIntent.why_this_action,
       expected_evidence: asStringArray(actionIntent.expected_evidence),
       fallback_if_blocked: actionIntent.fallback_if_blocked

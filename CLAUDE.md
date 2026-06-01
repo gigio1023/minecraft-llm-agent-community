@@ -15,6 +15,7 @@ has approved an operating-rule change.
 6. `docs/blog-doc/Terminology.md`
 7. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 8. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+9. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
 
 ## Project Direction
 
@@ -59,6 +60,20 @@ PlanBeads are Beads-inspired repo runtime state, not `bd`, `br`, `beads-mcp`,
 `.beads`, or a downloaded binary dependency. Do not add external Beads CLI calls
 to Minecraft actor state. Campaign work may use external task tools separately,
 but NPC PlanBeads live under actor workspace JSON records.
+
+## Action Skill Authoring
+
+During social-cycle runtime, new Minecraft action skill creation starts only
+when the action planner chooses `author_and_trial_action_skill`. Background
+reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
+review, patch, re-trial, reject, promote, retire, or supersede an existing
+candidate, but they must not originate a new NPC action skill candidate.
+
+Generated Mineflayer code is encouraged through that explicit author-and-trial
+path, not as hidden background authority. The generated candidate must include
+schema-bound parameters, generated TypeScript source, helper API version,
+timeout, verifier, failure modes, promotion policy, helper-event evidence, and
+post-observation. Prose never supplies missing executable parameters.
 
 ## Karpathy Guidelines
 

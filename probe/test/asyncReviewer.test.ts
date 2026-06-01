@@ -177,16 +177,7 @@ test("deterministic reviewer runner writes actor reviews without active skill mu
     assert.equal(review.actor_id, "npc_a");
     assert.equal(review.active_mutation, "forbidden");
     assert.match(review.findings[0].title, /fake progress/i);
-    assert.equal(review.candidate_proposals.length, 1);
-    assert.equal(
-      path.relative(rootDir, review.candidate_proposals[0]),
-      path.join("npc_a", "action-skills", "candidates", "proposal-review-job-0003.json")
-    );
-    const proposal = JSON.parse(await fs.readFile(review.candidate_proposals[0], "utf8"));
-    assert.equal(proposal.schema, "action-skill-proposal/v1");
-    assert.equal(proposal.owner_actor_id, "npc_a");
-    assert.equal(proposal.status, "draft");
-    assert.deepEqual(proposal.evidence_refs, [evidencePath]);
+    assert.equal(review.candidate_proposals.length, 0);
     assert.equal(await fs.readFile(activePath, "utf8"), beforeActive);
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });

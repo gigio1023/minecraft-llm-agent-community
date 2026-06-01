@@ -153,15 +153,32 @@ export type WorldEvent = {
 export type ActionIntentKind =
   | "use_action_skill"
   | "use_primitive"
+  | "author_and_trial_action_skill"
   | "wait"
   | "remember";
 
 const actionIntentKinds: readonly ActionIntentKind[] = [
   "use_action_skill",
   "use_primitive",
+  "author_and_trial_action_skill",
   "wait",
   "remember"
 ];
+
+export type GeneratedActionSkillCandidate = {
+  schema: "generated-action-skill-candidate/v1";
+  proposed_skill_id: string;
+  purpose: string;
+  source_language: "typescript";
+  source: string;
+  input_schema: Record<string, unknown>;
+  helper_api_version: "mineflayer-action-skill-helper/v1";
+  helper_allowlist: string[];
+  timeout_ms: number;
+  verifier: Record<string, unknown>;
+  promotion_policy: "record_candidate_only" | "promote_after_passed_trial";
+  known_failure_modes: string[];
+};
 
 export type ActionIntent = {
   schema: "action-intent/v1";
@@ -171,7 +188,10 @@ export type ActionIntent = {
   kind: ActionIntentKind;
   action_skill_id?: string;
   primitive_id?: string;
+  parameters?: Record<string, unknown>;
+  parameters_schema?: Record<string, unknown>;
   args: Record<string, unknown>;
+  candidate?: GeneratedActionSkillCandidate;
   why_this_action: string;
   expected_evidence: string[];
   fallback_if_blocked: string;
@@ -403,6 +423,15 @@ function includesString<T extends string>(values: readonly T[], value: unknown):
   return typeof value === "string" && values.includes(value as T);
 }
 
+export function actionIntentParameters(
+  intent: Pick<ActionIntent, "args" | "parameters">
+): Record<string, unknown> {
+  if (isRecord(intent.parameters)) {
+    return intent.parameters;
+  }
+  return isRecord(intent.args) ? intent.args : {};
+}
+
 export function validateActorSoul(value: unknown): { ok: true; soul: ActorSoul } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(value)) {
@@ -490,12 +519,20 @@ export function validateActionIntent(
   assertString(value, "fallback_if_blocked", errors);
   assertStringArray(value, "expected_evidence", errors);
   assertRecord(value, "args", errors);
+  if (value.parameters !== undefined) {
+    assertRecord(value, "parameters", errors);
+  }
+  if (value.parameters_schema !== undefined) {
+    assertRecord(value, "parameters_schema", errors);
+  }
   if (!includesString(actionIntentKinds, value.kind)) {
-    errors.push("kind must be one of use_action_skill, use_primitive, wait, remember");
+    errors.push("kind must be one of use_action_skill, use_primitive, author_and_trial_action_skill, wait, remember");
   } else if (value.kind === "use_primitive") {
     assertString(value, "primitive_id", errors);
   } else if (value.kind === "use_action_skill") {
     assertString(value, "action_skill_id", errors);
+  } else if (value.kind === "author_and_trial_action_skill") {
+    assertRecord(value, "candidate", errors);
   }
   if (errors.length > 0) {
     return { ok: false, errors };

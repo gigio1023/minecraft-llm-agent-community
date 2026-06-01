@@ -88,6 +88,39 @@ parallelism does not change runtime authority. Workers operate under lane
 contracts, produce artifacts or patches, and coordinator verification decides
 what lands.
 
+## Action Skill Authoring Gate
+
+New Minecraft action skill creation during social-cycle runtime must originate
+only from the action-selection stage. The action planner may choose an explicit
+`author_and_trial_action_skill` ActionIntent mode when current observation,
+CycleGoal, memory, PlanBeads, relationship context, retry constraints, and the
+action surface justify creating a new actor-owned behavior candidate.
+
+Background reviewers, async sidecars, PlanBead operations, legacy generated
+skill importers, and offline maintenance scripts must not originate new action
+skill candidates for an NPC during runtime. They may review, patch, reject,
+retire, supersede, promote, or re-trial an existing action-selection candidate
+with evidence. They may also propose PlanBeads that say a new action skill is
+needed, but PlanBeads do not create source, parameters, permissions, or
+executable authority.
+
+Generated Mineflayer code should be used more actively through this explicit
+author-and-trial path. It must be schema-bound and helper-limited:
+
+- provider output must include an input schema, current parameters, generated
+  TypeScript source, helper API version, timeout, verifier, failure modes, and
+  promotion policy;
+- primitive and action-skill parameters must validate against JSON
+  Schema/OpenAPI-style contracts before execution;
+- prose fields such as `why_this_action` never supply missing parameters;
+- generated source must run through bounded helpers and record helper events,
+  post-observation, verifier output, and actor-workspace evidence;
+- a passed trial is not active action skill authority until lifecycle promotion
+  succeeds.
+
+Use `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+as the active implementation plan for this rule.
+
 ## Project Identity vs External References
 
 External Minecraft-agent and LLM-agent papers are references, not product specs.
@@ -162,14 +195,15 @@ Read these first:
 15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 16. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 17. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-18. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-19. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-20. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-21. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-22. `docs/blog-doc/Architecture/Minimal-Probe.md`
-23. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-24. `docs/blog-doc/Setup/Headless-Server.md`
-25. `docs/blog-doc/Setup/Provider-Setup.md`
+18. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+19. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+20. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+21. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+22. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+23. `docs/blog-doc/Architecture/Minimal-Probe.md`
+24. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+25. `docs/blog-doc/Setup/Headless-Server.md`
+26. `docs/blog-doc/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 

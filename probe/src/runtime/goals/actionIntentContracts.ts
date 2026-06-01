@@ -1,4 +1,4 @@
-import type { ActionIntent } from "./types.js";
+import { actionIntentParameters, type ActionIntent } from "./types.js";
 
 export const ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION =
   "action-intent-primitive-args/v1" as const;
@@ -425,12 +425,12 @@ export function validatePrimitiveActionIntentArgs(
  * action-skill id can be a documented fallback only at that resolved boundary.
  */
 export function validateDirectPrimitiveActionIntentArgs(
-  intent: Pick<ActionIntent, "kind" | "primitive_id" | "action_skill_id" | "args">
+  intent: Pick<ActionIntent, "kind" | "primitive_id" | "action_skill_id" | "args" | "parameters">
 ): ActionIntentPrimitiveArgsContractResult {
   if (intent.kind === "wait" || intent.kind === "remember") {
     return validatePrimitiveActionIntentArgs({
       primitiveId: intent.kind,
-      args: intent.args,
+      args: actionIntentParameters(intent),
       actionSkillId: intent.action_skill_id
     });
   }
@@ -442,11 +442,12 @@ export function validateDirectPrimitiveActionIntentArgs(
     });
   }
 
-  const argsWithoutActionSkillFallback = isRecord(intent.args)
+  const parameters = actionIntentParameters(intent);
+  const argsWithoutActionSkillFallback = isRecord(parameters)
     ? Object.fromEntries(
-        Object.entries(intent.args).filter(([key]) => key !== "actionSkillId")
+        Object.entries(parameters).filter(([key]) => key !== "actionSkillId")
       )
-    : intent.args;
+    : parameters;
 
   return validatePrimitiveActionIntentArgs({
     primitiveId: intent.primitive_id,

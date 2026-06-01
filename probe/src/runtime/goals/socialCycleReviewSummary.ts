@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { loadProbeConfig } from "../../config.js";
-import type { CycleJudgment, SocialCycleRunReport } from "./types.js";
+import { actionIntentParameters, type CycleJudgment, type SocialCycleRunReport } from "./types.js";
 import { readJsonIfExists } from "./goalJsonStore.js";
 import type { ActionIntent } from "./types.js";
 
@@ -113,28 +113,29 @@ function movementContractStatus(intent: ActionIntent | null): MovementContractSt
   if (intent.kind !== "use_primitive" || intent.primitive_id !== "move_to") {
     return "not_move_to";
   }
-  if (!isRecord(intent.args)) {
+  const parameters = actionIntentParameters(intent);
+  if (!isRecord(parameters)) {
     return "invalid_args";
   }
-  if (Object.keys(intent.args).length === 0) {
+  if (Object.keys(parameters).length === 0) {
     return "empty_args";
   }
   if (
-    hasPositionShape(intent.args.position) ||
-    hasPositionShape(intent.args.targetPosition) ||
-    hasPositionShape(intent.args.target_position) ||
-    hasPositionShape(intent.args)
+    hasPositionShape(parameters.position) ||
+    hasPositionShape(parameters.targetPosition) ||
+    hasPositionShape(parameters.target_position) ||
+    hasPositionShape(parameters)
   ) {
     return "valid";
   }
 
-  const direction = typeof intent.args.direction === "string" ? intent.args.direction.toLowerCase() : null;
+  const direction = typeof parameters.direction === "string" ? parameters.direction.toLowerCase() : null;
   if (
     direction &&
     ["north", "south", "east", "west"].includes(direction) &&
-    isFiniteNumber(intent.args.distance) &&
-    intent.args.distance > 0 &&
-    intent.args.distance <= 12
+    isFiniteNumber(parameters.distance) &&
+    parameters.distance > 0 &&
+    parameters.distance <= 12
   ) {
     return "valid";
   }

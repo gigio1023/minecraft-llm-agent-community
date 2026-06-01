@@ -47,10 +47,12 @@ export type RunMineflayerProgramInput = {
   bot: Bot;
   targetBot?: Bot;
   source: string;
+  parameters?: Record<string, unknown>;
   purpose?: string;
   expectedObservation?: string;
   artifactDir?: string;
   timeoutMs?: number;
+  helperAllowlist?: readonly string[];
   signal?: AbortSignal;
 };
 
@@ -376,8 +378,10 @@ export async function runMineflayerProgram(
     skillName: "socialCycleMineflayerProgram",
     source: input.source,
     ctx,
+    params: input.parameters ?? {},
     timeoutMs,
     artifactDir: input.artifactDir,
+    helperAllowlist: input.helperAllowlist,
     onTimeout: () => clearMovement(input.bot)
   });
   clearMovement(input.bot);

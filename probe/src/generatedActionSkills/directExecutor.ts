@@ -18,9 +18,11 @@ export type DirectGeneratedActionSkillRunInput<TContext extends DirectGeneratedA
   skillName: string;
   source: string;
   ctx: TContext;
+  params?: Record<string, unknown>;
   timeoutMs?: number;
   artifactDir?: string;
   helperEvents?: GeneratedActionSkillHelperEvent[];
+  helperAllowlist?: readonly string[];
   onTimeout?: () => void | Promise<void>;
 };
 
@@ -73,13 +75,22 @@ async function writeGeneratedSource(input: {
 
 function withHelperLogging<TContext extends DirectGeneratedActionSkillContext>(
   ctx: TContext,
-  helperEvents: GeneratedActionSkillHelperEvent[]
+  helperEvents: GeneratedActionSkillHelperEvent[],
+  helperAllowlist?: readonly string[]
 ): TContext {
+  const allowedHelpers = helperAllowlist ? new Set(helperAllowlist) : undefined;
   return new Proxy(ctx, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof property !== "string" || typeof value !== "function" || property === "constructor") {
         return value;
+      }
+      if (allowedHelpers && !allowedHelpers.has(property)) {
+        return (...args: unknown[]) => {
+          const error = `Generated action skill helper ${property} is not in this candidate's helper_allowlist`;
+          helperEvents.push({ name: property, args, status: "failed", error });
+          throw new Error(error);
+        };
       }
 
       return (...args: unknown[]) => {
@@ -119,7 +130,7 @@ async function importGeneratedActionSkill(sourcePath: string) {
     throw new Error("Generated action skill module must export run(ctx)");
   }
 
-  return imported.run as (ctx: unknown) => Promise<unknown>;
+  return imported.run as (ctx: unknown, params?: Record<string, unknown>) => Promise<unknown>;
 }
 
 export async function runDirectGeneratedActionSkill<TContext extends DirectGeneratedActionSkillContext>(
@@ -135,8 +146,8 @@ export async function runDirectGeneratedActionSkill<TContext extends DirectGener
     assertDirectGeneratedActionSkillSource(input.source);
     sourcePath = await writeGeneratedSource(input);
     const run = await importGeneratedActionSkill(sourcePath);
-    const loggedCtx = withHelperLogging(input.ctx, helperEvents);
-    const runPromise = Promise.resolve(run(loggedCtx));
+    const loggedCtx = withHelperLogging(input.ctx, helperEvents, input.helperAllowlist);
+    const runPromise = Promise.resolve(run(loggedCtx, input.params ?? {}));
     const result = await Promise.race([
       runPromise,
       new Promise((resolve) => {

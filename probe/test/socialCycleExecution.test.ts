@@ -30,7 +30,7 @@ import {
   findMatchingRuntimeRetryConstraint
 } from "../src/runtime/retryConstraints.js";
 
-function fakeObserveBot(): Bot {
+function fakeObserveBot(username = "npc_b"): Bot {
   const position = {
     x: 0,
     y: 64,
@@ -38,14 +38,16 @@ function fakeObserveBot(): Bot {
     distanceTo: () => 0
   };
   return {
-    username: "npc_b",
+    username,
     entity: { position },
     inventory: { items: () => [] },
     findBlocks: () => [],
     blockAt: (pos: { x: number; y: number; z: number }) => ({
       name: "air",
       position: pos
-    })
+    }),
+    setControlState: () => undefined,
+    chat: () => undefined
   } as unknown as Bot;
 }
 
@@ -408,6 +410,104 @@ test("executor rejects direct primitive args actionSkillId fallback", async () =
   assert.equal(result.contractBlocked, true);
   assert.deepEqual(result.executedTools, ["craft_item"]);
   assert.match(JSON.stringify(result.runtimeResult), /Direct primitive intents cannot carry args.actionSkillId/);
+});
+
+test("executor authors and trials a generated action skill candidate only through action selection", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-author-trial-"));
+  const result = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0001",
+      status: "active",
+      source: "llm_planner",
+      summary: "author a reusable speech candidate",
+      rationale: "Generated action skills must originate at action selection.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "generated_action_skill_trial",
+        evidence_required: ["action_skill_candidate_trial"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["run_mineflayer_program"],
+      stop_conditions: ["trial_complete"]
+    },
+    intent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "author_and_trial_action_skill",
+      args: {},
+      parameters: { text: "bring logs to the shared chest" },
+      candidate: {
+        schema: "generated-action-skill-candidate/v1",
+        proposed_skill_id: "saySharedChestNeed",
+        purpose: "Say a concrete shared-storage need with helper evidence.",
+        source_language: "typescript",
+        source: "export async function run(ctx, params) { return ctx.say(params.text); }",
+        input_schema: {
+          type: "object",
+          required: ["text"],
+          additionalProperties: false,
+          properties: { text: { type: "string" } }
+        },
+        helper_api_version: "mineflayer-action-skill-helper/v1",
+        helper_allowlist: ["say"],
+        timeout_ms: 5_000,
+        verifier: { kind: "helper_result_status", helper: "say", status: "delivered" },
+        promotion_policy: "record_candidate_only",
+        known_failure_modes: ["target actor may be busy"]
+      },
+      why_this_action: "A reusable generated candidate is more precise than another memory note.",
+      expected_evidence: ["helper say delivered", "post observation"],
+      fallback_if_blocked: "remember the candidate trial blocker"
+    },
+    bot: fakeObserveBot(),
+    targetBot: fakeObserveBot("npc_a"),
+    activeActionSkills: [
+      testActionSkillRecord("runBoundedMineflayerProgram", ["run_mineflayer_program"], "npc_b")
+    ]
+  });
+
+  assert.equal(result.verifierStatus, "passed");
+  assert.deepEqual(result.executedTools, ["run_mineflayer_program"]);
+  assert.equal((result.runtimeResult as { status?: string }).status, "promotable");
+
+  const proposalRef = result.evidenceRefs.find((ref) =>
+    ref.includes("action-skills/candidates/cycle-0001-author-saySharedChestNeed.json")
+  );
+  assert.ok(proposalRef);
+  const proposal = JSON.parse(
+    await fs.readFile(path.join(workspaceRoot, "npc_b", proposalRef), "utf8")
+  );
+  assert.equal(proposal.generated_lifecycle_status, "promotable");
+  assert.equal(proposal.generated_parameters.text, "bring logs to the shared chest");
+  assert.equal(proposal.status, "draft");
+  assert.match(proposal.legacy_generated_code, /ctx\.say/);
+
+  const trialRef = result.evidenceRefs.find((ref) =>
+    ref.includes("generated-action-skill-trial-saySharedChestNeed.json")
+  );
+  assert.ok(trialRef);
+  const trialEvidence = JSON.parse(
+    await fs.readFile(path.join(workspaceRoot, "npc_b", trialRef), "utf8")
+  );
+  assert.equal(trialEvidence.category, "action_skill_candidate_trial");
+  assert.equal(trialEvidence.data.generated_lifecycle_status, "promotable");
+  assert.equal(trialEvidence.data.verifier_status, "passed");
 });
 
 test("wait and remember still pass through CycleGoal and active action-skill gates", async () => {

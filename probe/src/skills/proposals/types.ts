@@ -1,4 +1,6 @@
 import type { ActorActionSkillSourceKind } from "../../runtime/actorWorkspaceStore.js";
+import type { GeneratedActionSkillCandidate } from "../../runtime/goals/types.js";
+import type { GeneratedActionSkillLifecycleStatus } from "../generated/authoringSchemas.js";
 
 export type ActionSkillProposalRecord = {
   schema: "action-skill-proposal/v1";
@@ -18,5 +20,17 @@ export type ActionSkillProposalRecord = {
   updated_at: string;
   legacy_generated_code?: string;
   legacy_generated_code_language?: "typescript";
+  generated_candidate?: GeneratedActionSkillCandidate;
+  generated_parameters?: Record<string, unknown>;
+  generated_lifecycle_status?: GeneratedActionSkillLifecycleStatus;
+  generated_trial?: {
+    schema: "generated-action-skill-trial/v1";
+    status: GeneratedActionSkillLifecycleStatus;
+    verifier_status: "passed" | "failed" | "not_applicable";
+    evidence_refs: string[];
+    source_ref?: string;
+    helper_events?: unknown[];
+    reason: string;
+  };
   notes?: string;
 };

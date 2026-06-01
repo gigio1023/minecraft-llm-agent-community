@@ -15,6 +15,7 @@ export type ActorEvidenceCategory =
   | "review_input"
   | "world_state_scan"
   | "action_intent_contract_failure"
+  | "action_skill_candidate_trial"
   | "retry_constraint_blocked"
   | "context_checkpoint";
 

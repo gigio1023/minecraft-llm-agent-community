@@ -120,6 +120,16 @@ test("physical primitives reject hidden executor defaults", () => {
   }
 });
 
+test("provider-direct primitive validation uses parameters before legacy args", () => {
+  const intent = primitiveIntent({
+    primitiveId: "craft_item",
+    args: {}
+  });
+  intent.parameters = { itemName: "stick" };
+
+  assert.equal(validateDirectPrimitiveActionIntentArgs(intent).ok, true);
+});
+
 test("placement and building primitives accept explicit executable args", () => {
   assert.equal(
     validatePrimitiveActionIntentArgs({

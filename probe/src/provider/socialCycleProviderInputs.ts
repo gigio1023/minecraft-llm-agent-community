@@ -56,6 +56,57 @@ function buildActionSurfaceSummary(context: SocialCycleContextPacket) {
   };
 }
 
+function buildActionSelectionModes(context: SocialCycleContextPacket) {
+  const canRunGeneratedProgram = context.action_surface.direct_primitives.some(
+    (primitive) => primitive.primitive_id === "run_mineflayer_program"
+  );
+  return {
+    schema: "action-selection-modes/v1",
+    modes: [
+      {
+        kind: "use_primitive",
+        origin_authority: "select_existing_runtime_affordance",
+        parameters_field: "parameters"
+      },
+      {
+        kind: "use_action_skill",
+        origin_authority: "select_existing_actor_owned_action_skill",
+        parameters_field: "parameters"
+      },
+      {
+        kind: "author_and_trial_action_skill",
+        enabled: canRunGeneratedProgram,
+        origin_authority: "create_new_actor_owned_candidate_only_here",
+        parameters_field: "parameters",
+        candidate_contract: {
+          schema: "generated-action-skill-candidate/v1",
+          source_language: "typescript",
+          helper_api_version: "mineflayer-action-skill-helper/v1",
+          source_signature: "export async function run(ctx, params)",
+          required_candidate_fields: [
+            "proposed_skill_id",
+            "purpose",
+            "input_schema",
+            "source",
+            "helper_allowlist",
+            "timeout_ms",
+            "verifier",
+            "promotion_policy",
+            "known_failure_modes"
+          ],
+          lifecycle: "trial can produce promotable or trial_failed, never immediate active promotion"
+        }
+      }
+    ],
+    rules: {
+      action_selection_is_only_candidate_origin: true,
+      parameters_are_executable_authority: true,
+      prose_is_not_executable_authority: true,
+      generated_source_requires_helper_evidence: true
+    }
+  };
+}
+
 export function buildGoalMindProviderInput(context: SocialCycleContextPacket): JsonValue {
   const strategicGoals = selectStrategicGoalsForGoalMind(context.strategic_goals);
   return {
@@ -105,6 +156,7 @@ export function buildActionPlannerProviderInput(input: {
     cycle_goal: input.plannerCycleGoal,
     observation: input.context.observation,
     action_surface_summary: buildActionSurfaceSummary(input.context),
+    action_selection_modes: buildActionSelectionModes(input.context),
     direct_action_skills: input.directActionSkills,
     allowed_primitive_ids: input.plannerCycleGoal.allowed_primitive_ids,
     cycle_goal_allowed_primitive_ids_as_advisory: input.cycleGoal.allowed_primitive_ids,

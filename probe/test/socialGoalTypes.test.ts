@@ -80,6 +80,41 @@ test("validateActionIntent rejects shallow or mismatched action plans", () => {
   );
 });
 
+test("validateActionIntent accepts action-selection generated candidate authoring shape", () => {
+  const result = validateActionIntent({
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "author_and_trial_action_skill",
+    args: {},
+    parameters: { text: "bring logs to the shared chest" },
+    candidate: {
+      schema: "generated-action-skill-candidate/v1",
+      proposed_skill_id: "saySettlementNeed",
+      purpose: "Say a concrete settlement need with helper evidence.",
+      source_language: "typescript",
+      source: "export async function run(ctx, params) { return ctx.say(params.text); }",
+      input_schema: {
+        type: "object",
+        required: ["text"],
+        properties: { text: { type: "string" } }
+      },
+      helper_api_version: "mineflayer-action-skill-helper/v1",
+      helper_allowlist: ["say"],
+      timeout_ms: 5_000,
+      verifier: { kind: "helper_result_status", helper: "say", status: "delivered" },
+      promotion_policy: "record_candidate_only",
+      known_failure_modes: []
+    },
+    why_this_action: "create a reusable bounded speaking action",
+    expected_evidence: ["helper say delivered"],
+    fallback_if_blocked: "remember blocker"
+  });
+
+  assert.equal(result.ok, true);
+});
+
 test("validateCycleJudgment rejects invalid outcome and malformed memory writes", () => {
   const result = validateCycleJudgment({
     schema: "cycle-judgment/v1",

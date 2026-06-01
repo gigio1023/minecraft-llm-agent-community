@@ -455,6 +455,10 @@ function isMoveToIntent(intent: unknown): intent is Record<string, unknown> & { 
     intent.primitive_id === "move_to";
 }
 
+function actionIntentParametersForAudit(intent: Record<string, unknown>) {
+  return isRecord(intent.parameters) ? intent.parameters : intent.args;
+}
+
 function collectActionIntentRefs(
   cycle: SocialCycleRunReport["cycles"][number]
 ) {
@@ -482,7 +486,7 @@ async function auditMoveToIntentContracts(input: {
       continue;
     }
 
-    const status = moveToPhysicalArgsStatus(intent.args);
+    const status = moveToPhysicalArgsStatus(actionIntentParametersForAudit(intent));
     if (status === "empty_args") {
       input.errors.push(
         `Cycle ${input.cycleNumber} move_to intent ${ref} has empty args; structured movement target args are required`

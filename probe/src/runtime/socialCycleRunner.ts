@@ -21,6 +21,7 @@ import type {
   SocialCycleRunReport,
   WorldEventKind
 } from "./goals/types.js";
+import { actionIntentParameters } from "./goals/types.js";
 import { createWorldEvent, listWorldEvents, writeWorldEvent } from "./goals/worldEventStore.js";
 import { runSocialCycleGoalProvider } from "../provider/socialGoalMindProvider.js";
 import { runSocialActionPlannerProvider } from "../provider/socialActionPlannerProvider.js";
@@ -269,6 +270,7 @@ async function persistJudgmentMemoryWrites(
   }
 
   const now = new Date().toISOString();
+  const parameters = actionIntentParameters(actionIntent);
   await writeActorMemoryRecords(
     rootDir,
     judgment.memory_writes.map((write, index) => ({
@@ -295,8 +297,8 @@ async function persistJudgmentMemoryWrites(
       index: {
         objective_ids: [],
         objective_categories: ["social_cycle"],
-        item_names: typeof actionIntent.args.itemName === "string" ? [actionIntent.args.itemName] : [],
-        block_names: typeof actionIntent.args.blockName === "string" ? [actionIntent.args.blockName] : [],
+        item_names: typeof parameters.itemName === "string" ? [parameters.itemName] : [],
+        block_names: typeof parameters.blockName === "string" ? [parameters.blockName] : [],
         tool_names: [...executedTools],
         action_skill_ids: [
           ...(actionIntent.action_skill_id ? [actionIntent.action_skill_id] : []),
