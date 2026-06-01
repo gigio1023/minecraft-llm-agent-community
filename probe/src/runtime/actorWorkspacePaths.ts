@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 export type ActorWorkspacePaths = {
@@ -70,7 +71,12 @@ export type ActorMemoryLayerPath =
   | "guardrail";
 
 export function sanitizeWorkspaceFileId(id: string) {
-  return id.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const sanitized = id.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  if (sanitized.length <= 120) {
+    return sanitized;
+  }
+  const digest = createHash("sha256").update(sanitized).digest("hex").slice(0, 12);
+  return `${sanitized.slice(0, 107)}-${digest}`;
 }
 
 export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorWorkspacePaths {

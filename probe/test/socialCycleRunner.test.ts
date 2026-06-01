@@ -4,7 +4,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { runSocialCycle } from "../src/runtime/socialCycleRunner.js";
+import {
+  runSocialCycle,
+  selectGeminiFallbackModelsForCall,
+  selectGeminiModelForCall
+} from "../src/runtime/socialCycleRunner.js";
 import { cycleGoalProviderInputIncludesSoulAndLifeGoal } from "../src/runtime/goals/types.js";
 import { readJsonIfExists } from "../src/runtime/goals/goalJsonStore.js";
 import { initializeActorWorkspaces } from "../src/runtime/actorWorkspace.js";
@@ -162,6 +166,34 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   const planBeadPacket = (snapshot?.input as { plan_bead_packet?: { graph_summary?: { open_count?: number } } })
     ?.plan_bead_packet;
   assert.equal(planBeadPacket?.graph_summary?.open_count, 0);
+});
+
+test("Gemini social-cycle model rotation selects one model per provider call", () => {
+  const rotation = ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-3.1-flash-lite"];
+  assert.equal(
+    selectGeminiModelForCall({ rotation, callIndex: 0, fallbackModel: "gemma-4-31b-it" }),
+    "gemini-3-flash-preview"
+  );
+  assert.equal(
+    selectGeminiModelForCall({ rotation, callIndex: 1, fallbackModel: "gemma-4-31b-it" }),
+    "gemini-2.5-flash"
+  );
+  assert.equal(
+    selectGeminiModelForCall({ rotation, callIndex: 3, fallbackModel: "gemma-4-31b-it" }),
+    "gemini-3-flash-preview"
+  );
+  assert.equal(
+    selectGeminiModelForCall({ rotation: [], callIndex: 3, fallbackModel: "gemma-4-31b-it" }),
+    "gemma-4-31b-it"
+  );
+  assert.deepEqual(
+    selectGeminiFallbackModelsForCall({
+      rotation,
+      callIndex: 0,
+      fallbackModel: "gemini-3-flash-preview"
+    }),
+    ["gemini-2.5-flash", "gemini-3.1-flash-lite"]
+  );
 });
 
 test("social-cycle provider inputs are stage-specific and bounded", async () => {

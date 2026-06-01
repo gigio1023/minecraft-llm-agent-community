@@ -188,6 +188,7 @@ export type SocialCycleRunOptions = {
   actorWorkspaceRootDir?: string;
   openAiApiKey?: string;
   geminiApiKey?: string;
+  geminiModelRotation?: string[];
   repoRoot?: string;
   /** Use a run-scoped actor workspace under social-runs/<run_id>/ to avoid stale artifacts. */
   isolateWorkspace?: boolean;
@@ -203,6 +204,35 @@ export type SocialCycleRunResult = {
   report: SocialCycleRunReport;
   reportPath: string;
 };
+
+export function selectGeminiModelForCall(input: {
+  rotation?: readonly string[];
+  callIndex: number;
+  fallbackModel: string;
+}) {
+  const rotation = (input.rotation ?? [])
+    .map((model) => model.trim())
+    .filter(Boolean);
+  if (rotation.length === 0) {
+    return input.fallbackModel;
+  }
+  return rotation[input.callIndex % rotation.length] ?? input.fallbackModel;
+}
+
+export function selectGeminiFallbackModelsForCall(input: {
+  rotation?: readonly string[];
+  callIndex: number;
+  fallbackModel: string;
+}) {
+  const rotation = (input.rotation ?? [])
+    .map((model) => model.trim())
+    .filter(Boolean);
+  if (rotation.length <= 1) {
+    return [];
+  }
+  const selected = input.callIndex % rotation.length;
+  return rotation.filter((model, index) => index !== selected && model !== input.fallbackModel);
+}
 
 function memoryKindForJudgmentWrite(input: {
   layer: CycleJudgment["memory_writes"][number]["layer"];
@@ -373,12 +403,30 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       ? {
           apiKey: input.geminiApiKey ?? process.env.GEMINI_API_KEY ?? "",
           model: input.model,
-          maxOutputTokens: Number(process.env.SOCIAL_CYCLE_MAX_OUTPUT_TOKENS ?? 1600),
+          maxOutputTokens: Number(process.env.SOCIAL_CYCLE_MAX_OUTPUT_TOKENS ?? 8192),
           requestTimeoutMs: Number(process.env.GEMINI_TEXT_REQUEST_TIMEOUT_MS ?? 900_000),
           maxRetries: Number(process.env.GEMINI_JSON_MAX_RETRIES ?? 2),
           repoRoot
         }
       : undefined;
+  let geminiProviderCallIndex = 0;
+  const geminiForProviderCall = () => {
+    if (!gemini) {
+      return undefined;
+    }
+    const model = selectGeminiModelForCall({
+      rotation: input.geminiModelRotation,
+      callIndex: geminiProviderCallIndex,
+      fallbackModel: gemini.model
+    });
+    const fallbackModels = selectGeminiFallbackModelsForCall({
+      rotation: input.geminiModelRotation,
+      callIndex: geminiProviderCallIndex,
+      fallbackModel: model
+    });
+    geminiProviderCallIndex++;
+    return { ...gemini, model, fallbackModels };
+  };
 
   await initializeActorWorkspaces({
     rootDir,
@@ -562,7 +610,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         cycleId,
         context,
         openAi,
-        gemini,
+        gemini: geminiForProviderCall(),
         allowedActionSkillIds: allowedSkillIds,
         allowedPrimitiveIds: allowedPrimitives,
         runId
@@ -648,7 +696,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleGoal: cycleGoalProvider.cycleGoal,
           context: actionContext,
           openAi,
-          gemini,
+          gemini: geminiForProviderCall(),
           defaultPrimitive: actionIndex === 0 ? "observe" : "wait",
           recentActionAttempts: actionAttempts.map((attempt) => ({
             action_index: attempt.action_index,
@@ -736,7 +784,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           verifierStatus: execution.verifierStatus,
           runId,
           openAi,
-          gemini
+          gemini: geminiForProviderCall()
         });
 
         if (!judgmentResult.ok) {
@@ -873,11 +921,26 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       await writeJson(input.reportPath, report);
     }
   } finally {
+    const cleanupErrors: string[] = [];
     if (bot) {
-      await closeBots({ [input.actorId]: bot });
+      try {
+        await closeBots({ [input.actorId]: bot });
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error.message : String(error));
+      }
     }
     if (stopServer) {
-      await stopServer();
+      try {
+        await stopServer();
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    if (cleanupErrors.length > 0 && report.server) {
+      report.server = {
+        ...report.server,
+        error: `Post-run cleanup failed: ${cleanupErrors.join("; ")}`
+      };
     }
   }
 

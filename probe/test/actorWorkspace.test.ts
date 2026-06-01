@@ -12,7 +12,8 @@ import {
   getActorPlanBeadEventLogPath,
   getActorPlanBeadHistorySnapshotPath,
   getActorPlanBeadRecordPath,
-  getActorWorkspacePaths
+  getActorWorkspacePaths,
+  sanitizeWorkspaceFileId
 } from "../src/runtime/actorWorkspacePaths.js";
 import { readRelationshipEdge } from "../src/npc/relationships/relationshipStore.js";
 
@@ -22,6 +23,14 @@ const testArtifactRoot = path.resolve(
   "test-artifacts",
   `actor-workspace-${process.pid}-${Date.now()}`
 );
+
+test("workspace file ids are sanitized and bounded for filesystem limits", () => {
+  const id = `cycle-0009-${"blocked_actionintent_args_contract_failed_move_to_requires_structured_args_".repeat(8)}`;
+  const sanitized = sanitizeWorkspaceFileId(id);
+  assert.equal(/^[a-zA-Z0-9_.-]+$/.test(sanitized), true);
+  assert.equal(sanitized.length <= 120, true);
+  assert.match(sanitized, /-[a-f0-9]{12}$/);
+});
 
 test("initializes actor workspaces without deleting existing actor artifacts", async () => {
   const keepPath = path.join(

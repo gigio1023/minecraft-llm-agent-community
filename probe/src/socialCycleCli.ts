@@ -22,6 +22,7 @@ function parseArgs(argv: string[]) {
     worldSeed?: string;
     levelType?: string;
     prepareSpawnAccess?: boolean;
+    geminiModelRotation?: string[];
   } = { worldEvents: [] };
 
   for (let index = 0; index < argv.length; index++) {
@@ -70,10 +71,20 @@ function parseArgs(argv: string[]) {
       index++;
     } else if (arg === "--prepare-spawn-access") {
       options.prepareSpawnAccess = true;
+    } else if ((arg === "--gemini-model-rotation" || arg === "--models") && next) {
+      options.geminiModelRotation = parseCsvList(next);
+      index++;
     }
   }
 
   return options;
+}
+
+function parseCsvList(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeSocialCycleProvider(value: string | undefined): SocialCycleProviderId | undefined {
@@ -111,6 +122,9 @@ async function main() {
     normalizeSocialCycleProvider(process.env.SOCIAL_CYCLE_PROVIDER) ??
     "deterministic-social";
   const model = parsed.model ?? process.env.SOCIAL_CYCLE_MODEL ?? defaultModelForProvider(providerId);
+  const geminiModelRotation =
+    parsed.geminiModelRotation ??
+    parseCsvList(process.env.SOCIAL_CYCLE_GEMINI_MODEL_ROTATION || process.env.GEMINI_MODEL_ROTATION);
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const reportPath = parsed.report
@@ -133,6 +147,7 @@ async function main() {
     worldSeed: parsed.worldSeed,
     levelType: parsed.levelType,
     prepareSpawnAccess: parsed.prepareSpawnAccess,
+    geminiModelRotation,
     reasoning: process.env.SOCIAL_CYCLE_REASONING,
     repoRoot
   });

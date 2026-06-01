@@ -158,6 +158,86 @@ test("provider usage guard resets daily budget on UTC day boundary", async () =>
   }
 });
 
+test("Gemini provider usage guard resets daily budget on Pacific day boundary", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-pacific-day-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    await withUsageEnv(
+      {
+        PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS: "1",
+        PROVIDER_USAGE_LEDGER_PATH: ledgerPath,
+        PROVIDER_USAGE_BUDGETS_JSON: JSON.stringify({
+          budgets: [
+            {
+              provider_id: "gemini-api",
+              model: "gemini-2.5-flash",
+              total_token_limit_per_day: 100,
+              mode: "enforce"
+            }
+          ]
+        })
+      },
+      async () => {
+        await appendProviderUsageRecord({
+          providerId: "gemini-api",
+          model: "gemini-2.5-flash",
+          status: "succeeded",
+          usageSource: "estimated",
+          usage: {
+            requests: 1,
+            input_tokens: 70,
+            output_tokens: 20,
+            thinking_tokens: 0,
+            total_tokens: 90
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-01T23:59:00.000Z")
+        });
+
+        await assert.rejects(
+          guardProviderUsageRequest({
+            providerId: "gemini-api",
+            model: "gemini-2.5-flash",
+            estimatedUsage: {
+              requests: 1,
+              input_tokens: 50,
+              output_tokens: 1,
+              thinking_tokens: 0,
+              total_tokens: 51
+            },
+            context: { ledgerPath },
+            now: new Date("2026-06-02T00:01:00.000Z"),
+            maxAutoDelayMs: 0
+          }),
+          (error) =>
+            error instanceof ProviderUsageBudgetError &&
+            /total_token_limit_per_day/.test(error.message)
+        );
+
+        const decision = await guardProviderUsageRequest({
+          providerId: "gemini-api",
+          model: "gemini-2.5-flash",
+          estimatedUsage: {
+            requests: 1,
+            input_tokens: 50,
+            output_tokens: 1,
+            thinking_tokens: 0,
+            total_tokens: 51
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-02T07:01:00.000Z"),
+          maxAutoDelayMs: 0
+        });
+
+        assert.equal(decision.status, "allowed");
+        assert.equal(decision.projected?.day.total_tokens, 51);
+      }
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("provider usage records include UTC quota day for OpenAI free-token auditing", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-record-day-"));
   const ledgerPath = path.join(dir, "ledger.jsonl");

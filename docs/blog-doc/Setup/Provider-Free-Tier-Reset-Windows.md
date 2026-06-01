@@ -33,7 +33,7 @@ Operational rule:
 - Before long runs, check the provider dashboard when available and encode
   dashboard usage into `PROVIDER_USAGE_BUDGETS_JSON` or
   `build/provider-usage/free-tier-budgets.json` as `already_used`.
-- The repo ledger uses `quota_day_utc` for daily budget decisions.
+- The repo ledger uses `quota_day_utc` for `openai-api` daily budget decisions.
 
 Examples:
 
@@ -60,7 +60,14 @@ Operational rule:
 
 - For Gemini API daily request budgets, convert from the
   `America/Los_Angeles` timezone rather than assuming a fixed UTC hour.
+- The repo ledger uses `pacific_day` for `gemini-api` daily budget decisions.
 - Check current model/project/tier limits in Google AI Studio before long runs.
+- If the live API returns a `QuotaFailure` with `quotaValue`, treat that value
+  as authoritative for the current project/model. On 2026-06-01, this repo's
+  key observed `gemini-2.5-flash` returning
+  `GenerateRequestsPerDayPerProjectPerModel-FreeTier` with `quotaValue: 20`;
+  do not assume public model names are "roomy" without checking the active
+  project quota.
 - The repo's `gemma-4-31b-it` budget is an operator guardrail, not an official
   quota guarantee.
 - RPM/TPM windows are minute-rate limits; this document only records daily RPD

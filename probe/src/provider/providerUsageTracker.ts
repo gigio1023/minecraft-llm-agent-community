@@ -292,9 +292,20 @@ async function readUsageRecords(ledgerPath: string): Promise<ProviderUsageRecord
   }
 }
 
+function dailyQuotaDay(providerId: string, date: Date) {
+  return providerId === "gemini-api" ? pacificDay(date) : utcDay(date);
+}
+
+function recordDailyQuotaDay(record: ProviderUsageRecord) {
+  if (record.provider_id === "gemini-api") {
+    return record.pacific_day;
+  }
+  return record.quota_day_utc ?? record.created_at.slice(0, 10) ?? record.pacific_day;
+}
+
 function totalMatchingRecords(
   records: readonly ProviderUsageRecord[],
-  input: { providerId: string; model: string; quotaDayUtc: string; utcMinute: string }
+  input: { providerId: string; model: string; quotaDay: string; utcMinute: string }
 ) {
   const minute = cloneCounts();
   const day = cloneCounts();
@@ -302,8 +313,7 @@ function totalMatchingRecords(
     if (record.provider_id !== input.providerId || record.model !== input.model) {
       continue;
     }
-    const recordQuotaDayUtc = record.quota_day_utc ?? record.created_at.slice(0, 10) ?? record.pacific_day;
-    if (recordQuotaDayUtc === input.quotaDayUtc) {
+    if (recordDailyQuotaDay(record) === input.quotaDay) {
       Object.assign(day, addCounts(day, record.usage));
     }
     if (record.utc_minute === input.utcMinute) {
@@ -385,7 +395,7 @@ export async function guardProviderUsageRequest(input: {
   const windows = totalMatchingRecords(records, {
     providerId: input.providerId,
     model: input.model,
-    quotaDayUtc: utcDay(now),
+    quotaDay: dailyQuotaDay(input.providerId, now),
     utcMinute: utcMinute(now)
   });
   const existingDay = addCounts(windows.day, budget.already_used ?? {});

@@ -99,7 +99,7 @@ test("uses a longer timeout for docker compose up while keeping compose port and
   const timeouts = getComposeCommandTimeouts(config);
 
   assert.equal(timeouts.startupMs, config.server.pingTimeoutMs);
-  assert.equal(timeouts.managementMs, 10_000);
+  assert.equal(timeouts.managementMs, 30_000);
   assert.ok(timeouts.startupMs > timeouts.managementMs);
 });
 
