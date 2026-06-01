@@ -9,6 +9,7 @@ import { transitionActionSkillStatus } from "../src/skills/lifecycle/status.js";
 import { promoteActionSkillAfterTrial } from "../src/skills/lifecycle/promotion.js";
 import { retireActionSkill } from "../src/skills/lifecycle/retirement.js";
 import { runBoundedActionSkillRecipeTrial } from "../src/skills/recipes/trialRunner.js";
+import { listActiveActorActionSkillRecords } from "../src/runtime/actorWorkspace.js";
 import { writeActorActionSkillRecord } from "../src/runtime/actorWorkspaceStore.js";
 import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
 
@@ -159,6 +160,8 @@ test("promotes a validated candidate after trial evidence and supersedes the old
         ref.includes("recipe-trial-proposal-collect-logs-v2.json")
       )
     );
+    const indexedActive = await listActiveActorActionSkillRecords(rootDir, "npc_b");
+    assert.deepEqual(indexedActive.map((record) => record.skill_id), ["collectLogs"]);
 
     const superseded = JSON.parse(
       await fs.readFile(

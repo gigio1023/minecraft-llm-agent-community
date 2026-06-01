@@ -17,7 +17,11 @@ import {
   checkActiveActionSkillPermission,
   type ActiveActionSkillGate
 } from "./activeActionSkillGate.js";
-import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
+import {
+  addActorActionSkillToLibraryIndex,
+  writeActorActionSkillRecord,
+  type ActorActionSkillRecord
+} from "./actorWorkspaceStore.js";
 import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
 import type { ActorEvidenceCategory } from "./evidence/actorEvidence.js";
 import { createDialogueState } from "./dialogueState.js";
@@ -431,9 +435,32 @@ function normalizeCraftItemName(bot: Bot, itemName: string) {
   return normalized;
 }
 
-function argsForPrimitive(intent: ActionIntent, primitive: AllowedTool) {
+function argsForPrimitive(
+  intent: ActionIntent,
+  primitive: AllowedTool,
+  actionSkillRecord?: ActorActionSkillRecord
+) {
+  const parameters = actionIntentParameters(intent);
+  if (
+    primitive === "run_mineflayer_program" &&
+    actionSkillRecord &&
+    isGeneratedMineflayerActionSkill(actionSkillRecord)
+  ) {
+    return {
+      ...parameters,
+      source: actionSkillRecord.generated_source,
+      purpose: actionSkillRecord.notes ?? actionSkillRecord.success_verifier,
+      expectedObservation: intent.expected_evidence.join("; "),
+      timeoutMs: actionSkillRecord.generated_timeout_ms,
+      parameters,
+      helperAllowlist: actionSkillRecord.generated_helper_allowlist ?? [],
+      actionSkillId: intent.action_skill_id,
+      primitiveId: primitive
+    };
+  }
+
   return {
-    ...actionIntentParameters(intent),
+    ...parameters,
     ...(intent.kind === "use_action_skill" && intent.action_skill_id
       ? { actionSkillId: intent.action_skill_id }
       : {}),
@@ -1143,6 +1170,15 @@ function generatedTrialLifecycleStatus(
   return verifierStatus === "passed" ? "promotable" : "trial_failed";
 }
 
+function isGeneratedMineflayerActionSkill(record: ActorActionSkillRecord) {
+  return (
+    record.source_kind === "learned" &&
+    record.generated_source_language === "typescript" &&
+    typeof record.generated_source === "string" &&
+    record.generated_source.trim().length > 0
+  );
+}
+
 function sourceRefFromToolResult(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
@@ -1217,7 +1253,82 @@ function buildGeneratedActionSkillProposal(input: {
       reason: input.reason
     },
     notes:
-      "Generated in the action-selection stage. This proposal is not active until explicit guarded promotion."
+      input.lifecycleStatus === "promotable"
+        ? "Generated in the action-selection stage. Passed trial is eligible for runtime active-record promotion."
+        : "Generated in the action-selection stage. Failed trial remains candidate evidence until repaired."
+  };
+}
+
+function buildGeneratedActiveActionSkillRecord(input: {
+  actorId: string;
+  candidate: GeneratedActionSkillCandidate;
+  proposalRef: string;
+  sourceRef?: string;
+  trialEvidenceRef: string;
+  parameters: Record<string, unknown>;
+  evidenceRefs: string[];
+  now: string;
+}): ActorActionSkillRecord {
+  return {
+    schema: "actor-action-skill/v1",
+    skill_id: input.candidate.proposed_skill_id,
+    owner_actor_id: input.actorId,
+    source_kind: "learned",
+    status: "active",
+    created_at: input.now,
+    updated_at: input.now,
+    required_primitives: ["run_mineflayer_program"],
+    preconditions: [
+      "authored in action selection",
+      "generated source passed source guard",
+      "trial completed with verifier-classified helper evidence"
+    ],
+    success_verifier: generatedCandidateSuccessVerifier(input.candidate),
+    known_failure_modes: [...input.candidate.known_failure_modes],
+    evidence_refs: [...input.evidenceRefs, input.trialEvidenceRef, input.proposalRef],
+    review_refs: [],
+    generated_source: input.candidate.source,
+    generated_source_language: "typescript",
+    ...(input.sourceRef ? { generated_source_ref: input.sourceRef } : {}),
+    generated_candidate_ref: input.proposalRef,
+    generated_input_schema: input.candidate.input_schema,
+    generated_helper_allowlist: [...input.candidate.helper_allowlist],
+    generated_timeout_ms: input.candidate.timeout_ms,
+    generated_verifier: input.candidate.verifier,
+    notes:
+      `Generated Mineflayer action skill promoted from ${input.proposalRef}. ` +
+      `Example parameters from trial: ${JSON.stringify(input.parameters)}`
+  };
+}
+
+async function writeGeneratedActiveActionSkill(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  candidate: GeneratedActionSkillCandidate;
+  proposalRef: string;
+  sourceRef?: string;
+  trialEvidenceRef: string;
+  parameters: Record<string, unknown>;
+  evidenceRefs: string[];
+  now: string;
+}) {
+  const activeRecord = buildGeneratedActiveActionSkillRecord(input);
+  const activePath = await writeActorActionSkillRecord(
+    input.actorWorkspaceRootDir,
+    activeRecord
+  );
+  await addActorActionSkillToLibraryIndex({
+    rootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    status: "active",
+    skillId: activeRecord.skill_id,
+    updatedAt: input.now
+  });
+  const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
+  return {
+    activeRecord,
+    activePath,
+    activeRef: evidenceRefFromPath(paths.actorDir, activePath)
   };
 }
 
@@ -1372,18 +1483,38 @@ async function executeAuthorAndTrialActionSkill(input: {
       evidence_refs: [step.evidenceRef, trialEvidenceRef]
     }
   });
+  const activePromotion =
+    lifecycleStatus === "promotable"
+      ? await writeGeneratedActiveActionSkill({
+          actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+          actorId: input.actorId,
+          candidate: validation.candidate,
+          proposalRef,
+          sourceRef,
+          trialEvidenceRef,
+          parameters: validation.parameters,
+          evidenceRefs: [step.evidenceRef],
+          now
+        })
+      : null;
 
-  const evidenceRefs = [step.evidenceRef, trialEvidenceRef, proposalRef];
+  const evidenceRefs = [
+    step.evidenceRef,
+    trialEvidenceRef,
+    proposalRef,
+    ...(activePromotion ? [activePromotion.activeRef] : [])
+  ];
   const runtimeResult: JsonValue = {
     status: lifecycleStatus,
     action_authoring: {
       schema: "author-and-trial-action-skill-result/v1",
       candidate_proposal_ref: proposalRef,
       trial_evidence_ref: trialEvidenceRef,
+      active_action_skill_ref: activePromotion?.activeRef ?? null,
       generated_lifecycle_status: lifecycleStatus,
       verifier_status: verifierStatus,
       promotion_policy: validation.candidate.promotion_policy,
-      active_promotion_performed: false
+      active_promotion_performed: Boolean(activePromotion)
     },
     executed_tools: ["run_mineflayer_program"],
     tool_statuses: toolStatuses as unknown as JsonValue,
@@ -1692,6 +1823,10 @@ export async function executeSocialActionIntent(input: {
   const resolved = resolvePrimitivesForSocialIntent(input.intent, input.activeActionSkills);
   let primitivesToRun = resolved.primitives;
   actionSkillExecutionUnit = resolved.actionSkillExecutionUnit;
+  const selectedActionSkill =
+    input.intent.kind === "use_action_skill" && input.intent.action_skill_id
+      ? input.activeActionSkills.find((skill) => skill.skill_id === input.intent.action_skill_id)
+      : undefined;
 
   if (resolved.blockedReason) {
     return {
@@ -1762,7 +1897,7 @@ export async function executeSocialActionIntent(input: {
       actorId: input.actorId,
       cycleId: turnId,
       tool: primitive,
-      args: argsForPrimitive(input.intent, primitive),
+      args: argsForPrimitive(input.intent, primitive, selectedActionSkill),
       bot: input.bot,
       targetBot: input.targetBot,
       gate,
@@ -1869,6 +2004,12 @@ export function resolvePrimitivesForSocialIntent(
         primitives: [],
         actionSkillExecutionUnit: false,
         blockedReason: "No owned action skill primitives for intent"
+      };
+    }
+    if (isGeneratedMineflayerActionSkill(owned)) {
+      return {
+        primitives: ["run_mineflayer_program"],
+        actionSkillExecutionUnit: true
       };
     }
     if (!owned.required_primitives.every(isSocialExecutablePrimitive)) {

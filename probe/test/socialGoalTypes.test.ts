@@ -104,7 +104,7 @@ test("validateActionIntent accepts action-selection generated candidate authorin
       helper_allowlist: ["say"],
       timeout_ms: 5_000,
       verifier: { kind: "helper_result_status", helper: "say", status: "delivered" },
-      promotion_policy: "record_candidate_only",
+      promotion_policy: "promote_after_passed_trial",
       known_failure_modes: []
     },
     why_this_action: "create a reusable bounded speaking action",

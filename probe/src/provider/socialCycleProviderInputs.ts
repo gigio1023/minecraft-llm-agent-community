@@ -31,7 +31,10 @@ function selectStrategicGoalsForGoalMind(goals: readonly StrategicGoal[]) {
     .slice(0, GOAL_MIND_STRATEGIC_GOAL_LIMIT);
 }
 
-function buildActionSurfaceSummary(context: SocialCycleContextPacket) {
+function buildActionSurfaceSummary(
+  context: SocialCycleContextPacket,
+  options: { includeDirectActionSkills: boolean }
+) {
   const surface = context.action_surface;
   return {
     schema: "action-surface-summary/v1",
@@ -41,11 +44,19 @@ function buildActionSurfaceSummary(context: SocialCycleContextPacket) {
       category: primitive.category,
       description: primitive.description
     })),
-    direct_action_skills: surface.direct_action_skills.map((skill) => ({
-      action_skill_id: skill.action_skill_id,
-      required_primitives: [...skill.required_primitives],
-      success_verifier: skill.success_verifier
-    })),
+    ...(options.includeDirectActionSkills
+      ? {
+          direct_action_skills: surface.direct_action_skills.map((skill) => ({
+            action_skill_id: skill.action_skill_id,
+            required_primitives: [...skill.required_primitives],
+            success_verifier: skill.success_verifier
+          }))
+        }
+      : {
+          direct_action_skill_count: surface.direct_action_skills.length,
+          deferred_action_skill_count: surface.deferred_action_skills.length,
+          action_skill_details_visible_in_stage: "action_planner"
+        }),
     deferred_counts: {
       primitives: surface.deferred_primitives.length,
       action_skills: surface.deferred_action_skills.length
@@ -94,7 +105,8 @@ function buildActionSelectionModes(context: SocialCycleContextPacket) {
             "promotion_policy",
             "known_failure_modes"
           ],
-          lifecycle: "trial can produce promotable or trial_failed, never immediate active promotion"
+          lifecycle:
+            "passed trial writes an active actor-owned action skill; failed trial remains candidate evidence"
         }
       }
     ],
@@ -124,7 +136,9 @@ export function buildGoalMindProviderInput(context: SocialCycleContextPacket): J
     world_events: context.world_events,
     previous_cycle_judgments: context.previous_cycle_judgments,
     observation: context.observation,
-    action_surface_summary: buildActionSurfaceSummary(context),
+    action_surface_summary: buildActionSurfaceSummary(context, {
+      includeDirectActionSkills: false
+    }),
     allowed_primitive_ids: context.allowed_primitive_ids,
     runtime_retry_constraints: context.runtime_retry_constraints,
     relationship_context: context.relationship_context,
@@ -155,9 +169,12 @@ export function buildActionPlannerProviderInput(input: {
     ActorLifeGoal: input.context.ActorLifeGoal,
     cycle_goal: input.plannerCycleGoal,
     observation: input.context.observation,
-    action_surface_summary: buildActionSurfaceSummary(input.context),
+    action_surface_summary: buildActionSurfaceSummary(input.context, {
+      includeDirectActionSkills: true
+    }),
     action_selection_modes: buildActionSelectionModes(input.context),
     direct_action_skills: input.directActionSkills,
+    candidate_action_skill_search: input.context.candidate_action_skill_search,
     allowed_primitive_ids: input.plannerCycleGoal.allowed_primitive_ids,
     cycle_goal_allowed_primitive_ids_as_advisory: input.cycleGoal.allowed_primitive_ids,
     cycle_goal_allowed_action_skill_ids_as_advisory: input.cycleGoal.allowed_action_skill_ids,
@@ -208,7 +225,9 @@ export function buildCycleJudgmentProviderInput(input: {
     plan_bead_packet: input.context.plan_bead_packet ?? null,
     plan_bead_operation_guidance: input.planBeadOperationGuidance,
     action_skill_feedback_guidance: input.actionSkillFeedbackGuidance,
-    action_surface_summary: buildActionSurfaceSummary(input.context),
+    action_surface_summary: buildActionSurfaceSummary(input.context, {
+      includeDirectActionSkills: false
+    }),
     previous_cycle_judgments: input.context.previous_cycle_judgments,
     settlement_state: input.context.settlement_state
   } as JsonValue;

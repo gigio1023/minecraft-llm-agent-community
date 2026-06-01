@@ -53,6 +53,13 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     "active",
     "craftCraftingTable.json"
   );
+  const learnedActiveSkillPath = path.join(
+    testArtifactRoot,
+    "npc_b",
+    "action-skills",
+    "active",
+    "learnedSayNeed.json"
+  );
   const preExistingPaths = getActorWorkspacePaths(testArtifactRoot, "npc_b");
   const stalePlanBeadPath = getActorPlanBeadRecordPath(
     testArtifactRoot,
@@ -75,6 +82,7 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
   await fs.mkdir(path.dirname(staleProviderInputPath), { recursive: true });
   await fs.mkdir(path.dirname(staleProviderOutputPath), { recursive: true });
   await fs.mkdir(path.dirname(staleActiveSkillPath), { recursive: true });
+  await fs.mkdir(path.dirname(learnedActiveSkillPath), { recursive: true });
   await fs.mkdir(path.dirname(stalePlanBeadPath), { recursive: true });
   await fs.mkdir(path.dirname(preExistingPaths.planBeads.dependenciesFile), { recursive: true });
   await fs.mkdir(path.dirname(stalePlanBeadEventPath), { recursive: true });
@@ -98,7 +106,7 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       schema: "action-skill-library/v1",
       owner_actor_id: "npc_b",
       initialized_at: "2026-05-19T00:00:00.000Z",
-      active: ["craftCraftingTable"],
+      active: ["craftCraftingTable", "learnedSayNeed"],
       candidates: ["keep"],
       retired: ["oldShelterTrial"],
       rejected: ["unsafeDigTrial"]
@@ -121,6 +129,29 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       known_failure_modes: [],
       evidence_refs: [],
       review_refs: []
+    }, null, 2),
+    "utf8"
+  );
+  await fs.writeFile(
+    learnedActiveSkillPath,
+    JSON.stringify({
+      schema: "actor-action-skill/v1",
+      skill_id: "learnedSayNeed",
+      owner_actor_id: "npc_b",
+      source_kind: "learned",
+      status: "active",
+      created_at: "2026-05-19T00:00:00.000Z",
+      updated_at: "2026-05-19T00:00:00.000Z",
+      required_primitives: ["run_mineflayer_program"],
+      preconditions: ["passed generated trial"],
+      success_verifier: "generated-action-skill:helper_result_status",
+      known_failure_modes: ["target actor may be busy"],
+      evidence_refs: ["evidence/generated-trial.json"],
+      review_refs: [],
+      generated_source: "export async function run(ctx, params) { return ctx.say(params.text); }",
+      generated_source_language: "typescript",
+      generated_helper_allowlist: ["say"],
+      generated_timeout_ms: 5000
     }, null, 2),
     "utf8"
   );
@@ -172,30 +203,19 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       )
     );
     assert.equal(actionSkillIndex.schema, "action-skill-library/v1");
-    assert.deepEqual(actionSkillIndex.active, ["collectLogs"]);
+    assert.deepEqual(actionSkillIndex.active, ["collectLogs", "learnedSayNeed"]);
     assert.deepEqual(actionSkillIndex.candidates, ["keep"]);
     assert.deepEqual(actionSkillIndex.retired, ["oldShelterTrial"]);
     assert.deepEqual(actionSkillIndex.rejected, ["unsafeDigTrial"]);
 
     const activeRecords = await listActiveActorActionSkillRecords(testArtifactRoot, "npc_b");
-    assert.deepEqual(activeRecords, [
-      {
-        schema: "actor-action-skill/v1",
-        skill_id: "collectLogs",
-        owner_actor_id: "npc_b",
-        source_kind: "seed",
-        status: "active",
-        created_at: "2026-05-20T00:00:00.000Z",
-        updated_at: "2026-05-20T00:00:00.000Z",
-        required_primitives: ["observe", "collect_logs", "wait"],
-        preconditions: [],
-        success_verifier: "runtime verifier for collectLogs",
-        known_failure_modes: [],
-        evidence_refs: [],
-        review_refs: [],
-        notes: "Mine nearby trees to gather logs"
-      }
+    assert.deepEqual(activeRecords.map((record) => record.skill_id), [
+      "collectLogs",
+      "learnedSayNeed"
     ]);
+    assert.equal(activeRecords[0]?.source_kind, "seed");
+    assert.equal(activeRecords[1]?.source_kind, "learned");
+    assert.match(activeRecords[1]?.generated_source ?? "", /ctx\.say/);
 
     await fs.access(paths.actionSkills.activeDir);
     await fs.access(paths.actionSkills.candidatesDir);

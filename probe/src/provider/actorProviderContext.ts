@@ -101,11 +101,23 @@ function compactActiveActionSkill(record: ActorActionSkillRecord): JsonRecord {
 }
 
 function compactCandidate(actorDir: string, filePath: string, value: JsonRecord): JsonRecord {
+  const generatedTrial =
+    value.generated_trial &&
+    typeof value.generated_trial === "object" &&
+    !Array.isArray(value.generated_trial)
+      ? (value.generated_trial as JsonRecord)
+      : null;
   return {
     ref: relativeArtifactRef(actorDir, filePath),
     proposal_id: typeof value.proposal_id === "string" ? value.proposal_id : null,
     skill_id: typeof value.skill_id === "string" ? value.skill_id : null,
     status: typeof value.status === "string" ? value.status : null,
+    generated_lifecycle_status:
+      typeof value.generated_lifecycle_status === "string"
+        ? value.generated_lifecycle_status
+        : null,
+    generated_trial_status:
+      generatedTrial && typeof generatedTrial.status === "string" ? generatedTrial.status : null,
     task_intent: typeof value.task_intent === "string" ? value.task_intent : null,
     required_primitives: Array.isArray(value.required_primitives)
       ? value.required_primitives

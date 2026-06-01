@@ -6,6 +6,7 @@ import {
   type ActorActionSkillStatusPath
 } from "../../runtime/actorWorkspacePaths.js";
 import {
+  addActorActionSkillToLibraryIndex,
   writeActorActionSkillRecord,
   type ActorActionSkillRecord
 } from "../../runtime/actorWorkspaceStore.js";
@@ -150,6 +151,13 @@ export async function promoteActionSkillAfterTrial(input: PromoteActionSkillInpu
     input.actorWorkspaceRootDir,
     activeRecord
   );
+  await addActorActionSkillToLibraryIndex({
+    rootDir: input.actorWorkspaceRootDir,
+    actorId: activeRecord.owner_actor_id,
+    status: "active",
+    skillId: activeRecord.skill_id,
+    updatedAt: now(input.created_at)
+  });
 
   return {
     activePath,

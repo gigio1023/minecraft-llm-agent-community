@@ -233,6 +233,11 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
   assert.equal((goalMind?.input?.strategic_goal_window as { omitted_count?: number })?.omitted_count, 3);
   assert.equal(goalMind?.input?.action_surface, undefined);
   assert.ok(goalMind?.input?.action_surface_summary);
+  assert.equal(
+    (goalMind?.input?.action_surface_summary as { direct_action_skills?: unknown })
+      ?.direct_action_skills,
+    undefined
+  );
 
   const actionPlanner = await readJsonIfExists<{ input?: Record<string, unknown> }>(
     path.join(actorDir, actionPlannerRef)
@@ -243,6 +248,7 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
   assert.equal(actionPlanner?.input?.settlement_checklist, undefined);
   assert.ok(actionPlanner?.input?.runtime_affordances);
   assert.ok(actionPlanner?.input?.direct_action_skills);
+  assert.ok(actionPlanner?.input?.candidate_action_skill_search);
 
   const judgment = await readJsonIfExists<{ input?: Record<string, unknown> }>(
     path.join(actorDir, judgmentRef)
@@ -252,6 +258,11 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
   assert.equal(judgment?.input?.settlement_checklist, undefined);
   assert.ok(judgment?.input?.runtime_result);
   assert.ok(judgment?.input?.action_surface_summary);
+  assert.equal(
+    (judgment?.input?.action_surface_summary as { direct_action_skills?: unknown })
+      ?.direct_action_skills,
+    undefined
+  );
 });
 
 test("deterministic-social maxActionsPerCycle=2 report keeps observe and wait attempts", async () => {

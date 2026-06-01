@@ -11,6 +11,7 @@ import {
   filterExecutableSocialActionSkills,
   resolvePrimitivesForSocialIntent
 } from "../src/runtime/socialCycleExecution.js";
+import { listActiveActorActionSkillRecords } from "../src/runtime/actorWorkspace.js";
 import type { ActorActionSkillRecord } from "../src/runtime/actorWorkspaceStore.js";
 import {
   clampCycleJudgmentOutcome,
@@ -468,7 +469,7 @@ test("executor authors and trials a generated action skill candidate only throug
         helper_allowlist: ["say"],
         timeout_ms: 5_000,
         verifier: { kind: "helper_result_status", helper: "say", status: "delivered" },
-        promotion_policy: "record_candidate_only",
+        promotion_policy: "promote_after_passed_trial",
         known_failure_modes: ["target actor may be busy"]
       },
       why_this_action: "A reusable generated candidate is more precise than another memory note.",
@@ -508,6 +509,69 @@ test("executor authors and trials a generated action skill candidate only throug
   assert.equal(trialEvidence.category, "action_skill_candidate_trial");
   assert.equal(trialEvidence.data.generated_lifecycle_status, "promotable");
   assert.equal(trialEvidence.data.verifier_status, "passed");
+
+  const activeRecords = await listActiveActorActionSkillRecords(workspaceRoot, "npc_b");
+  const activeGenerated = activeRecords.find(
+    (record) => record.skill_id === "saySharedChestNeed"
+  );
+  assert.ok(activeGenerated);
+  assert.equal(activeGenerated.status, "active");
+  assert.equal(activeGenerated.source_kind, "learned");
+  assert.deepEqual(activeGenerated.required_primitives, ["run_mineflayer_program"]);
+  assert.match(activeGenerated.generated_source ?? "", /ctx\.say/);
+  assert.deepEqual(activeGenerated.generated_helper_allowlist, ["say"]);
+
+  const reused = await executeSocialActionIntent({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0002",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-2",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0002",
+      status: "active",
+      source: "llm_planner",
+      summary: "Reuse generated speaking action",
+      rationale: "Active generated action skills must execute stored source with new parameters.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "generated_action_skill_reuse",
+        evidence_required: ["run_mineflayer_program"]
+      },
+      allowed_action_skill_ids: ["saySharedChestNeed"],
+      allowed_primitive_ids: ["run_mineflayer_program"],
+      stop_conditions: ["verifier_passed"]
+    },
+    intent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0002",
+      cycle_goal_id: "cycle-goal-2",
+      kind: "use_action_skill",
+      action_skill_id: "saySharedChestNeed",
+      args: {},
+      parameters: { text: "new shared chest message" },
+      why_this_action: "Reuse the generated speaking action with current text.",
+      expected_evidence: ["helper say delivered"],
+      fallback_if_blocked: "remember reuse blocker"
+    },
+    bot: fakeObserveBot(),
+    targetBot: fakeObserveBot("npc_a"),
+    activeActionSkills: activeRecords
+  });
+
+  assert.equal(reused.verifierStatus, "passed");
+  assert.deepEqual(reused.executedTools, ["run_mineflayer_program"]);
+  assert.match(JSON.stringify(reused.runtimeResult), /new shared chest message/);
 });
 
 test("wait and remember still pass through CycleGoal and active action-skill gates", async () => {

@@ -40,7 +40,25 @@ export type ActorActionSkillRecord = {
     evidence_refs: string[];
   };
   legacy_source_ref?: string;
+  generated_source?: string;
+  generated_source_language?: "typescript";
+  generated_source_ref?: string;
+  generated_candidate_ref?: string;
+  generated_input_schema?: Record<string, unknown>;
+  generated_helper_allowlist?: string[];
+  generated_timeout_ms?: number;
+  generated_verifier?: Record<string, unknown>;
   notes?: string;
+};
+
+type ActionSkillLibraryIndex = {
+  schema: "action-skill-library/v1";
+  owner_actor_id: string;
+  initialized_at: string;
+  active: string[];
+  candidates: string[];
+  retired: string[];
+  rejected: string[];
 };
 
 export async function writeJson(filePath: string, value: unknown) {
@@ -59,6 +77,55 @@ async function readJson<T>(filePath: string): Promise<T> {
 
 function toStatusPath(status: ActorActionSkillStatus): ActorActionSkillStatusPath {
   return status;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+function uniqueSorted(values: readonly string[]) {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+async function readActionSkillLibraryIndex(
+  rootDir: string,
+  actorId: string,
+  initializedAt: string
+): Promise<ActionSkillLibraryIndex> {
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+
+  try {
+    const index = JSON.parse(await fs.readFile(paths.actionSkills.indexFile, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    return {
+      schema: "action-skill-library/v1",
+      owner_actor_id: actorId,
+      initialized_at:
+        typeof index.initialized_at === "string" ? index.initialized_at : initializedAt,
+      active: stringArray(index.active),
+      candidates: stringArray(index.candidates),
+      retired: stringArray(index.retired),
+      rejected: stringArray(index.rejected)
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {
+        schema: "action-skill-library/v1",
+        owner_actor_id: actorId,
+        initialized_at: initializedAt,
+        active: [],
+        candidates: [],
+        retired: [],
+        rejected: []
+      };
+    }
+
+    throw error;
+  }
 }
 
 export function materializeSeedActionSkillRecord(
@@ -105,6 +172,32 @@ export async function writeActorActionSkillRecord(
   );
   await writeJson(filePath, record);
   return filePath;
+}
+
+export async function addActorActionSkillToLibraryIndex(input: {
+  rootDir: string;
+  actorId: string;
+  status: ActorActionSkillStatusPath;
+  skillId: string;
+  updatedAt?: string;
+}) {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const paths = getActorWorkspacePaths(input.rootDir, input.actorId);
+  const index = await readActionSkillLibraryIndex(input.rootDir, input.actorId, updatedAt);
+  const key =
+    input.status === "active"
+      ? "active"
+      : input.status === "rejected"
+        ? "rejected"
+        : input.status === "retired" || input.status === "superseded"
+          ? "retired"
+          : "candidates";
+
+  await writeJson(paths.actionSkills.indexFile, {
+    ...index,
+    initialized_at: index.initialized_at,
+    [key]: uniqueSorted([...index[key], input.skillId])
+  });
 }
 
 export async function listActorActionSkillRecords(

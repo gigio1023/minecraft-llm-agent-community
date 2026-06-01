@@ -63,6 +63,7 @@ export type SocialCycleContextPacket = {
     preconditions: string[];
     success_verifier: string;
   }>;
+  candidate_action_skill_search: unknown[];
   allowed_primitive_ids: string[];
   action_surface: ActionSurfacePacket;
   runtime_retry_constraints: RuntimeRetryConstraint[];
@@ -192,6 +193,9 @@ export async function assembleSocialCycleContext(input: {
       preconditions: [...record.preconditions],
       success_verifier: record.success_verifier
     })),
+    candidate_action_skill_search: Array.isArray(providerContext.candidate_action_skills)
+      ? providerContext.candidate_action_skills
+      : [],
     allowed_primitive_ids: [...input.allowedPrimitiveIds],
     action_surface: actionSurface,
     runtime_retry_constraints: [...(input.runtimeRetryConstraints ?? [])],

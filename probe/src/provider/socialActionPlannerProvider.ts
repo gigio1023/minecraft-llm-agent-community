@@ -54,7 +54,7 @@ const generatedActionSkillCandidateSchema = {
     verifier: { type: "object" },
     promotion_policy: {
       type: "string",
-      enum: ["record_candidate_only", "promote_after_passed_trial"]
+      enum: ["promote_after_passed_trial"]
     },
     known_failure_modes: { type: "array", items: { type: "string" } }
   },
@@ -306,13 +306,14 @@ export async function runSocialActionPlannerProvider(input: {
       schema: actionPlannerSchema,
       system: `You plan one bounded ActionIntent for the active CycleGoal.
 ActorSoul and ActorLifeGoal are fixed context. The actor cares about social consequences according to its soul and relationships, but ordinary Minecraft actions do not need forced social framing.
-Select from runtime_affordances and direct_action_skills based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, and recent attempts. action_surface_summary explains the actor's current body shape; it is not a strategy checklist.
+Select from runtime_affordances and direct_action_skills based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, candidate_action_skill_search, and recent attempts. action_surface_summary explains the actor's current body shape; it is not a strategy checklist.
 plan_bead_packet is read-only work-state context for continuity. If ready or in_progress beads exist, use them to avoid forgetting unfinished work, but current observation, action_surface_summary, runtime_retry_constraints, and ActorLifeGoal can still justify a pivot. PlanBeads never add executable args, action permissions, physical success, or a requirement to follow a checklist.
 Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
 Vitals and food candidates are observation fields, not runtime priorities. If consuming food is useful, choose consume_item with an explicit itemName from inventory evidence.
 Deferred primitives or action skills explain missing affordances; do not choose them in this ActionIntent. Direct primitives and direct action skills are the executable body for this turn.
 Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not ordinary executable actions until the selected ActionIntent is author_and_trial_action_skill.
-Use author_and_trial_action_skill when the best next step needs a new actor-owned generated action skill candidate. This is the only social-cycle stage that may originate a new generated action skill candidate. Put executable inputs in parameters, define candidate.input_schema as a JSON object schema for those parameters, and put the complete TypeScript source in candidate.source. The source must export async function run(ctx, params) and use the helper API declared in candidate.helper_allowlist. Keep helper code active and concrete; prefer actual Mineflayer helper calls over returning descriptive text.
+candidate_action_skill_search is read-only history for prior generated candidates; it can inform whether to reuse an active skill, author a better candidate, or avoid repeating a failed shape. It is visible only in this action-selection stage.
+Use author_and_trial_action_skill when the best next step needs a new actor-owned generated action skill. This is the only social-cycle stage that may originate a new generated action skill candidate. Put executable inputs in parameters, define candidate.input_schema as a JSON object schema for those parameters, and put the complete TypeScript source in candidate.source. The source must export async function run(ctx, params) and use the helper API declared in candidate.helper_allowlist. Set candidate.promotion_policy to promote_after_passed_trial. A passed trial is stored as an active actor-owned action skill for later use_action_skill turns; a failed trial remains candidate evidence. Keep helper code active and concrete; prefer actual Mineflayer helper calls over returning descriptive text.
 Do not create generated candidates from judgment, PlanBeads, memory, or reviewer text. Those surfaces may review, patch, retry, retire, or promote an existing candidate, but origin authority belongs to this ActionIntent.
 Use use_primitive run_mineflayer_program only for legacy one-off direct program execution when you are not trying to create an actor-owned candidate. For reusable behavior, choose author_and_trial_action_skill instead.
 Treat CycleGoal allowed_* lists as compatibility mirrors/advisory context. They must not shrink the action surface; runtime_affordances and direct_action_skills define what can be selected.
@@ -325,7 +326,7 @@ If a ready PlanBead points at a blocker or action-skill followup, choose an exec
 remember is a continuity tool, not a substitute for acting. After a blocker has already been remembered once, do not keep selecting remember for the same blocker; choose fresh observation, a different reachable target, another useful action, or let judgment defer/update the PlanBead.
 If a primitive reports a concrete required position in runtime_result, use structured move_to toward that explicit position or observe current state before retrying. Do not retry the same primitive from outside its reported interaction range.
 Building primitives such as build_pattern are ordinary affordances. Use them only when the current CycleGoal, WorldEvents, observation, or memory makes building relevant; never treat a construction target as always-on architecture.
-use_action_skill executes every required_primitive in order as one verifier-checked bundle; prefer use_primitive when a single runtime affordance is enough. Prefer author_and_trial_action_skill when code generation should become an actor-owned candidate with source, schema, parameters, helper events, result, and post-observation attached to actor workspace artifacts.
+use_action_skill executes seed/recipe bundles through their required primitives; generated Mineflayer action skills execute their stored source through run_mineflayer_program with current parameters. Prefer use_primitive when a single runtime affordance is enough. Prefer author_and_trial_action_skill when code generation should become an actor-owned action skill with source, schema, parameters, helper events, result, post-observation, and active record attached to actor workspace artifacts.
 Do not claim success through text. Pick actions whose evidence can be verified by runtime outputs. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {

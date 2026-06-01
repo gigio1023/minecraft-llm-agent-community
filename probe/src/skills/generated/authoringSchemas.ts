@@ -269,6 +269,14 @@ export function validateAuthorAndTrialActionSkillIntent(
   if (!candidateResult.ok) {
     return candidateResult;
   }
+  if (candidateResult.candidate.promotion_policy !== "promote_after_passed_trial") {
+    return {
+      ok: false,
+      errors: [
+        "author_and_trial_action_skill requires candidate.promotion_policy promote_after_passed_trial"
+      ]
+    };
+  }
 
   const parameters = actionIntentParameters(intent);
   const schemaResult = validateJsonObjectAgainstSimpleSchema({
