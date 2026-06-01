@@ -61,6 +61,16 @@ test("direct generated action skill source guard rejects Node escape hatches", (
   );
 });
 
+test("direct generated action skill source guard rejects obvious unbounded loops", () => {
+  assert.throws(
+    () =>
+      assertDirectGeneratedActionSkillSource(`
+        export async function run(ctx) { while (true) { await ctx.wait(100); } }
+      `),
+    /blocked API or obvious unbounded loop/
+  );
+});
+
 test("direct generated action skill executor passes schema-bound params", async () => {
   const result = await runDirectGeneratedActionSkill({
     actorId: "npc_b",

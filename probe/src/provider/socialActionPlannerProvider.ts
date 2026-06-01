@@ -220,6 +220,35 @@ function validateExecutableIntent(
   return null;
 }
 
+export function shouldRegenerateActionIntent(intent: ActionIntent, error: string) {
+  return (
+    intent.kind === "author_and_trial_action_skill" &&
+    error.startsWith("Generated action skill candidate contract failed:")
+  );
+}
+
+export function buildActionIntentRegenerationGuidance(input: {
+  error: string;
+  rejectedIntent: ActionIntent;
+}) {
+  return {
+    schema: "action-planner-regeneration-guidance/v1",
+    reason:
+      "The previous generated action skill candidate was rejected before execution. Generate one corrected replacement ActionIntent now.",
+    rejected_error: input.error,
+    rejected_intent: input.rejectedIntent as unknown as JsonValue,
+    rules: {
+      fix_the_reported_error_directly: true,
+      do_not_repeat_blocked_source_or_helper_shape: true,
+      source_must_export_async_run_ctx_params: true,
+      source_must_not_use_import_require_process_eval_function_fs_net_http_or_obvious_infinite_loops: true,
+      helper_allowlist_must_include_every_ctx_helper_called_by_source: true,
+      parameters_must_match_candidate_input_schema: true,
+      promotion_policy_must_be_promote_after_passed_trial: true
+    }
+  };
+}
+
 /**
  * Produces one bounded ActionIntent and stores both provider input and output.
  *
@@ -240,6 +269,8 @@ export async function runSocialActionPlannerProvider(input: {
   actionIndex?: number;
   recentActionAttempts?: JsonValue;
   runId?: string;
+  regenerationAttempt?: number;
+  regenerationGuidance?: JsonValue;
 }): Promise<ActionPlannerProviderResult> {
   const turnId = input.turnId ?? input.cycleId;
   const snapshotId = `action-planner-${turnId}-${randomUUID()}`;
@@ -255,7 +286,7 @@ export async function runSocialActionPlannerProvider(input: {
       description: primitive.description,
       args_contract: primitive.args_contract
     }));
-  const providerInput = buildActionPlannerProviderInput({
+  const baseProviderInput = buildActionPlannerProviderInput({
     context: input.context,
     turnId,
     actionIndex: input.actionIndex,
@@ -265,6 +296,16 @@ export async function runSocialActionPlannerProvider(input: {
     runtimeAffordances: runtimeAffordances as unknown as JsonValue,
     recentActionAttempts: input.recentActionAttempts
   });
+  const providerInput =
+    input.regenerationGuidance &&
+    typeof baseProviderInput === "object" &&
+    baseProviderInput !== null &&
+    !Array.isArray(baseProviderInput)
+      ? ({
+          ...baseProviderInput,
+          regeneration_guidance: input.regenerationGuidance
+        } as JsonValue)
+      : baseProviderInput;
 
   const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-input-snapshot/v1",
@@ -314,6 +355,7 @@ Deferred primitives or action skills explain missing affordances; do not choose 
 Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not ordinary executable actions until the selected ActionIntent is author_and_trial_action_skill.
 candidate_action_skill_search is read-only history for prior generated candidates; it can inform whether to reuse an active skill, author a better candidate, or avoid repeating a failed shape. It is visible only in this action-selection stage.
 Use author_and_trial_action_skill when the best next step needs a new actor-owned generated action skill. This is the only social-cycle stage that may originate a new generated action skill candidate. Put executable inputs in parameters, define candidate.input_schema as a JSON object schema for those parameters, and put the complete TypeScript source in candidate.source. The source must export async function run(ctx, params) and use the helper API declared in candidate.helper_allowlist. Set candidate.promotion_policy to promote_after_passed_trial. A passed trial is stored as an active actor-owned action skill for later use_action_skill turns; a failed trial remains candidate evidence. Keep helper code active and concrete; prefer actual Mineflayer helper calls over returning descriptive text.
+If regeneration_guidance is present, the previous generated candidate was rejected by runtime validation. Fix the reported reason directly, do not repeat the rejected source shape, and return one corrected ActionIntent.
 Do not create generated candidates from judgment, PlanBeads, memory, or reviewer text. Those surfaces may review, patch, retry, retire, or promote an existing candidate, but origin authority belongs to this ActionIntent.
 Use use_primitive run_mineflayer_program only for legacy one-off direct program execution when you are not trying to create an actor-owned candidate. For reusable behavior, choose author_and_trial_action_skill instead.
 Treat CycleGoal allowed_* lists as compatibility mirrors/advisory context. They must not shrink the action surface; runtime_affordances and direct_action_skills define what can be selected.
@@ -442,6 +484,20 @@ Do not claim success through text. Pick actions whose evidence can be verified b
       proposal: { error: executableError },
       usage: usageRecord
     });
+    if (
+      input.providerId !== "deterministic-social" &&
+      (input.regenerationAttempt ?? 0) < 1 &&
+      shouldRegenerateActionIntent(validated.intent, executableError)
+    ) {
+      return runSocialActionPlannerProvider({
+        ...input,
+        regenerationAttempt: (input.regenerationAttempt ?? 0) + 1,
+        regenerationGuidance: buildActionIntentRegenerationGuidance({
+          error: executableError,
+          rejectedIntent: validated.intent
+        }) as unknown as JsonValue
+      });
+    }
     return {
       ok: false,
       error: executableError,

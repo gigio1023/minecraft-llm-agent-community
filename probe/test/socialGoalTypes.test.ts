@@ -9,7 +9,12 @@ import {
   validateActionIntent,
   validateCycleJudgment
 } from "../src/runtime/goals/types.js";
+import type { ActionIntent } from "../src/runtime/goals/types.js";
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
+import {
+  buildActionIntentRegenerationGuidance,
+  shouldRegenerateActionIntent
+} from "../src/provider/socialActionPlannerProvider.js";
 
 test("ActorSoul and LifeGoal validators accept canonical records", () => {
   const soul = compileActorSoulFromProfile("npc_b");
@@ -81,7 +86,7 @@ test("validateActionIntent rejects shallow or mismatched action plans", () => {
 });
 
 test("validateActionIntent accepts action-selection generated candidate authoring shape", () => {
-  const result = validateActionIntent({
+  const intent: ActionIntent = {
     schema: "action-intent/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
@@ -110,9 +115,47 @@ test("validateActionIntent accepts action-selection generated candidate authorin
     why_this_action: "create a reusable bounded speaking action",
     expected_evidence: ["helper say delivered"],
     fallback_if_blocked: "remember blocker"
-  });
+  };
+  const result = validateActionIntent(intent);
 
   assert.equal(result.ok, true);
+});
+
+test("generated candidate contract failures request one guided regeneration", () => {
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "author_and_trial_action_skill",
+    args: {},
+    parameters: {},
+    candidate: {
+      schema: "generated-action-skill-candidate/v1",
+      proposed_skill_id: "badLoop",
+      purpose: "Bad candidate",
+      source_language: "typescript",
+      source: "export async function run(ctx) { while (true) {} }",
+      input_schema: { type: "object" },
+      helper_api_version: "mineflayer-action-skill-helper/v1",
+      helper_allowlist: ["wait"],
+      timeout_ms: 5_000,
+      verifier: { kind: "helper_event_progress" },
+      promotion_policy: "promote_after_passed_trial",
+      known_failure_modes: []
+    },
+    why_this_action: "test regeneration",
+    expected_evidence: ["corrected source"],
+    fallback_if_blocked: "observe"
+  };
+  const error =
+    "Generated action skill candidate contract failed: Generated action skill contains a blocked API or obvious unbounded loop";
+
+  assert.equal(shouldRegenerateActionIntent(intent, error), true);
+  const guidance = buildActionIntentRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
+  assert.equal(guidance.rejected_error, error);
+  assert.equal(guidance.rules.do_not_repeat_blocked_source_or_helper_shape, true);
 });
 
 test("validateCycleJudgment rejects invalid outcome and malformed memory writes", () => {
