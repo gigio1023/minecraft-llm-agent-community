@@ -190,7 +190,7 @@ export async function observe({
       actorId: actor.username,
       scanId: `observe-${actor.username}-${randomUUID()}`,
       radius: 32,
-      caps: { blockObservations: 64, nearestExamples: 12 }
+      caps: { blockObservations: 256, nearestExamples: 12 }
     })
   );
   const sharedChestItems = sharedChest

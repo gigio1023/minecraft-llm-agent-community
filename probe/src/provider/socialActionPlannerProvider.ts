@@ -74,6 +74,14 @@ const generatedActionSkillCandidateSchema = {
   ]
 } as const;
 
+const MAX_ACTION_INTENT_REGENERATION_ATTEMPTS = 2;
+const DEFAULT_ACTION_PLANNER_MAX_COMPLETION_TOKENS = 4096;
+
+const REPAIRABLE_ACTION_INTENT_METADATA_ERRORS = new Set([
+  "why_this_action must be a non-empty string",
+  "fallback_if_blocked must be a non-empty string"
+]);
+
 const actionPlannerSchema = {
   type: "object",
   additionalProperties: false,
@@ -171,6 +179,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function optionalPositiveInteger(value: string | undefined) {
+  if (value === undefined || value.trim() === "") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function openAiConfigForActionPlanner(config: OpenAiJsonProviderConfig) {
+  const stageCap =
+    optionalPositiveInteger(process.env.SOCIAL_ACTION_PLANNER_MAX_COMPLETION_TOKENS) ??
+    DEFAULT_ACTION_PLANNER_MAX_COMPLETION_TOKENS;
+  return {
+    ...config,
+    maxCompletionTokens: Math.max(config.maxCompletionTokens ?? 0, stageCap)
+  };
+}
+
 function hasDirectPrimitiveActionSkillFallback(intent: ActionIntent) {
   const parameters = actionIntentParameters(intent);
   return Boolean(
@@ -178,6 +204,60 @@ function hasDirectPrimitiveActionSkillFallback(intent: ActionIntent) {
       (typeof parameters.actionSkillId === "string" && parameters.actionSkillId.trim()) ||
       (typeof parameters.action_skill_id === "string" && parameters.action_skill_id.trim())
   );
+}
+
+function actionIntentTargetLabel(intent: ActionIntent) {
+  if (intent.kind === "use_primitive") {
+    return `primitive ${intent.primitive_id ?? "<missing>"}`;
+  }
+  if (intent.kind === "use_action_skill") {
+    return `action skill ${intent.action_skill_id ?? "<missing>"}`;
+  }
+  if (intent.kind === "author_and_trial_action_skill") {
+    return "generated action skill trial";
+  }
+  return intent.kind;
+}
+
+export function repairNonExecutableActionIntentMetadata(input: {
+  intent: ActionIntent;
+  errors: readonly string[];
+}): { intent: ActionIntent; repairs: JsonValue[] } | null {
+  if (
+    input.errors.length === 0 ||
+    !input.errors.every((error) => REPAIRABLE_ACTION_INTENT_METADATA_ERRORS.has(error))
+  ) {
+    return null;
+  }
+
+  const repairs: JsonValue[] = [];
+  const intent = { ...input.intent };
+  const target = actionIntentTargetLabel(intent);
+
+  if (typeof intent.why_this_action !== "string" || intent.why_this_action.trim().length === 0) {
+    intent.why_this_action =
+      `Provider omitted why_this_action after guided regeneration; continuing with structured ${target} intent because runtime args and gates still validate.`;
+    repairs.push({
+      field: "why_this_action",
+      reason: "provider omitted non-executable metadata after guided regeneration",
+      value: intent.why_this_action
+    });
+  }
+
+  if (
+    typeof intent.fallback_if_blocked !== "string" ||
+    intent.fallback_if_blocked.trim().length === 0
+  ) {
+    intent.fallback_if_blocked =
+      "If blocked, record the runtime blocker and let the next cycle choose from fresh evidence.";
+    repairs.push({
+      field: "fallback_if_blocked",
+      reason: "provider omitted non-executable metadata after guided regeneration",
+      value: intent.fallback_if_blocked
+    });
+  }
+
+  return repairs.length > 0 ? { intent, repairs } : null;
 }
 
 /** Performs the final provider-output guard before an intent is persisted. */
@@ -221,10 +301,27 @@ function validateExecutableIntent(
 }
 
 export function shouldRegenerateActionIntent(intent: ActionIntent, error: string) {
-  return (
+  if (
+    error.includes("why_this_action") ||
+    error.includes("fallback_if_blocked") ||
+    error.includes("expected_evidence")
+  ) {
+    return true;
+  }
+
+  if (
     intent.kind === "author_and_trial_action_skill" &&
     error.startsWith("Generated action skill candidate contract failed:")
-  );
+  ) {
+    return true;
+  }
+
+  return (
+    intent.kind === "use_primitive" &&
+    error.startsWith("ActionIntent parameters contract failed:")
+  ) ||
+    error.startsWith("Primitive ") ||
+    error.startsWith("Action skill ");
 }
 
 export function buildActionIntentRegenerationGuidance(input: {
@@ -234,11 +331,13 @@ export function buildActionIntentRegenerationGuidance(input: {
   return {
     schema: "action-planner-regeneration-guidance/v1",
     reason:
-      "The previous generated action skill candidate was rejected before execution. Generate one corrected replacement ActionIntent now.",
+      "The previous ActionIntent was rejected before execution. Generate one corrected replacement ActionIntent now.",
     rejected_error: input.error,
     rejected_intent: input.rejectedIntent as unknown as JsonValue,
     rules: {
       fix_the_reported_error_directly: true,
+      use_runtime_affordance_args_contract: true,
+      parameters_must_satisfy_selected_action_contract: true,
       do_not_repeat_blocked_source_or_helper_shape: true,
       source_must_export_async_run_ctx_params: true,
       source_must_not_use_import_require_process_eval_function_fs_net_http_or_obvious_infinite_loops: true,
@@ -350,12 +449,13 @@ ActorSoul and ActorLifeGoal are fixed context. The actor cares about social cons
 Select from runtime_affordances and direct_action_skills based on live observation, query-neutral world-state evidence, memory_packet, relationship_context, world_events, previous judgments, candidate_action_skill_search, and recent attempts. action_surface_summary explains the actor's current body shape; it is not a strategy checklist.
 plan_bead_packet is read-only work-state context for continuity. If ready or in_progress beads exist, use them to avoid forgetting unfinished work, but current observation, action_surface_summary, runtime_retry_constraints, and ActorLifeGoal can still justify a pivot. PlanBeads never add executable args, action permissions, physical success, or a requirement to follow a checklist.
 Observation is raw evidence. Decide what matters from those facts yourself; do not treat every visible fact as a command.
+minecraft_basic_guide is an always-visible Minecraft mechanics guide. Follow the full packet when choosing structured parameters: known_item_flows name concrete prerequisite chains, station_requirements define when inventory crafting is insufficient, blocked_recovery_guides map runtime blocker text to the next executable repair, observe_stop_guides limit repeated observation, coordinates are block cells, scans are bounded loaded-world evidence, and place_block targetPosition is the cell to occupy, not the solid floor block.
 Vitals and food candidates are observation fields, not runtime priorities. If consuming food is useful, choose consume_item with an explicit itemName from inventory evidence.
 Deferred primitives or action skills explain missing affordances; do not choose them in this ActionIntent. Direct primitives and direct action skills are the executable body for this turn.
 Mineflayer expansion opportunities show where the actor body can grow through bounded runtime adapters or action skill candidates. They are not ordinary executable actions until the selected ActionIntent is author_and_trial_action_skill.
 candidate_action_skill_search is read-only history for prior generated candidates; it can inform whether to reuse an active skill, author a better candidate, or avoid repeating a failed shape. It is visible only in this action-selection stage.
 Use author_and_trial_action_skill when the best next step needs a new actor-owned generated action skill. This is the only social-cycle stage that may originate a new generated action skill candidate. Put executable inputs in parameters, define candidate.input_schema as a JSON object schema for those parameters, and put the complete TypeScript source in candidate.source. The source must export async function run(ctx, params) and use the helper API declared in candidate.helper_allowlist. Set candidate.promotion_policy to promote_after_passed_trial. A passed trial is stored as an active actor-owned action skill for later use_action_skill turns; a failed trial remains candidate evidence. Keep helper code active and concrete; prefer actual Mineflayer helper calls over returning descriptive text.
-If regeneration_guidance is present, the previous generated candidate was rejected by runtime validation. Fix the reported reason directly, do not repeat the rejected source shape, and return one corrected ActionIntent.
+If regeneration_guidance is present, the previous ActionIntent was rejected by runtime validation. Fix the reported reason directly, use the selected affordance's args_contract for structured parameters, do not repeat the rejected shape, and return one corrected ActionIntent.
 Do not create generated candidates from judgment, PlanBeads, memory, or reviewer text. Those surfaces may review, patch, retry, retire, or promote an existing candidate, but origin authority belongs to this ActionIntent.
 Use use_primitive run_mineflayer_program only for legacy one-off direct program execution when you are not trying to create an actor-owned candidate. For reusable behavior, choose author_and_trial_action_skill instead.
 Treat CycleGoal allowed_* lists as compatibility mirrors/advisory context. They must not shrink the action surface; runtime_affordances and direct_action_skills define what can be selected.
@@ -364,6 +464,7 @@ runtime_retry_constraints are hard runtime suppressions over exact target plus s
 Do not treat fixed material families, stations, construction readiness, or any other gameplay taxonomy as mandatory planning headings. Use raw observed Minecraft names and runtime evidence; decide relevance from the current CycleGoal.
 Use settlement_state and blocker_histogram as observation/evidence/context packets before choosing an action. They are not a mandatory single-domain strategy.
 If blocker_histogram shows the same blocked reason repeatedly, pivot to a different action skill, movement, observation, or a truthful memory/judgment instead of repeating the same primitive.
+If a blocked table/crafting attempt reports missing crafting_table inventory, missing planks/sticks, or unreachable table, apply minecraft_basic_guide.blocked_recovery_guides and repair the prerequisite directly. Do not keep selecting observe when the available evidence already names the missing prerequisite.
 If a ready PlanBead points at a blocker or action-skill followup, choose an executable affordance that repairs or investigates it; if no such affordance is currently valid, pick observe, movement, or a truthful memory action instead of pretending the bead is executable.
 remember is a continuity tool, not a substitute for acting. After a blocker has already been remembered once, do not keep selecting remember for the same blocker; choose fresh observation, a different reachable target, another useful action, or let judgment defer/update the PlanBead.
 If a primitive reports a concrete required position in runtime_result, use structured move_to toward that explicit position or observe current state before retrying. Do not retry the same primitive from outside its reported interaction range.
@@ -386,7 +487,7 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     }) : await callOpenAiJsonSchema<{
       action_intent: ProviderActionIntentPayload;
     }>({
-      config: input.openAi!,
+      config: openAiConfigForActionPlanner(input.openAi!),
       ...providerCall
     });
 
@@ -439,9 +540,11 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     };
   }
 
-  const validated = validateActionIntent(intent);
+  const metadataRepairs: JsonValue[] = [];
+  let validated = validateActionIntent(intent);
   if (!validated.ok) {
-    const error = validated.errors.join("; ");
+    const validationErrors = validated.errors;
+    const error = validationErrors.join("; ");
     const outputPath = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
       schema: "provider-output-snapshot/v1",
       snapshot_id: `${snapshotId}-out`,
@@ -458,12 +561,50 @@ Do not claim success through text. Pick actions whose evidence can be verified b
       proposal: { error },
       usage: usageRecord
     });
-    return {
-      ok: false,
-      error,
-      inputRef: inputPath,
-      outputRef: outputPath
-    };
+    if (
+      input.providerId !== "deterministic-social" &&
+      (input.regenerationAttempt ?? 0) < MAX_ACTION_INTENT_REGENERATION_ATTEMPTS
+    ) {
+      return runSocialActionPlannerProvider({
+        ...input,
+        regenerationAttempt: (input.regenerationAttempt ?? 0) + 1,
+        regenerationGuidance: buildActionIntentRegenerationGuidance({
+          error,
+          rejectedIntent: intent
+        }) as unknown as JsonValue
+      });
+    }
+    const repair = repairNonExecutableActionIntentMetadata({
+      intent,
+      errors: validationErrors
+    });
+    if (repair) {
+      intent = repair.intent;
+      metadataRepairs.push(...repair.repairs);
+      validated = validateActionIntent(intent);
+      if (validated.ok) {
+        // Continue into executable validation. The repair is metadata-only and
+        // is recorded on the accepted output snapshot below.
+      } else {
+        return {
+          ok: false,
+          error: validated.errors.join("; "),
+          inputRef: inputPath,
+          outputRef: outputPath
+        };
+      }
+    } else {
+      return {
+        ok: false,
+        error,
+        inputRef: inputPath,
+        outputRef: outputPath
+      };
+    }
+  }
+
+  if (!validated.ok) {
+    throw new Error("ActionIntent validation remained invalid after metadata repair guard");
   }
 
   const executableError = validateExecutableIntent(validated.intent, plannerCycleGoal);
@@ -486,8 +627,7 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     });
     if (
       input.providerId !== "deterministic-social" &&
-      (input.regenerationAttempt ?? 0) < 1 &&
-      shouldRegenerateActionIntent(validated.intent, executableError)
+      (input.regenerationAttempt ?? 0) < MAX_ACTION_INTENT_REGENERATION_ATTEMPTS
     ) {
       return runSocialActionPlannerProvider({
         ...input,
@@ -524,7 +664,10 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     created_at: new Date().toISOString(),
     raw_output_text: JSON.stringify(validated.intent),
     parsed_output: validated.intent as unknown as JsonValue,
-    proposal: { action_intent_ref: intentRef },
+    proposal: {
+      action_intent_ref: intentRef,
+      ...(metadataRepairs.length > 0 ? { metadata_repairs: metadataRepairs } : {})
+    },
     usage: usageRecord
   });
 

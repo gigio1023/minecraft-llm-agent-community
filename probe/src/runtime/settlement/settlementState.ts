@@ -270,6 +270,33 @@ function findNearbyBlock(observation: ObserveResult | Record<string, unknown>, b
   ) ?? null;
 }
 
+function findWorldStateSummaryBlock(
+  observation: ObserveResult | Record<string, unknown>,
+  blockName: string
+) {
+  const summary = (observation as { worldStateSummary?: unknown }).worldStateSummary;
+  if (!isRecord(summary)) {
+    return null;
+  }
+  const blockObservations = isRecord(summary.block_observations)
+    ? summary.block_observations
+    : null;
+  const byName = Array.isArray(blockObservations?.by_name) ? blockObservations.by_name : [];
+  const entry = byName.find((candidate) =>
+    isRecord(candidate) &&
+    candidate.name === blockName &&
+    typeof candidate.count === "number" &&
+    candidate.count > 0
+  );
+  if (!isRecord(entry)) {
+    return null;
+  }
+  const nearest = Array.isArray(entry.nearest)
+    ? entry.nearest.find((candidate) => isRecord(candidate) && candidate.name === blockName)
+    : null;
+  return nearest ?? entry;
+}
+
 function positionFromNearbyBlock(block: unknown) {
   if (!isRecord(block)) {
     return undefined;
@@ -535,7 +562,8 @@ export function buildSettlementState(input: {
   });
   const actorPosition = readPosition((input.observation as { position?: unknown }).position);
   const nearbyCraftingTable = findNearbyBlock(input.observation, "crafting_table");
-  const tableNearby = Boolean(nearbyCraftingTable);
+  const scannedCraftingTable = findWorldStateSummaryBlock(input.observation, "crafting_table");
+  const tableNearby = Boolean(nearbyCraftingTable ?? scannedCraftingTable);
   const toolCraftingTable = craftingTablePlacementFromToolResults(input.recentToolResults);
   const tableEvidenceRefs =
     craftingTablePostcondition?.evidence_refs ??
@@ -596,13 +624,18 @@ export function buildSettlementState(input: {
       ...(actorPosition ? { actor_position: actorPosition } : {}),
       crafting_table: {
         status: craftingTablePostcondition || toolCraftingTable ? "placed" : tableNearby ? "nearby" : "unknown",
-        position: toolCraftingTable?.position ?? positionFromNearbyBlock(nearbyCraftingTable),
+        position:
+          toolCraftingTable?.position ??
+          positionFromNearbyBlock(nearbyCraftingTable) ??
+          positionFromNearbyBlock(scannedCraftingTable),
         evidence_refs: tableEvidenceRefs
       },
       shared_chest: {
         status: storagePostcondition
           ? "contributed"
-          : sharedStorage.status === "known"
+          : sharedStorage.status === "contributed"
+            ? "contributed"
+            : sharedStorage.status === "known"
             ? "inspected"
             : "unknown",
         chest_id: sharedStorage.chest_id,

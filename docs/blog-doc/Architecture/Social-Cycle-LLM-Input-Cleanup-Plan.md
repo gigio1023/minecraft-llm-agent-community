@@ -6,7 +6,8 @@ sidebar_position: 42
 
 Search token: `SOCIAL_CYCLE_LLM_INPUT_CLEANUP`.
 
-Status: active implementation plan.
+Status: implemented cleanup slice and migration input. The target hot-path
+architecture is now `Actor-Episode-And-Actor-Turn-Architecture.md`.
 
 Recorded: 2026-06-01.
 
@@ -19,8 +20,8 @@ history, duplicated packets, or domain-strategy scaffolding.
 
 The goal is not to constrain the LLM into a hard-coded plan. The goal is to give
 the LLM clearer tools: truthful observation, compact continuity, executable
-affordances, retry constraints, memory, relationship context, and PlanBead ready
-fronts.
+affordances, retry constraints, memory, relationship context, PlanBead ready
+fronts, and a compact Minecraft Basic Guide for stable game mechanics.
 
 ## Harness Insights
 
@@ -66,7 +67,7 @@ but not clean enough for longer runs.
 - The LLM should keep freedom to pivot when current observation, LifeGoal,
   memory, relationship state, or runtime blockers justify it.
 
-## Stage Contracts
+## Stage Input Boundaries
 
 ### Goal Mind
 
@@ -83,6 +84,8 @@ Must receive:
 - settlement state;
 - runtime retry constraints;
 - compact action-surface summary;
+- `minecraft_basic_guide` for stable mechanics such as item flows, station
+  requirements, blocker recovery, and repeated-observe limits;
 - bounded strategic-goal window with omitted-count metadata.
 
 Must not receive:
@@ -103,6 +106,8 @@ Must receive:
 - direct action skills;
 - current memory, relationship, PlanBead, retry, and settlement-state context;
 - recent action attempts;
+- `minecraft_basic_guide`, especially `known_item_flows`,
+  `station_requirements`, `blocked_recovery_guides`, and `observe_stop_guides`;
 - compact action-surface summary for missing-affordance context.
 
 Must not receive:
@@ -120,6 +125,8 @@ Must receive:
 - ActorSoul, ActorLifeGoal, CycleGoal, and ActionIntent;
 - runtime result, evidence refs, executed tools, tool statuses, verifier status;
 - memory, relationship, PlanBead, and settlement-state context;
+- `minecraft_basic_guide` so blocker interpretation can distinguish missing
+  prerequisites from useful observation;
 - compact action-surface summary only when needed to explain why the action
   mattered or failed.
 
@@ -135,7 +142,7 @@ Must not receive:
 |-------|--------|------|--------------|
 | 1 | complete | Add stage-specific provider input projection for goal mind, action planner, and cycle judgment | Focused social-cycle runner test asserts schemas, bounded strategic goals, and no duplicate `action_surface` or `settlement_checklist` |
 | 2 | complete | Re-run a short deterministic and live social cycle, then compare input byte totals and provider behavior | 2-cycle OpenAI run passed with 77,264 tokens; snapshots used stage schemas, no full `action_surface`, and no duplicate top-level `settlement_checklist` |
-| 3 | pending | Add an audit summary command for provider input shape and duplication | Command reports max bytes, top fields, and schema violations from a report |
+| 3 | complete | Add Minecraft Basic Guide to all provider input stages so basic Minecraft mechanics are visible without turning them into strategy | Focused social-cycle runner test asserts `minecraft_basic_guide`, schema `minecraft-basic-guide/v1`, known item flows, blocker recovery guides, and observe-stop guides |
 | 4 | pending | Re-run a longer live cycle under budget and inspect whether the LLM uses PlanBeads and memory without overfitting to them | Runtime report, provider inputs, provider outputs, PlanBead ops, and usage ledger |
 
 ## Acceptance Criteria
@@ -149,6 +156,8 @@ Must not receive:
 - Cycle judgment does not receive the full action-surface catalog.
 - Provider prompts name `action_surface_summary` where that is the packet being
   sent.
+- All social-cycle provider stages receive `minecraft_basic_guide` with concrete
+  known item flows and blocker recovery guidance.
 - Existing deterministic social-cycle tests pass.
 - TypeScript typecheck passes.
 - A live run remains budget-auditable through the provider usage ledger.

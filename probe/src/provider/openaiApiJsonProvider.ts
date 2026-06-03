@@ -16,6 +16,7 @@ export type OpenAiJsonProviderConfig = {
   model: string;
   reasoning?: string;
   maxCompletionTokens?: number;
+  maxRetries?: number;
   repoRoot?: string;
   usageLedgerPath?: string;
 };
@@ -131,6 +132,10 @@ export function parseOpenAiJsonText<T>(rawText: string): T {
   }
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Calls OpenAI Chat Completions with JSON schema response format.
  * Never logs or returns the API key.
@@ -146,6 +151,7 @@ export async function callOpenAiJsonSchema<T>(input: {
   const started = Date.now();
   const model = input.config.model;
   const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
+  const maxRetries = input.config.maxRetries ?? Number(process.env.OPENAI_JSON_MAX_RETRIES ?? 2);
   const usageContext = {
     repoRoot: input.config.repoRoot,
     ledgerPath: input.config.usageLedgerPath,
@@ -166,118 +172,139 @@ export async function callOpenAiJsonSchema<T>(input: {
     };
   }
 
-  let budgetDecision: ProviderUsageBudgetDecision | undefined;
-  try {
-    budgetDecision = await guardProviderUsageRequest({
-      providerId: "openai-api",
-      model,
-      estimatedUsage,
-      context: usageContext
-    });
-  } catch (error) {
-    if (error instanceof ProviderUsageBudgetError) {
-      return {
-        ok: false,
-        errorKind: "usage_budget_exceeded",
-        message: error.message,
-        elapsedMs: Date.now() - started,
-        model,
-        budgetDecision: error.decision
-      };
-    }
-    throw error;
-  }
-
   const client = new OpenAI({ apiKey: input.config.apiKey });
+  let lastFailure: Extract<OpenAiJsonCallResult<T>, { ok: false }> | undefined;
 
-  try {
-    const response = await client.chat.completions.create({
-      model,
-      max_completion_tokens: maxCompletionTokens,
-      messages: [
-        { role: "system", content: input.system },
-        { role: "user", content: input.user }
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: input.schemaName,
-          // Strict mode requires every object property in `required`; social
-          // ActionIntent args vary by primitive and are validated after parse.
-          strict: false,
-          schema: input.schema
-        }
-      }
-    });
-    const normalizedUsage = normalizeOpenAiUsage(response.usage, estimatedUsage);
-    const usageRecord = await appendProviderUsageRecord({
-      providerId: "openai-api",
-      model,
-      status: "succeeded",
-      usage: normalizedUsage.usage,
-      usageSource: normalizedUsage.source,
-      context: usageContext,
-      elapsedMs: Date.now() - started,
-      rawUsage: normalizedUsage.rawUsage,
-      budgetDecision
-    });
-
-    const rawText = response.choices[0]?.message?.content ?? "";
-    if (!rawText.trim()) {
-      return {
-        ok: false,
-        errorKind: "empty_output",
-        message: "OpenAI returned empty completion content",
-        elapsedMs: Date.now() - started,
+  for (let attemptIndex = 0; attemptIndex <= maxRetries; attemptIndex++) {
+    let budgetDecision: ProviderUsageBudgetDecision | undefined;
+    try {
+      budgetDecision = await guardProviderUsageRequest({
+        providerId: "openai-api",
         model,
-        rawText,
-        usageRecord,
-        budgetDecision
-      };
+        estimatedUsage,
+        context: usageContext
+      });
+    } catch (error) {
+      if (error instanceof ProviderUsageBudgetError) {
+        return {
+          ok: false,
+          errorKind: "usage_budget_exceeded",
+          message: error.message,
+          elapsedMs: Date.now() - started,
+          model,
+          budgetDecision: error.decision
+        };
+      }
+      throw error;
     }
 
     try {
-      const parsed = parseOpenAiJsonText<T>(rawText);
-      return {
-        ok: true,
-        parsed,
-        rawText,
-        elapsedMs: Date.now() - started,
+      const response = await client.chat.completions.create({
         model,
-        usageRecord,
+        max_completion_tokens: maxCompletionTokens,
+        messages: [
+          { role: "system", content: input.system },
+          { role: "user", content: input.user }
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: input.schemaName,
+            // Strict mode requires every object property in `required`; social
+            // ActionIntent args vary by primitive and are validated after parse.
+            strict: false,
+            schema: input.schema
+          }
+        }
+      });
+      const normalizedUsage = normalizeOpenAiUsage(response.usage, estimatedUsage);
+      const usageRecord = await appendProviderUsageRecord({
+        providerId: "openai-api",
+        model,
+        status: "succeeded",
+        usage: normalizedUsage.usage,
+        usageSource: normalizedUsage.source,
+        context: usageContext,
+        elapsedMs: Date.now() - started,
+        rawUsage: normalizedUsage.rawUsage,
         budgetDecision
-      };
-    } catch {
+      });
+
+      const rawText = response.choices[0]?.message?.content ?? "";
+      if (!rawText.trim()) {
+        lastFailure = {
+          ok: false,
+          errorKind: "empty_output",
+          message: "OpenAI returned empty completion content",
+          elapsedMs: Date.now() - started,
+          model,
+          rawText,
+          usageRecord,
+          budgetDecision
+        };
+        if (attemptIndex < maxRetries) {
+          await delay(1_000 * 2 ** attemptIndex);
+          continue;
+        }
+        break;
+      }
+
+      try {
+        const parsed = parseOpenAiJsonText<T>(rawText);
+        return {
+          ok: true,
+          parsed,
+          rawText,
+          elapsedMs: Date.now() - started,
+          model,
+          usageRecord,
+          budgetDecision
+        };
+      } catch {
+        lastFailure = {
+          ok: false,
+          errorKind: "parse_error",
+          message: "OpenAI output was not valid JSON",
+          elapsedMs: Date.now() - started,
+          model,
+          rawText,
+          usageRecord,
+          budgetDecision
+        };
+        if (attemptIndex < maxRetries) {
+          await delay(1_000 * 2 ** attemptIndex);
+          continue;
+        }
+        break;
+      }
+    } catch (error) {
+      const usageRecord = await appendProviderUsageRecord({
+        providerId: "openai-api",
+        model,
+        status: "failed",
+        usage: estimatedUsage,
+        usageSource: "estimated",
+        context: usageContext,
+        elapsedMs: Date.now() - started,
+        budgetDecision
+      });
       return {
         ok: false,
-        errorKind: "parse_error",
-        message: "OpenAI output was not valid JSON",
+        errorKind: classifyOpenAiError(error),
+        message: error instanceof Error ? error.message : String(error),
         elapsedMs: Date.now() - started,
         model,
-        rawText,
         usageRecord,
         budgetDecision
       };
     }
-  } catch (error) {
-    const usageRecord = await appendProviderUsageRecord({
-      providerId: "openai-api",
-      model,
-      status: "failed",
-      usage: estimatedUsage,
-      usageSource: "estimated",
-      context: usageContext,
-      elapsedMs: Date.now() - started,
-      budgetDecision
-    });
-    return {
-      ok: false,
-      errorKind: classifyOpenAiError(error),
-      message: error instanceof Error ? error.message : String(error),
-      elapsedMs: Date.now() - started,
-      model,
-      usageRecord,
-      budgetDecision
-    };
   }
+
+  return lastFailure ?? {
+    ok: false,
+    errorKind: "api_error",
+    message: "OpenAI JSON provider exhausted retries without a terminal result",
+    elapsedMs: Date.now() - started,
+    model
+  };
 }

@@ -107,6 +107,12 @@ substrate should expose raw Minecraft observations, query limits, positions,
 distances, and evidence refs; the provider chooses relevance under ActorSoul,
 LifeGoal, CycleGoal, action surface, and current evidence.
 
+Providers may receive a compact `minecraft_basic_guide` for stable Minecraft
+mechanics such as item prerequisite flows, station requirements, tool usefulness,
+item-vs-world-block distinctions, and repeated-observe limits. This guide is
+background mechanics, not a strategy checklist, runtime permission, current
+state claim, or proof of progress.
+
 Physical `ActionIntent` arguments are a contract, not a hint. Required arguments
 for actions such as movement, mining, placement, crafting, storage, inspection,
 or building must be present in structured args before execution. Natural-language

@@ -100,13 +100,13 @@ test("direct generated action skill executor enforces helper allowlist", async (
     actorId: "npc_b",
     skillName: "blockedHelper",
     source: `
-      export async function run(ctx: { mineflayer(method: string): Promise<unknown> }) {
-        return ctx.mineflayer("activateItem");
+      export async function run(ctx: { mineBlock(args: { blockName: string }): Promise<unknown> }) {
+        return ctx.mineBlock({ blockName: "stone" });
       }
     `,
     ctx: {
-      async mineflayer(method: string) {
-        return { status: "completed", method };
+      async mineBlock(args: { blockName: string }) {
+        return { status: "completed", args };
       }
     },
     helperAllowlist: ["observe"]
@@ -114,8 +114,21 @@ test("direct generated action skill executor enforces helper allowlist", async (
 
   assert.equal(result.status, "skill_error");
   assert.match(result.errorMessage ?? "", /not in this candidate's helper_allowlist/);
-  assert.equal(result.helperEvents[0]?.name, "mineflayer");
+  assert.equal(result.helperEvents[0]?.name, "mineBlock");
   assert.equal(result.helperEvents[0]?.status, "failed");
+});
+
+test("direct generated action skill source guard rejects unsupported ctx shapes", () => {
+  for (const source of [
+    `export async function run(ctx) { return ctx.helpers.observe({}); }`,
+    `export async function run(ctx) { return ctx.sharedStorage.chest; }`,
+    `export async function run(ctx) { return ctx.mineflayer().activateItem(); }`
+  ]) {
+    assert.throws(
+      () => assertDirectGeneratedActionSkillSource(source),
+      /direct helper API only/
+    );
+  }
 });
 
 test("direct generated action skill executor reports timeout", async () => {

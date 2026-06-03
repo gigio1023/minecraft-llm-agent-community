@@ -531,6 +531,19 @@ function choosePlaceBlockItemName(input: {
 }
 
 function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positioned {
+  const surfacePosition =
+    readPositionedObject(args.surfacePosition) ??
+    readPositionedObject(args.surface_position) ??
+    readPositionedObject(args.supportPosition) ??
+    readPositionedObject(args.support_position);
+  if (surfacePosition) {
+    return {
+      x: surfacePosition.x,
+      y: surfacePosition.y + 1,
+      z: surfacePosition.z
+    };
+  }
+
   return (
     readPositionedObject(args.targetPosition) ??
     readPositionedObject(args.target_position) ??

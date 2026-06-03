@@ -328,6 +328,48 @@ test("normalizes provider create placeholders without granting id authority", as
   }
 });
 
+test("rejects duplicate open PlanBead create operations", async () => {
+  const rootDir = testRoot("duplicate-create");
+  try {
+    await writeActorArtifact(rootDir, "evidence/cycle-0001-observe.json");
+
+    const createOperation = {
+      schema: "plan-bead-operation/v1" as const,
+      actor_id: actorId,
+      op: "create" as const,
+      rationale: "Both proposals describe the same open concern.",
+      evidence_refs: ["evidence/cycle-0001-observe.json"],
+      confidence: "inferred" as const,
+      patch: {
+        kind: "concern" as const,
+        title: "Resolve shared chest contribution blocker",
+        description: "Track the exact allowed-item blocker before attempting another shared chest deposit.",
+        acceptance_evidence_required: ["runtime evidence for the allowed-item blocker"],
+        notes_next: ["Choose an eligible item before the next deposit."],
+        priority: 1 as const
+      }
+    };
+
+    const applied = await applyPlanBeadOperations({
+      rootDir,
+      actorId,
+      lifeGoalId,
+      cycleId: "cycle-0001",
+      turnId: "cycle-0001-deliberation",
+      now,
+      operations: [createOperation, createOperation]
+    });
+
+    assert.deepEqual(applied.results.map((result) => result.status), ["accepted", "rejected"]);
+    assert.match(applied.results[1]?.reason ?? "", /duplicate open PlanBead create rejected/);
+    const beads = await listActorPlanBeads(rootDir, actorId);
+    assert.equal(beads.length, 1);
+    assert.equal(beads[0]?.title, "Resolve shared chest contribution blocker");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
+});
+
 test("applies same-batch operations against the latest accepted checkpoint", async () => {
   const rootDir = testRoot("same-batch-checkpoint");
   try {

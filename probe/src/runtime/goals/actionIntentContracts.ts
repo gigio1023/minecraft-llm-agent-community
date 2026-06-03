@@ -188,6 +188,20 @@ function hasActionSkillFallback(input: ActionIntentPrimitiveArgsInput, args: Rec
   return nonEmptyString(input.actionSkillId) || nonEmptyString(args.actionSkillId);
 }
 
+function isInventoryGridRecipeItemName(value: unknown) {
+  if (!nonEmptyString(value)) {
+    return false;
+  }
+  const itemName = value.trim().toLowerCase();
+  return (
+    itemName === "crafting_table" ||
+    itemName === "stick" ||
+    itemName === "sticks" ||
+    itemName.endsWith("_planks") ||
+    itemName === "planks"
+  );
+}
+
 function validateSharedTransferArgs(
   input: ActionIntentPrimitiveArgsInput,
   args: Record<string, unknown>
@@ -228,7 +242,15 @@ function validatePhysicalPrimitiveArgs(
       }
       if (
         !hasFallback &&
-        !hasPositionAt(args, ["targetPosition", "target_position", "position"]) &&
+        !hasPositionAt(args, [
+          "targetPosition",
+          "target_position",
+          "position",
+          "surfacePosition",
+          "surface_position",
+          "supportPosition",
+          "support_position"
+        ]) &&
         !readPosition("args", args)
       ) {
         return failed({
@@ -252,13 +274,27 @@ function validatePhysicalPrimitiveArgs(
         ? passed({ primitiveId: input.primitiveId })
         : failed({ primitiveId: input.primitiveId, error: "mine_block requires blockName or targetBlock unless an actionSkillId fallback is present" });
     case "craft_item":
-    case "craft_with_table":
       return hasNonEmptyArg(args, "itemName") || hasActionSkillFallback(input, args)
         ? passed({ primitiveId: input.primitiveId })
         : failed({
             primitiveId: input.primitiveId,
             error: `${input.primitiveId} requires itemName unless an actionSkillId fallback is present`
           });
+    case "craft_with_table":
+      if (!hasNonEmptyArg(args, "itemName") && !hasActionSkillFallback(input, args)) {
+        return failed({
+          primitiveId: input.primitiveId,
+          error: "craft_with_table requires itemName unless an actionSkillId fallback is present"
+        });
+      }
+      if (!hasActionSkillFallback(input, args) && isInventoryGridRecipeItemName(args.itemName)) {
+        return failed({
+          primitiveId: input.primitiveId,
+          error:
+            "craft_with_table is for table-bound recipes such as wooden_pickaxe; use craft_item for inventory-grid recipes such as planks, sticks, or crafting_table"
+        });
+      }
+      return passed({ primitiveId: input.primitiveId });
     case "consume_item":
       return hasNonEmptyArg(args, "itemName") || hasActionSkillFallback(input, args)
         ? passed({ primitiveId: input.primitiveId })
@@ -317,10 +353,11 @@ export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgs
     case "place_block":
       return {
         ...base,
-        required_structured_args: ["itemName or blockName", "target position"],
+        required_structured_args: ["itemName or blockName", "target position or support surface position"],
         accepted_forms: [
-          "{itemName:string,targetPosition:{x:number,y:number,z:number}}",
-          "{blockName:string,position:{x:number,y:number,z:number}}",
+          "{itemName:string,targetPosition:{x:number,y:number,z:number}} where targetPosition is the empty/replaceable block cell to occupy, not the floor block",
+          "{itemName:string,surfacePosition:{x:number,y:number,z:number}} to place on top of a known solid support block",
+          "{blockName:string,position:{x:number,y:number,z:number}} where position is the empty/replaceable block cell to occupy",
           "resolved actor-owned action skill primitive args"
         ]
       };
@@ -346,12 +383,20 @@ export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgs
         ]
       };
     case "craft_item":
+      return {
+        ...base,
+        required_structured_args: ["itemName"],
+        accepted_forms: [
+          "{itemName:string} for inventory-grid recipes such as planks, sticks, and crafting_table",
+          "resolved actor-owned action skill primitive args"
+        ]
+      };
     case "craft_with_table":
       return {
         ...base,
         required_structured_args: ["itemName"],
         accepted_forms: [
-          "{itemName:string}",
+          "{itemName:string} for table-bound recipes such as wooden_pickaxe; do not use for planks, sticks, or crafting_table",
           "resolved actor-owned action skill primitive args"
         ]
       };

@@ -102,6 +102,13 @@ The built-in `gemma-4-31b-it` budget is an operator guardrail, not an official
 quota guarantee. Google documents that Gemini API limits vary by project, tier,
 and model, and that active limits should be checked in AI Studio.
 
+The repo also carries a conservative `gemini-2.5-flash-lite` guard at 20
+requests per Pacific day. This is based on a live Gemini API error observed on
+2026-06-02 during an Actor Turn social-cycle run:
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier` returned `quotaValue: 20`
+for `gemini-2.5-flash-lite`. Treat this as a project/model safety cap, not a
+universal Gemini quota.
+
 ## Social-Cycle Gemini API
 
 Gemini API is the current lightweight path for social-cycle provider tests:
@@ -134,6 +141,30 @@ bun run probe:social-cycle -- \
   --report ../tmp/social-cycle-npc-b-gemma31b-offline.json \
   --no-dashboard
 ```
+
+Experimental Actor Turn bridge check:
+
+```bash
+cd probe
+bun run probe:social-cycle -- \
+  --provider deterministic-social \
+  --model deterministic-social \
+  --actor npc_b \
+  --cycles 2 \
+  --max-actions-per-cycle 2 \
+  --offline \
+  --action-hot-path actor_turn \
+  --report ../tmp/social-cycle-actor-turn-cli-smoke.json \
+  --no-dashboard
+```
+
+This check should write `actor-turn-input/v1` provider snapshots and
+`action_hot_path: "actor_turn"` in the report. In this mode ordinary turn
+judgment is runtime-classified, so per-action `cycle-judgment` provider
+snapshots should not appear. A two-cycle non-branch smoke should show one
+initial `goal_mind` provider input, four `actor-turn` provider inputs, the same
+`active_episode_ref` on both cycles, and no `deliberation_branch_refs`. Offline
+runs can still end as `blocked` because they cannot prove Minecraft mutation.
 
 Live social-cycle run:
 

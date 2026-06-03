@@ -116,7 +116,7 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     primitiveIds: ["observe", "place_block", "wait"],
     evidence: [
       "crafting_table is selected from inventory when no explicit item is supplied",
-      "place_block equips the table item and calls Mineflayer placeBlock with an adjacent support block",
+      "place_block equips the table item and calls Mineflayer placeBlock with an adjacent support block, resolving surface coordinates to the space above when needed",
       "target world block is re-read and verified as crafting_table"
     ],
     protectedBy: ["test/placeBlock.test.ts", "test/socialCycleExecution.test.ts"]

@@ -58,11 +58,11 @@ function classifyGeminiJsonError(error: unknown): Extract<GeminiJsonCallResult<u
   const message = error instanceof Error ? error.message : String(error);
   const status = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
   const lower = message.toLowerCase();
-  if (status === 429 || lower.includes("rate limit")) {
-    return "rate_limit";
-  }
   if (lower.includes("quota") || lower.includes("resource exhausted")) {
     return "quota";
+  }
+  if (status === 429 || lower.includes("rate limit")) {
+    return "rate_limit";
   }
   if (lower.includes("timeout") || lower.includes("deadline")) {
     return "timeout";

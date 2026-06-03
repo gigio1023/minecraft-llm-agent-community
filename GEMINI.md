@@ -15,7 +15,11 @@ user has approved an operating-rule change.
 6. `docs/blog-doc/Terminology.md`
 7. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 8. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-9. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+9. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+10. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+11. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+12. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+13. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
 
 ## Project Direction
 
@@ -45,7 +49,9 @@ NPC state.
 ## Action Skill Authoring
 
 During social-cycle runtime, new Minecraft action skill creation starts only
-when the action planner chooses `author_and_trial_action_skill`. Background
+from the action-selection stage. In Actor Turn mode, that means
+`author_mineflayer_action`, which resolves into the existing
+`author_and_trial_action_skill` runtime path. Background
 reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
 review, patch, re-trial, reject, promote, retire, or supersede an existing
 candidate, but they must not originate a new NPC action skill candidate.

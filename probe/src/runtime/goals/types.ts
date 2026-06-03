@@ -284,17 +284,22 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
+  action_hot_path?: "legacy" | "actor_turn";
   provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";
+  active_episode_refs?: string[];
+  deliberation_branch_refs?: string[];
   server?: {
     mode: "manual" | "live_smoke" | "fresh_world";
     seed: string;
     level_type: string;
     version: string;
-    endpoint?: string;
-    spawn_access_prepared?: boolean;
-    spawn_access_position?: { x: number; y: number; z: number };
-    error_kind?: "environment_blocked";
+	    endpoint?: string;
+	    spawn_access_prepared?: boolean;
+	    spawn_access_position?: { x: number; y: number; z: number };
+	    shared_storage_social_smoke?: boolean;
+	    starter_inventory_seeded?: boolean;
+	    error_kind?: "environment_blocked";
     error?: string;
   };
   /** Producer workspace root used to resolve actor-relative artifact refs during audit. */
@@ -318,6 +323,9 @@ export type SocialCycleRunReport = {
   cycles: Array<{
     cycle_id: string;
     cycle_goal_ref: string;
+    active_episode_ref?: string;
+    deliberation_branch_ref?: string;
+    deliberation_trigger_reason?: string;
     action_intent_ref: string;
     provider_input_refs: string[];
     provider_output_refs: string[];
@@ -331,6 +339,7 @@ export type SocialCycleRunReport = {
       attempt_id: string;
       action_index: number;
       turn_id: string;
+      active_episode_id?: string;
       action_intent_ref: string;
       provider_input_refs: string[];
       provider_output_refs: string[];
@@ -342,6 +351,8 @@ export type SocialCycleRunReport = {
       runtime_result?: unknown;
       runtime_status: string;
       retry_constraint_blocked?: boolean;
+      branch_recommended?: boolean;
+      branch_reason?: string;
       postcondition_results?: ActionSkillPostconditionResult[];
       plan_bead_operation_result_refs?: string[];
     }>;

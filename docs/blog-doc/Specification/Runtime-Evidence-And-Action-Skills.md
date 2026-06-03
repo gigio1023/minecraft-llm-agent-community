@@ -179,6 +179,27 @@ The action surface is substrate. It is not a domain strategy. For example,
 not mean every CycleGoal should consider building. It only means building is
 available if the model chooses it from current context.
 
+## Minecraft Basic Guide
+
+The provider may also receive `minecraft_basic_guide`, a compact mechanics guide
+for stable Minecraft facts such as prerequisite item flows, station
+requirements, item-vs-world-block distinctions, useful tool requirements,
+blocker recovery, and repeated-observe limits.
+
+The guide is not runtime truth. It does not prove inventory, world blocks,
+container state, reachability, or success. It helps the provider avoid basic
+mechanics mistakes such as trying a table-sized recipe before a reachable placed
+crafting table exists or repeatedly observing for an inventory item that must be
+crafted from known prerequisites.
+
+Runtime evidence and action-surface gates remain authoritative:
+
+- current state comes from observation and runtime artifacts;
+- executable choices come from `runtime_affordances`, direct action skills, and
+  runtime gates;
+- physical success comes from verifier-backed evidence;
+- `minecraft_basic_guide` supplies background mechanics only.
+
 ## Transcript And Artifacts
 
 Every meaningful run should leave artifacts that explain:

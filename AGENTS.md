@@ -91,10 +91,13 @@ what lands.
 ## Action Skill Authoring Gate
 
 New Minecraft action skill creation during social-cycle runtime must originate
-only from the action-selection stage. The action planner may choose an explicit
-`author_and_trial_action_skill` ActionIntent mode when current observation,
-CycleGoal, memory, PlanBeads, relationship context, retry constraints, and the
-action surface justify creating a new actor-owned behavior candidate.
+only from the action-selection stage. In Actor Turn mode, the provider may
+choose `author_mineflayer_action`, which the runtime resolves into the existing
+`author_and_trial_action_skill` ActionIntent path. Legacy planner paths may
+still produce `author_and_trial_action_skill` while they remain in migration
+scope. In either mode, current observation, CycleGoal or Active Episode, memory,
+PlanBeads, relationship context, retry constraints, and the action surface must
+justify creating a new actor-owned behavior candidate.
 
 Background reviewers, async sidecars, PlanBead operations, legacy generated
 skill importers, and offline maintenance scripts must not originate new action
@@ -195,15 +198,19 @@ Read these first:
 15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 16. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 17. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-18. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-19. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-20. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-21. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-22. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-23. `docs/blog-doc/Architecture/Minimal-Probe.md`
-24. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-25. `docs/blog-doc/Setup/Headless-Server.md`
-26. `docs/blog-doc/Setup/Provider-Setup.md`
+18. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+19. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+20. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+21. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+22. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+23. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+24. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+25. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+26. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+27. `docs/blog-doc/Architecture/Minimal-Probe.md`
+28. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+29. `docs/blog-doc/Setup/Headless-Server.md`
+30. `docs/blog-doc/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -378,6 +385,7 @@ Important search tokens:
 - `PROVIDER_FREE_TIER_RESET_WINDOWS`
 - `GEMINI_API_SOCIAL_PROVIDER`
 - `WORLD_STATE_DIAGNOSTICS`
+- `MINECRAFT_BASIC_GUIDE`
 - `ACTOR_PERSISTENT_STATE_PLAN_BEADS`
 - `ACTION_INTENT_CONTRACT`
 - `RUNTIME_RETRY_CONSTRAINT`
@@ -446,6 +454,12 @@ Important search tokens:
   World context is evidence substrate: raw Minecraft names, positions,
   distances, limits, and query refs. The provider decides what matters from
   ActorSoul/LifeGoal, CycleGoal, action surface, and evidence.
+- Do expose the compact `minecraft_basic_guide` to social-cycle provider stages
+  as stable background mechanics. It should help the provider apply basic item
+  flows, station requirements, tool usefulness, item-vs-world-block distinctions,
+  blocker recovery, and repeated-observe limits. It is a guide, not a strategy
+  checklist, runtime permission, current-state claim, ActionIntent contract, or
+  proof of progress.
 - It is acceptable for a specific action skill implementation to query a
   specific Minecraft block or item family as part of its own primitive contract.
   It is not acceptable to turn those families into always-present planner

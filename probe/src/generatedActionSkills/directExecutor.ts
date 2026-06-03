@@ -43,6 +43,9 @@ const defaultTimeoutMs = 30_000;
 const blockedGeneratedCodePattern =
   /\b(import|require|process|Bun|Deno|eval|Function|child_process|fs|node:fs|net|http|https)\b|while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/;
 
+const blockedGeneratedCtxPattern =
+  /\bctx\.(helpers|sharedStorage|bot)\b|\bctx\.mineflayer\s*\(/;
+
 function sanitizeFileId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "generated_action_skill";
 }
@@ -54,6 +57,10 @@ export function assertDirectGeneratedActionSkillSource(source: string) {
 
   if (blockedGeneratedCodePattern.test(source)) {
     throw new Error("Generated action skill contains a blocked API or obvious unbounded loop");
+  }
+
+  if (blockedGeneratedCtxPattern.test(source)) {
+    throw new Error("Generated action skill must use direct helper API only; ctx.helpers, ctx.sharedStorage, ctx.bot, and ctx.mineflayer() are not supported");
   }
 }
 

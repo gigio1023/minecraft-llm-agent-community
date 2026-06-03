@@ -119,7 +119,11 @@ const coreActionSkills: SeedActionSkill[] = [
     implementationNotes: "Uses inventory crafting; crafting table itself does not require an existing table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter", "settler"],
-    preconditions: ["inventory has planks"],
+    preconditions: [
+      "inventory has planks >= 4",
+      "no usable crafting_table already known",
+      "no crafting_table item already carried"
+    ],
     primitiveIds: ["observe", "craft_item", "wait"]
   },
   {
@@ -130,7 +134,12 @@ const coreActionSkills: SeedActionSkill[] = [
       "Uses a nearby observed crafting table block and verifies wooden_pickaxe inventory increase.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter", "settler"],
-    preconditions: ["inventory has planks", "inventory has sticks", "crafting_table nearby"],
+    preconditions: [
+      "inventory has planks >= 3",
+      "inventory has sticks >= 2",
+      "crafting_table nearby",
+      "no wooden_pickaxe already carried"
+    ],
     primitiveIds: ["observe", "craft_with_table", "wait"]
   },
   {
@@ -151,7 +160,7 @@ const coreActionSkills: SeedActionSkill[] = [
     implementationNotes: "Requires crafting-table support and cobblestone acquisition first.",
     intentKinds: ["bootstrap_progress"],
     validRoles: ["crafter", "settler"],
-    preconditions: ["inventory has cobblestone", "inventory has sticks", "crafting_table nearby"],
+    preconditions: ["inventory has cobblestone >= 3", "inventory has sticks >= 2", "crafting_table nearby"],
     primitiveIds: ["observe", "wait"],
     missingPrimitives: ["use_crafting_table"]
   },
@@ -242,10 +251,10 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     summary: "Place or approach a crafting table so table recipes become available",
     runtimeStatus: "implemented",
     implementationNotes:
-      "Uses place_block to put a crafting_table into the world and verifies the target block afterward. Table-bound recipe use remains handled by craft_with_table.",
+      "Uses place_block to put a crafting_table into a replaceable world cell, or onto a nearby support surface, and verifies the target block afterward. Table-bound recipe use remains handled by craft_with_table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter", "quartermaster", "settler"],
-    preconditions: ["inventory has crafting_table"],
+    preconditions: ["inventory has crafting_table", "no usable crafting_table already known"],
     primitiveIds: ["observe", "place_block", "wait"]
   },
   {
@@ -363,7 +372,12 @@ const socialActionSkills: SeedActionSkill[] = [
     implementationNotes: "Uses shared chest deposit and say; item transfer is ledger-backed.",
     intentKinds: ["fulfill_obligation", "unblock_teammate"],
     validRoles: ["gatherer", "quartermaster", "settler"],
-    preconditions: ["shared chest nearby", "obligation pending"],
+    preconditions: [
+      "shared chest nearby",
+      "obligation pending",
+      "inventory has depositable items",
+      "target actor visible"
+    ],
     primitiveIds: ["observe", "inspect_chest", "deposit_shared", "say", "wait"]
   },
   {

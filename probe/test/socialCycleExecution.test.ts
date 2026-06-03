@@ -15,8 +15,11 @@ import { listActiveActorActionSkillRecords } from "../src/runtime/actorWorkspace
 import type { ActorActionSkillRecord } from "../src/runtime/actorWorkspaceStore.js";
 import {
   clampCycleJudgmentOutcome,
+  deterministicJudgmentOutcome,
   deriveProgressVerifierStatus,
   hasPartialVerifiedProgress,
+  isDurableProgressVerifier,
+  isMovementOnlyVerifier,
   isMeaningfulGameplayPrimitive
 } from "../src/runtime/socialCycleProgress.js";
 import type { ActionIntent, CycleJudgment } from "../src/runtime/goals/types.js";
@@ -143,10 +146,7 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
     ["place_block", "placed"],
     ["place_block", "already_present"],
     ["build_pattern", "built"],
-    ["deposit_shared", "deposited"],
-    ["inspect_chest", "inspected"],
-    ["move_to", "arrived"],
-    ["move_to", "moved"]
+    ["deposit_shared", "deposited"]
   ];
 
   for (const [tool, status] of progressCases) {
@@ -156,6 +156,39 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
       `${tool}=${status} should count as verified progress`
     );
   }
+});
+
+test("move_to verifies movement but does not count as durable social-cycle progress by itself", () => {
+  assert.equal(
+    deriveProgressVerifierStatus({ toolAttempts: [{ tool: "move_to", status: "arrived" }] }),
+    "passed"
+  );
+  assert.equal(isMovementOnlyVerifier("passed", ["move_to"]), true);
+  assert.equal(isDurableProgressVerifier("passed", ["move_to"]), false);
+  assert.equal(
+    deterministicJudgmentOutcome({
+      verifierStatus: "passed",
+      executedTools: ["move_to"],
+      toolStatuses: [{ tool: "move_to", status: "arrived" }]
+    }),
+    "no_progress"
+  );
+});
+
+test("inspect_chest verifies container access without durable social-cycle progress", () => {
+  assert.equal(
+    deriveProgressVerifierStatus({ toolAttempts: [{ tool: "inspect_chest", status: "inspected" }] }),
+    "passed"
+  );
+  assert.equal(isDurableProgressVerifier("passed", ["inspect_chest"]), false);
+  assert.equal(
+    deterministicJudgmentOutcome({
+      verifierStatus: "passed",
+      executedTools: ["inspect_chest"],
+      toolStatuses: [{ tool: "inspect_chest", status: "inspected" }]
+    }),
+    "no_progress"
+  );
 });
 
 test("run_mineflayer_program completion without helper evidence does not pass progress", () => {

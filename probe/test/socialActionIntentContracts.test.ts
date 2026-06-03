@@ -145,6 +145,13 @@ test("placement and building primitives accept explicit executable args", () => 
     }).ok,
     true
   );
+  assert.equal(
+    validatePrimitiveActionIntentArgs({
+      primitiveId: "place_block",
+      args: { itemName: "crafting_table", surfacePosition: { x: 2, y: 63, z: 0 } }
+    }).ok,
+    true
+  );
 
   for (const args of [
     { anchor: { x: 4, y: 64, z: 4 } },
@@ -162,10 +169,6 @@ test("craft primitives require itemName unless actionSkillId fallback is present
       "requires itemName"
     );
     assert.equal(
-      validatePrimitiveActionIntentArgs({ primitiveId, args: { itemName: "stick" } }).ok,
-      true
-    );
-    assert.equal(
       validatePrimitiveActionIntentArgs({
         primitiveId,
         args: { actionSkillId: "craftPlanksAndSticks" }
@@ -181,6 +184,37 @@ test("craft primitives require itemName unless actionSkillId fallback is present
       true
     );
   }
+  assert.equal(
+    validatePrimitiveActionIntentArgs({ primitiveId: "craft_item", args: { itemName: "stick" } }).ok,
+    true
+  );
+  assert.equal(
+    validatePrimitiveActionIntentArgs({
+      primitiveId: "craft_with_table",
+      args: { itemName: "wooden_pickaxe" }
+    }).ok,
+    true
+  );
+});
+
+test("craft_with_table rejects direct inventory-grid recipe items", () => {
+  for (const itemName of ["crafting_table", "stick", "sticks", "planks", "acacia_planks"]) {
+    assertRejected(
+      validatePrimitiveActionIntentArgs({
+        primitiveId: "craft_with_table",
+        args: { itemName }
+      }),
+      "use craft_item for inventory-grid recipes"
+    );
+  }
+
+  assert.equal(
+    validatePrimitiveActionIntentArgs({
+      primitiveId: "craft_with_table",
+      args: { itemName: "crafting_table", actionSkillId: "craftWoodenPickaxe" }
+    }).ok,
+    true
+  );
 });
 
 test("generated Mineflayer program primitive requires source authority", () => {

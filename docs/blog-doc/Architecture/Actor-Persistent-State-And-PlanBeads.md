@@ -27,10 +27,11 @@ The Minecraft adaptation is:
 ActorSoul + LifeGoal
 -> actor-owned PlanBeadGraph
 -> ready PlanBeads
--> CycleGoal
+-> Active Episode selected/related refs
+-> Actor Turn compact hints
 -> ActionIntent
 -> runtime execution and evidence
--> CycleJudgment
+-> branch-time Deliberation when needed
 -> guarded PlanBead updates
 ```
 
@@ -61,7 +62,8 @@ Adapted to this repo:
 - PlanBeads are actor-owned issue-like work items under a LifeGoal.
 - The PlanBeadGraph is the actor's living work graph, not a hidden domain
   strategy.
-- `ready_beads` are unblocked concerns that may justify the next CycleGoal.
+- `ready_beads` are unblocked concerns that may justify the next Active Episode
+  focus, CycleGoal compatibility record, or compact Actor Turn hint.
 - PlanBead closure requires runtime evidence, guarded relationship evidence, or
   a truthful non-physical resolution.
 - Ordinary memory remains recall/context; it does not own active work state.
@@ -88,8 +90,8 @@ A **ready PlanBead** is an open PlanBead that is not blocked by another open
 blocking dependency, not deferred, and still relevant under current LifeGoal,
 observation, action surface, and evidence.
 
-The CycleGoal provider may select from ready PlanBeads, but it may also choose a
-CycleGoal from urgent current observation when the world demands it. PlanBeads
+Active Episode / Deliberation may select from ready PlanBeads, but Actor Turn may
+also choose an urgent current-state action when the world demands it. PlanBeads
 guide continuity; they do not force every cycle through a checklist.
 
 ## What A PlanBead Answers
@@ -304,11 +306,16 @@ A bead is ready when:
 - current action surface has at least one plausible next affordance, or the bead
   is ready for a non-physical resolution such as recording a truthful blocker;
 - the bead has enough context in `description`, `acceptance_criteria`, and
-  `notes.next` to support a bounded CycleGoal.
+  `notes.next` to support a bounded Active Episode focus or compatibility
+  CycleGoal.
 
 The ready front is context, not a command. It helps the CycleGoal provider choose
-what concern to work on now. The provider still must produce a valid CycleGoal
-and the ActionIntent still must pass runtime gates.
+what concern to work on now on the legacy path, and it helps branch-time
+Deliberation / Active Episode selection on the Actor Turn path. The Actor Turn
+provider may see only compact hints. ActionIntent still must pass runtime gates.
+Episode selection may auto-cite one or two matching ready/in-progress beads as
+`selected_plan_bead_refs` for audit continuity; this citation is not executable
+authority and does not force Actor Turn to follow a checklist action.
 
 ## Actor Workspace Layout
 
@@ -407,9 +414,19 @@ plus a small blocked/in-progress summary when it explains current choice.
 ## Provider Proposal Boundary
 
 Providers may propose `bead_op_proposals` only through runtime-approved stages.
-The first implementation accepts them from `CycleJudgment`, because judgment has
-the latest evidence interpretation. The CycleGoal provider may select bead refs
-but should not directly mutate the PlanBeadGraph.
+The legacy social-cycle path accepts them from `CycleJudgment`, because judgment
+has the latest evidence interpretation in that path. The Actor Episode / Actor
+Turn path moves ordinary turns away from provider `CycleJudgment`; branch-time
+Deliberation is the approved transport for PlanBead operation proposals there.
+Loose Deliberation hints may be adapted into guarded `create` operations, but
+status changes, satisfied closure, dependencies, and executable authority still
+require schema-valid operation records and guarded-applier acceptance.
+
+The CycleGoal provider, Active Episode builder, and Actor Turn provider may
+select or cite bead refs, but they must not directly mutate the PlanBeadGraph.
+Ordinary Actor Turn continuation may correctly produce no PlanBead operations.
+PlanBead presence is then proven by ready-front and provider-context artifacts,
+not by per-turn operation counts.
 
 Allowed operation families for the implemented vertical slice:
 
@@ -550,6 +567,9 @@ Run reports should expose:
 
 - PlanBeadGraph summary at run start and end;
 - ready front at each cycle, when available;
+- cycle-level `plan_bead_packet_ref` values that point at ready-front snapshots;
+- provider input `compact_plan_bead_hints`, including empty arrays when no
+  current graph hints exist;
 - PlanBead refs cited by each CycleGoal and ActionIntent;
 - accepted and rejected bead operations;
 - dependency edges created or cleared;

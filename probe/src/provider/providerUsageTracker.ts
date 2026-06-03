@@ -122,6 +122,14 @@ const defaultGeminiBudgets: ProviderUsageBudget[] = [
     mode: "enforce",
     source:
       "operator_free_tier_reference; verify active project limits in Google AI Studio before long runs"
+  },
+  {
+    provider_id: "gemini-api",
+    model: "gemini-2.5-flash-lite",
+    request_limit_per_day: 20,
+    mode: "enforce",
+    source:
+      "observed Gemini API free-tier error on 2026-06-02: GenerateRequestsPerDayPerProjectPerModel-FreeTier limit 20 for gemini-2.5-flash-lite"
   }
 ];
 

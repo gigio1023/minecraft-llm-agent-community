@@ -13,6 +13,7 @@ import type { ActionIntent } from "../src/runtime/goals/types.js";
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
 import {
   buildActionIntentRegenerationGuidance,
+  repairNonExecutableActionIntentMetadata,
   shouldRegenerateActionIntent
 } from "../src/provider/socialActionPlannerProvider.js";
 
@@ -156,6 +157,110 @@ test("generated candidate contract failures request one guided regeneration", ()
   assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
   assert.equal(guidance.rejected_error, error);
   assert.equal(guidance.rules.do_not_repeat_blocked_source_or_helper_shape, true);
+});
+
+test("direct primitive parameter contract failures request one guided regeneration", () => {
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: {},
+    parameters: {},
+    why_this_action: "scout nearby",
+    expected_evidence: ["position delta"],
+    fallback_if_blocked: "observe current state"
+  };
+  const error =
+    "ActionIntent parameters contract failed: move_to requires structured args with x/y/z, position, targetPosition, target_position, or explicit scout direction and distance 2..12";
+
+  assert.equal(shouldRegenerateActionIntent(intent, error), true);
+  const guidance = buildActionIntentRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
+  assert.equal(guidance.rejected_error, error);
+  assert.equal(guidance.rules.use_runtime_affordance_args_contract, true);
+  assert.equal(guidance.rules.parameters_must_satisfy_selected_action_contract, true);
+});
+
+test("missing required action intent narrative fields request one guided regeneration", () => {
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    primitive_id: "observe",
+    args: {},
+    parameters: {},
+    why_this_action: "",
+    expected_evidence: ["observation"],
+    fallback_if_blocked: ""
+  };
+  const error = "why_this_action must be a non-empty string; fallback_if_blocked must be a non-empty string";
+
+  assert.equal(shouldRegenerateActionIntent(intent, error), true);
+  const guidance = buildActionIntentRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(guidance.rejected_error, error);
+  assert.equal(guidance.rules.fix_the_reported_error_directly, true);
+});
+
+test("non-executable action intent metadata can be repaired after guided regeneration fails", () => {
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { targetPosition: { x: 1, y: 64, z: 1 } },
+    parameters: { targetPosition: { x: 1, y: 64, z: 1 } },
+    why_this_action: "",
+    expected_evidence: [],
+    fallback_if_blocked: ""
+  };
+
+  const repaired = repairNonExecutableActionIntentMetadata({
+    intent,
+    errors: [
+      "why_this_action must be a non-empty string",
+      "fallback_if_blocked must be a non-empty string"
+    ]
+  });
+
+  assert.ok(repaired);
+  assert.equal(repaired.repairs.length, 2);
+  assert.deepEqual(repaired.intent.parameters, intent.parameters);
+  assert.equal(validateActionIntent(repaired.intent).ok, true);
+  assert.match(repaired.intent.why_this_action, /Provider omitted why_this_action/);
+});
+
+test("action intent metadata repair does not cover executable contract failures", () => {
+  const intent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    args: {},
+    parameters: {},
+    why_this_action: "",
+    expected_evidence: [],
+    fallback_if_blocked: ""
+  };
+
+  assert.equal(
+    repairNonExecutableActionIntentMetadata({
+      intent,
+      errors: [
+        "why_this_action must be a non-empty string",
+        "fallback_if_blocked must be a non-empty string",
+        "primitive_id must be a non-empty string"
+      ]
+    }),
+    null
+  );
 });
 
 test("validateCycleJudgment rejects invalid outcome and malformed memory writes", () => {

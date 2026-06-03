@@ -353,6 +353,23 @@ function graphHasPath(input: {
   return false;
 }
 
+function normalizedComparableText(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function createOperationDuplicatesOpenBead(input: {
+  operation: Extract<PlanBeadOperation, { op: "create" }>;
+  beads: readonly ActorPlanBead[];
+}) {
+  const title = normalizedComparableText(input.operation.patch.title);
+  const description = normalizedComparableText(input.operation.patch.description);
+  return input.beads.find((bead) =>
+    bead.status !== "closed" &&
+    normalizedComparableText(bead.title) === title &&
+    normalizedComparableText(bead.description) === description
+  );
+}
+
 async function writeAcceptedBeadArtifacts(input: {
   rootDir: string;
   bead: ActorPlanBead;
@@ -413,6 +430,13 @@ async function applyOneOperation(input: {
   });
 
   if (operation.op === "create") {
+    const duplicate = createOperationDuplicatesOpenBead({
+      operation,
+      beads: await listActorPlanBeads(input.rootDir, input.actorId)
+    });
+    if (duplicate) {
+      throw new Error(`duplicate open PlanBead create rejected: ${duplicate.bead_id}`);
+    }
     const beadId = `bead-${randomUUID()}`;
     const bead: ActorPlanBead = {
       schema: "actor-plan-bead/v1",
