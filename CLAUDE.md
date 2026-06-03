@@ -13,13 +13,14 @@ has approved an operating-rule change.
 4. `docs/blog-doc/Documentation-Map.md`
 5. `docs/blog-doc/Agent-Search-Index.md`
 6. `docs/blog-doc/Terminology.md`
-7. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-8. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-9. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-10. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-11. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-12. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-13. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+7. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+8. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+9. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+11. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+12. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+13. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+14. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
 
 ## Project Direction
 

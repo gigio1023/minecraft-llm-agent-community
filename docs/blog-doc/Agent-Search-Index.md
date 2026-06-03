@@ -93,20 +93,21 @@ For any onboarding developer or agent, read in this order:
 11. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
 12. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
 13. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
-14. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-15. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-16. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-17. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-18. `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-19. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-20. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-21. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-22. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
-23. `docs/blog-doc/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
-24. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-25. `docs/blog-doc/Setup/Headless-Server.md`
-26. `docs/blog-doc/Setup/Provider-Setup.md`
-27. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
+14. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+15. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+16. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+17. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+18. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+19. `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+20. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+21. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+22. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+23. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+24. `docs/blog-doc/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+25. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+26. `docs/blog-doc/Setup/Headless-Server.md`
+27. `docs/blog-doc/Setup/Provider-Setup.md`
+28. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Active vs Archived
 

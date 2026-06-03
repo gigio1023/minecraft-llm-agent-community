@@ -192,25 +192,26 @@ Read these first:
 9. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
 10. `docs/blog-doc/Documentation-Map.md`
 11. `docs/blog-doc/Agent-Search-Index.md`
-12. `docs/blog-doc/Terminology.md`
-13. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
-14. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
-15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-16. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-17. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-18. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-19. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-20. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-21. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-22. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
-23. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-24. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-25. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-26. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-27. `docs/blog-doc/Architecture/Minimal-Probe.md`
-28. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-29. `docs/blog-doc/Setup/Headless-Server.md`
-30. `docs/blog-doc/Setup/Provider-Setup.md`
+12. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+13. `docs/blog-doc/Terminology.md`
+14. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
+15. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
+16. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+17. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+18. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+19. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+20. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+21. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+22. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+23. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+24. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+25. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+26. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+27. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+28. `docs/blog-doc/Architecture/Minimal-Probe.md`
+29. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+30. `docs/blog-doc/Setup/Headless-Server.md`
+31. `docs/blog-doc/Setup/Provider-Setup.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
