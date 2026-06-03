@@ -206,6 +206,7 @@ Setup docs:
 
 - `docs/blog-doc/Setup/Headless-Server.md`
 - `docs/blog-doc/Setup/Provider-Setup.md`
+- `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## 4. Non-Negotiable Direction
 

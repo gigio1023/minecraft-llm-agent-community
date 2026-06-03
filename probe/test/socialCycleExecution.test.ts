@@ -773,6 +773,78 @@ test("runtime retry constraints group exact repeated blocker target and args", (
   );
 });
 
+test("runtime retry constraints canonicalize equivalent move_to position args", () => {
+  const baseIntent: ActionIntent = {
+    schema: "action-intent/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "cycle-goal-1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { targetPosition: { x: -8, y: 99, z: 3 } },
+    why_this_action: "move toward a known station",
+    expected_evidence: ["position_delta"],
+    fallback_if_blocked: "choose a different target"
+  };
+  const equivalentIntents: ActionIntent[] = [
+    baseIntent,
+    {
+      ...baseIntent,
+      cycle_id: "cycle-0002",
+      args: { position: { x: -8, y: 99, z: 3 } }
+    },
+    {
+      ...baseIntent,
+      cycle_id: "cycle-0003",
+      args: { x: -8, y: 99, z: 3 }
+    }
+  ];
+  const attempts = equivalentIntents.map((intent, index) =>
+    buildRuntimeRetryAttempt({
+      actorId: "npc_b",
+      cycleId: intent.cycle_id,
+      turnId: `cycle-${String(index + 1).padStart(4, "0")}-action-01`,
+      actionIndex: 0,
+      intent,
+      execution: {
+        runtimeResult: {
+          status: "blocked",
+          reason: "move_to scout failed: Path was stopped before it could be completed!"
+        },
+        evidenceRefs: [`evidence/cycle-${String(index + 1).padStart(4, "0")}-move_to.json`],
+        verifierStatus: "failed",
+        toolStatuses: [{ tool: "move_to", status: "blocked" }]
+      }
+    })
+  );
+
+  assert.ok(attempts.every(Boolean));
+  assert.deepEqual(attempts.map((attempt) => attempt?.args_normalized), [
+    { targetPosition: { x: -8, y: 99, z: 3 } },
+    { targetPosition: { x: -8, y: 99, z: 3 } },
+    { targetPosition: { x: -8, y: 99, z: 3 } }
+  ]);
+  assert.equal(new Set(attempts.map((attempt) => attempt?.args_fingerprint)).size, 1);
+
+  const constraints = deriveRuntimeRetryConstraints({
+    actorId: "npc_b",
+    attempts: attempts.filter((attempt): attempt is NonNullable<typeof attempt> => attempt !== null)
+  });
+
+  assert.equal(constraints.length, 1);
+  assert.equal(constraints[0]?.repeat_count, 3);
+  assert.ok(findMatchingRuntimeRetryConstraint(equivalentIntents[0]!, constraints));
+  assert.ok(findMatchingRuntimeRetryConstraint(equivalentIntents[1]!, constraints));
+  assert.ok(findMatchingRuntimeRetryConstraint(equivalentIntents[2]!, constraints));
+  assert.equal(
+    findMatchingRuntimeRetryConstraint(
+      { ...baseIntent, args: { targetPosition: { x: -2.5, y: 93, z: 3.7 } } },
+      constraints
+    ),
+    null
+  );
+});
+
 test("social executor blocks an exact retry constraint before Mineflayer execution", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-retry-constraint-"));
   const intent: ActionIntent = {

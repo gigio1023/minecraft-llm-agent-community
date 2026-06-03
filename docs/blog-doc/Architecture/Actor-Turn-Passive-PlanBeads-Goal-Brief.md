@@ -46,6 +46,10 @@ references as needed:
    mechanics guide for provider context.
 9. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md` - dated current
    state, live-run evidence, and unresolved risks.
+10. `docs/blog-doc/Setup/Provider-Setup.md` - provider auth, usage guard, and
+    social-cycle run command reference.
+11. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` - OpenAI and
+    Gemini free-tier reset windows and Korea-time budget rules.
 
 Do not link broad historical plans as primary goal context unless a specific
 question requires them. If these documents conflict, prefer `AGENTS.md`,
@@ -113,6 +117,8 @@ The campaign is not complete until current evidence proves all of these:
   actor workspace artifacts.
 - Focused tests, typecheck, and docs build pass.
 - A low-cost 30-cycle smoke run and, if feasible, a 60-cycle run are reviewed.
+- Provider setup and free-tier reset-window docs are checked before long
+  provider-backed runs.
 - The report shows current-state consumption, actionfulness, no silent errors,
   basic Minecraft mechanics awareness, and at least one plausible
   social-simulation consequence or a clearly classified blocker.

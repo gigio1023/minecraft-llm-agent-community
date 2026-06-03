@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { JsonValue } from "../provider/inputSnapshot.js";
+import { validatePrimitiveActionIntentArgs } from "./goals/actionIntentContracts.js";
 import { actionIntentParameters, type ActionIntent, type ActionIntentKind } from "./goals/types.js";
 
 /**
@@ -141,9 +142,31 @@ function normalizeJsonValue(value: unknown): JsonValue {
 
 /** Normalizes only structured args; rationale/prose never contributes to retry identity. */
 export function normalizedActionIntentArgs(
-  intent: Pick<ActionIntent, "args" | "parameters">
+  intent: Pick<ActionIntent, "kind" | "primitive_id" | "args" | "parameters">
 ): JsonValue {
-  return normalizeJsonValue(actionIntentParameters(intent));
+  const args = actionIntentParameters(intent);
+  if (intent.kind === "use_primitive" && intent.primitive_id === "move_to") {
+    const contract = validatePrimitiveActionIntentArgs({
+      primitiveId: "move_to",
+      args
+    });
+    if (contract.target?.kind === "position") {
+      return {
+        targetPosition: {
+          x: contract.target.position.x,
+          y: contract.target.position.y,
+          z: contract.target.position.z
+        }
+      };
+    }
+    if (contract.target?.kind === "scout") {
+      return {
+        direction: contract.target.direction,
+        distance: contract.target.distance
+      };
+    }
+  }
+  return normalizeJsonValue(args);
 }
 
 /** Produces a stable short id for compact provider context and report diffs. */

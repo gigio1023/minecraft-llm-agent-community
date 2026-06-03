@@ -551,6 +551,7 @@ function retryConstraintSummaries(context: SocialCycleContextPacket) {
   return context.runtime_retry_constraints.map((constraint) => ({
     constraint_id: constraint.constraint_id,
     target_summary: `${constraint.action_kind}:${constraint.target.kind}:${constraint.target.id}`,
+    args_normalized: constraint.args_normalized,
     blocked_reason: constraint.blocker_reason,
     repeat_count: constraint.repeat_count,
     evidence_refs: [...constraint.evidence_refs]
@@ -636,7 +637,6 @@ function shouldDemoteRepeatedCobblestoneMining(input: {
   recentEvidenceTrace: readonly EvidenceTraceEntry[];
 }) {
   return currentCobblestoneCount(input.currentState) >= 16 &&
-    recentSuccessfulCobblestoneMiningCount(input.recentEvidenceTrace) >= 3 &&
     !hasExplicitCobblestoneShortage({
       activeEpisode: input.activeEpisode,
       currentState: input.currentState
@@ -1263,6 +1263,9 @@ function buildActorTurnDecisionFrame(input: {
       ? `shared_storage_contribution_evidence=${input.currentState.shared_storage.evidence_refs.join(",")}`
       : "",
     cobblestoneCount > 0 ? `cobblestone=${cobblestoneCount}` : "",
+    demoteRepeatedCobblestoneMining
+      ? `cobblestone_stockpile=sufficient_for_starter_material_buffer; do_not_mine_more_for_generic_future_building`
+      : "",
     recentCobblestoneMiningCount > 0
       ? `recent_successful_cobblestone_mining_turns=${recentCobblestoneMiningCount}`
       : "",
@@ -1300,7 +1303,7 @@ function buildActorTurnDecisionFrame(input: {
       : []),
     ...(demoteRepeatedCobblestoneMining
       ? [
-          `do not keep selecting Mine Cobblestone after ${recentCobblestoneMiningCount} recent successful mining turns and cobblestone:${cobblestoneCount}; choose build, craft, place, social, or authored progress unless a new explicit cobblestone shortage appears`
+          `do not keep selecting Mine Cobblestone with cobblestone:${cobblestoneCount}; choose build, craft, place, social, movement-enabled, or authored progress unless a new explicit cobblestone shortage appears`
         ]
       : []),
     ...input.recentEvidenceTrace
@@ -1382,7 +1385,7 @@ function buildActorTurnDecisionFrame(input: {
         ? ["a request is open but deposit is not currently eligible; choose the nearest visible prerequisite such as chest inspection or movement"]
         : []),
       ...(demoteRepeatedCobblestoneMining
-        ? ["recent mining already produced a cobblestone buffer; use another eligible card or author a specific Mineflayer helper for the next distinct blocker"]
+        ? ["current inventory already has a cobblestone buffer; prefer a distinct next step such as shelter placement repair, reachable crafting-table use/repositioning, social follow-up, or a specific authored Mineflayer helper"]
         : []),
       "avoid using remember as the main action when a visible Action Card can create runtime evidence"
     ])

@@ -137,6 +137,7 @@ export type PlanBeadHint = {
 export type RuntimeRetryConstraintSummary = {
   constraint_id: string;
   target_summary: string;
+  args_normalized: JsonValue;
   blocked_reason: string;
   repeat_count: number;
   evidence_refs: string[];

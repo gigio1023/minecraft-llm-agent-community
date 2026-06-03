@@ -21,6 +21,8 @@ has approved an operating-rule change.
 12. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
 13. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
 14. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+15. `docs/blog-doc/Setup/Provider-Setup.md`
+16. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 

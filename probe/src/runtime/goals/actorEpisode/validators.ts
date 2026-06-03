@@ -394,6 +394,9 @@ function validateRetryConstraint(value: unknown, path: string, errors: string[])
   }
   assertString(value, "constraint_id", path, errors);
   assertString(value, "target_summary", path, errors);
+  if (!("args_normalized" in value)) {
+    errors.push(`${path}.args_normalized must be present`);
+  }
   assertString(value, "blocked_reason", path, errors);
   assertNonNegativeInteger(value, "repeat_count", path, errors);
   assertStringArray(value, "evidence_refs", path, errors);

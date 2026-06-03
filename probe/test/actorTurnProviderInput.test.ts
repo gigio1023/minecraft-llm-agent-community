@@ -582,6 +582,7 @@ test("Actor Turn input hides exact empty-args Action Card blocked by runtime ret
       constraint.target_summary === "use_action_skill:action_skill:collectLogs"
     )
   );
+  assert.deepEqual(actorTurnInput.runtime_retry_constraints[0]?.args_normalized, {});
   assert.ok(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("Collect Logs hidden because runtime_retry_constraint already blocks")
@@ -593,6 +594,70 @@ test("Actor Turn input hides exact empty-args Action Card blocked by runtime ret
     ),
     false
   );
+});
+
+test("Actor Turn input exposes normalized retry args for blocked move_to targets", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [buildNpcBActionSkillRecord()],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      inventory: [],
+      nearbyBlocks: [{ name: "crafting_table", position: { x: -8, y: 99, z: 3 } }]
+    },
+    allowedPrimitiveIds: ["observe", "move_to", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 15,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: [
+      {
+        schema: "runtime-retry-constraint/v1",
+        constraint_id: "retry-move-to-known-table",
+        actor_id: "npc_b",
+        action_kind: "use_primitive",
+        target: { kind: "primitive", id: "move_to", primitive_id: "move_to" },
+        args_fingerprint: "same-target",
+        args_normalized: { targetPosition: { x: -8, y: 99, z: 3 } },
+        blocker_key: "blocked:path_stopped",
+        blocker_status: "blocked",
+        blocker_reason: "move_to scout failed: Path was stopped before it could be completed.",
+        repeat_count: 3,
+        attempt_refs: ["cycle-0011-action-01", "cycle-0015-action-01"],
+        evidence_refs: ["evidence/cycle-0015-action-01-move_to.json"],
+        rule: {
+          same_target_and_args_blocked: true,
+          provider_must_pivot_or_repair_args: true,
+          runtime_blocks_before_mineflayer: true
+        }
+      }
+    ]
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-move-to-retry-args-visible",
+    context,
+    cycleGoal: cycleGoal(),
+    startedAtTurnRef: "turns/turn-move-to-retry-args-visible.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-move-to-retry-args-visible",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/move-to-retry-args-visible.json"]
+  });
+
+  assert.deepEqual(actorTurnInput.runtime_retry_constraints[0]?.args_normalized, {
+    targetPosition: { x: -8, y: 99, z: 3 }
+  });
 });
 
 test("Actor Turn input suppresses Remember after repeated no-progress memory turns", async () => {
@@ -786,7 +851,7 @@ test("Actor Turn input does not recommend empty parameters for target-required p
   );
 });
 
-test("Actor Turn input demotes repeated cobblestone mining after enough verified stone collection", async () => {
+test("Actor Turn input demotes cobblestone mining after stockpile is sufficient", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -829,7 +894,7 @@ test("Actor Turn input demotes repeated cobblestone mining after enough verified
     context,
     activeEpisode,
     currentObservationRefs: ["observations/repeated-mine-cobblestone.json"],
-    recentEvidenceTrace: [1, 2, 3].map((index) => ({
+    recentEvidenceTrace: [1, 2].map((index) => ({
       schema: "evidence-trace/v1" as const,
       turn_id: `turn-mine-${index}`,
       episode_id: activeEpisode.episode_id,
@@ -857,6 +922,89 @@ test("Actor Turn input demotes repeated cobblestone mining after enough verified
     actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
       entry.includes("do not keep selecting Mine Cobblestone")
     )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("cobblestone_stockpile=sufficient")
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.next_action_guidance.some((entry) =>
+      entry.includes("current inventory already has a cobblestone buffer")
+    )
+  );
+});
+
+test("Actor Turn input keeps cobblestone mining prioritized for an explicit shortage", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [buildMineCobblestoneRecord(), buildNpcBActionSkillRecord()],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      inventory: [
+        { name: "wooden_pickaxe", count: 1 },
+        { name: "cobblestone", count: 18 }
+      ],
+      nearbyBlocks: [{ name: "stone", position: { x: 2, y: 63, z: 0 } }]
+    },
+    allowedPrimitiveIds: ["observe", "mine_block", "move_to", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 20,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-explicit-cobblestone-shortage",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Need more cobblestone before continuing a stone-heavy repair.",
+      allowed_primitive_ids: ["observe", "mine_block", "move_to", "wait", "remember"]
+    },
+    startedAtTurnRef: "turns/turn-explicit-cobblestone-shortage.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-explicit-cobblestone-shortage",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/explicit-cobblestone-shortage.json"],
+    recentEvidenceTrace: [1, 2].map((index) => ({
+      schema: "evidence-trace/v1" as const,
+      turn_id: `turn-mine-shortage-${index}`,
+      episode_id: activeEpisode.episode_id,
+      action_ref: `goals/cycle/intents/turn-mine-shortage-${index}-intent.json`,
+      runtime_gate_ref: `runtime-gates/turn-mine-shortage-${index}.json`,
+      outcome: "verified_mutation" as const,
+      compact_summary: `turn-mine-shortage-${index} observe,mine_block,wait -> completed`
+    }))
+  });
+
+  assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone"));
+  assert.ok(
+    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+      card.title === "Mine Cobblestone"
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.title === "Mine Cobblestone"
+    )
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("cobblestone_stockpile=sufficient")
+    ),
+    false
   );
 });
 

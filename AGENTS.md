@@ -212,6 +212,7 @@ Read these first:
 29. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
 30. `docs/blog-doc/Setup/Headless-Server.md`
 31. `docs/blog-doc/Setup/Provider-Setup.md`
+32. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 

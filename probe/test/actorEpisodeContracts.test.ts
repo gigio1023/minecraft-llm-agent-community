@@ -176,6 +176,7 @@ function actorTurnInput(): ActorTurnInput {
       {
         constraint_id: "retry-place-table-oak-leaves",
         target_summary: "place crafting_table at blocked oak_leaves target",
+        args_normalized: { itemName: "crafting_table", targetPosition: { x: 1, y: 64, z: 0 } },
         blocked_reason: "target cell was occupied",
         repeat_count: 2,
         evidence_refs: ["evidence/turn-001-place-failed.json"]

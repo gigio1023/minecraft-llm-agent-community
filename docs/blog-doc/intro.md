@@ -146,6 +146,7 @@ transcript evidence.
 - [Social Actor Profiles And Relationships](Architecture/Social-Actor-Profiles-And-Relationships.md)
 - [Headless Server Setup](Setup/Headless-Server.md)
 - [Provider Setup](Setup/Provider-Setup.md)
+- [Provider Free-Tier Reset Windows](Setup/Provider-Free-Tier-Reset-Windows.md)
 - [Architecture Spec](Architecture/SPEC.md)
 - [Agent Search Index](Agent-Search-Index.md)
 - [Terminology](Terminology.md)

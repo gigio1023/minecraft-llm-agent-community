@@ -52,6 +52,16 @@ Longer live runs under OpenAI `gpt-5.4-nano`:
   1 `no_progress`. The actor kept real inventory/world progress:
   final inventory included `wooden_pickaxe`, `crafting_table`, 23 `cobblestone`,
   23 `oak_planks`, 6 `stick`, and 5 `dirt`.
+- `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v15.json`:
+  `runtime_status=passed`, 66 provider records, 532,169 total tokens, 30 cycles.
+  Provider usage guard projected 6,186,613 / 9,000,000 daily tokens. This run
+  confirmed that stockpile-aware Actor Turn guidance reduced `mineCobblestone`
+  from the dominant late action to 2 attempts, but it exposed a new
+  `move_to` loop: 10 `move_to` top-level actions, 7 failed movements, and 8
+  retry-constraint-blocked attempts around the same crafting-table coordinate.
+  The main implementation lesson is that equivalent movement parameter shapes
+  such as `targetPosition`, `position`, and direct `{x,y,z}` must share one
+  runtime retry identity and must expose `args_normalized` to Actor Turn.
 
 What improved in this slice:
 
@@ -65,13 +75,19 @@ What improved in this slice:
 - crafting table state now distinguishes a known or placed table from a table
   that is nearby and usable by the actor;
 - Actor Turn repair removes rejected Action Cards from both the visible card
-  list and `decision_frame` candidate lists.
+  list and `decision_frame` candidate lists;
+- `move_to` runtime retry identity now canonicalizes equivalent explicit
+  position args and Actor Turn receives `args_normalized` in retry summaries, so
+  the provider can see the exact blocked target instead of only the blocker text.
 
 Remaining failures from the 60-cycle review:
 
 - `mineCobblestone` returned as the dominant late action: 22 of 60 top-level
-  actions, including 14 in cycles 41-60. This is a `loop-constriction` finding,
-  not a runtime crash.
+  actions in v14, including 14 in cycles 41-60. v15 reduced this to 2 attempts,
+  but broader loop-constriction still exists through movement/repositioning.
+- v15 exposed `move_to` as the next dominant loop: repeated attempts to reach a
+  crafting-table coordinate did not produce durable progress and consumed late
+  cycles even after retry constraints existed.
 - `buildBasicShelter` ran 3 times and never produced verified shelter evidence,
   so `starter_shelter_verified` remains pending.
 - social evidence remains minimal: one `deposit_shared` mutation, no visible

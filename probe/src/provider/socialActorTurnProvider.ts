@@ -487,6 +487,7 @@ export function buildRepairActorTurnInput(input: {
         constraint_id:
           `actor-turn-contract-rejection-${input.actorTurnInput.turn_id}-${input.actorTurnInput.runtime_retry_constraints.length + 1}`,
         target_summary: `${target} rejected before execution`,
+        args_normalized: {},
         blocked_reason: input.errors.join("; "),
         repeat_count: 1,
         evidence_refs: []
@@ -507,6 +508,7 @@ function buildMalformedOutputRepairActorTurnInput(input: {
         constraint_id:
           `actor-turn-malformed-output-${input.actorTurnInput.turn_id}-${input.actorTurnInput.runtime_retry_constraints.length + 1}`,
         target_summary: "provider output rejected before ActionIntent resolution",
+        args_normalized: {},
         blocked_reason:
           `${input.error}. Return an actor_turn object, not the JSON schema. choice must be use_existing_action or author_mineflayer_action, and parameters must be an object.`,
         repeat_count: 1,
