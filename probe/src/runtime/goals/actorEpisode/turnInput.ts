@@ -795,6 +795,30 @@ function annotateActionCardsWithCurrentStateHints(
   currentState: ActorTurnCurrentStateProjection
 ): ActionCardProjection {
   const actionCards = projection.action_cards.map((card) => {
+    if (card.title === "Inspect Chest" || card.title === "Inspect Shared Chest") {
+      return {
+        ...card,
+        parameter_hints: unique([
+          ...card.parameter_hints,
+          "Use empty parameters. This Action Card is the bounded shared-chest container snapshot, reachability, and openability check; do not author generated code just to probe the same chest.",
+          `Current shared_storage status: ${currentState.shared_storage.status}.`,
+          ...(currentState.shared_storage.items.length > 0
+            ? [
+                `Known shared_storage items: ${currentState.shared_storage.items
+                  .map((item) => `${item.name}:${item.count}`)
+                  .join(", ")}.`
+              ]
+            : []),
+          ...(currentState.shared_storage.evidence_refs.length > 0
+            ? [`Shared storage evidence refs: ${currentState.shared_storage.evidence_refs.join(", ")}.`]
+            : [])
+        ]),
+        likely_blockers: unique([
+          ...card.likely_blockers,
+          "if this card is visible, use it before authoring a generated chest/openability probe"
+        ])
+      };
+    }
     if (card.title === "Deposit Shared" || card.title === "Deposit Shared Items" || card.title === "Handoff Item At Chest") {
       const candidates = currentState.deposit_candidates.slice(0, 6);
       const requestedCandidates = candidates.filter((candidate) => candidate.socially_requested);

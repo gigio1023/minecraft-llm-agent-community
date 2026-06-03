@@ -1114,3 +1114,63 @@ Next implementation targets:
    not only represented as a world event.
 5. Add acceptance accounting for top-action concentration and social-surface
    evidence so `runtime_status=passed` is not confused with product acceptance.
+
+## 2026-06-03 Actor Turn Passive PlanBeads Pivot Update
+
+Goal companion:
+
+- `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+
+Current decision:
+
+- Actor Turn remains the hot-path decision maker.
+- PlanBeads remain useful only as passive actor-owned issue-like work state.
+- Deliberation should propose PlanBead mutations only at meaningful branch
+  points.
+- PlanBeads must not become a semantic Minecraft planner, primitive selector,
+  ActionIntent argument source, retry override, or success oracle.
+
+Implemented in this checkpoint:
+
+- Added a compact goal companion document and routed it through
+  `Documentation-Map.md` and `Agent-Search-Index.md` with search token
+  `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL`.
+- Reduced `craftPlanksAndSticks` repetition pressure by hiding/rejecting the
+  broad planks/sticks action when current state already has enough basic
+  planks/sticks for early progression, while keeping it available when sticks
+  are still missing.
+- Clarified `inspect_chest` as the existing bounded shared-chest container
+  snapshot/openability check, so Actor Turn should use it instead of authoring
+  generated Mineflayer probes for the same chest boundary.
+- Rejected generated shared-chest and crafting-table reachability probes when
+  visible Action Cards or current state already cover the same check.
+- Corrected generated-source prompt examples away from unsupported
+  `ctx.mineflayer.lookAtNearestBlock(...)` object-style usage and toward direct
+  helper calls.
+
+Explicitly not implemented:
+
+- Automatic PlanBead blocker matching from failed runtime actions was not kept.
+  It would push PlanBeads toward semantic reconciliation/planning authority.
+  Blocker expansion should happen through branch-time Deliberation and guarded
+  PlanBead operations, or through narrow evidence-backed lifecycle rules that do
+  not interpret provider prose.
+
+Verification:
+
+- `cd probe && bun test ./test/actorTurnProviderInput.test.ts ./test/actorTurnResolver.test.ts ./test/planBeadLifecycle.test.ts`
+  - passed: 52 tests.
+- `cd probe && bun test ./test/actorTurnProviderInput.test.ts ./test/actorTurnResolver.test.ts ./test/directGeneratedActionSkillExecutor.test.ts ./test/socialCycleExecution.test.ts ./test/planBeadOperations.test.ts ./test/planBeadLifecycle.test.ts ./test/socialDeliberationProvider.test.ts`
+  - passed: 102 tests.
+- `cd probe && bun run typecheck`
+  - passed.
+- `git diff --check`
+  - passed.
+- `cd docs && npm run build`
+  - passed.
+
+Remaining:
+
+- Re-run a low-cost 30-cycle Actor Turn smoke before claiming product progress.
+- A 60-cycle run remains required before the overall goal can be considered
+  complete.

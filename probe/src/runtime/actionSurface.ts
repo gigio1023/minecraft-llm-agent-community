@@ -68,7 +68,7 @@ const primitiveDescriptions: Record<string, string> = {
   run_mineflayer_program: "Run a bounded generated Mineflayer helper program and record source, helper calls, result, and post-observation evidence.",
   place_block: "Place one explicit inventory block into an empty/replaceable target cell, or onto a named support surface, and verify the world block afterward.",
   build_pattern: "Run one bounded block-pattern executor only when current context makes building relevant.",
-  inspect_chest: "Inspect a nearby shared chest and record a container snapshot.",
+  inspect_chest: "Inspect a nearby shared chest and record container snapshot, reachability, or openability evidence without generated code.",
   deposit_shared: "Deposit role-allowed useful inventory into shared storage.",
   withdraw_shared: "Withdraw a specific item from shared storage when it enables the current goal.",
   say: "Speak when communication matters for the current relationship or role context.",

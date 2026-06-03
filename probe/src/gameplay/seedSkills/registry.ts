@@ -109,7 +109,10 @@ const coreActionSkills: SeedActionSkill[] = [
     implementationNotes: "Uses inventory crafting recipes that do not require a crafting table.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter", "settler"],
-    preconditions: ["inventory has logs"],
+    preconditions: [
+      "inventory has logs",
+      "basic planks/sticks need not already satisfied"
+    ],
     primitiveIds: ["observe", "craft_item", "wait"]
   },
   {

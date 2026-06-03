@@ -411,6 +411,15 @@ export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgs
           "resolved actor-owned action skill primitive args"
         ]
       };
+    case "inspect_chest":
+      return {
+        ...base,
+        required_structured_args: [],
+        accepted_forms: [
+          "{} to inspect the nearest known shared chest and record container snapshot/openability evidence",
+          "resolved actor-owned action skill primitive args"
+        ]
+      };
     case "say":
       return {
         ...base,

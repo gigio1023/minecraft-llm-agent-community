@@ -87,6 +87,19 @@ const projection: ActionCardProjection = {
     },
     {
       schema: "action-card/v1",
+      action_card_id: "card-inspect-chest",
+      title: "Inspect Chest",
+      description: "Inspect a nearby shared chest and record container snapshot/openability evidence.",
+      parameters_schema_ref: "runtime-parameters/action-intent-primitive-args/v1/inspect_chest.json",
+      parameter_hints: ["{} to inspect the nearest known shared chest."],
+      current_state_requirements: ["shared chest nearby"],
+      expected_evidence: ["container snapshot or blocked openability evidence"],
+      likely_blockers: ["shared chest unavailable"],
+      readiness: "requires_current_state_check",
+      runtime_mapping_ref: "action-card-mappings/card-inspect-chest.json"
+    },
+    {
+      schema: "action-card/v1",
       action_card_id: "card-place-crafting-table",
       title: "Place Crafting Table",
       description: "Place or approach a crafting table so table recipes become available.",
@@ -107,7 +120,10 @@ const projection: ActionCardProjection = {
       parameter_hints: [
         "Empty parameters are preferred; itemName may only name a crafted output such as oak_planks or stick."
       ],
-      current_state_requirements: ["inventory has logs"],
+      current_state_requirements: [
+        "inventory has logs",
+        "basic planks/sticks need not already satisfied"
+      ],
       expected_evidence: ["crafted planks or sticks"],
       likely_blockers: ["missing logs"],
       readiness: "requires_current_state_check",
@@ -152,6 +168,11 @@ const projection: ActionCardProjection = {
       kind: "use_primitive",
       action_card_id: "card-craft-with-table",
       primitive_id: "craft_with_table"
+    },
+    {
+      kind: "use_primitive",
+      action_card_id: "card-inspect-chest",
+      primitive_id: "inspect_chest"
     },
     {
       kind: "use_action_skill",
@@ -332,6 +353,87 @@ test("Runtime Action Resolver rejects action-skill parameters that contradict th
         error.includes("Craft Planks And Sticks cannot use itemName=oak_log")
       )
   );
+});
+
+test("Runtime Action Resolver rejects broad planks-and-sticks crafting when basic materials are already sufficient", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      schema: "actor-turn-current-state/v1",
+      observer_id: "npc_b",
+      inventory_counts: {
+        spruce_log: 1,
+        spruce_planks: 24,
+        stick: 4
+      },
+      visible_actors: [],
+      nearby_block_hints: [],
+      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+      deposit_candidates: [],
+      settlement_progress: {
+        inventory_counts: {},
+        shared_storage_status: "unknown",
+        known_position_summaries: [],
+        checklist: [],
+        recent_blockers: []
+      }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-craft-planks-and-sticks",
+      parameters: {},
+      why_this_action: "Craft more generic wood materials.",
+      expected_evidence: ["crafted planks or sticks"],
+      fallback_if_blocked: "choose the next physical need"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(
+    !result.ok &&
+      result.errors.some((error) =>
+        error.includes("basic planks/sticks need not already satisfied")
+      )
+  );
+});
+
+test("Runtime Action Resolver keeps planks-and-sticks crafting valid when sticks are still missing", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      schema: "actor-turn-current-state/v1",
+      observer_id: "npc_b",
+      inventory_counts: {
+        spruce_log: 1,
+        spruce_planks: 24
+      },
+      visible_actors: [],
+      nearby_block_hints: [],
+      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+      deposit_candidates: [],
+      settlement_progress: {
+        inventory_counts: {},
+        shared_storage_status: "unknown",
+        known_position_summaries: [],
+        checklist: [],
+        recent_blockers: []
+      }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-craft-planks-and-sticks",
+      parameters: {},
+      why_this_action: "Craft sticks from existing wood materials.",
+      expected_evidence: ["stick inventory increase"],
+      fallback_if_blocked: "choose another prerequisite"
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.intent.kind, "use_action_skill");
+  assert.equal(result.ok && result.intent.action_skill_id, "craftPlanksAndSticks");
 });
 
 test("Runtime Action Resolver rejects unmapped Action Cards", () => {
@@ -742,6 +844,108 @@ test("Runtime Action Resolver maps author_mineflayer_action to generated ActionI
   assert.deepEqual(result.ok && result.intent.parameters, {
     text: "I am blocked placing the crafting table; trying a new cell."
   });
+});
+
+test("Runtime Action Resolver rejects generated shared chest probe when Inspect Chest covers it", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      schema: "actor-turn-current-state/v1",
+      observer_id: "npc_b",
+      inventory_counts: {},
+      visible_actors: [],
+      nearby_block_hints: [{ name: "chest", distance: 2 }],
+      shared_storage: {
+        status: "known",
+        items: [],
+        evidence_refs: ["evidence/cycle-0001-inspect_chest.json"]
+      },
+      deposit_candidates: [],
+      settlement_progress: {
+        inventory_counts: {},
+        shared_storage_status: "known",
+        known_position_summaries: ["shared_chest=inspected at (1, 64, 0)"],
+        checklist: [],
+        recent_blockers: []
+      }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "author_mineflayer_action",
+      proposed_action_skill_id: "probeSharedChestOpenability",
+      purpose: "Check whether the shared chest can be opened and snapshot the container.",
+      input_schema: { type: "object", properties: {}, additionalProperties: false },
+      parameters: {},
+      source_language: "typescript",
+      source: "export async function run(ctx, params) { await ctx.observe({}); return { status: 'checked' }; }",
+      helper_api_version: "mineflayer-action-skill-helper/v1",
+      helper_allowlist: ["observe"],
+      timeout_ms: 5000,
+      verifier: { kind: "helper_event", helper: "observe" },
+      known_failure_modes: ["shared chest unavailable"],
+      promotion_policy: "promote_after_passed_trial",
+      why_this_action: "Probe chest openability.",
+      expected_evidence: ["container snapshot"],
+      fallback_if_blocked: "use Inspect Chest"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(
+    !result.ok &&
+      result.errors.some((error) =>
+        error.includes("shared chest/container probing is already covered")
+      )
+  );
+});
+
+test("Runtime Action Resolver rejects generated crafting-table reachability probe when station cards cover it", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      schema: "actor-turn-current-state/v1",
+      observer_id: "npc_b",
+      inventory_counts: { oak_planks: 3, stick: 2 },
+      visible_actors: [],
+      nearby_block_hints: [{ name: "crafting_table", distance: 1 }],
+      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+      deposit_candidates: [],
+      settlement_progress: {
+        inventory_counts: {},
+        shared_storage_status: "unknown",
+        known_position_summaries: ["crafting_table=nearby at (1, 64, 0)"],
+        checklist: [],
+        recent_blockers: []
+      }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "author_mineflayer_action",
+      proposed_action_skill_id: "checkCraftingTableReachability",
+      purpose: "Verify crafting table station reachability before table-bound crafting.",
+      input_schema: { type: "object", properties: {}, additionalProperties: false },
+      parameters: {},
+      source_language: "typescript",
+      source: "export async function run(ctx, params) { await ctx.observe({}); return { status: 'checked' }; }",
+      helper_api_version: "mineflayer-action-skill-helper/v1",
+      helper_allowlist: ["observe"],
+      timeout_ms: 5000,
+      verifier: { kind: "helper_event", helper: "observe" },
+      known_failure_modes: ["crafting table unavailable"],
+      promotion_policy: "promote_after_passed_trial",
+      why_this_action: "Probe table reachability.",
+      expected_evidence: ["station reachability"],
+      fallback_if_blocked: "use Craft With Table or place the carried table"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(
+    !result.ok &&
+      result.errors.some((error) =>
+        error.includes("crafting-table/station probing is already covered")
+      )
+  );
 });
 
 test("Runtime Action Resolver rejects non-executable generated promotion policy", () => {

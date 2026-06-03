@@ -86,6 +86,7 @@ Architecture:
 - `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
 - `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
 - `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+- `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
 - `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
 - `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 - `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`

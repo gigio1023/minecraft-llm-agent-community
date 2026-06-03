@@ -153,6 +153,11 @@ function inventoryCountForNames(
   return total;
 }
 
+function basicPlanksAndSticksNeedSatisfied(state: ActorTurnCurrentStateProjection) {
+  return inventoryCountForNames(state, plankItemNames) >= 8 &&
+    inventoryCountForNames(state, ["stick", "sticks"]) >= 4;
+}
+
 type IngredientRequirement =
   | { kind: "planks"; count: number }
   | { kind: "sticks"; count: number }
@@ -421,6 +426,51 @@ function actionSkillParameterErrors(input: {
   return errors;
 }
 
+function visibleActionCardTitles(projection: ActionCardProjection) {
+  return new Set(projection.action_cards.map((card) => card.title));
+}
+
+function authoringProbeCoveredByExistingSurface(input: {
+  output: Extract<ActorTurnOutput, { choice: "author_mineflayer_action" }>;
+  projection: ActionCardProjection;
+  currentState?: ActorTurnCurrentStateProjection;
+}) {
+  const visibleTitles = visibleActionCardTitles(input.projection);
+  const text = [
+    input.output.proposed_action_skill_id,
+    input.output.purpose,
+    input.output.why_this_action,
+    input.output.fallback_if_blocked,
+    input.output.source
+  ].join(" ").toLowerCase();
+  const looksLikeProbe = /\b(check|probe|inspect|verify|confirm|test|openability|reachable|reachability|access|open|snapshot)\b/
+    .test(text);
+  if (!looksLikeProbe) {
+    return undefined;
+  }
+  const containerProbe = /\b(chest|container|shared storage|shared_storage|inventory snapshot)\b/.test(text);
+  if (
+    containerProbe &&
+    (visibleTitles.has("Inspect Chest") ||
+      visibleTitles.has("Inspect Shared Chest") ||
+      input.currentState?.shared_storage.status === "known" ||
+      input.currentState?.shared_storage.status === "contributed")
+  ) {
+    return "author_mineflayer_action rejected because shared chest/container probing is already covered by Inspect Chest or current shared_storage state";
+  }
+  const stationProbe = /\b(crafting_table|crafting table|table-bound|station|workbench)\b/.test(text);
+  if (
+    stationProbe &&
+    (visibleTitles.has("Craft With Table") ||
+      visibleTitles.has("Place Crafting Table") ||
+      visibleTitles.has("Craft Crafting Table") ||
+      (input.currentState ? craftingTableAlreadyUsable(input.currentState) : false))
+  ) {
+    return "author_mineflayer_action rejected because crafting-table/station probing is already covered by visible Action Cards or current crafting_table state";
+  }
+  return undefined;
+}
+
 function requirementSatisfied(
   requirement: string,
   state: ActorTurnCurrentStateProjection,
@@ -471,6 +521,9 @@ function requirementSatisfied(
   }
   if (normalized.includes("no wooden_pickaxe already carried")) {
     return !countForInventoryLike(state, ["wooden_pickaxe"]);
+  }
+  if (normalized.includes("basic planks/sticks need not already satisfied")) {
+    return !basicPlanksAndSticksNeedSatisfied(state);
   }
   if (normalized.includes("inventory has logs")) {
     return countForInventoryLike(state, [
@@ -666,6 +719,14 @@ export function resolveActorTurnOutputToActionIntent(
         "author_mineflayer_action must use promotion_policy promote_after_passed_trial to become an executable ActionIntent"
       ]
     };
+  }
+  const coveredProbeReason = authoringProbeCoveredByExistingSurface({
+    output,
+    projection: input.actionCardProjection,
+    currentState: input.currentState
+  });
+  if (coveredProbeReason) {
+    return { ok: false, errors: [coveredProbeReason] };
   }
 
   const intent: ActionIntent = {

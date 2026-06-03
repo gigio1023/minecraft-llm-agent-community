@@ -164,6 +164,27 @@ function buildCraftCraftingTableRecord() {
   };
 }
 
+function buildCraftPlanksAndSticksRecord() {
+  return {
+    schema: "actor-action-skill/v1" as const,
+    skill_id: "craftPlanksAndSticks",
+    owner_actor_id: "npc_b",
+    source_kind: "seed" as const,
+    status: "active" as const,
+    created_at: "2026-06-03T00:00:00.000Z",
+    updated_at: "2026-06-03T00:00:00.000Z",
+    required_primitives: ["observe", "craft_item", "wait"],
+    preconditions: [
+      "inventory has logs",
+      "basic planks/sticks need not already satisfied"
+    ],
+    success_verifier: "planks or sticks added to inventory",
+    known_failure_modes: ["missing logs", "basic planks and sticks already sufficient"],
+    evidence_refs: [],
+    review_refs: []
+  };
+}
+
 function buildCraftWoodenPickaxeRecord() {
   return {
     schema: "actor-action-skill/v1" as const,
@@ -879,6 +900,73 @@ test("Actor Turn input exposes shared-storage deposit candidates from inventory 
   ]);
 });
 
+test("Actor Turn input marks Inspect Chest as the bounded container openability check", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [buildNpcBActionSkillRecord(), buildDepositSharedItemsRecord()],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      visibleActors: [],
+      inventory: [],
+      nearbyBlocks: [{ name: "chest", position: { x: 2, y: 64, z: 0 }, distance: 2 }],
+      sharedChest: {
+        chestId: "shared-chest-spawn",
+        items: [{ name: "oak_log", count: 1 }]
+      }
+    },
+    allowedPrimitiveIds: ["observe", "inspect_chest", "wait"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 1,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-inspect-chest",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Check the known shared chest before choosing a storage action.",
+      allowed_primitive_ids: ["observe", "inspect_chest", "wait"]
+    },
+    startedAtTurnRef: "turns/turn-inspect-chest.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-inspect-chest",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/inspect-chest.json"]
+  });
+
+  const inspectCard = actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest");
+  assert.ok(inspectCard);
+  assert.ok(
+    inspectCard.parameter_hints.some((hint) =>
+      hint.includes("bounded shared-chest container snapshot") &&
+      hint.includes("do not author generated code")
+    )
+  );
+  assert.ok(
+    inspectCard.parameter_hints.some((hint) =>
+      hint.includes("Current shared_storage status")
+    )
+  );
+  assert.ok(
+    inspectCard.likely_blockers.some((blocker) =>
+      blocker.includes("use it before authoring a generated chest/openability probe")
+    )
+  );
+});
+
 test("Actor Turn input does not keep a completed one-item shared-storage request socially requested", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
@@ -1358,6 +1446,146 @@ test("Actor Turn input hides crafting-table crafting after current_state already
   );
 });
 
+test("Actor Turn input hides broad planks-and-sticks crafting after basic materials are already sufficient", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [
+      buildNpcBActionSkillRecord(),
+      buildCraftPlanksAndSticksRecord(),
+      buildMineCobblestoneRecord()
+    ],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 37, y: 71, z: -13 },
+      visibleActors: [],
+      inventory: [
+        { name: "spruce_log", count: 1 },
+        { name: "spruce_planks", count: 24 },
+        { name: "stick", count: 4 },
+        { name: "wooden_pickaxe", count: 1 }
+      ],
+      nearbyBlocks: [
+        { name: "stone", position: { x: 38, y: 70, z: -13 }, distance: 2 }
+      ]
+    },
+    allowedPrimitiveIds: ["observe", "craft_item", "mine_block", "collect_logs", "wait"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 8,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-cycle-0008-materials",
+    context,
+    cycleGoal: cycleGoal(),
+    startedAtTurnRef: "turns/turn-008-materials.json"
+  });
+
+  const { actorTurnInput, actionCardProjection } = buildActorTurnInput({
+    turnId: "turn-008-materials",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/cycle-0008-materials.json"]
+  });
+
+  assert.equal(
+    actorTurnInput.action_cards.some((card) => card.title === "Craft Planks And Sticks"),
+    false
+  );
+  assert.equal(
+    actionCardProjection.runtime_mappings.some((mapping) =>
+      mapping.kind === "use_action_skill" && mapping.action_skill_id === "craftPlanksAndSticks"
+    ),
+    false
+  );
+  assert.ok(
+    actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone")
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.title === "Craft Planks And Sticks"
+    ),
+    false
+  );
+  assert.ok(
+    actionCardProjection.missing_affordances.some((reason) =>
+      reason.includes("Craft Planks And Sticks") &&
+      reason.includes("basic planks/sticks need not already satisfied")
+    )
+  );
+});
+
+test("Actor Turn input keeps planks-and-sticks crafting visible when sticks are still missing", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [
+      buildNpcBActionSkillRecord(),
+      buildCraftPlanksAndSticksRecord()
+    ],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 37, y: 71, z: -13 },
+      visibleActors: [],
+      inventory: [
+        { name: "spruce_log", count: 1 },
+        { name: "spruce_planks", count: 24 }
+      ],
+      nearbyBlocks: [
+        { name: "spruce_log", position: { x: 39, y: 70, z: -13 }, distance: 3 }
+      ]
+    },
+    allowedPrimitiveIds: ["observe", "craft_item", "collect_logs", "wait"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 8,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-cycle-0008-sticks",
+    context,
+    cycleGoal: cycleGoal(),
+    startedAtTurnRef: "turns/turn-008-sticks.json"
+  });
+
+  const { actorTurnInput, actionCardProjection } = buildActorTurnInput({
+    turnId: "turn-008-sticks",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/cycle-0008-sticks.json"]
+  });
+
+  assert.equal(
+    actorTurnInput.action_cards.some((card) => card.title === "Craft Planks And Sticks"),
+    true
+  );
+  assert.ok(
+    actionCardProjection.runtime_mappings.some((mapping) =>
+      mapping.kind === "use_action_skill" && mapping.action_skill_id === "craftPlanksAndSticks"
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.title === "Craft Planks And Sticks"
+    )
+  );
+});
+
 test("Actor Turn input hides current-state-impossible action cards but keeps reachable prerequisites", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
@@ -1370,21 +1598,7 @@ test("Actor Turn input hides current-state-impossible action cards but keeps rea
     previousJudgments: [],
     activeActionSkills: [
       buildNpcBActionSkillRecord(),
-      {
-        schema: "actor-action-skill/v1",
-        skill_id: "craftPlanksAndSticks",
-        owner_actor_id: "npc_b",
-        source_kind: "seed",
-        status: "active",
-        created_at: "2026-06-03T00:00:00.000Z",
-        updated_at: "2026-06-03T00:00:00.000Z",
-        required_primitives: ["craft_item", "observe"],
-        preconditions: ["inventory has logs"],
-        success_verifier: "planks or sticks added to inventory",
-        known_failure_modes: ["missing logs"],
-        evidence_refs: [],
-        review_refs: []
-      }
+      buildCraftPlanksAndSticksRecord()
     ],
     observation: {
       status: "ok",
@@ -1702,21 +1916,7 @@ test("Actor Turn input hides Craft Item when no inventory-grid recipe is current
     worldEvents: [],
     previousJudgments: [],
     activeActionSkills: [
-      {
-        schema: "actor-action-skill/v1",
-        skill_id: "craftPlanksAndSticks",
-        owner_actor_id: "npc_b",
-        source_kind: "seed",
-        status: "active",
-        created_at: "2026-06-03T00:00:00.000Z",
-        updated_at: "2026-06-03T00:00:00.000Z",
-        required_primitives: ["observe", "craft_item", "wait"],
-        preconditions: ["inventory has logs"],
-        success_verifier: "planks or sticks added to inventory",
-        known_failure_modes: ["missing logs", "missing planks"],
-        evidence_refs: [],
-        review_refs: []
-      }
+      buildCraftPlanksAndSticksRecord()
     ],
     observation: {
       status: "ok",
