@@ -1,3 +1,11 @@
+/**
+ * Builds the Actor Turn Action Card surface from active action skills and
+ * runtime context.
+ *
+ * @remarks Action Cards are provider-facing affordances, not direct execution.
+ * Their mappings and parameter contracts must still resolve into validated
+ * `ActionIntent` records before Mineflayer work starts.
+ */
 import type {
   ActionSurfaceActionSkill,
   ActionSurfacePacket,
@@ -90,6 +98,11 @@ function primitiveCurrentStateRequirements(primitive: ActionSurfacePrimitive) {
       return [
         "inventory has the requested block item",
         "provider supplied an explicit target cell or support surface"
+      ];
+    case "build_pattern":
+      return [
+        "inventory has solid build material",
+        "provider supplied an explicit build anchor, target cell, or support surface"
       ];
     case "say":
       return ["target actor visible"];

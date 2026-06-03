@@ -1,3 +1,12 @@
+/**
+ * Actor Turn provider boundary for selecting one existing Action Card or one
+ * generated Mineflayer action skill candidate.
+ *
+ * @remarks Provider prose is normalized and validated here because only the
+ * resolved `ActionIntent` may become executable authority. The prompts preserve
+ * project policy in-context, but runtime validation still rejects missing args,
+ * hidden primitive ids, and generated-code metadata in the wrong place.
+ */
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
@@ -83,7 +92,7 @@ Treat movement-only position_delta evidence as context, not durable progress. Us
 Choose author_mineflayer_action only when no existing Action Card can do the needed Mineflayer behavior. Do not include action_card_id with author_mineflayer_action. Generated source must be TypeScript, helper-limited, schema-bound, timed, verifier-backed, and trialed by runtime before promotion.
 Do not author generated code merely to probe shared chest/container openability, crafting-table reachability, or station availability when Inspect Chest, Craft With Table, Place Crafting Table, Craft Crafting Table, or current_state already expresses that boundary. Choose the existing Action Card or a prerequisite instead.
 For author_mineflayer_action, promotion_policy must be promote_after_passed_trial; never use record_candidate_only. parameters must contain only runtime inputs declared in input_schema and read through params; never put source_language, source, helper_api_version, helper_allowlist, timeout_ms, verifier, known_failure_modes, or promotion_policy inside parameters.
-For author_mineflayer_action, source must define export async function run(ctx, params) with no import, require, process, filesystem, network, eval, Function, while(true), or for(;;). Use only direct ctx helpers named in helper_allowlist, for example ctx.observe(...), ctx.wait(...), ctx.mineBlock(...), ctx.craftItem(...), ctx.placeBlock(...), or ctx.say(...). Do not use ctx.helpers, ctx.sharedStorage, ctx.bot, or ctx.mineflayer() as a function. Supported helper names are exactly: position, inventoryItems, observe, wait, collectLogs, mineBlock, craftItem, craftWithTable, consumeItem, placeBlock, buildPattern, say, mineflayer.
+For author_mineflayer_action, source must define export async function run(ctx, params) with no import, require, process, filesystem, network, eval, Function, while(true), or for(;;). Use only direct ctx helpers named in helper_allowlist, for example ctx.observe(...), ctx.wait({ durationMs: 200 }), ctx.mineBlock(...), ctx.craftItem(...), ctx.placeBlock(...), ctx.mineflayer("lookAtNearestBlock", { blockName: "chest" }), or ctx.say(...). Do not use ctx.helpers, ctx.sharedStorage, ctx.bot, or ctx.mineflayer() object access. Supported helper names are exactly: position, inventoryItems, observe, wait, collectLogs, mineBlock, craftItem, craftWithTable, consumeItem, placeBlock, buildPattern, say, mineflayer.
 PlanBeads preserve work continuity but never supply executable parameters or proof of progress.
 Do not treat observe, wait, memory notes, or provider prose as success. Runtime evidence decides what happened.
 Prefer action over repeated observation after evidence already identifies the blocker. JSON only.`;

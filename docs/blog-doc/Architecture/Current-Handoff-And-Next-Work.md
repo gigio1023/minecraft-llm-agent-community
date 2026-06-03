@@ -32,8 +32,9 @@ Recorded 2026-06-03 (`Asia/Seoul`).
 The current Actor Turn plus passive PlanBeads line has now been tested beyond
 the initial shared-storage fixture. The latest verdict is
 `PASSED_RUNTIME_BUT_BEHAVIOR_LOOP_WEAK`: the runtime completes long low-cost
-provider runs and records truthful evidence, but the NPC still collapses into
-resource loops before the social/shelter behavior is strong enough.
+provider runs and records truthful evidence, and the latest report audit passes,
+but the NPC still collapses into resource loops before the social/shelter
+behavior is strong enough.
 
 Longer live runs under OpenAI `gpt-5.4-nano`:
 
@@ -62,6 +63,32 @@ Longer live runs under OpenAI `gpt-5.4-nano`:
   The main implementation lesson is that equivalent movement parameter shapes
   such as `targetPosition`, `position`, and direct `{x,y,z}` must share one
   runtime retry identity and must expose `args_normalized` to Actor Turn.
+- `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v18.json`:
+  `runtime_status=passed`, 59 provider records, 477,722 total tokens, 30 cycles.
+  Provider usage guard projected 7,476,570 / 9,000,000 daily tokens. This run
+  confirmed that Actor Turn no longer exposes impossible building and placement
+  cards when the actor only has non-block items such as `stick`, and it removed
+  the earlier `build_pattern` and generic `mine_block` loops. The report audit
+  still failed because runtime classifier memory copied provider absence-like
+  prose into CycleJudgment.
+- `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v19.json`:
+  `runtime_status=passed`, 68 provider records, 581,090 total tokens, 30 cycles.
+  Provider usage guard projected 8,057,660 / 9,000,000 daily tokens. This run
+  exercised Actor Turn generated Mineflayer action authoring once through
+  `author_and_trial_action_skill`. It exposed two implementation issues: the
+  runtime classifier still copied provider absence-like text into memory writes,
+  and generated code called `ctx.wait({ durationMs })` while the helper accepted
+  only a bare number, producing a Node `TimeoutNaNWarning`.
+- `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v20.json`:
+  `runtime_status=passed`, 43 provider records, 342,817 total tokens, 30 cycles.
+  Provider usage guard projected 8,400,477 / 9,000,000 daily tokens. The social
+  cycle report audit passed. Outcome distribution was 23 `verified_progress`,
+  2 `partial_verified_progress`, and 5 `blocked`. The first cycle completed the
+  shared-storage contribution through `deposit_shared`, `builtin_goal_authority`
+  was false, and `gameplay_progress_verified` was true. Remaining behavioral
+  weakness: no generated action authoring occurred in this run, no social
+  follow-up event was produced after the deposit, and `craftPlanksAndSticks`
+  still dominated 12 of 30 top-level actions.
 
 What improved in this slice:
 
@@ -79,22 +106,33 @@ What improved in this slice:
 - `move_to` runtime retry identity now canonicalizes equivalent explicit
   position args and Actor Turn receives `args_normalized` in retry summaries, so
   the provider can see the exact blocked target instead of only the blocker text.
+- Actor Turn now hides building and placement cards when current inventory lacks
+  solid block items, and it demotes generic `mine_block` when no explicit mined
+  block need exists.
+- runtime-generated Mineflayer source can use bounded
+  `ctx.mineflayer(method,args)` helper calls while direct `ctx.bot` access and
+  `ctx.mineflayer().method` object escapes remain blocked.
+- `ctx.wait` in generated Mineflayer source accepts structured
+  `{ durationMs }` input and rejects non-finite durations as helper evidence
+  instead of leaking Node timer warnings.
+- Actor Turn runtime classifier writes neutral evidence-linked memory summaries
+  instead of copying provider `why_this_action` prose into CycleJudgment memory
+  writes.
 
-Remaining failures from the 60-cycle review:
+Remaining failures from the latest review:
 
-- `mineCobblestone` returned as the dominant late action: 22 of 60 top-level
-  actions in v14, including 14 in cycles 41-60. v15 reduced this to 2 attempts,
-  but broader loop-constriction still exists through movement/repositioning.
-- v15 exposed `move_to` as the next dominant loop: repeated attempts to reach a
-  crafting-table coordinate did not produce durable progress and consumed late
-  cycles even after retry constraints existed.
-- `buildBasicShelter` ran 3 times and never produced verified shelter evidence,
-  so `starter_shelter_verified` remains pending.
+- broader loop-constriction still exists: v20 removed the prior movement loop
+  but overused `craftPlanksAndSticks` 12 times in 30 cycles;
+- `buildBasicShelter` has not produced verified shelter evidence in the latest
+  reviewed runs, and v20 still only produced partial shelter progress;
 - social evidence remains minimal: one `deposit_shared` mutation, no visible
-  actors, no `say` tool calls, and no relationship events.
-- PlanBead audit still fails because several CycleJudgments make physical
-  absence/progress claims without exhaustive scan evidence, and the live run
-  still uses builtin goal authority.
+  actors, no `say` tool calls, and no relationship events;
+- generated Mineflayer action authoring is wired and was exercised in v19, but
+  v20 did not need or choose it, so the next proof should include a scenario
+  where no existing Action Card expresses the needed behavior;
+- CycleGoal context is still marked `runtime_rule` for compatibility, so
+  branch-only deliberation should continue moving goal authority away from the
+  old per-cycle planner shape.
 
 Earlier accepted shared-storage slices remain useful but are no longer the
 latest behavioral proof:
@@ -120,14 +158,15 @@ latest behavioral proof:
 
 Next work:
 
-- make Actor Turn choose a valuable next action after sufficient cobblestone
-  instead of returning to `mineCobblestone`;
+- make Actor Turn choose a valuable next action after sufficient planks/sticks
+  instead of returning to `craftPlanksAndSticks`;
 - improve `buildBasicShelter` or replace it with a narrower, more verifiable
   Mineflayer-backed shelter action skill;
 - add a social-visible follow-up action after a completed shared-storage
   contribution, such as a bounded `say` or relationship event path;
-- tighten CycleJudgment wording or audit policy so non-exhaustive scans do not
-  become absolute absence claims;
+- create a live scenario that forces bounded generated Mineflayer authoring and
+  verifies candidate source, helper events, verifier output, and actor-workspace
+  evidence;
 - keep Actor Turn as the opt-in hot path until actionfulness, PlanBead
   continuity, social consequence, and budget gates pass together.
 

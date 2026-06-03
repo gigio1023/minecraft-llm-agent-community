@@ -1,3 +1,12 @@
+/**
+ * Builds the Actor Turn provider packet from current runtime evidence,
+ * relationship context, PlanBeads, retry constraints, and Minecraft state.
+ *
+ * @remarks This module is intentionally policy-heavy: it translates distant
+ * architecture rules into compact provider context without granting execution
+ * authority. The decision frame can recommend or demote actions, but validated
+ * `ActionIntent` parameters and runtime gates still decide what can run.
+ */
 import { lifeGoalRef } from "../lifeGoalStore.js";
 import { soulRef } from "../actorSoulStore.js";
 import type { ActorCycleGoal } from "../types.js";
@@ -9,6 +18,7 @@ import {
 import {
   feasibleInventoryGridRecipeNames,
   feasibleTableBoundRecipeNames,
+  isLikelyPlaceableBlockItemName,
   missingInventoryGridRecipeIngredients,
   missingTableBoundRecipeIngredients,
   validateActionCardCurrentStateRequirements
@@ -606,10 +616,75 @@ function recentSuccessfulCobblestoneMiningCount(recentEvidenceTrace: readonly Ev
     ).length;
 }
 
+const logItemNames = [
+  "oak_log",
+  "spruce_log",
+  "birch_log",
+  "jungle_log",
+  "acacia_log",
+  "dark_oak_log",
+  "mangrove_log",
+  "cherry_log",
+  "crimson_stem",
+  "warped_stem"
+] as const;
+
+const plankItemNames = [
+  "oak_planks",
+  "spruce_planks",
+  "birch_planks",
+  "jungle_planks",
+  "acacia_planks",
+  "dark_oak_planks",
+  "mangrove_planks",
+  "cherry_planks",
+  "crimson_planks",
+  "warped_planks"
+] as const;
+
+function currentItemCountForNames(
+  currentState: ActorTurnCurrentStateProjection,
+  names: readonly string[]
+) {
+  return names.reduce((total, name) =>
+    total + Math.max(
+      currentState.inventory_counts[name] ?? 0,
+      currentState.settlement_progress.inventory_counts[name] ?? 0
+    ), 0);
+}
+
 function currentCobblestoneCount(currentState: ActorTurnCurrentStateProjection) {
-  return Math.max(
-    currentState.inventory_counts.cobblestone ?? 0,
-    currentState.settlement_progress.inventory_counts.cobblestone ?? 0
+  return currentItemCountForNames(currentState, ["cobblestone"]);
+}
+
+function starterWoodMaterialCounts(currentState: ActorTurnCurrentStateProjection) {
+  return {
+    logs: currentItemCountForNames(currentState, logItemNames),
+    planks: currentItemCountForNames(currentState, plankItemNames),
+    sticks: currentItemCountForNames(currentState, ["stick", "sticks"]),
+    craftingTables: currentItemCountForNames(currentState, ["crafting_table"])
+  };
+}
+
+function inventoryEntries(currentState: ActorTurnCurrentStateProjection) {
+  return [
+    ...Object.entries(currentState.inventory_counts),
+    ...Object.entries(currentState.settlement_progress.inventory_counts)
+  ];
+}
+
+function hasStarterSolidBuildMaterial(currentState: ActorTurnCurrentStateProjection) {
+  return currentItemCountForNames(currentState, [
+    ...plankItemNames,
+    ...logItemNames,
+    "dirt",
+    "cobblestone"
+  ]) > 0;
+}
+
+function hasPlaceableBlockItem(currentState: ActorTurnCurrentStateProjection) {
+  return inventoryEntries(currentState).some(([itemName, count]) =>
+    count > 0 && isLikelyPlaceableBlockItemName(itemName)
   );
 }
 
@@ -617,7 +692,18 @@ function hasExplicitCobblestoneShortage(input: {
   activeEpisode: ActiveEpisode;
   currentState: ActorTurnCurrentStateProjection;
 }) {
-  const text = [
+  const text = shortageContextText(input);
+  return /\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b.{0,48}\b(cobblestone|stone)\b/i
+    .test(text) ||
+    /\b(cobblestone|stone)\b.{0,48}\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b/i
+      .test(text);
+}
+
+function shortageContextText(input: {
+  activeEpisode: ActiveEpisode;
+  currentState: ActorTurnCurrentStateProjection;
+}) {
+  return [
     input.activeEpisode.current_focus,
     ...input.currentState.settlement_progress.checklist
       .filter((item) => item.status !== "satisfied")
@@ -625,10 +711,26 @@ function hasExplicitCobblestoneShortage(input: {
     ...input.currentState.settlement_progress.recent_blockers
       .map((blocker) => `${blocker.key} ${blocker.example ?? ""}`)
   ].join(" ");
-  return /\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b.{0,48}\b(cobblestone|stone)\b/i
+}
+
+function hasExplicitWoodMaterialShortage(input: {
+  activeEpisode: ActiveEpisode;
+  currentState: ActorTurnCurrentStateProjection;
+}) {
+  const text = shortageContextText(input);
+  return /\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b.{0,56}\b(log|logs|wood|plank|planks|stick|sticks|crafting[_ ]?table)\b/i
     .test(text) ||
-    /\b(cobblestone|stone)\b.{0,48}\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b/i
+    /\b(log|logs|wood|plank|planks|stick|sticks|crafting[_ ]?table)\b.{0,56}\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b/i
       .test(text);
+}
+
+function hasExplicitGenericMiningNeed(input: {
+  activeEpisode: ActiveEpisode;
+  currentState: ActorTurnCurrentStateProjection;
+}) {
+  const text = shortageContextText(input);
+  return /\b(mine|mining|dig|quarry|stone|cobblestone|coal|iron|ore|blockName|targetBlock)\b/i
+    .test(text);
 }
 
 function shouldDemoteRepeatedCobblestoneMining(input: {
@@ -641,6 +743,18 @@ function shouldDemoteRepeatedCobblestoneMining(input: {
       activeEpisode: input.activeEpisode,
       currentState: input.currentState
     });
+}
+
+function shouldDemoteStarterWoodMaterialLoop(input: {
+  activeEpisode: ActiveEpisode;
+  currentState: ActorTurnCurrentStateProjection;
+}) {
+  const counts = starterWoodMaterialCounts(input.currentState);
+  const potentialPlanks = counts.planks + counts.logs * 4;
+  return potentialPlanks >= 16 &&
+    counts.sticks >= 4 &&
+    counts.craftingTables >= 1 &&
+    !hasExplicitWoodMaterialShortage(input);
 }
 
 function suppressObserveCards(
@@ -1215,10 +1329,21 @@ function buildActorTurnDecisionFrame(input: {
   );
   const recentCobblestoneMiningCount = recentSuccessfulCobblestoneMiningCount(input.recentEvidenceTrace);
   const cobblestoneCount = currentCobblestoneCount(input.currentState);
+  const woodMaterialCounts = starterWoodMaterialCounts(input.currentState);
+  const hasSolidBuildMaterial = hasStarterSolidBuildMaterial(input.currentState);
+  const hasPlaceableBlock = hasPlaceableBlockItem(input.currentState);
   const demoteRepeatedCobblestoneMining = shouldDemoteRepeatedCobblestoneMining({
     activeEpisode: input.activeEpisode,
     currentState: input.currentState,
     recentEvidenceTrace: input.recentEvidenceTrace
+  });
+  const demoteStarterWoodMaterialLoop = shouldDemoteStarterWoodMaterialLoop({
+    activeEpisode: input.activeEpisode,
+    currentState: input.currentState
+  });
+  const demoteGenericMineBlock = !hasExplicitGenericMiningNeed({
+    activeEpisode: input.activeEpisode,
+    currentState: input.currentState
   });
   const visibleCardTitles = new Set(input.actionCardProjection.action_cards.map((card) => card.title));
   const decisionFrameActionCards = input.actionCardProjection.action_cards.filter((card) =>
@@ -1226,12 +1351,18 @@ function buildActorTurnDecisionFrame(input: {
       (card.title !== "Deposit Shared" &&
         card.title !== "Deposit Shared Items" &&
         card.title !== "Handoff Item At Chest" &&
-        !(demoteRepeatedCobblestoneMining && card.title === "Mine Cobblestone"))
+        !(demoteRepeatedCobblestoneMining && card.title === "Mine Cobblestone") &&
+        !(demoteStarterWoodMaterialLoop &&
+          (card.title === "Collect Logs" || card.title === "Craft Planks And Sticks")) &&
+        !(demoteGenericMineBlock && card.title === "Mine Block") &&
+        !(!hasSolidBuildMaterial && (card.title === "Build Pattern" || card.title === "Build Basic Shelter")) &&
+        !(!hasPlaceableBlock && card.title === "Place Block"))
   );
   const topCardPreference = [
     ...(requestedDeposits.length > 0 ? ["Deposit Shared"] : []),
     "Inspect Chest",
     "Craft Crafting Table",
+    "Place Crafting Table",
     "Craft Planks And Sticks",
     "Collect Logs",
     "Mine Cobblestone",
@@ -1266,6 +1397,12 @@ function buildActorTurnDecisionFrame(input: {
     demoteRepeatedCobblestoneMining
       ? `cobblestone_stockpile=sufficient_for_starter_material_buffer; do_not_mine_more_for_generic_future_building`
       : "",
+    demoteStarterWoodMaterialLoop
+      ? `wood_material_stockpile=sufficient_for_starter_material_buffer; logs=${woodMaterialCounts.logs} planks=${woodMaterialCounts.planks} sticks=${woodMaterialCounts.sticks} crafting_tables=${woodMaterialCounts.craftingTables}; do_not_collect_or_craft_more_generic_wood_materials`
+      : "",
+    hasSolidBuildMaterial ? "" : "solid_build_material=none; do_not_select_build_pattern_until_inventory_has_planks_logs_dirt_or_cobblestone",
+    hasPlaceableBlock ? "" : "placeable_block_item=none; do_not_select_place_block_with_non_block_items_such_as_stick",
+    demoteGenericMineBlock ? "generic_mine_block_demoted=no_explicit_mined_block_target; do_not_mine_grass_block_or_crafting_table_for_generic_progress" : "",
     recentCobblestoneMiningCount > 0
       ? `recent_successful_cobblestone_mining_turns=${recentCobblestoneMiningCount}`
       : "",
@@ -1305,6 +1442,20 @@ function buildActorTurnDecisionFrame(input: {
       ? [
           `do not keep selecting Mine Cobblestone with cobblestone:${cobblestoneCount}; choose build, craft, place, social, movement-enabled, or authored progress unless a new explicit cobblestone shortage appears`
         ]
+      : []),
+    ...(demoteStarterWoodMaterialLoop
+      ? [
+          `do not keep selecting Collect Logs or Craft Planks And Sticks with logs:${woodMaterialCounts.logs} planks:${woodMaterialCounts.planks} sticks:${woodMaterialCounts.sticks} crafting_tables:${woodMaterialCounts.craftingTables}; choose table placement/use repair, shelter verification, social follow-up, movement-enabled fresh evidence, or an authored helper unless a new explicit wood-material shortage appears`
+        ]
+      : []),
+    ...(!hasSolidBuildMaterial
+      ? ["do not select Build Pattern or Build Basic Shelter while inventory has no solid build material such as planks, logs, dirt, or cobblestone"]
+      : []),
+    ...(!hasPlaceableBlock
+      ? ["do not select Place Block while inventory has no placeable block item; stick is not a place_block item"]
+      : []),
+    ...(demoteGenericMineBlock
+      ? ["do not select generic Mine Block without an explicit mined block target; grass_block and crafting_table are not generic progress targets"]
       : []),
     ...input.recentEvidenceTrace
       .slice(-3)
@@ -1386,6 +1537,18 @@ function buildActorTurnDecisionFrame(input: {
         : []),
       ...(demoteRepeatedCobblestoneMining
         ? ["current inventory already has a cobblestone buffer; prefer a distinct next step such as shelter placement repair, reachable crafting-table use/repositioning, social follow-up, or a specific authored Mineflayer helper"]
+        : []),
+      ...(demoteStarterWoodMaterialLoop
+        ? ["current inventory already has a starter wood-material buffer; prefer a distinct next step such as placing/repositioning a crafting table, repairing shelter verification, social follow-up, or a specific authored Mineflayer helper"]
+        : []),
+      ...(!hasSolidBuildMaterial
+        ? ["building cards need solid inventory materials first; choose collection, crafting, social follow-up, movement-enabled evidence, or author a specific helper instead of build_pattern"]
+        : []),
+      ...(!hasPlaceableBlock
+        ? ["place_block needs a real block item and explicit target cell; non-block items such as stick should lead to another action or authored helper"]
+        : []),
+      ...(demoteGenericMineBlock
+        ? ["generic Mine Block is not a fallback action; use a target-specific mining card, exact mined-block parameters, or a different visible action"]
         : []),
       "avoid using remember as the main action when a visible Action Card can create runtime evidence"
     ])

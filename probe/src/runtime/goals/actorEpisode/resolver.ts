@@ -38,6 +38,9 @@ export type ActorTurnResolutionResult =
 
 export type CurrentStateRequirementValidationMode = "selection" | "resolution";
 
+// These bounded Minecraft recipe facts are used only to reject impossible or
+// misplaced Actor Turn selections. They are not a planner curriculum or a global
+// survival strategy.
 const plankItemNames = [
   "oak_planks",
   "spruce_planks",
@@ -422,6 +425,36 @@ function hasSolidBuildMaterial(state: ActorTurnCurrentStateProjection) {
   ]) > 0;
 }
 
+const likelyPlaceableBlockItemNames = new Set([
+  "crafting_table",
+  "chest",
+  "furnace",
+  "torch",
+  "dirt",
+  "grass_block",
+  "cobblestone",
+  "stone",
+  "sand",
+  "gravel"
+]);
+
+export function isLikelyPlaceableBlockItemName(itemName: string) {
+  if (likelyPlaceableBlockItemNames.has(itemName)) {
+    return true;
+  }
+  return /(_log|_wood|_stem|_hyphae|_planks|_leaves|_sapling|_slab|_stairs|_fence|_wall|_door|_trapdoor|_sign|_torch|_lantern|_block|_ore)$/
+    .test(itemName);
+}
+
+function hasAnyPlaceableBlockItem(state: ActorTurnCurrentStateProjection) {
+  return [
+    ...Object.entries(state.inventory_counts),
+    ...Object.entries(state.settlement_progress.inventory_counts)
+  ].some(([itemName, count]) =>
+    count > 0 && isLikelyPlaceableBlockItemName(itemName)
+  );
+}
+
 function inventoryHasRequestedItem(
   state: ActorTurnCurrentStateProjection,
   parameters: Record<string, unknown>
@@ -431,7 +464,9 @@ function inventoryHasRequestedItem(
     : typeof parameters.blockName === "string"
       ? parameters.blockName
       : undefined;
-  return itemName ? countForInventoryLike(state, [itemName]) : hasAnyInventoryEntry(state);
+  return itemName
+    ? isLikelyPlaceableBlockItemName(itemName) && countForInventoryLike(state, [itemName])
+    : hasAnyPlaceableBlockItem(state);
 }
 
 function requestedItemName(parameters: Record<string, unknown>) {
@@ -521,7 +556,8 @@ function requirementSatisfied(
   const normalized = requirement.toLowerCase();
   if (
     mode === "selection" &&
-    normalized.includes("provider supplied an explicit target cell or support surface")
+    (normalized.includes("provider supplied an explicit target cell or support surface") ||
+      normalized.includes("provider supplied an explicit build anchor"))
   ) {
     return true;
   }
@@ -662,6 +698,16 @@ function requirementSatisfied(
       parameters.position !== undefined ||
       parameters.surfacePosition !== undefined;
   }
+  if (normalized.includes("provider supplied an explicit build anchor")) {
+    return parameters.anchor !== undefined ||
+      parameters.targetPosition !== undefined ||
+      parameters.target_position !== undefined ||
+      parameters.position !== undefined ||
+      parameters.surfacePosition !== undefined ||
+      parameters.surface_position !== undefined ||
+      parameters.supportPosition !== undefined ||
+      parameters.support_position !== undefined;
+  }
   return true;
 }
 
@@ -688,6 +734,13 @@ export function validateActionCardCurrentStateRequirements(input: {
     );
 }
 
+/**
+ * Resolves provider Actor Turn output into a runtime ActionIntent.
+ *
+ * @remarks Natural-language fields such as `why_this_action` can explain the
+ * choice but cannot supply missing structured parameters. The returned intent
+ * still passes through ActionIntent validation before runtime execution.
+ */
 export function resolveActorTurnOutputToActionIntent(
   input: ActorTurnResolutionInput
 ): ActorTurnResolutionResult {

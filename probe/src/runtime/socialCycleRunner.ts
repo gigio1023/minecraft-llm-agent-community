@@ -966,7 +966,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         activeEpisodeRefForCycle = activeEpisodeState.ref;
         report.agency_status.strategic_goal_source = "runtime_rule";
         report.agency_status.cycle_goal_source = cycleGoal.source;
-        report.agency_status.builtin_goal_authority = true;
+        report.agency_status.builtin_goal_authority = input.providerId === "deterministic-social";
       } else if (actionHotPath === "actor_turn" && activeEpisodeState && pendingDeliberationBranch) {
         const deliberation = await runSocialDeliberationProvider({
           providerId: input.providerId,
@@ -1029,7 +1029,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.active_episode_refs = pushUniqueRef(report.active_episode_refs, activeEpisodeRefForCycle);
         report.agency_status.strategic_goal_source = "runtime_rule";
         report.agency_status.cycle_goal_source = cycleGoal.source;
-        report.agency_status.builtin_goal_authority = true;
+        report.agency_status.builtin_goal_authority = input.providerId === "deterministic-social";
       } else {
         const cycleGoalProvider = await runSocialCycleGoalProvider({
           providerId: input.providerId,

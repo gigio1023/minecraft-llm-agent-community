@@ -1,3 +1,4 @@
+/** Regression coverage for direct generated action skill executor limits. */
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -118,10 +119,21 @@ test("direct generated action skill executor enforces helper allowlist", async (
   assert.equal(result.helperEvents[0]?.status, "failed");
 });
 
+test("direct generated action skill source guard allows bounded ctx.mineflayer helper calls", () => {
+  assert.doesNotThrow(() =>
+    assertDirectGeneratedActionSkillSource(`
+      export async function run(ctx) {
+        return ctx.mineflayer("lookAtNearestBlock", { blockName: "chest" });
+      }
+    `)
+  );
+});
+
 test("direct generated action skill source guard rejects unsupported ctx shapes", () => {
   for (const source of [
     `export async function run(ctx) { return ctx.helpers.observe({}); }`,
     `export async function run(ctx) { return ctx.sharedStorage.chest; }`,
+    `export async function run(ctx) { return ctx.bot.entity.position; }`,
     `export async function run(ctx) { return ctx.mineflayer().activateItem(); }`
   ]) {
     assert.throws(

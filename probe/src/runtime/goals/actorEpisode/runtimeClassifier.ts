@@ -48,18 +48,32 @@ function branchReason(input: {
 function memoryWritesForRuntime(input: {
   intent: ActionIntent;
   outcome: CycleJudgment["outcome"];
+  verifierStatus: CycleJudgment["verifier_status"];
+  evidenceRefCount: number;
 }): CycleJudgment["memory_writes"] {
   if (input.outcome === "no_progress") {
     return [];
   }
   const layer = input.outcome === "blocked" ? "procedural" : "episodic";
+  const actionId = actionIntentRuntimeLabel(input.intent);
   return [
     {
       layer,
-      summary: input.intent.why_this_action,
+      summary:
+        `Actor Turn runtime classified ${actionId} as ${input.outcome}; verifier=${input.verifierStatus}; evidence_refs=${input.evidenceRefCount}.`,
       confidence: "observed"
     }
   ];
+}
+
+function actionIntentRuntimeLabel(intent: ActionIntent) {
+  if (intent.kind === "use_primitive") {
+    return `primitive:${intent.primitive_id}`;
+  }
+  if (intent.kind === "use_action_skill") {
+    return `action_skill:${intent.action_skill_id}`;
+  }
+  return intent.kind;
 }
 
 /**
@@ -102,12 +116,14 @@ export async function classifyActorTurnRuntime(input: {
       outcome,
       what_happened: runtimeStatusSummary(input),
       why_it_mattered_for_life_goal:
-        `${input.cycleGoal.summary} remains bounded by runtime evidence; this classifier does not create PlanBead operations or executable authority.`,
+        `Runtime evidence for ${input.cycleGoal.goal_id} updates the active episode under ActorSoul/LifeGoal context. This classifier records executed-tool results only; it does not assert unscanned world state, create PlanBead operations, or grant executable authority.`,
       verifier_status: input.verifierStatus,
       evidence_refs: [...input.evidenceRefs],
       memory_writes: memoryWritesForRuntime({
         intent: input.actionIntent,
-        outcome
+        outcome,
+        verifierStatus: input.verifierStatus,
+        evidenceRefCount: input.evidenceRefs.length
       }),
       relationship_event_proposals: [],
       next_goal_context: reason

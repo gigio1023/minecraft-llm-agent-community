@@ -1,3 +1,4 @@
+/** Regression coverage for Actor Turn output resolution into ActionIntent. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -248,6 +249,33 @@ test("Runtime Action Resolver maps use_existing_action cards to primitive Action
     itemName: "crafting_table",
     targetPosition: { x: 0, y: 64, z: 1 }
   });
+});
+
+test("Runtime Action Resolver rejects non-block items for place_block", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      ...resolutionBase().currentState,
+      inventory_counts: { stick: 4 }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-place-block",
+      parameters: { itemName: "stick", targetPosition: { x: 0, y: 64, z: 1 } },
+      why_this_action: "Try to place a stick as if it were a block.",
+      expected_evidence: ["block delta"],
+      fallback_if_blocked: "choose another action"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(
+    !result.ok &&
+      result.errors.some((error) =>
+        error.includes("inventory has the requested block item")
+      )
+  );
 });
 
 test("Runtime Action Resolver rejects stale crafting-table placement when a usable table is already known", () => {

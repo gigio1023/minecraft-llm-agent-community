@@ -44,7 +44,7 @@ const blockedGeneratedCodePattern =
   /\b(import|require|process|Bun|Deno|eval|Function|child_process|fs|node:fs|net|http|https)\b|while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/;
 
 const blockedGeneratedCtxPattern =
-  /\bctx\.(helpers|sharedStorage|bot)\b|\bctx\.mineflayer\s*\(/;
+  /\bctx\.(helpers|sharedStorage|bot)\b|\bctx\.mineflayer\s*\(\s*\)\s*\./;
 
 function sanitizeFileId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "generated_action_skill";
@@ -60,7 +60,7 @@ export function assertDirectGeneratedActionSkillSource(source: string) {
   }
 
   if (blockedGeneratedCtxPattern.test(source)) {
-    throw new Error("Generated action skill must use direct helper API only; ctx.helpers, ctx.sharedStorage, ctx.bot, and ctx.mineflayer() are not supported");
+    throw new Error("Generated action skill must use direct helper API only; ctx.helpers, ctx.sharedStorage, ctx.bot, and ctx.mineflayer() object access are not supported");
   }
 }
 

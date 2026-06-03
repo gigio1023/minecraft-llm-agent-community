@@ -1,3 +1,4 @@
+/** Regression coverage for Actor Turn provider packet and decision-frame policy. */
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
@@ -1892,6 +1893,241 @@ test("Actor Turn input keeps planks-and-sticks crafting visible when sticks are 
   assert.ok(
     actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
       candidate.title === "Craft Planks And Sticks"
+    )
+  );
+});
+
+test("Actor Turn input demotes generic wood collection after starter stockpile is sufficient", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [
+      buildNpcBActionSkillRecord(),
+      buildCraftPlanksAndSticksRecord(),
+      buildPlaceCraftingTableRecord()
+    ],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 37, y: 71, z: -13 },
+      visibleActors: [],
+      inventory: [
+        { name: "birch_log", count: 8 },
+        { name: "birch_planks", count: 4 },
+        { name: "stick", count: 4 },
+        { name: "crafting_table", count: 1 }
+      ],
+      nearbyBlocks: [
+        { name: "birch_log", position: { x: 39, y: 70, z: -13 }, distance: 3 }
+      ]
+    },
+    allowedPrimitiveIds: ["observe", "craft_item", "collect_logs", "place_block", "move_to", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 30,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-cycle-0030-wood-stockpile",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Continue useful settlement work after basic wood materials are prepared."
+    },
+    startedAtTurnRef: "turns/turn-0030-wood-stockpile.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-0030-wood-stockpile",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/cycle-0030-wood-stockpile.json"]
+  });
+
+  assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Collect Logs"));
+  assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Craft Planks And Sticks"));
+  assert.equal(
+    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+      card.title === "Collect Logs" || card.title === "Craft Planks And Sticks"
+    ),
+    false
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.title === "Collect Logs" || candidate.title === "Craft Planks And Sticks"
+    ),
+    false
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.top_eligible_action_cards[0]?.title,
+    "Place Crafting Table"
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("wood_material_stockpile=sufficient")
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
+      entry.includes("do not keep selecting Collect Logs or Craft Planks And Sticks")
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.next_action_guidance.some((entry) =>
+      entry.includes("starter wood-material buffer")
+    )
+  );
+});
+
+test("Actor Turn input keeps wood collection prioritized for an explicit shortage", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [
+      buildNpcBActionSkillRecord(),
+      buildCraftPlanksAndSticksRecord(),
+      buildPlaceCraftingTableRecord()
+    ],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 37, y: 71, z: -13 },
+      visibleActors: [],
+      inventory: [
+        { name: "birch_log", count: 8 },
+        { name: "birch_planks", count: 4 },
+        { name: "stick", count: 4 },
+        { name: "crafting_table", count: 1 }
+      ],
+      nearbyBlocks: [
+        { name: "birch_log", position: { x: 39, y: 70, z: -13 }, distance: 3 }
+      ]
+    },
+    allowedPrimitiveIds: ["observe", "craft_item", "collect_logs", "place_block", "move_to", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 31,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-cycle-0031-wood-shortage",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Need more logs before continuing a wood-heavy repair."
+    },
+    startedAtTurnRef: "turns/turn-0031-wood-shortage.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-0031-wood-shortage",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/cycle-0031-wood-shortage.json"]
+  });
+
+  assert.ok(
+    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+      card.title === "Collect Logs" || card.title === "Craft Planks And Sticks"
+    )
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("wood_material_stockpile=sufficient")
+    ),
+    false
+  );
+});
+
+test("Actor Turn input demotes impossible building, placement, and generic mining when only sticks are carried", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 8, y: 71, z: -84 },
+      visibleActors: [],
+      inventory: [{ name: "stick", count: 4 }],
+      nearbyBlocks: [
+        { name: "grass_block", position: { x: 8, y: 70, z: -84 }, distance: 1 },
+        { name: "crafting_table", position: { x: 7, y: 71, z: -84 }, distance: 2 }
+      ]
+    },
+    allowedPrimitiveIds: ["observe", "mine_block", "place_block", "build_pattern", "move_to", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 32,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-cycle-0032-stick-only",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Continue useful settlement work after local wood collection failed."
+    },
+    startedAtTurnRef: "turns/turn-0032-stick-only.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-0032-stick-only",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/cycle-0032-stick-only.json"]
+  });
+
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Place Block"), false);
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Build Pattern"), false);
+  assert.equal(
+    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+      card.title === "Mine Block" || card.title === "Place Block" || card.title === "Build Pattern"
+    ),
+    false
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.title === "Mine Block" || candidate.title === "Place Block" || candidate.title === "Build Pattern"
+    ),
+    false
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("solid_build_material=none")
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("placeable_block_item=none")
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("generic_mine_block_demoted")
+    )
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
+      entry.includes("stick is not a place_block item")
     )
   );
 });

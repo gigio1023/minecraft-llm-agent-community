@@ -33,6 +33,7 @@ import {
   deriveRuntimeRetryConstraints,
   findMatchingRuntimeRetryConstraint
 } from "../src/runtime/retryConstraints.js";
+import { classifyActorTurnRuntime } from "../src/runtime/goals/actorEpisode/runtimeClassifier.js";
 
 function fakeObserveBot(username = "npc_b"): Bot {
   const position = {
@@ -283,6 +284,72 @@ test("clampCycleJudgmentOutcome downgrades unpassed verified progress to partial
     toolStatuses: [{ tool: "build_pattern", status: "progressing" }]
   });
   assert.equal(clamped.outcome, "partial_verified_progress");
+});
+
+test("Actor Turn runtime classifier does not copy provider absence claims into judgment or memory", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "actor-turn-classifier-"));
+  const result = await classifyActorTurnRuntime({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-absence-summary",
+    turnId: "cycle-absence-summary-action-01",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-absence-summary",
+      life_goal_id: "life-1",
+      cycle_id: "cycle-absence-summary",
+      status: "active",
+      source: "runtime_rule",
+      summary: "Inspect locally and conclude the container is not found locally if no nearby chest appears.",
+      rationale: "Fixture with absence-like wording.",
+      derived_from: {
+        soul_ref: "goals/soul/soul-npc_b.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime evidence",
+        evidence_required: ["runtime evidence"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["observe"],
+      stop_conditions: []
+    },
+    actionIntent: {
+      schema: "action-intent/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-absence-summary",
+      cycle_goal_id: "cycle-goal-absence-summary",
+      kind: "use_primitive",
+      primitive_id: "observe",
+      args: {},
+      why_this_action: "No nearby container target is available, so observe current loaded state.",
+      expected_evidence: ["observation"],
+      fallback_if_blocked: "record blocker"
+    },
+    evidenceRefs: ["evidence/cycle-absence-summary-observe.json"],
+    executedTools: ["observe"],
+    toolStatuses: [{ tool: "observe", status: "ok" }],
+    verifierStatus: "passed"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    result.ok && /not found locally|no nearby chest|conclude the container/i.test(result.judgment.why_it_mattered_for_life_goal),
+    false
+  );
+  assert.match(
+    result.ok ? result.judgment.why_it_mattered_for_life_goal : "",
+    /does not assert unscanned world state/
+  );
+  assert.equal(
+    result.ok && result.judgment.memory_writes.some((write) => /no nearby container|target is available/i.test(write.summary)),
+    false
+  );
 });
 
 test("use_action_skill resolves full owned primitive bundle", () => {

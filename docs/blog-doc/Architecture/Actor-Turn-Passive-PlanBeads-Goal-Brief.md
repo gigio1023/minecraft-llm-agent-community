@@ -23,6 +23,18 @@ decision brief for the current pivot:
 - Deliberation mutates PlanBeads only at meaningful branch points.
 - Live runtime evidence decides whether low-cost social simulation is working.
 
+## Recommended `/goal` Objective
+
+Codex documents goal text as both the starting prompt and the standard for
+completion. If a goal needs multiple instructions, keep the goal short and point
+it at a file that carries the detailed context. For this campaign, the goal
+should directly link this brief; this brief then routes workers to the active
+spec, implementation, handoff, provider, and budget documents.
+
+```text
+Finish the Actor Turn + passive PlanBeads campaign for this repo. Use docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md as the routing spec, with AGENTS.md and SPEC.md as authority and docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md for latest evidence. Keep Actor Turn as the ordinary hot path, PlanBeads passive, and generated Mineflayer action authoring gated through Actor Turn. Verify with focused tests, typecheck, docs build, and budget-guarded 30/60-cycle live evidence. Do not mark complete from green tests alone.
+```
+
 ## Correct Link Set
 
 A short goal prompt should link this document, then the worker should read these
@@ -31,24 +43,28 @@ references as needed:
 1. `AGENTS.md` - binding repo-agent rules, current product direction, and
    PlanBeads authority boundaries.
 2. `SPEC.md` - canonical rebuild spec.
-3. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md` -
+3. `docs/blog-doc/Documentation-Map.md` - documentation authority order and
+   active/supporting/historical document boundaries.
+4. `docs/blog-doc/Terminology.md` - canonical terms for Actor Turn, Action
+   Cards, Evidence Trace, PlanBeads, agent skills, and action skills.
+5. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md` -
    campaign gates, social proof scenarios, and acceptance accounting.
-4. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md` -
+6. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md` -
    target Actor Turn, Active Episode, Evidence Trace, and branch-only
    Deliberation architecture.
-5. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+7. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
    - current implementation plan and live-run gate status.
-6. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md` -
+8. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md` -
    durable actor work graph contract.
-7. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+9. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
    - generated Mineflayer action authoring authority.
-8. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md` - stable Minecraft
+10. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md` - stable Minecraft
    mechanics guide for provider context.
-9. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md` - dated current
+11. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md` - dated current
    state, live-run evidence, and unresolved risks.
-10. `docs/blog-doc/Setup/Provider-Setup.md` - provider auth, usage guard, and
+12. `docs/blog-doc/Setup/Provider-Setup.md` - provider auth, usage guard, and
     social-cycle run command reference.
-11. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` - OpenAI and
+13. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` - OpenAI and
     Gemini free-tier reset windows and Korea-time budget rules.
 
 Do not link broad historical plans as primary goal context unless a specific
