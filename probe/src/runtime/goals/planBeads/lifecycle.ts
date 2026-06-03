@@ -25,6 +25,21 @@ export type PlanBeadLifecycleDerivationInput = {
   beads: readonly ActorPlanBead[];
 };
 
+export type PlanBeadCurrentStateLifecycleInput = {
+  actorId: string;
+  cycleId: string;
+  turnId: string;
+  currentState: {
+    shared_storage?: {
+      status?: string;
+      items?: readonly { name: string; count: number }[];
+      evidence_refs?: readonly string[];
+    };
+    deposit_candidates?: readonly { socially_requested?: boolean }[];
+  };
+  beads: readonly ActorPlanBead[];
+};
+
 function uniqueStrings(values: readonly string[]) {
   return [...new Set(values.filter((value) => value.length > 0))];
 }
@@ -99,15 +114,16 @@ export function matchPlanBeadAcceptanceEvidence(input: {
   const text = textForBead(input.bead);
   switch (input.signal.kind) {
     case "deposit_shared": {
-      const terms = [
+      const storageTerms = [
         "shared storage",
         "shared chest",
+        "chest deposit",
+        "storage deposit",
         "deposit",
         "contribution",
-        "contribute",
-        ...itemTerms(input.signal.itemName)
+        "contribute"
       ];
-      return hasAny(text, terms) ? "close_satisfied" : "no_match";
+      return hasAny(text, storageTerms) ? "close_satisfied" : "no_match";
     }
     case "inspect_chest": {
       const isChestConcern = hasAny(text, [
@@ -242,5 +258,52 @@ export function derivePlanBeadLifecycleOperationsFromTurnEvidence(
       }
     }
   }
+  return operations;
+}
+
+export function derivePlanBeadLifecycleOperationsFromCurrentState(
+  input: PlanBeadCurrentStateLifecycleInput
+): PlanBeadOperation[] {
+  const sharedStorage = input.currentState.shared_storage;
+  const evidenceRefs = runtimeEvidenceRefs(sharedStorage?.evidence_refs ?? []);
+  const hasOpenSocialDeposit = (input.currentState.deposit_candidates ?? []).some((candidate) =>
+    candidate.socially_requested === true
+  );
+  if (
+    sharedStorage?.status !== "contributed" ||
+    evidenceRefs.length === 0 ||
+    hasOpenSocialDeposit
+  ) {
+    return [];
+  }
+
+  const depositedItems = (sharedStorage.items ?? [])
+    .filter((item) => item.count > 0)
+    .map((item) => item.name);
+  const signals: EvidenceSignal[] = depositedItems.length > 0
+    ? depositedItems.map((itemName) => ({ kind: "deposit_shared", itemName }))
+    : [{ kind: "deposit_shared" }];
+  const operations: PlanBeadOperation[] = [];
+  const touched = new Set<string>();
+
+  for (const bead of input.beads) {
+    if (bead.status === "closed" || touched.has(bead.bead_id)) {
+      continue;
+    }
+    for (const signal of signals) {
+      const match = matchPlanBeadAcceptanceEvidence({ bead, signal });
+      if (match === "close_satisfied") {
+        operations.push(closeOperation({
+          actorId: input.actorId,
+          bead,
+          signal,
+          evidenceRefs
+        }));
+        touched.add(bead.bead_id);
+        break;
+      }
+    }
+  }
+
   return operations;
 }

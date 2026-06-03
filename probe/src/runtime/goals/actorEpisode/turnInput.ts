@@ -210,14 +210,42 @@ function positionSummary(value: unknown) {
   return position ? `(${position.x}, ${position.y}, ${position.z})` : undefined;
 }
 
-function knownPositionSummaries(context: SocialCycleContextPacket) {
+function distanceBetween(
+  left: NonNullable<ActorTurnCurrentStateProjection["position"]>,
+  right: NonNullable<ActorTurnCurrentStateProjection["position"]>
+) {
+  const dx = left.x - right.x;
+  const dy = left.y - right.y;
+  const dz = left.z - right.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function tableUsabilitySuffix(input: {
+  actorPosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>;
+  tablePosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>;
+}) {
+  if (!input.actorPosition || !input.tablePosition) {
+    return "";
+  }
+  const distance = distanceBetween(input.actorPosition, input.tablePosition);
+  const rounded = Math.round(distance * 10) / 10;
+  return ` distance_from_actor=${rounded} usable_now=${distance <= 4.5}`;
+}
+
+function knownPositionSummaries(
+  context: SocialCycleContextPacket,
+  actorPosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>
+) {
   const positions = context.settlement_state.known_positions;
+  const craftingTablePosition = positions.crafting_table?.position
+    ? positionFromRecord(positions.crafting_table.position)
+    : undefined;
   return [
     positions.actor_position ? `actor_position=${positionSummary(positions.actor_position)}` : undefined,
     positions.crafting_table
       ? `crafting_table=${positions.crafting_table.status}${
           positions.crafting_table.position ? ` at ${positionSummary(positions.crafting_table.position)}` : ""
-        }`
+        }${tableUsabilitySuffix({ actorPosition, tablePosition: craftingTablePosition })}`
       : undefined,
     positions.shared_chest ? `shared_chest=${positions.shared_chest.status}` : undefined,
     positions.shelter ? `shelter=${positions.shelter.status}` : undefined
@@ -365,10 +393,11 @@ export function buildActorTurnCurrentStateProjection(
   const observation = context.observation;
   const observerId = readString(asRecord(observation)?.observerId) ?? context.ActorSoul.actor_id;
   const inventoryCounts = inventoryCountsFromObservation(observation);
+  const actorPosition = positionFromRecord(asRecord(observation)?.position);
   return {
     schema: "actor-turn-current-state/v1",
     observer_id: observerId,
-    ...(positionFromRecord(asRecord(observation)?.position) ? { position: positionFromRecord(asRecord(observation)?.position) } : {}),
+    ...(actorPosition ? { position: actorPosition } : {}),
     inventory_counts: inventoryCounts,
     ...(vitalsFromObservation(observation) ? { vitals: vitalsFromObservation(observation) } : {}),
     visible_actors: visibleActorsFromObservation(observation),
@@ -380,7 +409,7 @@ export function buildActorTurnCurrentStateProjection(
     settlement_progress: {
       inventory_counts: { ...context.settlement_state.inventory_counts },
       shared_storage_status: context.settlement_state.shared_storage.status,
-      known_position_summaries: knownPositionSummaries(context),
+      known_position_summaries: knownPositionSummaries(context, actorPosition),
       checklist: checklistProjection(context),
       recent_blockers: blockerProjection(context)
     }
@@ -565,6 +594,53 @@ function shouldSuppressMoveToCards(input: {
       /\bmove_to\b/i.test(entry.compact_summary)
     );
   return recentMovementWithoutProgress.length >= 2;
+}
+
+function recentSuccessfulCobblestoneMiningCount(recentEvidenceTrace: readonly EvidenceTraceEntry[]) {
+  return recentEvidenceTrace
+    .slice(-6)
+    .filter((entry) =>
+      (entry.outcome === "verified_mutation" || entry.outcome === "partial_verified_progress") &&
+      /\b(mine_block|mineCobblestone|Mine Cobblestone)\b/i.test(entry.compact_summary)
+    ).length;
+}
+
+function currentCobblestoneCount(currentState: ActorTurnCurrentStateProjection) {
+  return Math.max(
+    currentState.inventory_counts.cobblestone ?? 0,
+    currentState.settlement_progress.inventory_counts.cobblestone ?? 0
+  );
+}
+
+function hasExplicitCobblestoneShortage(input: {
+  activeEpisode: ActiveEpisode;
+  currentState: ActorTurnCurrentStateProjection;
+}) {
+  const text = [
+    input.activeEpisode.current_focus,
+    ...input.currentState.settlement_progress.checklist
+      .filter((item) => item.status !== "satisfied")
+      .map((item) => item.reason),
+    ...input.currentState.settlement_progress.recent_blockers
+      .map((blocker) => `${blocker.key} ${blocker.example ?? ""}`)
+  ].join(" ");
+  return /\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b.{0,48}\b(cobblestone|stone)\b/i
+    .test(text) ||
+    /\b(cobblestone|stone)\b.{0,48}\b(missing|need|needs|needed|short|shortage|lack|lacking|insufficient|not enough)\b/i
+      .test(text);
+}
+
+function shouldDemoteRepeatedCobblestoneMining(input: {
+  activeEpisode: ActiveEpisode;
+  currentState: ActorTurnCurrentStateProjection;
+  recentEvidenceTrace: readonly EvidenceTraceEntry[];
+}) {
+  return currentCobblestoneCount(input.currentState) >= 16 &&
+    recentSuccessfulCobblestoneMiningCount(input.recentEvidenceTrace) >= 3 &&
+    !hasExplicitCobblestoneShortage({
+      activeEpisode: input.activeEpisode,
+      currentState: input.currentState
+    });
 }
 
 function suppressObserveCards(
@@ -1137,12 +1213,20 @@ function buildActorTurnDecisionFrame(input: {
   const hadRecentChestInspection = input.recentEvidenceTrace.slice(-4).some((entry) =>
     entry.outcome === "verified_mutation" && /\binspect_chest\b/i.test(entry.compact_summary)
   );
+  const recentCobblestoneMiningCount = recentSuccessfulCobblestoneMiningCount(input.recentEvidenceTrace);
+  const cobblestoneCount = currentCobblestoneCount(input.currentState);
+  const demoteRepeatedCobblestoneMining = shouldDemoteRepeatedCobblestoneMining({
+    activeEpisode: input.activeEpisode,
+    currentState: input.currentState,
+    recentEvidenceTrace: input.recentEvidenceTrace
+  });
   const visibleCardTitles = new Set(input.actionCardProjection.action_cards.map((card) => card.title));
   const decisionFrameActionCards = input.actionCardProjection.action_cards.filter((card) =>
     requestedDeposits.length > 0 ||
       (card.title !== "Deposit Shared" &&
         card.title !== "Deposit Shared Items" &&
-        card.title !== "Handoff Item At Chest")
+        card.title !== "Handoff Item At Chest" &&
+        !(demoteRepeatedCobblestoneMining && card.title === "Mine Cobblestone"))
   );
   const topCardPreference = [
     ...(requestedDeposits.length > 0 ? ["Deposit Shared"] : []),
@@ -1178,6 +1262,10 @@ function buildActorTurnDecisionFrame(input: {
     hasCompletedSharedContribution
       ? `shared_storage_contribution_evidence=${input.currentState.shared_storage.evidence_refs.join(",")}`
       : "",
+    cobblestoneCount > 0 ? `cobblestone=${cobblestoneCount}` : "",
+    recentCobblestoneMiningCount > 0
+      ? `recent_successful_cobblestone_mining_turns=${recentCobblestoneMiningCount}`
+      : "",
     `inventory=${Object.entries(input.currentState.inventory_counts)
       .map(([name, count]) => `${name}:${count}`)
       .join(",") || "empty"}`,
@@ -1209,6 +1297,11 @@ function buildActorTurnDecisionFrame(input: {
       : []),
     ...(hadRecentChestInspection && !visibleCardTitles.has("Inspect Chest")
       ? ["do not inspect the same shared chest again unless another actor or inventory change creates a fresh container question"]
+      : []),
+    ...(demoteRepeatedCobblestoneMining
+      ? [
+          `do not keep selecting Mine Cobblestone after ${recentCobblestoneMiningCount} recent successful mining turns and cobblestone:${cobblestoneCount}; choose build, craft, place, social, or authored progress unless a new explicit cobblestone shortage appears`
+        ]
       : []),
     ...input.recentEvidenceTrace
       .slice(-3)
@@ -1287,6 +1380,9 @@ function buildActorTurnDecisionFrame(input: {
         : []),
       ...(requestedDeposits.length > 0 && !visibleCardTitles.has("Deposit Shared")
         ? ["a request is open but deposit is not currently eligible; choose the nearest visible prerequisite such as chest inspection or movement"]
+        : []),
+      ...(demoteRepeatedCobblestoneMining
+        ? ["recent mining already produced a cobblestone buffer; use another eligible card or author a specific Mineflayer helper for the next distinct blocker"]
         : []),
       "avoid using remember as the main action when a visible Action Card can create runtime evidence"
     ])

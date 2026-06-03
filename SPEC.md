@@ -163,28 +163,43 @@ Read these documents to understand the full spec:
 6. `docs/blog-doc/Documentation-Map.md`
    - documentation authority order, active/supporting/historical categories,
      and cleanup rules.
-7. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+7. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+   - compact current-goal routing for Actor Turn as hot path and PlanBeads as
+     passive actor-owned work state.
+8. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+   - active campaign gates for proving cheap-model Actor Turn behavior.
+9. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+   - Active Episode, Actor Turn, Action Cards, Evidence Trace, and branch-only
+     Deliberation architecture.
+10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+    - current implementation sequence and acceptance gates for the Actor Turn
+      migration.
+11. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
    - concrete Soul/LifeGoal/CycleGoal architecture.
-8. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
+12. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
    - hot path, runtime verification, and bounded execution.
-9. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
+13. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
    - transcript and artifact persistence contract.
-10. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+14. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
-11. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+15. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
    - restart-safe actor state, PlanBead work graph, dependencies, and ready front.
-12. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+16. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+    - Actor Turn-only generated Mineflayer action-skill authoring authority.
+17. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+    - provider-visible basic Minecraft mechanics guide.
+18. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
     - actor profiles, role context, and relationship state.
-13. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+19. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
     - current implementation state and next work.
-14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+20. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
     - repo-internal whole-project implementation map for current boundaries,
       runtime flow, evidence, and risks.
-15. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
+21. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
     - latest architecture/implementation cross-check.
-16. `docs/blog-doc/Agent-Search-Index.md`
+22. `docs/blog-doc/Agent-Search-Index.md`
     - routing map and search tokens.
-17. `docs/blog-doc/Terminology.md`
+23. `docs/blog-doc/Terminology.md`
     - canonical terms such as `agent skill` and `action skill`.
 
 Setup docs:

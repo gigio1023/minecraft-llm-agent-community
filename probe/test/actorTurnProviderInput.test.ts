@@ -15,6 +15,7 @@ import {
 import type { ActorCycleGoal, CycleJudgment } from "../src/runtime/goals/types.js";
 import { buildNpcBActionSkillRecord } from "./helpers/socialCycleTestHelpers.js";
 import {
+  buildRepairActorTurnInput,
   buildActorTurnProviderPayload,
   parseActorTurnProviderOutput
 } from "../src/provider/socialActorTurnProvider.js";
@@ -782,6 +783,167 @@ test("Actor Turn input does not recommend empty parameters for target-required p
   assert.equal(
     actorTurnInput.decision_frame.recommended_next_action_candidates[0]?.title,
     "Mine Cobblestone"
+  );
+});
+
+test("Actor Turn input demotes repeated cobblestone mining after enough verified stone collection", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [buildMineCobblestoneRecord(), buildNpcBActionSkillRecord()],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      inventory: [
+        { name: "wooden_pickaxe", count: 1 },
+        { name: "cobblestone", count: 18 }
+      ],
+      nearbyBlocks: [{ name: "stone", position: { x: 2, y: 63, z: 0 } }]
+    },
+    allowedPrimitiveIds: ["observe", "mine_block", "move_to", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 19,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-repeated-mine-cobblestone",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Continue useful settlement work after collecting stone.",
+      allowed_primitive_ids: ["observe", "mine_block", "move_to", "wait", "remember"]
+    },
+    startedAtTurnRef: "turns/turn-repeated-mine-cobblestone.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-repeated-mine-cobblestone",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/repeated-mine-cobblestone.json"],
+    recentEvidenceTrace: [1, 2, 3].map((index) => ({
+      schema: "evidence-trace/v1" as const,
+      turn_id: `turn-mine-${index}`,
+      episode_id: activeEpisode.episode_id,
+      action_ref: `goals/cycle/intents/turn-mine-${index}-intent.json`,
+      runtime_gate_ref: `runtime-gates/turn-mine-${index}.json`,
+      outcome: "verified_mutation" as const,
+      compact_summary: `turn-mine-${index} observe,mine_block,wait -> completed`
+    }))
+  });
+
+  assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone"));
+  assert.equal(
+    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+      card.title === "Mine Cobblestone"
+    ),
+    false
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.title === "Mine Cobblestone"
+    ),
+    false
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
+      entry.includes("do not keep selecting Mine Cobblestone")
+    )
+  );
+});
+
+test("Actor Turn repair input removes a rejected Action Card from decision-frame candidates", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [buildCraftWoodenPickaxeRecord(), buildMineCobblestoneRecord()],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      inventory: [
+        { name: "wooden_pickaxe", count: 1 },
+        { name: "stick", count: 2 }
+      ],
+      nearbyBlocks: [
+        { name: "crafting_table", position: { x: 1, y: 64, z: 0 }, distance: 1 },
+        { name: "stone", position: { x: 2, y: 63, z: 0 }, distance: 2 }
+      ]
+    },
+    allowedPrimitiveIds: ["observe", "craft_with_table", "mine_block", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 19,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-repair-visible-cards",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Repair the next useful action after a table-bound contract rejection.",
+      allowed_primitive_ids: ["observe", "craft_with_table", "mine_block", "wait", "remember"]
+    },
+    startedAtTurnRef: "turns/turn-repair-visible-cards.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-repair-visible-cards",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/repair-visible-cards.json"]
+  });
+  const rejectedCard = actorTurnInput.action_cards.find((card) => card.title === "Mine Cobblestone");
+  assert.ok(rejectedCard);
+
+  const repairInput = buildRepairActorTurnInput({
+    actorTurnInput,
+    rejectedOutput: {
+      schema: "actor-turn-output/v1",
+      choice: "use_existing_action",
+      action_card_id: rejectedCard.action_card_id,
+      parameters: {},
+      why_this_action: "Try the rejected mining card.",
+      expected_evidence: ["mine_block evidence"],
+      fallback_if_blocked: "choose another visible card"
+    },
+    errors: [`${rejectedCard.action_card_id} current_state requirement not satisfied`]
+  });
+
+  assert.equal(
+    repairInput.action_cards.some((card) => card.action_card_id === rejectedCard.action_card_id),
+    false
+  );
+  assert.equal(
+    repairInput.decision_frame.top_eligible_action_cards.some((card) =>
+      card.action_card_id === rejectedCard.action_card_id
+    ),
+    false
+  );
+  assert.equal(
+    repairInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+      candidate.action_card_id === rejectedCard.action_card_id
+    ),
+    false
+  );
+  assert.ok(
+    repairInput.decision_frame.do_not_repeat.some((entry) =>
+      entry.includes(`Action Card ${rejectedCard.action_card_id}`)
+    )
   );
 });
 

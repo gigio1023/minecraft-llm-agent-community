@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   applyPlanBeadOperations,
   computeReadyPlanBeads,
+  derivePlanBeadLifecycleOperationsFromCurrentState,
   derivePlanBeadLifecycleOperationsFromTurnEvidence,
   readActorPlanBead,
   writeActorPlanBead,
@@ -190,6 +191,96 @@ test("inspect_chest updates a deposit bead as incomplete instead of closing it",
   assert.equal(operations[0]?.op, "update_notes");
   assert.match(operations[0]?.patch.in_progress?.join("\n") ?? "", /deposit evidence is still missing/);
   assert.ok(operations[0]?.patch.in_progress?.includes("Existing note survives lifecycle updates."));
+});
+
+test("current shared-storage contribution evidence closes stale deposit-access PlanBeads", () => {
+  const staleAccessBead = bead({
+    beadId: "bead-shared-storage-access",
+    title: "Verify shared chest access for oak_log deposit",
+    description: "npc_a needs one oak_log deposited into shared storage before trusting progress.",
+    evidenceRequired: ["runtime evidence matching this PlanBead's concern"]
+  });
+
+  const operations = derivePlanBeadLifecycleOperationsFromCurrentState({
+    actorId,
+    cycleId: "cycle-0002",
+    turnId: "cycle-0002-current-state",
+    currentState: {
+      shared_storage: {
+        status: "contributed",
+        items: [{ name: "oak_log", count: 1 }],
+        evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
+      },
+      deposit_candidates: [
+        {
+          socially_requested: false
+        }
+      ]
+    },
+    beads: [staleAccessBead]
+  });
+
+  assert.equal(operations.length, 1);
+  assert.equal(operations[0]?.op, "set_status");
+  assert.equal(operations[0]?.bead_id, "bead-shared-storage-access");
+  assert.equal(operations[0]?.patch.status, "closed");
+  assert.match(operations[0]?.patch.close_reason ?? "", /deposited oak_log/);
+});
+
+test("current shared-storage lifecycle does not close when a social deposit request is still open", () => {
+  const openRequestBead = bead({
+    beadId: "bead-shared-storage-open-request",
+    title: "Deposit oak logs into shared chest",
+    description: "A newer actor request still needs more oak_log in shared storage.",
+    evidenceRequired: ["deposit_shared evidence"]
+  });
+
+  const operations = derivePlanBeadLifecycleOperationsFromCurrentState({
+    actorId,
+    cycleId: "cycle-0002",
+    turnId: "cycle-0002-current-state",
+    currentState: {
+      shared_storage: {
+        status: "contributed",
+        items: [{ name: "oak_log", count: 1 }],
+        evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
+      },
+      deposit_candidates: [
+        {
+          socially_requested: true
+        }
+      ]
+    },
+    beads: [openRequestBead]
+  });
+
+  assert.deepEqual(operations, []);
+});
+
+test("current shared-storage lifecycle does not close unrelated item-only PlanBeads", () => {
+  const collectWoodBead = bead({
+    beadId: "bead-collect-oak-log",
+    title: "Collect oak_log for starter shelter",
+    description: "The actor should gather oak_log for later construction.",
+    evidenceRequired: ["inventory contains oak_log from collection"]
+  });
+
+  const operations = derivePlanBeadLifecycleOperationsFromCurrentState({
+    actorId,
+    cycleId: "cycle-0002",
+    turnId: "cycle-0002-current-state",
+    currentState: {
+      shared_storage: {
+        status: "contributed",
+        items: [{ name: "oak_log", count: 1 }],
+        evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
+      },
+      deposit_candidates: []
+    },
+    beads: [collectWoodBead]
+  });
+
+  assert.deepEqual(operations, []);
 });
 
 test("crafted item evidence closes only a matching crafting PlanBead", () => {

@@ -84,6 +84,7 @@ import { applyCycleJudgmentRelationshipEventProposals } from "../reviewer/relati
 import {
   applyPlanBeadOperations,
   computeReadyPlanBeads,
+  derivePlanBeadLifecycleOperationsFromCurrentState,
   derivePlanBeadLifecycleOperationsFromTurnEvidence,
   loadPlanBeadGraphSnapshot,
   writePlanBeadReadyFrontSnapshot
@@ -91,6 +92,7 @@ import {
 import {
   buildActiveEpisodeFromCycleGoal,
   buildCycleGoalFromActiveEpisode,
+  buildActorTurnCurrentStateProjection,
   buildActorTurnInput,
   anchorActiveEpisodeToPlanBeadContext,
   classifyActorTurnRuntime,
@@ -791,14 +793,103 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         actorId: input.actorId,
         attempts: runtimeRetryAttempts
       });
-      const planBeadGraph = await loadPlanBeadGraphSnapshot(rootDir, input.actorId);
-      const planBeadPacket = computeReadyPlanBeads({
+      let planBeadGraph = await loadPlanBeadGraphSnapshot(rootDir, input.actorId);
+      let planBeadPacket = computeReadyPlanBeads({
         beads: planBeadGraph.beads,
         dependencies: planBeadGraph.dependencies,
         lifeGoalId: lifeGoal.goal_id,
         nowIso: new Date().toISOString(),
         maxReady: 3
       });
+
+      if (previousJudgments.length > 0) {
+        report.agency_status.used_previous_judgment = true;
+      }
+
+      const observation = await observeActorWorld({ actorId: input.actorId, bot });
+      let context = await assembleSocialCycleContext({
+        actorWorkspaceRootDir: rootDir,
+        actorId: input.actorId,
+        soul,
+        lifeGoal,
+        strategicGoals,
+        worldEvents,
+        previousJudgments,
+        activeActionSkills: executableActiveSkills,
+        observation,
+        allowedPrimitiveIds: allowedPrimitives,
+        maxActionsPerCycle: input.maxActionsPerCycle,
+        cycleIndex,
+        recentToolResults: settlementToolResults,
+        postconditionResults: allPostconditionResults,
+        evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
+        judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+        memoryWriteCount,
+        runtimeRetryConstraints: cycleRetryConstraints,
+        planBeadPacket
+      });
+      const cyclePlanBeadOperationResultRefs: string[] = [];
+      const currentStateLifecycleOperations = actionHotPath === "actor_turn"
+        ? derivePlanBeadLifecycleOperationsFromCurrentState({
+            actorId: input.actorId,
+            cycleId,
+            turnId: `${cycleId}-current-state`,
+            currentState: buildActorTurnCurrentStateProjection(context),
+            beads: planBeadGraph.beads
+          })
+        : [];
+      if (currentStateLifecycleOperations.length > 0) {
+        const beadOperationApplication = await applyPlanBeadOperations({
+          rootDir,
+          actorId: input.actorId,
+          lifeGoalId: lifeGoal.goal_id,
+          cycleId,
+          turnId: `${cycleId}-current-state`,
+          operations: currentStateLifecycleOperations
+        });
+        report.plan_bead_operation_results ??= [];
+        report.plan_bead_operation_results.push(
+          ...beadOperationApplication.results.map((result, index) => ({
+            cycle_id: cycleId,
+            turn_id: `${cycleId}-current-state`,
+            ref: beadOperationApplication.result_refs[index] ?? "",
+            op: result.op,
+            status: result.status,
+            bead_id: result.bead_id,
+            reason: result.reason
+          }))
+        );
+        cyclePlanBeadOperationResultRefs.push(...beadOperationApplication.result_refs);
+        planBeadGraph = await loadPlanBeadGraphSnapshot(rootDir, input.actorId);
+        planBeadPacket = computeReadyPlanBeads({
+          beads: planBeadGraph.beads,
+          dependencies: planBeadGraph.dependencies,
+          lifeGoalId: lifeGoal.goal_id,
+          nowIso: new Date().toISOString(),
+          maxReady: 3
+        });
+        context = await assembleSocialCycleContext({
+          actorWorkspaceRootDir: rootDir,
+          actorId: input.actorId,
+          soul,
+          lifeGoal,
+          strategicGoals,
+          worldEvents,
+          previousJudgments,
+          activeActionSkills: executableActiveSkills,
+          observation,
+          allowedPrimitiveIds: allowedPrimitives,
+          maxActionsPerCycle: input.maxActionsPerCycle,
+          cycleIndex,
+          recentToolResults: settlementToolResults,
+          postconditionResults: allPostconditionResults,
+          evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
+          judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+          memoryWriteCount,
+          runtimeRetryConstraints: cycleRetryConstraints,
+          planBeadPacket
+        });
+      }
       const readyFrontSnapshot = await writePlanBeadReadyFrontSnapshot({
         rootDir,
         actorId: input.actorId,
@@ -819,33 +910,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         actorId: input.actorId,
         packet: planBeadPacket,
         readyFrontRef: readyFrontSnapshot.ref
-      });
-
-      if (previousJudgments.length > 0) {
-        report.agency_status.used_previous_judgment = true;
-      }
-
-      const observation = await observeActorWorld({ actorId: input.actorId, bot });
-      const context = await assembleSocialCycleContext({
-        actorWorkspaceRootDir: rootDir,
-        actorId: input.actorId,
-        soul,
-        lifeGoal,
-        strategicGoals,
-        worldEvents,
-        previousJudgments,
-        activeActionSkills: executableActiveSkills,
-        observation,
-        allowedPrimitiveIds: allowedPrimitives,
-        maxActionsPerCycle: input.maxActionsPerCycle,
-        cycleIndex,
-        recentToolResults: settlementToolResults,
-        postconditionResults: allPostconditionResults,
-        evidenceRefs: report.cycles.flatMap((cycle) => cycle.evidence_refs),
-        judgmentRefs: report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
-        memoryWriteCount,
-        runtimeRetryConstraints: cycleRetryConstraints,
-        planBeadPacket
       });
       report.runtime_retry_constraints = cycleRetryConstraints;
 
@@ -873,7 +937,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       let cycleGoalOutputRef: string | undefined;
       let activeEpisodeForCycle: ActiveEpisode;
       let activeEpisodeRefForCycle = "";
-      const cyclePlanBeadOperationResultRefs: string[] = [];
 
       if (actionHotPath === "actor_turn" && activeEpisodeState && !pendingDeliberationBranch) {
         const anchoredEpisode = anchorActiveEpisodeToPlanBeadContext({

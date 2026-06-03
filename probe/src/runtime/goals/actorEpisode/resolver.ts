@@ -346,16 +346,57 @@ function hasNearbyBlockLike(state: ActorTurnCurrentStateProjection, names: reado
   return state.world_scan?.retained_block_counts.some((block) => wanted.has(block.name) && block.count > 0) ?? false;
 }
 
+function hasNearbyObservedBlockLike(state: ActorTurnCurrentStateProjection, names: readonly string[]) {
+  const wanted = new Set(names);
+  return state.nearby_block_hints.some((block) =>
+    wanted.has(block.name) && (block.distance === undefined || block.distance <= 4.5)
+  );
+}
+
+function positionFromKnownPositionSummary(summary: string) {
+  const match = summary.match(/\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/);
+  if (!match) {
+    return undefined;
+  }
+  return {
+    x: Number(match[1]),
+    y: Number(match[2]),
+    z: Number(match[3])
+  };
+}
+
+function distanceBetween(
+  left: NonNullable<ActorTurnCurrentStateProjection["position"]>,
+  right: NonNullable<ActorTurnCurrentStateProjection["position"]>
+) {
+  const dx = left.x - right.x;
+  const dy = left.y - right.y;
+  const dz = left.z - right.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function knownCraftingTableUsableNow(state: ActorTurnCurrentStateProjection) {
+  return state.settlement_progress.known_position_summaries.some((entry) => {
+    if (!entry.includes("crafting_table=")) {
+      return false;
+    }
+    if (entry.includes("usable_now=false")) {
+      return false;
+    }
+    if (entry.includes("crafting_table=nearby") || entry.includes("usable_now=true")) {
+      return true;
+    }
+    const tablePosition = positionFromKnownPositionSummary(entry);
+    if (state.position && tablePosition) {
+      return distanceBetween(state.position, tablePosition) <= 4.5;
+    }
+    return entry.includes("crafting_table=known") || entry.includes("crafting_table=placed");
+  });
+}
+
 export function craftingTableAlreadyUsable(state: ActorTurnCurrentStateProjection) {
-  return hasNearbyBlockLike(state, ["crafting_table"]) ||
-    state.settlement_progress.known_position_summaries.some((entry) =>
-      entry.includes("crafting_table=placed") ||
-      entry.includes("crafting_table=nearby") ||
-      entry.includes("crafting_table=known")
-    ) ||
-    state.settlement_progress.checklist.some((item) =>
-      item.id === "crafting_table_known_or_placed" && item.status === "satisfied"
-    );
+  return hasNearbyObservedBlockLike(state, ["crafting_table"]) ||
+    knownCraftingTableUsableNow(state);
 }
 
 function hasAnyInventoryEntry(state: ActorTurnCurrentStateProjection) {
@@ -591,10 +632,7 @@ function requirementSatisfied(
   }
   if (normalized.includes("crafting_table nearby") ||
       normalized.includes("reachable crafting_table block")) {
-    return hasNearbyBlockLike(state, ["crafting_table"]) ||
-      state.settlement_progress.known_position_summaries.some((entry) =>
-        entry.includes("crafting_table=known") || entry.includes("crafting_table=placed")
-      );
+    return craftingTableAlreadyUsable(state);
   }
   if (normalized.includes("nearby loaded world evidence contains reachable log blocks")) {
     return hasNearbyBlockLike(state, [

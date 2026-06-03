@@ -14,9 +14,11 @@ import type { SocialCycleProviderId } from "../runtime/goals/types.js";
 import {
   activeEpisodeStatuses,
   buildMinecraftBasicGuideProjection,
+  buildActorTurnCurrentStateProjection,
   validateDeliberationOutput,
   writeActiveEpisode,
   type ActiveEpisode,
+  type ActorTurnCurrentStateProjection,
   type DeliberationBranch,
   type DeliberationOutput,
   type EvidenceExpectation
@@ -53,6 +55,7 @@ You may reframe the Active Episode and propose guarded PlanBead operations.
 You must not choose an action, select an Action Card, emit primitive_id, action_skill_id, action_intent, generated source, helper settings, args, or executable parameters.
 PlanBeads are durable work-state context only. They never supply physical args or prove Minecraft progress.
 Use runtime evidence, branch reason, ActorSoul/LifeGoal context, memory refs, relationships, world events, and Minecraft Basic Guide.
+Use current_state before older current_episode or PlanBead wording. If current_state.shared_storage is contributed and no deposit candidate is socially_requested, the shared-storage request is already satisfied; do not re-open chest/deposit/openability work unless a new unsatisfied request appears.
 Keep the next Active Episode broad enough for a low-cost Actor Turn LLM to act freely, but concrete enough to avoid forgetting the branch reason.
 PlanBead create proposals must be actionable compact-hint material: use a specific title, a description grounded in cited evidence, and next notes that say what remains open. Do not create a generic branch tracker such as "Branch concern <branch_id>" or "Track branch-time concern..."; return [] when no concrete durable concern is available.
 If branch reason is episode_success, do not re-open the same successful action as the next focus. Use the evidence to pick a distinct next concern or prerequisite under the LifeGoal.
@@ -68,6 +71,7 @@ export type DeliberationProviderInput = {
     life_goal_summary: string;
   };
   plan_bead_packet: SocialCycleContextPacket["plan_bead_packet"];
+  current_state: ActorTurnCurrentStateProjection;
   memory_refs: string[];
   relationship_refs: string[];
   world_event_summaries: string[];
@@ -124,6 +128,7 @@ export function buildDeliberationProviderInput(input: {
       life_goal_summary: input.context.ActorLifeGoal.objective
     },
     plan_bead_packet: input.context.plan_bead_packet,
+    current_state: buildActorTurnCurrentStateProjection(input.context),
     memory_refs: memoryRefs(input.context),
     relationship_refs: relationshipRefs(input.context),
     world_event_summaries: input.context.world_events.map((event) => event.summary),
@@ -367,6 +372,32 @@ function normalizeText(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function textBlob(values: readonly unknown[]) {
+  return values
+    .filter(nonEmptyString)
+    .join(" ")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function sharedStorageSatisfiedByCurrentState(
+  currentState: ActorTurnCurrentStateProjection | undefined
+) {
+  return Boolean(
+    currentState?.shared_storage.status === "contributed" &&
+      currentState.shared_storage.evidence_refs.length > 0 &&
+      !currentState.deposit_candidates.some((candidate) => candidate.socially_requested)
+  );
+}
+
+function looksLikeSatisfiedSharedStorageWork(text: string) {
+  const mentionsStorage = /\b(shared storage|shared chest|chest|container)\b/.test(text);
+  const mentionsCompletedRequest = /\b(deposit|contribut|oak log|oaklog|npc a|trust|openability|reachability|container ui|openable|reachable)\b/
+    .test(text);
+  return mentionsStorage && mentionsCompletedRequest;
+}
+
 function isGenericBranchConcernText(value: string, branchId: string) {
   const text = normalizeText(value).toLowerCase();
   const lowerBranchId = branchId.toLowerCase();
@@ -532,6 +563,100 @@ function normalizePlanBeadProposal(input: {
   };
 }
 
+function planBeadOperationText(operation: unknown) {
+  if (!isRecord(operation)) {
+    return "";
+  }
+  const patch = isRecord(operation.patch) ? operation.patch : {};
+  return textBlob([
+    operation.rationale,
+    operation.bead_id,
+    patch.title,
+    patch.description,
+    ...(Array.isArray(patch.acceptance_evidence_required) ? patch.acceptance_evidence_required : []),
+    ...(Array.isArray(patch.notes_next) ? patch.notes_next : [])
+  ]);
+}
+
+function episodeText(episode: ActiveEpisode) {
+  const episodeRecord = episode as unknown as Record<string, unknown>;
+  return textBlob([
+    episodeRecord.title,
+    episode.purpose,
+    episode.current_focus,
+    episodeRecord.episode_purpose,
+    episodeRecord.broad_scope,
+    ...episode.success_signals.map((signal) => signal.description),
+    ...episode.pivot_triggers.map((trigger) => trigger.trigger),
+    ...episode.social_pressure.map((pressure) => pressure.summary)
+  ]);
+}
+
+function sanitizeDeliberationForCurrentState(input: {
+  output: DeliberationOutput;
+  currentState?: ActorTurnCurrentStateProjection;
+}): DeliberationOutput {
+  if (!sharedStorageSatisfiedByCurrentState(input.currentState)) {
+    return input.output;
+  }
+
+  const filteredPlanBeadOps = input.output.plan_bead_op_proposals.filter((operation) =>
+    !(
+      isRecord(operation) &&
+      operation.op === "create" &&
+      looksLikeSatisfiedSharedStorageWork(planBeadOperationText(operation))
+    )
+  );
+  const staleEpisode = looksLikeSatisfiedSharedStorageWork(episodeText(input.output.next_episode));
+  if (!staleEpisode && filteredPlanBeadOps.length === input.output.plan_bead_op_proposals.length) {
+    return input.output;
+  }
+
+  const contributionRefs = input.currentState?.shared_storage.evidence_refs ?? [];
+  return {
+    ...input.output,
+    rationale: [
+      input.output.rationale,
+      "Runtime current_state already shows shared-storage contribution evidence, so stale chest/deposit/openability work is treated as completed context."
+    ].join(" "),
+    next_episode: staleEpisode
+      ? {
+          ...input.output.next_episode,
+          purpose: "Continue after the completed shared-storage contribution with a distinct evidence-backed step.",
+          current_focus:
+            "Use current_state and visible Action Cards for a different useful Minecraft or social step; do not re-open the completed shared-storage deposit/openability request unless a new unsatisfied request appears.",
+          selected_plan_bead_refs: [],
+          related_plan_bead_refs: [],
+          success_signals: [
+            {
+              kind: "runtime_artifact",
+              description: "Runtime evidence of a distinct non-storage action, social response, or truthful blocker."
+            }
+          ],
+          pivot_triggers: [
+            {
+              trigger: "A new unsatisfied social request creates a fresh shared-storage question.",
+              evidence_refs: []
+            },
+            {
+              trigger: "The chosen non-storage step succeeds or blocks with evidence.",
+              evidence_refs: []
+            }
+          ],
+          social_pressure: [
+            ...input.output.next_episode.social_pressure,
+            {
+              kind: "shared_storage",
+              summary: "Shared storage contribution is already satisfied in current_state.",
+              evidence_refs: [...contributionRefs]
+            }
+          ]
+        }
+      : input.output.next_episode,
+    plan_bead_op_proposals: filteredPlanBeadOps
+  };
+}
+
 export function parseDeliberationProviderOutput(
   value: unknown,
   defaults: {
@@ -539,6 +664,7 @@ export function parseDeliberationProviderOutput(
     currentEpisodeRef: string;
     currentEpisode: ActiveEpisode;
     branchEvidenceRefs: readonly string[];
+    currentState?: ActorTurnCurrentStateProjection;
   }
 ):
   | { ok: true; output: DeliberationOutput }
@@ -610,9 +736,17 @@ export function parseDeliberationProviderOutput(
       : []
   };
   const result = validateDeliberationOutput(candidate);
-  return result.ok
-    ? { ok: true, output: result.output }
-    : { ok: false, errors: result.errors };
+  if (!result.ok) {
+    return { ok: false, errors: result.errors };
+  }
+  const sanitized = sanitizeDeliberationForCurrentState({
+    output: result.output,
+    currentState: defaults.currentState
+  });
+  const sanitizedResult = validateDeliberationOutput(sanitized);
+  return sanitizedResult.ok
+    ? { ok: true, output: sanitizedResult.output }
+    : { ok: false, errors: sanitizedResult.errors };
 }
 
 async function writeFailureOutput(input: {
@@ -678,10 +812,13 @@ export async function runSocialDeliberationProvider(input: {
   let rawText = "";
   let usageRecord: ProviderUsageRecord | undefined;
   if (input.providerId === "deterministic-social") {
-    deliberation = deterministicDeliberation({
-      branch: input.branch,
-      currentEpisode: input.currentEpisode,
-      currentEpisodeRef: input.currentEpisodeRef
+    deliberation = sanitizeDeliberationForCurrentState({
+      output: deterministicDeliberation({
+        branch: input.branch,
+        currentEpisode: input.currentEpisode,
+        currentEpisodeRef: input.currentEpisodeRef
+      }),
+      currentState: providerInput.current_state
     });
     rawText = JSON.stringify({ deliberation });
   } else {
@@ -728,7 +865,8 @@ export async function runSocialDeliberationProvider(input: {
         branchId: input.branch.branch_id,
         currentEpisodeRef: input.currentEpisodeRef,
         currentEpisode: input.currentEpisode,
-        branchEvidenceRefs: input.branch.evidence_refs
+        branchEvidenceRefs: input.branch.evidence_refs,
+        currentState: providerInput.current_state
       }
     );
     if (!parsed.ok) {

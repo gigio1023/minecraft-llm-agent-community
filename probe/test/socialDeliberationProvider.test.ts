@@ -222,6 +222,90 @@ test("Deliberation parser carries current Active Episode fields and normalizes c
   assert.equal(validatePlanBeadOperation(operation).ok, true);
 });
 
+test("Deliberation parser suppresses stale shared-storage work after contribution evidence", () => {
+  const currentEpisode = {
+    ...activeEpisode(),
+    purpose: "Resolve the block on depositing an oak_log to shared storage.",
+    current_focus: "Check whether the shared chest container UI opens before depositing oak_log.",
+    selected_plan_bead_refs: ["bead-stale-shared-storage"],
+    related_plan_bead_refs: ["bead-stale-shared-storage"]
+  };
+  const result = parseDeliberationProviderOutput(
+    {
+      deliberation: {
+        rationale: "Try the shared chest again.",
+        next_episode: {
+          episode_id: "episode-stale-shared-storage",
+          purpose: "Validate shared chest openability for oak_log deposit.",
+          current_focus: "Probe the shared chest container UI and then deposit oak_log."
+        },
+        plan_bead_op_proposals: [
+          {
+            title: "Record exact chest-interaction failure mode",
+            description: "The actor still needs to verify shared chest reachability for oak_log deposit.",
+            acceptance_evidence_required: ["chest/container UI opens for deposit"],
+            notes_next: ["Retry only an adjacent shared chest interaction tile."],
+            priority: 2
+          }
+        ]
+      }
+    },
+    {
+      branchId: "branch-cycle-0030-shared-storage",
+      currentEpisodeRef: "goals/episodes/episode-stale-shared-storage.json",
+      currentEpisode,
+      branchEvidenceRefs: ["evidence/cycle-0030-action-01-wait.json"],
+      currentState: {
+        schema: "actor-turn-current-state/v1",
+        observer_id: "npc_b",
+        inventory_counts: { dark_oak_log: 2 },
+        visible_actors: [],
+        nearby_block_hints: [],
+        shared_storage: {
+          status: "contributed",
+          chest_id: "shared-chest-1",
+          items: [{ name: "oak_log", count: 1 }],
+          evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
+        },
+        deposit_candidates: [
+          {
+            itemName: "dark_oak_log",
+            inventoryCount: 2,
+            suggestedCount: 1,
+            maxDepositableCount: 2,
+            socially_requested: false,
+            requested_by_actor_ids: [],
+            request_summaries: [],
+            evidence_refs: []
+          }
+        ],
+        settlement_progress: {
+          inventory_counts: { dark_oak_log: 2 },
+          shared_storage_status: "contributed",
+          known_position_summaries: ["shared_chest=contributed"],
+          checklist: [],
+          recent_blockers: []
+        }
+      }
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.output.plan_bead_op_proposals.length, 0);
+  assert.equal(result.ok && result.output.next_episode.selected_plan_bead_refs.length, 0);
+  assert.match(
+    result.ok ? result.output.next_episode.current_focus : "",
+    /different useful Minecraft or social step/
+  );
+  assert.ok(
+    result.ok &&
+      result.output.next_episode.social_pressure.some((pressure) =>
+        pressure.kind === "shared_storage" &&
+          pressure.evidence_refs.includes("evidence/cycle-0001-action-01-deposit_shared.json")
+      )
+  );
+});
+
 test("Deliberation parser normalizes sparse success signal strings", () => {
   const currentEpisode = activeEpisode();
   const result = parseDeliberationProviderOutput(

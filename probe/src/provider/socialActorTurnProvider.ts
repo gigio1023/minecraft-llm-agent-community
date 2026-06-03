@@ -442,7 +442,7 @@ async function writeActorTurnAttemptSnapshot(input: {
   });
 }
 
-function buildRepairActorTurnInput(input: {
+export function buildRepairActorTurnInput(input: {
   actorTurnInput: ActorTurnInput;
   rejectedOutput: ActorTurnOutput;
   errors: string[];
@@ -456,9 +456,32 @@ function buildRepairActorTurnInput(input: {
   const actionCards = rejectedActionCardId && input.actorTurnInput.action_cards.length > 1
     ? input.actorTurnInput.action_cards.filter((card) => card.action_card_id !== rejectedActionCardId)
     : input.actorTurnInput.action_cards;
+  const visibleCardIds = new Set(actionCards.map((card) => card.action_card_id));
+  const rejectedGuidance = rejectedActionCardId
+    ? [
+        `do not choose rejected ${target} again in this repair attempt`,
+        `choose only from the visible action_cards list; ${target} was removed after contract rejection`
+      ]
+    : [`do not repeat rejected ${target} in this repair attempt`];
   return {
     ...input.actorTurnInput,
     action_cards: actionCards,
+    decision_frame: {
+      ...input.actorTurnInput.decision_frame,
+      top_eligible_action_cards: input.actorTurnInput.decision_frame.top_eligible_action_cards
+        .filter((card) => visibleCardIds.has(card.action_card_id)),
+      recommended_next_action_candidates: input.actorTurnInput.decision_frame.recommended_next_action_candidates
+        .filter((candidate) => visibleCardIds.has(candidate.action_card_id)),
+      do_not_repeat: [
+        ...rejectedGuidance,
+        ...input.actorTurnInput.decision_frame.do_not_repeat
+      ],
+      next_action_guidance: [
+        `previous ${target} failed contract validation: ${input.errors.join("; ")}`,
+        "repair must choose a currently visible Action Card with schema-valid parameters or author a specific Mineflayer action",
+        ...input.actorTurnInput.decision_frame.next_action_guidance
+      ]
+    },
     runtime_retry_constraints: [
       {
         constraint_id:

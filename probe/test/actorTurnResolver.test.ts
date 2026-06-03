@@ -296,6 +296,98 @@ test("Runtime Action Resolver rejects stale crafting-table placement when a usab
   );
 });
 
+test("Runtime Action Resolver does not treat a far placed crafting table as nearby", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      schema: "actor-turn-current-state/v1",
+      observer_id: "npc_b",
+      position: { x: 4.13, y: 85, z: -14.46 },
+      inventory_counts: { acacia_planks: 8, stick: 4 },
+      visible_actors: [],
+      nearby_block_hints: [],
+      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+      deposit_candidates: [],
+      settlement_progress: {
+        inventory_counts: {},
+        shared_storage_status: "unknown",
+        known_position_summaries: [
+          "crafting_table=placed at (-8, 104, 7) distance_from_actor=25.2 usable_now=false"
+        ],
+        checklist: [
+          {
+            id: "crafting_table_known_or_placed",
+            status: "satisfied",
+            reason: "Crafting table was verified in prior runtime evidence.",
+            evidence_ref_count: 1
+          }
+        ],
+        recent_blockers: []
+      }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-craft-wooden-pickaxe",
+      parameters: { itemName: "wooden_pickaxe" },
+      why_this_action: "Craft a wooden pickaxe at the known table.",
+      expected_evidence: ["wooden_pickaxe inventory delta"],
+      fallback_if_blocked: "craft or place a local table"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(
+    !result.ok &&
+      result.errors.some((error) => error.includes("crafting_table nearby"))
+  );
+});
+
+test("Runtime Action Resolver allows crafting a new table when the known table is far", () => {
+  const result = resolveActorTurnOutputToActionIntent({
+    ...resolutionBase(),
+    currentState: {
+      schema: "actor-turn-current-state/v1",
+      observer_id: "npc_b",
+      position: { x: 4.13, y: 85, z: -14.46 },
+      inventory_counts: { acacia_planks: 8, stick: 4 },
+      visible_actors: [],
+      nearby_block_hints: [],
+      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+      deposit_candidates: [],
+      settlement_progress: {
+        inventory_counts: {},
+        shared_storage_status: "unknown",
+        known_position_summaries: [
+          "crafting_table=placed at (-8, 104, 7) distance_from_actor=25.2 usable_now=false"
+        ],
+        checklist: [
+          {
+            id: "crafting_table_known_or_placed",
+            status: "satisfied",
+            reason: "Crafting table was verified in prior runtime evidence.",
+            evidence_ref_count: 1
+          }
+        ],
+        recent_blockers: []
+      }
+    },
+    output: {
+      schema: "actor-turn-output/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-craft-crafting-table",
+      parameters: {},
+      why_this_action: "Craft a local table because the known placed table is not usable now.",
+      expected_evidence: ["crafted crafting_table"],
+      fallback_if_blocked: "collect logs"
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.intent.kind, "use_action_skill");
+  assert.equal(result.ok && result.intent.action_skill_id, "craftCraftingTable");
+});
+
 test("Runtime Action Resolver maps use_existing_action cards to action skill ActionIntent", () => {
   const result = resolveActorTurnOutputToActionIntent({
     ...resolutionBase(),

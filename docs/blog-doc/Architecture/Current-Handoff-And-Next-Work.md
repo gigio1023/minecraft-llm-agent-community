@@ -29,8 +29,59 @@ is reliable.
 
 Recorded 2026-06-03 (`Asia/Seoul`).
 
-The current Actor Turn shared-storage social smoke has a small accepted live
-slice under OpenAI `gpt-5.4-nano`:
+The current Actor Turn plus passive PlanBeads line has now been tested beyond
+the initial shared-storage fixture. The latest verdict is
+`PASSED_RUNTIME_BUT_BEHAVIOR_LOOP_WEAK`: the runtime completes long low-cost
+provider runs and records truthful evidence, but the NPC still collapses into
+resource loops before the social/shelter behavior is strong enough.
+
+Longer live runs under OpenAI `gpt-5.4-nano`:
+
+- `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v13.json`:
+  `runtime_status=passed`, 45 provider records, 328,773 total tokens, 30 cycles.
+  The actor deposited `1 oak_log`, crafted planks/sticks, crafted and placed a
+  crafting table, crafted a wooden pickaxe through a table-bound path, and used
+  10 distinct top-level actions. Remaining weakness: shelter stayed unverified,
+  social evidence stayed thin, and several cycles still hit blocked movement,
+  collection, or placement attempts.
+- `tmp/social-smoke-openai-nano-60cycle-passive-planbeads-v14.json`:
+  `runtime_status=passed`, 75 provider records, 598,552 total tokens, 60 cycles.
+  Provider usage guard projected 5,654,444 / 9,000,000 daily tokens, so the run
+  stayed within the current OpenAI budget policy. Outcome distribution was
+  49 `verified_progress`, 2 `partial_verified_progress`, 8 `blocked`, and
+  1 `no_progress`. The actor kept real inventory/world progress:
+  final inventory included `wooden_pickaxe`, `crafting_table`, 23 `cobblestone`,
+  23 `oak_planks`, 6 `stick`, and 5 `dirt`.
+
+What improved in this slice:
+
+- completed shared-storage evidence can close stale shared-storage PlanBeads
+  from current state before the ready front is exposed;
+- deliberation receives `current_state` and suppresses stale shared-storage
+  reopen proposals when the contribution is already done;
+- Actor Turn demotes repeated `mineCobblestone` only when cobblestone is already
+  sufficient and no explicit shortage exists, while keeping the Action Card
+  available;
+- crafting table state now distinguishes a known or placed table from a table
+  that is nearby and usable by the actor;
+- Actor Turn repair removes rejected Action Cards from both the visible card
+  list and `decision_frame` candidate lists.
+
+Remaining failures from the 60-cycle review:
+
+- `mineCobblestone` returned as the dominant late action: 22 of 60 top-level
+  actions, including 14 in cycles 41-60. This is a `loop-constriction` finding,
+  not a runtime crash.
+- `buildBasicShelter` ran 3 times and never produced verified shelter evidence,
+  so `starter_shelter_verified` remains pending.
+- social evidence remains minimal: one `deposit_shared` mutation, no visible
+  actors, no `say` tool calls, and no relationship events.
+- PlanBead audit still fails because several CycleJudgments make physical
+  absence/progress claims without exhaustive scan evidence, and the live run
+  still uses builtin goal authority.
+
+Earlier accepted shared-storage slices remain useful but are no longer the
+latest behavioral proof:
 
 - `tmp/social-smoke-openai-nano-2cycle-rerun6.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 3 provider records,
@@ -51,38 +102,16 @@ slice under OpenAI `gpt-5.4-nano`:
   `open_social_requests=[]`, and no `Inspect Chest` / `Inspect Shared Chest`
   Action Cards, so the cheap model did not re-verify the completed handoff.
 
-This is `PASS` for the first fixture-backed shared-storage social consequence
-and completed-request non-repeat slice. The `decision_frame-v2` run is also
-`PASS` for the small post-completion follow-up slice because it pivoted into
-crafting progress instead of repeated chest inspection. It remains `PARTIAL` for
-broader social coherence until a longer 30/60-cycle run proves context-change
-behavior, PlanBead lifecycle pressure, and social consequences together.
-
-Implementation changes that produced this evidence:
-
-- specific item requests no longer mark unrelated inventory as socially
-  requested deposit candidates;
-- completed shared-storage requests suppress deposit-oriented Action Cards;
-- completed shared-storage requests suppress stale chest-inspection Action Cards
-  when no fresh social/container question is open;
-- Actor Turn `decision_frame` summarizes current truths, completed work, open
-  social requests, recent action verdicts, do-not-repeat constraints, open
-  progress fronts, and recommended next Action Card candidates before older
-  Active Episode wording;
-- Actor Turn repair keeps the visible Action Card list and resolver projection
-  aligned;
-- `craftPlanksAndSticks` rejects contradictory `itemName=oak_log` parameters;
-- shared-storage smoke uses a simpler deterministic chest placement and a
-  larger raw observation scan cap.
-
 Next work:
 
-- run a longer 30/60-cycle low-cost Actor Turn smoke with at least one context
-  change or blocker, not only the shared-storage fixture;
-- verify that PlanBeads remain durable work graph context while `decision_frame`
-  acts only as the per-turn current-truth lens;
-- review whether repeated crafting-table-item creation should become another
-  current-state-consumption gate once a usable crafting table is already known;
+- make Actor Turn choose a valuable next action after sufficient cobblestone
+  instead of returning to `mineCobblestone`;
+- improve `buildBasicShelter` or replace it with a narrower, more verifiable
+  Mineflayer-backed shelter action skill;
+- add a social-visible follow-up action after a completed shared-storage
+  contribution, such as a bounded `say` or relationship event path;
+- tighten CycleJudgment wording or audit policy so non-exhaustive scans do not
+  become absolute absence claims;
 - keep Actor Turn as the opt-in hot path until actionfulness, PlanBead
   continuity, social consequence, and budget gates pass together.
 
