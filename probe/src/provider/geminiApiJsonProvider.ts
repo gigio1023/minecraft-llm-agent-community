@@ -16,7 +16,6 @@ export type GeminiJsonProviderConfig = {
   apiKey: string;
   model: string;
   fallbackModels?: string[];
-  maxOutputTokens?: number;
   requestTimeoutMs?: number;
   maxRetries?: number;
   thinkingBudget?: number;
@@ -124,7 +123,6 @@ export async function callGeminiJsonSchema<T>(input: {
     .map((candidate) => candidate.trim())
     .filter((candidate, index, list) => candidate.length > 0 && list.indexOf(candidate) === index);
   const primaryModel = models[0] ?? input.config.model;
-  const maxOutputTokens = input.config.maxOutputTokens ?? 1600;
   const maxRetries = input.config.maxRetries ?? Number(process.env.GEMINI_JSON_MAX_RETRIES ?? 2);
   const thinkingBudget = input.config.thinkingBudget ?? optionalNumber(process.env.GEMINI_THINKING_BUDGET);
   const usageContext = {
@@ -133,8 +131,7 @@ export async function callGeminiJsonSchema<T>(input: {
     ...input.usageContext
   };
   const estimatedUsage = buildEstimatedUsage({
-    inputText: `${input.system}\n${input.user}`,
-    maxOutputTokens
+    inputText: `${input.system}\n${input.user}`
   });
 
   if (!input.config.apiKey.trim()) {
@@ -181,7 +178,6 @@ export async function callGeminiJsonSchema<T>(input: {
           contents: input.user,
           config: {
             systemInstruction: input.system,
-            maxOutputTokens,
             responseMimeType: "application/json",
             responseJsonSchema: input.schema,
             ...(thinkingBudget !== undefined

@@ -80,8 +80,7 @@ export async function callGeminiTextGenai(input: {
   for (const [index, model] of models.entries()) {
     const started = Date.now();
     const estimatedUsage = buildEstimatedUsage({
-      inputText: input.prompt,
-      maxOutputTokens: 0
+      inputText: input.prompt
     });
     let budgetDecision;
     try {

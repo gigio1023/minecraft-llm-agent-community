@@ -330,8 +330,12 @@ repo-root `.env`.
 OPENAI_API_KEY=...
 OPENAI_MODEL=...
 SOCIAL_CYCLE_REASONING=low
-SOCIAL_CYCLE_MAX_COMPLETION_TOKENS=1600
 ```
+
+Social-cycle provider requests do not expose an output-token cap. OpenAI
+Responses requests omit `max_output_tokens`, so a long run fails only on
+provider, schema, budget, or runtime evidence rather than an operator-imposed
+completion cap.
 
 Run:
 

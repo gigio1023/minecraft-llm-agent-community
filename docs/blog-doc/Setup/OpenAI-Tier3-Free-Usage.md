@@ -29,8 +29,10 @@ therefore tracks `quota_day_utc` for daily budget decisions.
 - **Auth:** `OPENAI_API_KEY` in repo-root `.env` (gitignored).
 - **Prior experiment model:** `gpt-5.4-mini` (mini pool, 10M tokens/day).
 - **Not the same as:** `openai-codex` gameplay provider (`chatgpt.com/backend-api/codex/responses`) or `build/provider-auth/openai-codex-auth.json`.
-- **Structured output:** prefer `response_format.type = "json_schema"` per [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs); `json_object` is legacy/looser. Strict schemas require every property under `args` to appear in `required` (see `TOOL_PROPOSAL_JSON_SCHEMA` in `plannerProviderMatrixShared.ts`).
-- **Chat Completions params:** `gpt-5.4-mini` uses `max_completion_tokens` (not `max_tokens`).
+- **Structured output:** the active OpenAI path uses Responses API JSON schema
+  output or Responses function calling. The social-cycle provider path does not
+  expose an output-token cap; let provider output complete unless a separate
+  throwaway smoke test is intentionally bounding output outside the runtime.
 - **`.env` loading:** experiment scripts call `loadRepoDotEnv(repo, { overrideKeys: ["OPENAI_API_KEY"] })` so a stale shell `OPENAI_API_KEY` does not shadow repo `.env`.
 - **Planner matrix script:** `probe/scripts/experimentPlannerProviderMatrix.ts` → `tmp/planner-provider-matrix-report.json`.
 

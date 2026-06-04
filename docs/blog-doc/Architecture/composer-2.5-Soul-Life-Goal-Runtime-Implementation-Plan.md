@@ -340,15 +340,17 @@ OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-5.4-mini
 SOCIAL_CYCLE_PROVIDER=openai-api
 SOCIAL_CYCLE_REASONING=low
-SOCIAL_CYCLE_MAX_COMPLETION_TOKENS=1600
 ```
 
 Implementation rules:
 
 - Read repo-root `.env` before provider calls. Existing scripts use
   `loadRepoDotEnv`; reuse or extract that helper.
-- Use Chat Completions with `response_format.type = "json_schema"` for v1.
-- Use `max_completion_tokens` for OpenAI API models in this family.
+- Use the Responses API JSON schema and function-calling paths for active
+  social-cycle OpenAI calls.
+- Do not set an OpenAI output-token cap for ordinary behavior runs. If a smoke
+  test intentionally bounds output, name that as a test constraint instead of
+  treating it as runtime policy.
 - Persist every provider input and output packet under actor workspace.
 - Include `provider_id`, `model`, `reasoning`, `schema_name`, `cycle_id`,
   `actor_id`, and elapsed time in output records.

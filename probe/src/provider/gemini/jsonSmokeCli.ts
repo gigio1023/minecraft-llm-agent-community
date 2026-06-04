@@ -50,7 +50,6 @@ async function main() {
     config: {
       apiKey: process.env.GEMINI_API_KEY ?? "",
       model,
-      maxOutputTokens: 96,
       requestTimeoutMs: Number(process.env.GEMINI_TEXT_REQUEST_TIMEOUT_MS ?? 120_000),
       repoRoot
     },

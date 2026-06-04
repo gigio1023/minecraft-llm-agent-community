@@ -191,7 +191,6 @@ export async function callGeminiFunctionToolSelection(input: {
     .map((candidate) => candidate.trim())
     .filter((candidate, index, list) => candidate.length > 0 && list.indexOf(candidate) === index);
   const primaryModel = models[0] ?? input.config.model;
-  const maxOutputTokens = input.config.maxOutputTokens ?? 1600;
   const maxRetries = input.config.maxRetries ?? Number(process.env.GEMINI_JSON_MAX_RETRIES ?? 2);
   const thinkingBudget = input.config.thinkingBudget ?? optionalNumber(process.env.GEMINI_THINKING_BUDGET);
   const usageContext = {
@@ -204,8 +203,7 @@ export async function callGeminiFunctionToolSelection(input: {
     .map((declaration) => declaration.name)
     .filter((name): name is string => typeof name === "string" && name.trim().length > 0);
   const estimatedUsage = buildEstimatedUsage({
-    inputText: `${input.system}\n${input.user}\n${JSON.stringify(functionDeclarations)}`,
-    maxOutputTokens
+    inputText: `${input.system}\n${input.user}\n${JSON.stringify(functionDeclarations)}`
   });
 
   if (!input.config.apiKey.trim()) {
@@ -252,7 +250,6 @@ export async function callGeminiFunctionToolSelection(input: {
           contents: input.user,
           config: {
             systemInstruction: input.system,
-            maxOutputTokens,
             tools: [{ functionDeclarations }],
             toolConfig: {
               functionCallingConfig: {

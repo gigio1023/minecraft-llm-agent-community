@@ -81,7 +81,6 @@ function responsesBackgroundEnabled(config: OpenAiJsonProviderConfig) {
 
 function buildOpenAiToolResponseRequest(input: {
   model: string;
-  maxCompletionTokens: number;
   reasoning?: string;
   background?: boolean;
   system: string;
@@ -94,7 +93,6 @@ function buildOpenAiToolResponseRequest(input: {
     model: input.model,
     instructions: input.system,
     input: input.user,
-    max_output_tokens: input.maxCompletionTokens,
     tools: input.tools,
     tool_choice: "required",
     parallel_tool_calls: false,
@@ -233,7 +231,6 @@ export async function callOpenAiFunctionToolSelection(input: {
 }): Promise<OpenAiFunctionToolCallResult> {
   const started = Date.now();
   const model = input.config.model;
-  const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
   const maxRetries = input.config.maxRetries ?? Number(process.env.OPENAI_JSON_MAX_RETRIES ?? 2);
   const useBackgroundResponses = responsesBackgroundEnabled(input.config);
   const responsePollIntervalMs =
@@ -246,8 +243,7 @@ export async function callOpenAiFunctionToolSelection(input: {
     ...input.usageContext
   };
   const estimatedUsage = buildEstimatedUsage({
-    inputText: `${input.system}\n${input.user}\n${JSON.stringify(input.tools)}`,
-    maxOutputTokens: maxCompletionTokens
+    inputText: `${input.system}\n${input.user}\n${JSON.stringify(input.tools)}`
   });
 
   if (!input.config.apiKey.trim()) {
@@ -289,7 +285,6 @@ export async function callOpenAiFunctionToolSelection(input: {
     try {
       const initialResponse = await client.responses.create(buildOpenAiToolResponseRequest({
         model,
-        maxCompletionTokens,
         reasoning: input.config.reasoning,
         background: useBackgroundResponses,
         system: input.system,

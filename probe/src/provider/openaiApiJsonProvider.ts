@@ -21,7 +21,6 @@ export type OpenAiJsonProviderConfig = {
   apiKey: string;
   model: string;
   reasoning?: string;
-  maxCompletionTokens?: number;
   maxRetries?: number;
   responsesBackground?: boolean;
   responsePollIntervalMs?: number;
@@ -98,7 +97,6 @@ function responsesBackgroundEnabled(config: OpenAiJsonProviderConfig) {
 
 export function buildOpenAiJsonSchemaResponseRequest(input: {
   model: string;
-  maxCompletionTokens: number;
   reasoning?: string;
   background?: boolean;
   schemaName: string;
@@ -112,7 +110,6 @@ export function buildOpenAiJsonSchemaResponseRequest(input: {
     model: input.model,
     instructions: input.system,
     input: input.user,
-    max_output_tokens: input.maxCompletionTokens,
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     ...(background ? { background: true, store: true } : { store: false }),
     text: {
@@ -278,7 +275,6 @@ export async function callOpenAiJsonSchema<T>(input: {
 }): Promise<OpenAiJsonCallResult<T>> {
   const started = Date.now();
   const model = input.config.model;
-  const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
   const maxRetries = input.config.maxRetries ?? Number(process.env.OPENAI_JSON_MAX_RETRIES ?? 2);
   const useBackgroundResponses = responsesBackgroundEnabled(input.config);
   const responsePollIntervalMs =
@@ -291,8 +287,7 @@ export async function callOpenAiJsonSchema<T>(input: {
     ...input.usageContext
   };
   const estimatedUsage = buildEstimatedUsage({
-    inputText: `${input.system}\n${input.user}`,
-    maxOutputTokens: maxCompletionTokens
+    inputText: `${input.system}\n${input.user}`
   });
 
   if (!input.config.apiKey.trim()) {
@@ -334,7 +329,6 @@ export async function callOpenAiJsonSchema<T>(input: {
     try {
       const initialResponse = await client.responses.create(buildOpenAiJsonSchemaResponseRequest({
         model,
-        maxCompletionTokens,
         reasoning: input.config.reasoning,
         background: useBackgroundResponses,
         schemaName: input.schemaName,

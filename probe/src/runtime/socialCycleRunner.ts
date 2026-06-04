@@ -803,7 +803,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           apiKey: input.openAiApiKey ?? process.env.OPENAI_API_KEY ?? "",
           model: input.model,
           reasoning,
-          maxCompletionTokens: Number(process.env.SOCIAL_CYCLE_MAX_COMPLETION_TOKENS ?? 1600),
           repoRoot
         }
       : undefined;
@@ -812,7 +811,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       ? {
           apiKey: input.geminiApiKey ?? process.env.GEMINI_API_KEY ?? "",
           model: input.model,
-          maxOutputTokens: Number(process.env.SOCIAL_CYCLE_MAX_OUTPUT_TOKENS ?? 8192),
           requestTimeoutMs: Number(process.env.GEMINI_TEXT_REQUEST_TIMEOUT_MS ?? 900_000),
           maxRetries: Number(process.env.GEMINI_JSON_MAX_RETRIES ?? 2),
           repoRoot

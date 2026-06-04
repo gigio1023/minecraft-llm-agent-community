@@ -133,8 +133,7 @@ async function runJob(client: OpenAI, spec: JobSpec): Promise<JobResult> {
           ...(spec.outputMode === "json_object"
             ? { response_format: { type: "json_object" as const } }
             : {}),
-          temperature: 0.2,
-          max_tokens: 1024
+          temperature: 0.2
         })
     );
 
@@ -214,7 +213,7 @@ async function main() {
     phases: PHASE_IDS,
     outputModes: ["codegen_ts", "json_object"] as const,
     parallelLimit: 4,
-    parameters: { temperature: 0.2, max_tokens: 1024, baseURL: GEMINI_OPENAI_BASE_URL }
+    parameters: { temperature: 0.2, baseURL: GEMINI_OPENAI_BASE_URL }
   };
 
   const jobs: JobSpec[] = [];
