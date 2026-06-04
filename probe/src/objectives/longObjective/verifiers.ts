@@ -1,3 +1,9 @@
+/**
+ * Verifiers for legacy long-objective phase reports.
+ *
+ * @remarks These checks protect probe reporting from fake success, but they are
+ * scoped to direct-objective experiments rather than the social-cycle runtime.
+ */
 import type { InventoryItem } from "./types.js";
 import type { LongPhaseDefinition } from "./ladder.js";
 

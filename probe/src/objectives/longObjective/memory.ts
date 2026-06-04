@@ -1,3 +1,9 @@
+/**
+ * Memory persistence for legacy long-objective runs.
+ *
+ * @remarks This is probe memory, not ActorSoul/LifeGoal actor memory. Keep its
+ * claims tied to long-objective artifacts and reports.
+ */
 import path from "node:path";
 
 import {

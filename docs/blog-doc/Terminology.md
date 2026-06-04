@@ -22,8 +22,9 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
 4. Use **provider** for model-facing code. Do not call it the actor's brain,
    mind, consciousness, or intelligence.
 5. Use **ActorSoul**, **LifeGoal**, **WorldEvent**, **CycleGoal**,
-   **ActionIntent**, and **CycleJudgment** only for schema-backed social-cycle
-   records.
+   **CycleJudgment**, **Active Episode**, **Actor Turn**, **Action Card**,
+   **runtime action**, and **Evidence Trace** only for schema-backed runtime
+   records. Use **ActionIntent** only for legacy or migration artifacts.
 6. If existing code, schemas, paths, or historical artifacts contain older
    vocabulary, treat that wording as a legacy identifier. Do not copy it into
    new prose unless you also name the canonical term.
@@ -142,6 +143,35 @@ or another blocker.
 An action surface is not a strategy checklist. It must not imply that one domain
 goal, such as building a house or shelter, should always be considered.
 
+## Action Card
+
+An **Action Card** is the Actor Turn provider-visible projection of one existing
+runtime affordance. It describes what the actor can attempt and which structured
+parameters are required, without asking the provider to choose between primitive
+and action skill categories as the primary decision.
+
+In the target architecture, Action Cards are emitted as `action-card/v1` records
+inside `actor-turn-input/v1`. The runtime maps an Action Card to a runtime
+primitive, seed action skill, actor-owned action skill, or promoted generated
+action skill.
+
+An Action Card is not a strategy checklist, not proof that preconditions are
+true, and not a bypass around runtime action validation.
+
+## Minecraft Basic Guide
+
+The **Minecraft Basic Guide** is the provider-visible compact mechanics guide
+sent as `minecraft_basic_guide`.
+
+It describes stable Minecraft mechanics that an LLM should not need to
+rediscover from observation, such as early item flows, station requirements,
+item-vs-world-block distinctions, useful tool prerequisites, blocker recovery,
+and repeated-observe limits.
+
+It is a guide, not a runtime action contract, verifier, runtime permission
+packet, strategy checklist, or proof of progress. Runtime evidence still owns
+current world state, and the action surface still owns executable affordances.
+
 ## Tool Call
 
 A **tool call** is a provider's structured request to run one runtime primitive
@@ -187,18 +217,24 @@ survive initialization unless a separate explicit cleanup operation is requested
 
 ## Provider
 
-A **provider** is the model-facing component that proposes a CycleGoal,
-ActionIntent, CycleJudgment, tool call, or short utterance.
+A **provider** is the model-facing component that proposes an Actor Turn tool
+selection, CycleGoal, CycleJudgment, branch-time Deliberation update, generated
+action candidate, or short utterance.
 
 The provider does not own reality, verification, timeouts, runtime permissions,
 or action skill promotion.
 
 Preferred terms:
 
-- **cycle goal provider** for the component that proposes StrategicGoal and
-  CycleGoal records;
-- **action planner provider** for the component that proposes ActionIntent
-  records;
+- **Actor Turn provider** for the target hot-path component that chooses exactly
+  one visible Action Card function tool or `author_mineflayer_action` from an
+  `actor-turn-input/v1` packet;
+- **Deliberation provider** for the target branch-only component that reframes
+  or updates Active Episode state and proposes guarded PlanBead operations;
+- **cycle goal provider** for the legacy/migration component that selects
+  PlanBead context and proposes CycleGoal records;
+- **action planner provider** for the legacy/migration component that proposes
+  ActionIntent or `LegacyPlannerAction` records;
 - **cycle judgment provider** for the component that summarizes evidence into a
   CycleJudgment.
 
@@ -293,6 +329,116 @@ can influence CycleGoal selection, but it is not the actor's LifeGoal.
 A **StrategicGoal** is a medium-horizon interpretation of ActorSoul, LifeGoal,
 memory, world state, and social context.
 
+`StrategicGoal` is retained as a legacy-adjacent compatibility term. New
+architecture work should not add new persistent StrategicGoal stores when the
+state being modeled is durable multi-cycle work; use PlanBeads and PlanBead
+dependencies instead.
+
+## PlanBead
+
+A **PlanBead** is one actor-owned checkpointed issue-like work item under
+LifeGoal, such as securing food, preparing shelter materials, repairing a
+repeated blocker, investigating a runtime failure, or fulfilling an obligation.
+
+PlanBeads are work graph state, not ordinary memory. A PlanBead records what
+work or concern exists, why it matters under LifeGoal, what evidence would close
+or block it, what is currently known, what should happen next, and which
+evidence, judgments, dependencies, or related records changed it.
+
+A PlanBead is not executable authority, not physical proof, and not a hidden
+domain planner. It must not grant runtime primitive permissions, supply missing
+runtime action parameters, or mark progress without runtime evidence. If a
+PlanBead claims closure, satisfaction, or blockage, that transition must cite
+evidence refs or guarded non-physical resolution evidence.
+
+## PlanBeadGraph
+
+A **PlanBeadGraph** is the actor-owned dependency graph of PlanBeads. The graph,
+not a single PlanBead, is the actor's durable multi-cycle work plan.
+
+Ready PlanBeads are open PlanBeads with no open blocking dependencies. The ready
+front is context for CycleGoal selection, not a script the actor must follow.
+
+`StrategicGoal` is the legacy-adjacent medium-horizon term. New architecture
+work should treat PlanBeads plus PlanBeadGraph as the checkpointed successor for
+living multi-cycle work state, while keeping compatibility with existing
+StrategicGoal records as projections or migration inputs rather than a second
+active middle layer.
+
+## Active Episode
+
+An **Active Episode** is the actor's current bounded working window under
+ActorSoul and LifeGoal. It contains the current focus, selected or related
+PlanBead refs, success signals, pivot triggers, mistake budget, social pressure,
+and evidence refs needed to continue or branch.
+
+In artifacts the target schema is `active-episode/v1`.
+
+An Active Episode is not a second PlanBeadGraph and not executable authority. It
+does not choose a Mineflayer action, supply missing parameters, or prove
+physical progress. It gives the Actor Turn provider a coherent current focus.
+
+## Actor Turn
+
+An **Actor Turn** is one provider-proposed runtime step inside an Active Episode.
+It receives compact actor context, current observation refs, recent Evidence
+Trace entries, PlanBead hints, runtime retry constraints, Action Cards, and the
+Minecraft Basic Guide.
+
+In artifacts the target schemas are `actor-turn-input/v1` and
+`actor-turn-output/v1`.
+
+An Actor Turn should usually produce exactly one function tool choice: one
+visible Action Card with schema-bound `parameters`, or
+`author_mineflayer_action`. Runtime gates still validate parameters,
+permissions, retry constraints, generated source, timeout, and verifier
+contracts before Mineflayer execution.
+
+## Evidence Trace
+
+An **Evidence Trace** is the append-oriented, runtime-owned record of what
+happened across Actor Turns. It cites action refs, runtime gate refs, execution
+refs, verifier refs, helper events, post-observation refs, provider usage refs,
+and compact outcomes.
+
+In artifacts the target schema is `evidence-trace/v1`.
+
+Evidence Trace entries are not provider narration. They should preserve enough
+runtime evidence for the next Actor Turn and for later audits without feeding an
+unbounded raw transcript back to the provider.
+
+## Runtime Action Resolver
+
+The **Runtime Action Resolver** maps direct Action Card function-tool selection,
+or the older `use_existing_action` compatibility shape, to the current runtime
+execution authority. It may resolve the card to a runtime primitive, seed action
+skill, actor-owned action skill, or promoted generated action skill, then
+validate structured parameters before execution.
+
+For `author_mineflayer_action`, the resolver maps the proposal into the
+action-selection-gated generated action skill trial path. Generated code remains
+schema-bound, helper-limited, verifier-backed, and actor-workspace owned.
+
+## Runtime Classifier
+
+The **Runtime Classifier** is the runtime-owned decision layer that turns
+Evidence Trace entries into continue, close, defer, blocked, branch, provider
+budget blocker, or environment blocker outcomes for the Active Episode.
+
+The Runtime Classifier does not create executable actions. It should not treat
+provider prose, memory notes, `wait`, or observe-only evidence as physical
+success.
+
+## Deliberation
+
+**Deliberation** is the branch-only provider stage that reframes or updates the
+Active Episode and may propose guarded PlanBead operations when an important
+branch condition occurs.
+
+Deliberation replaces per-turn `goal_mind` as the target architecture. It should
+not run every Actor Turn, choose Action Cards, generate Mineflayer source, or
+close PlanBeads without guarded operation evidence.
+
 ## CycleGoal
 
 A **CycleGoal** is the bounded current-cycle objective. It must be specific
@@ -300,17 +446,23 @@ enough for action selection and verification.
 
 ## ActionIntent
 
-An **ActionIntent** is one proposed action for the current CycleGoal. It can
-target a runtime primitive or an owned action skill, subject to runtime gates.
+An **ActionIntent** is the legacy/migration term for one proposed action for the
+current CycleGoal. It can target a runtime primitive or an owned action skill,
+subject to runtime gates.
 
-Physical ActionIntent args are an executable contract. A rationale field such
-as `why_this_action` can explain the intent, but it cannot supply missing
+Active Actor Turn work should prefer **Action Card**, **Actor Turn tool
+selection**, and **runtime action** unless it is explicitly reading or writing a
+legacy artifact.
+
+Physical legacy ActionIntent args are an executable contract. A rationale field
+such as `why_this_action` can explain the intent, but it cannot supply missing
 coordinates, item names, counts, container ids, anchors, or block selectors.
 
 ## Runtime Retry Constraint
 
 A **runtime retry constraint** is a runtime-owned gate created after repeated
-matching blocker evidence for the same ActionIntent target and structured args.
+matching blocker evidence for the same runtime action target and structured
+args.
 In artifacts the schema is `runtime-retry-constraint/v1` and the provider-facing
 field is `runtime_retry_constraints`.
 
@@ -439,6 +591,7 @@ The active path is:
 - headless Mineflayer runtime;
 - Soul/LifeGoal-grounded actor continuity;
 - bounded runtime loop;
+- Active Episode and Actor Turn as the target hot path;
 - actor-owned action skill state;
 - runtime-owned verification;
 - live transcript and runtime artifacts first.

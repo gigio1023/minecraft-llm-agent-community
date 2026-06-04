@@ -1,3 +1,10 @@
+/**
+ * Experimental Gemini Live planner adapter for Mineflayer code generation.
+ *
+ * @remarks This path is not the default planner authority. Keep it isolated as
+ * provider experimentation and record failures as provider/path evidence rather
+ * than changing the social runtime contract.
+ */
 import path from "node:path";
 
 import type { JsonValue } from "../inputSnapshot.js";

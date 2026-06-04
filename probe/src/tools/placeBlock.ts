@@ -1,3 +1,11 @@
+/**
+ * Mineflayer primitive for placing a block with bounded target and support
+ * checks.
+ *
+ * @remarks Placement is a physical mutation claim, so this tool must be strict
+ * about structured args, reachable positions, held inventory, and verifier
+ * evidence. Provider prose must never supply missing target coordinates.
+ */
 import { goals } from "mineflayer-pathfinder";
 import { Vec3 } from "vec3";
 
@@ -31,6 +39,9 @@ export type PlaceBlockResult = {
   status: "placed" | "already_present" | "blocked";
   itemName: string;
   targetPosition: Positioned;
+  requestedTargetPosition?: Positioned;
+  supportPosition?: Positioned;
+  targetResolution?: "requested_target" | "surface_position_above_requested_target";
   expectedBlockNames: string[];
   beforeBlockName?: string;
   afterBlockName?: string;
@@ -73,6 +84,34 @@ const NON_SUPPORT_BLOCKS = new Set([
   "snow",
   "seagrass",
   "tall_seagrass"
+]);
+
+const PROTECTED_SURFACE_TARGET_BLOCKS = new Set([
+  "barrel",
+  "blast_furnace",
+  "brewing_stand",
+  "campfire",
+  "cartography_table",
+  "chest",
+  "chipped_anvil",
+  "composter",
+  "crafting_table",
+  "damaged_anvil",
+  "dispenser",
+  "dropper",
+  "enchanting_table",
+  "ender_chest",
+  "furnace",
+  "grindstone",
+  "hopper",
+  "lectern",
+  "loom",
+  "shulker_box",
+  "smithing_table",
+  "smoker",
+  "soul_campfire",
+  "stonecutter",
+  "trapped_chest"
 ]);
 
 const FACE_OFFSETS = [
@@ -183,6 +222,98 @@ function isSupportBlock(block: MineflayerBlockLike | null | undefined) {
     return true;
   }
   return !NON_SUPPORT_BLOCKS.has(block.name);
+}
+
+function isProtectedSurfaceTargetBlock(block: MineflayerBlockLike | null | undefined) {
+  if (!block) {
+    return false;
+  }
+  return PROTECTED_SURFACE_TARGET_BLOCKS.has(block.name) ||
+    block.name.endsWith("_bed") ||
+    block.name.endsWith("_door") ||
+    block.name.endsWith("_fence_gate") ||
+    block.name.endsWith("_sign") ||
+    block.name.endsWith("_trapdoor") ||
+    block.name.endsWith("shulker_box");
+}
+
+function isResolvableSupportSurface(block: MineflayerBlockLike | null | undefined) {
+  return isSupportBlock(block) && !isProtectedSurfaceTargetBlock(block);
+}
+
+type PlacementTargetResolution =
+  | {
+      ok: true;
+      targetPosition: Positioned;
+      requestedTargetPosition: Positioned;
+      supportPosition?: Positioned;
+      targetResolution: PlaceBlockResult["targetResolution"];
+      beforeBlock: MineflayerBlockLike | null | undefined;
+    }
+  | {
+      ok: false;
+      targetPosition: Positioned;
+      requestedTargetPosition: Positioned;
+      beforeBlock: MineflayerBlockLike | null | undefined;
+      reason: string;
+    };
+
+function resolvePlacementTarget(input: {
+  bot: PlaceBlockBot;
+  requestedTarget: Positioned;
+  expectedBlockNames: readonly string[];
+  replaceable: Set<string>;
+}): PlacementTargetResolution {
+  const requestedBlock = input.bot.blockAt?.(toVec3(input.requestedTarget));
+  if (
+    !requestedBlock ||
+    input.expectedBlockNames.includes(requestedBlock.name) ||
+    isReplaceable(requestedBlock, input.replaceable)
+  ) {
+    return {
+      ok: true,
+      targetPosition: input.requestedTarget,
+      requestedTargetPosition: input.requestedTarget,
+      targetResolution: "requested_target",
+      beforeBlock: requestedBlock
+    };
+  }
+
+  if (isResolvableSupportSurface(requestedBlock)) {
+    const aboveTarget = add(input.requestedTarget, { x: 0, y: 1, z: 0 });
+    const aboveBlock = input.bot.blockAt?.(toVec3(aboveTarget));
+    if (
+      !aboveBlock ||
+      input.expectedBlockNames.includes(aboveBlock.name) ||
+      isReplaceable(aboveBlock, input.replaceable)
+    ) {
+      return {
+        ok: true,
+        targetPosition: aboveTarget,
+        requestedTargetPosition: input.requestedTarget,
+        supportPosition: input.requestedTarget,
+        targetResolution: "surface_position_above_requested_target",
+        beforeBlock: aboveBlock
+      };
+    }
+    return {
+      ok: false,
+      targetPosition: input.requestedTarget,
+      requestedTargetPosition: input.requestedTarget,
+      beforeBlock: aboveBlock,
+      reason:
+        `place_block target ${requestedBlock.name} looks like a support surface, ` +
+        `but the space above contains non-replaceable block ${aboveBlock.name}.`
+    };
+  }
+
+  return {
+    ok: false,
+    targetPosition: input.requestedTarget,
+    requestedTargetPosition: input.requestedTarget,
+    beforeBlock: requestedBlock,
+    reason: `place_block target contains non-replaceable block ${requestedBlock.name}.`
+  };
 }
 
 async function manualMoveToward(bot: PlaceBlockBot, target: Positioned, signal?: AbortSignal) {
@@ -314,11 +445,32 @@ export async function placeBlock({
   inventorySettleMs?: number;
   signal?: AbortSignal;
 }): Promise<PlaceBlockResult> {
-  const normalizedTarget = normalizePosition(targetPosition);
+  const requestedTarget = normalizePosition(targetPosition);
   const normalizedApproach = approachPosition ? normalizePosition(approachPosition) : undefined;
   const expected = expectedBlockNames.length > 0 ? expectedBlockNames : [itemName];
   const replaceable = new Set([...DEFAULT_REPLACEABLE_BLOCKS, ...allowReplace]);
-  const beforeBlock = bot.blockAt?.(toVec3(normalizedTarget));
+  let targetResolution = resolvePlacementTarget({
+    bot,
+    requestedTarget,
+    expectedBlockNames: expected,
+    replaceable
+  });
+  if (!targetResolution.ok) {
+    return {
+      status: "blocked",
+      itemName,
+      targetPosition: targetResolution.targetPosition,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      expectedBlockNames: expected,
+      beforeBlockName: targetResolution.beforeBlock?.name,
+      beforeCount: countInventoryItem(bot, itemName),
+      approachPosition: normalizedApproach,
+      reason: targetResolution.reason
+    };
+  }
+
+  let normalizedTarget = targetResolution.targetPosition;
+  let beforeBlock = targetResolution.beforeBlock;
   const beforeCount = countInventoryItem(bot, itemName);
 
   if (beforeBlock && expected.includes(beforeBlock.name)) {
@@ -326,6 +478,9 @@ export async function placeBlock({
       status: "already_present",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: beforeBlock.name,
       afterBlockName: beforeBlock.name,
@@ -337,24 +492,14 @@ export async function placeBlock({
     };
   }
 
-  if (!isReplaceable(beforeBlock, replaceable)) {
-    return {
-      status: "blocked",
-      itemName,
-      targetPosition: normalizedTarget,
-      expectedBlockNames: expected,
-      beforeBlockName: beforeBlock?.name,
-      beforeCount,
-      approachPosition: normalizedApproach,
-      reason: `place_block target contains non-replaceable block ${beforeBlock?.name ?? "unknown"}.`
-    };
-  }
-
   if (!bot.placeBlock || !bot.equip) {
     return {
       status: "blocked",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: beforeBlock?.name,
       beforeCount,
@@ -369,6 +514,9 @@ export async function placeBlock({
       status: "blocked",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: beforeBlock?.name,
       beforeCount,
@@ -385,6 +533,9 @@ export async function placeBlock({
       status: "blocked",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: beforeBlock?.name,
       beforeCount,
@@ -393,12 +544,36 @@ export async function placeBlock({
     };
   }
 
-  const currentBlock = bot.blockAt?.(toVec3(normalizedTarget));
+  targetResolution = resolvePlacementTarget({
+    bot,
+    requestedTarget,
+    expectedBlockNames: expected,
+    replaceable
+  });
+  if (!targetResolution.ok) {
+    return {
+      status: "blocked",
+      itemName,
+      targetPosition: targetResolution.targetPosition,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      expectedBlockNames: expected,
+      beforeBlockName: targetResolution.beforeBlock?.name,
+      beforeCount,
+      approachPosition: normalizedApproach,
+      reason: targetResolution.reason
+    };
+  }
+  normalizedTarget = targetResolution.targetPosition;
+  beforeBlock = targetResolution.beforeBlock;
+  const currentBlock = targetResolution.beforeBlock;
   if (currentBlock && expected.includes(currentBlock.name)) {
     return {
       status: "already_present",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: currentBlock.name,
       afterBlockName: currentBlock.name,
@@ -410,25 +585,15 @@ export async function placeBlock({
     };
   }
 
-  if (!isReplaceable(currentBlock ?? beforeBlock, replaceable)) {
-    return {
-      status: "blocked",
-      itemName,
-      targetPosition: normalizedTarget,
-      expectedBlockNames: expected,
-      beforeBlockName: currentBlock?.name ?? beforeBlock?.name,
-      beforeCount,
-      approachPosition: normalizedApproach,
-      reason: `place_block target contains non-replaceable block ${currentBlock?.name ?? beforeBlock?.name ?? "unknown"}.`
-    };
-  }
-
   const reference = findPlacementReference(bot, normalizedTarget);
   if (!reference?.referenceBlock) {
     return {
       status: "blocked",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: currentBlock?.name ?? beforeBlock?.name,
       beforeCount,
@@ -445,6 +610,9 @@ export async function placeBlock({
       status: "blocked",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: beforeBlock?.name,
       beforeCount,
@@ -469,6 +637,9 @@ export async function placeBlock({
       status: "placed",
       itemName,
       targetPosition: normalizedTarget,
+      requestedTargetPosition: targetResolution.requestedTargetPosition,
+      supportPosition: targetResolution.supportPosition,
+      targetResolution: targetResolution.targetResolution,
       expectedBlockNames: expected,
       beforeBlockName: beforeBlock?.name,
       afterBlockName: afterBlock.name,
@@ -486,6 +657,9 @@ export async function placeBlock({
     status: "blocked",
     itemName,
     targetPosition: normalizedTarget,
+    requestedTargetPosition: targetResolution.requestedTargetPosition,
+    supportPosition: targetResolution.supportPosition,
+    targetResolution: targetResolution.targetResolution,
     expectedBlockNames: expected,
     beforeBlockName: beforeBlock?.name,
     afterBlockName: afterBlock?.name,

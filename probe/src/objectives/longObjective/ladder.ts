@@ -1,3 +1,9 @@
+/**
+ * Declarative ladder of legacy long-objective probe tasks.
+ *
+ * @remarks The ladder is capability scaffolding for experiments, not a mandatory
+ * CycleGoal sequence for Soul-grounded social simulation.
+ */
 export type LongObjectiveId =
   | "craft_current_run_stone_pickaxe_1"
   | "obtain_current_run_iron_ingot_1"

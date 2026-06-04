@@ -13,6 +13,7 @@ import type {
   StrategicGoal,
   WorldEvent
 } from "./types.js";
+import type { PlanBeadPacket } from "./planBeads/index.js";
 import type { RuntimeRetryConstraint } from "../retryConstraints.js";
 import {
   buildActionSurfacePacket,
@@ -62,11 +63,13 @@ export type SocialCycleContextPacket = {
     preconditions: string[];
     success_verifier: string;
   }>;
+  candidate_action_skill_search: unknown[];
   allowed_primitive_ids: string[];
   action_surface: ActionSurfacePacket;
   runtime_retry_constraints: RuntimeRetryConstraint[];
   relationship_context: SocialCycleRelationshipContext;
   memory_packet: ActorMemoryRetrievalPacket;
+  plan_bead_packet?: PlanBeadPacket;
   settlement_state: SettlementState;
   limits: {
     max_actions_per_cycle: number;
@@ -99,7 +102,7 @@ function memoryItemNamesFromWorldEvents(worldEvents: readonly WorldEvent[]) {
   return [...new Set(summaries.match(/\b[a-z0-9]+(?:_[a-z0-9]+)+\b/g) ?? [])];
 }
 
-/** Builds the compact context packet used by CycleGoal, ActionIntent, and judgment providers. */
+/** Builds the compact context packet used by CycleGoal, LegacyPlannerAction, and judgment providers. */
 export async function assembleSocialCycleContext(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
@@ -119,6 +122,7 @@ export async function assembleSocialCycleContext(input: {
   judgmentRefs?: readonly string[];
   memoryWriteCount?: number;
   runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
+  planBeadPacket?: PlanBeadPacket;
 }): Promise<SocialCycleContextPacket> {
   const actionSkillIds = input.activeActionSkills.map((record) => record.skill_id);
   const itemNames = [
@@ -189,6 +193,9 @@ export async function assembleSocialCycleContext(input: {
       preconditions: [...record.preconditions],
       success_verifier: record.success_verifier
     })),
+    candidate_action_skill_search: Array.isArray(providerContext.candidate_action_skills)
+      ? providerContext.candidate_action_skills
+      : [],
     allowed_primitive_ids: [...input.allowedPrimitiveIds],
     action_surface: actionSurface,
     runtime_retry_constraints: [...(input.runtimeRetryConstraints ?? [])],
@@ -209,6 +216,7 @@ export async function assembleSocialCycleContext(input: {
         : []
     },
     memory_packet: memoryPacket,
+    ...(input.planBeadPacket ? { plan_bead_packet: input.planBeadPacket } : {}),
     settlement_state: settlementState,
     limits: {
       max_actions_per_cycle: input.maxActionsPerCycle,
@@ -235,5 +243,5 @@ export type ParsedCycleGoalProviderOutput = {
 };
 
 export type ParsedActionPlannerOutput = {
-  action_intent: import("./types.js").ActionIntent;
+  legacy_planner_action: import("./types.js").LegacyPlannerAction;
 };

@@ -118,6 +118,7 @@ export type ActorCycleGoal = {
     memory_refs: string[];
     relationship_refs: string[];
     previous_cycle_judgment_refs: string[];
+    plan_bead_refs?: string[];
   };
   success_condition: {
     verifier: string;
@@ -149,32 +150,106 @@ export type WorldEvent = {
   run_id?: string;
 };
 
-export type ActionIntentKind =
-  | "use_action_skill"
+export type GeneratedActionSkillCandidate = {
+  schema: "generated-action-skill-candidate/v1";
+  proposed_skill_id: string;
+  purpose: string;
+  source_language: "typescript";
+  source: string;
+  input_schema: Record<string, unknown>;
+  helper_api_version: "mineflayer-action-skill-helper/v1";
+  helper_allowlist: string[];
+  timeout_ms: number;
+  verifier: Record<string, unknown>;
+  promotion_policy: "promote_after_passed_trial";
+  known_failure_modes: string[];
+};
+
+export type LegacyPlannerActionKind =
   | "use_primitive"
+  | "use_action_skill"
+  | "author_and_trial_action_skill"
   | "wait"
   | "remember";
 
-const actionIntentKinds: readonly ActionIntentKind[] = [
-  "use_action_skill",
-  "use_primitive",
-  "wait",
-  "remember"
-];
-
-export type ActionIntent = {
-  schema: "action-intent/v1";
+/**
+ * Legacy planner-only action record.
+ *
+ * @remarks Actor Turn must not use this as a provider-facing or codegen-facing
+ * boundary. It remains only so the explicit `action_hot_path=legacy` path and
+ * old artifacts can compile while the ordinary runtime moves through
+ * `ActorTurnResolvedAction`.
+ */
+export type LegacyPlannerAction = {
+  schema: "legacy-planner-action/v1" | "action-intent/v1";
   actor_id: string;
   cycle_id: string;
   cycle_goal_id: string;
-  kind: ActionIntentKind;
-  action_skill_id?: string;
+  kind: LegacyPlannerActionKind;
   primitive_id?: string;
-  args: Record<string, unknown>;
+  action_skill_id?: string;
+  args?: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+  parameters_schema?: Record<string, unknown>;
+  candidate?: GeneratedActionSkillCandidate;
   why_this_action: string;
   expected_evidence: string[];
   fallback_if_blocked: string;
 };
+
+export function legacyPlannerActionParameters(
+  action: LegacyPlannerAction
+): Record<string, unknown> {
+  return action.parameters ?? action.args ?? {};
+}
+
+export function validateLegacyPlannerAction(
+  value: unknown
+): { ok: true; action: LegacyPlannerAction } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  if (!isRecord(value)) {
+    return { ok: false, errors: ["LegacyPlannerAction must be an object"] };
+  }
+  if (value.schema !== "legacy-planner-action/v1" && value.schema !== "action-intent/v1") {
+    errors.push("schema must be legacy-planner-action/v1");
+  }
+  assertString(value, "actor_id", errors);
+  assertString(value, "cycle_id", errors);
+  assertString(value, "cycle_goal_id", errors);
+  if (!includesString([
+    "use_primitive",
+    "use_action_skill",
+    "author_and_trial_action_skill",
+    "wait",
+    "remember"
+  ] as const, value.kind)) {
+    errors.push("kind must be a known legacy planner action kind");
+  }
+  if (value.kind === "use_primitive" && typeof value.primitive_id !== "string") {
+    errors.push("primitive_id must be present for use_primitive");
+  }
+  if (value.kind === "use_action_skill" && typeof value.action_skill_id !== "string") {
+    errors.push("action_skill_id must be present for use_action_skill");
+  }
+  if (value.kind === "author_and_trial_action_skill" && !isRecord(value.candidate)) {
+    errors.push("candidate must be present for author_and_trial_action_skill");
+  }
+  if (value.kind === "wait" || value.kind === "remember") {
+    if (value.primitive_id !== undefined || value.action_skill_id !== undefined) {
+      errors.push("wait/remember legacy planner actions must not carry primitive_id or action_skill_id");
+    }
+  }
+  if (!isRecord(value.parameters) && !isRecord(value.args)) {
+    errors.push("parameters must be an object");
+  }
+  assertString(value, "why_this_action", errors);
+  assertStringArray(value, "expected_evidence", errors);
+  assertString(value, "fallback_if_blocked", errors);
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+  return { ok: true, action: value as LegacyPlannerAction };
+}
 
 /** Cycle outcomes distinguish final success from useful current-run mutation that still failed a verifier. */
 export type CycleJudgmentOutcome =
@@ -248,6 +323,8 @@ export type CycleJudgment = {
     evidence_refs: string[];
   }>;
   next_goal_context: string[];
+  /** Proposal candidates are validated by the guarded PlanBead applier per item. */
+  bead_op_proposals?: unknown[];
 };
 
 export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
@@ -261,17 +338,22 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
+  action_hot_path?: "legacy" | "actor_turn";
   provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";
+  active_episode_refs?: string[];
+  deliberation_branch_refs?: string[];
   server?: {
     mode: "manual" | "live_smoke" | "fresh_world";
     seed: string;
     level_type: string;
     version: string;
-    endpoint?: string;
-    spawn_access_prepared?: boolean;
-    spawn_access_position?: { x: number; y: number; z: number };
-    error_kind?: "environment_blocked";
+	    endpoint?: string;
+	    spawn_access_prepared?: boolean;
+	    spawn_access_position?: { x: number; y: number; z: number };
+	    shared_storage_social_smoke?: boolean;
+	    starter_inventory_seeded?: boolean;
+	    error_kind?: "environment_blocked";
     error?: string;
   };
   /** Producer workspace root used to resolve actor-relative artifact refs during audit. */
@@ -295,17 +377,24 @@ export type SocialCycleRunReport = {
   cycles: Array<{
     cycle_id: string;
     cycle_goal_ref: string;
-    action_intent_ref: string;
+    active_episode_ref?: string;
+    deliberation_branch_ref?: string;
+    deliberation_trigger_reason?: string;
+    action_ref: string;
     provider_input_refs: string[];
     provider_output_refs: string[];
     evidence_refs: string[];
     judgment_ref: string;
     verifier_status: "passed" | "failed" | "not_applicable";
+    plan_bead_packet_ref?: string;
+    selected_plan_bead_refs?: string[];
+    plan_bead_operation_result_refs?: string[];
     action_attempts?: Array<{
       attempt_id: string;
       action_index: number;
       turn_id: string;
-      action_intent_ref: string;
+      active_episode_id?: string;
+      action_ref: string;
       provider_input_refs: string[];
       provider_output_refs: string[];
       evidence_refs: string[];
@@ -316,15 +405,53 @@ export type SocialCycleRunReport = {
       runtime_result?: unknown;
       runtime_status: string;
       retry_constraint_blocked?: boolean;
+      branch_recommended?: boolean;
+      branch_reason?: string;
       postcondition_results?: ActionSkillPostconditionResult[];
+      plan_bead_operation_result_refs?: string[];
     }>;
   }>;
   provider_error?: string;
+  provider_error_refs?: Array<{
+    stage: string;
+    turn_id?: string;
+    error: string;
+    provider_input_refs: string[];
+    provider_output_refs: string[];
+  }>;
   action_skill_execution_unit?: boolean;
   settlement_state?: SettlementState;
   settlement_checklist?: SettlementChecklist;
   postcondition_results?: ActionSkillPostconditionResult[];
   runtime_retry_constraints?: RuntimeRetryConstraint[];
+  plan_bead_graph_summary?: {
+    schema: "plan-bead-graph-summary/v1";
+    actor_id: string;
+    open_count: number;
+    ready_count: number;
+    blocked_count: number;
+    deferred_count: number;
+    closed_recent_count: number;
+    last_ready_front_ref?: string;
+  };
+  plan_bead_ready_fronts?: Array<{
+    schema: "plan-bead-ready-front/v1";
+    cycle_id: string;
+    ref: string;
+    ready_bead_ids: string[];
+    in_progress_bead_ids: string[];
+    blocked_bead_ids: string[];
+    physical_progress_claim: false;
+  }>;
+  plan_bead_operation_results?: Array<{
+    cycle_id: string;
+    turn_id: string;
+    ref: string;
+    op: string;
+    status: "accepted" | "rejected";
+    bead_id?: string;
+    reason?: string;
+  }>;
   relationship_application_results?: Array<{
     event_id: string;
     from_actor_id: string;
@@ -438,36 +565,6 @@ export function validateActorCycleGoal(
   return { ok: true, cycleGoal: value as ActorCycleGoal };
 }
 
-export function validateActionIntent(
-  value: unknown
-): { ok: true; intent: ActionIntent } | { ok: false; errors: string[] } {
-  const errors: string[] = [];
-  if (!isRecord(value)) {
-    return { ok: false, errors: ["ActionIntent must be an object"] };
-  }
-  if (value.schema !== "action-intent/v1") {
-    errors.push("schema must be action-intent/v1");
-  }
-  assertString(value, "actor_id", errors);
-  assertString(value, "cycle_id", errors);
-  assertString(value, "cycle_goal_id", errors);
-  assertString(value, "why_this_action", errors);
-  assertString(value, "fallback_if_blocked", errors);
-  assertStringArray(value, "expected_evidence", errors);
-  assertRecord(value, "args", errors);
-  if (!includesString(actionIntentKinds, value.kind)) {
-    errors.push("kind must be one of use_action_skill, use_primitive, wait, remember");
-  } else if (value.kind === "use_primitive") {
-    assertString(value, "primitive_id", errors);
-  } else if (value.kind === "use_action_skill") {
-    assertString(value, "action_skill_id", errors);
-  }
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-  return { ok: true, intent: value as ActionIntent };
-}
-
 export function validateCycleJudgment(
   value: unknown
 ): { ok: true; judgment: CycleJudgment } | { ok: false; errors: string[] } {
@@ -521,6 +618,11 @@ export function validateCycleJudgment(
         errors.push(`relationship_event_proposals[${index}].kind must be a known proposal kind`);
       }
       assertStringArray(proposal, "evidence_refs", errors);
+    }
+  }
+  if (value.bead_op_proposals !== undefined) {
+    if (!Array.isArray(value.bead_op_proposals)) {
+      errors.push("bead_op_proposals must be an array when present");
     }
   }
   if (errors.length > 0) {

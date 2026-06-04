@@ -1,3 +1,10 @@
+/**
+ * Recipe contract for bounded action skill trials.
+ *
+ * @remarks A recipe describes guarded primitive steps and verifier expectations;
+ * it is not active actor-owned authority until lifecycle promotion writes an
+ * active record.
+ */
 import type { RoleId } from "../../npc/roles/contracts.js";
 import type { RuntimePrimitiveId } from "../../gameplay/primitives/registry.js";
 

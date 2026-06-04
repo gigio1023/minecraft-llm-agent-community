@@ -1,3 +1,4 @@
+/** Regression coverage for bounded build-pattern placement evidence. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

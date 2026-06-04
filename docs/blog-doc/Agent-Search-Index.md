@@ -38,8 +38,18 @@ guidance.
 | `ACTION_SKILL` | Minecraft/Mineflayer bundled behavior validated, executed, verified, and recorded by the runtime | `Terminology.md`, `Architecture/Actor-Workspace-And-Action-Skill-Memory.md` |
 | `AGENT_SKILL` | Codex/Claude-style repo capability under `.agents/skills/*/SKILL.md` | `Terminology.md`, `AGENTS.md` |
 | `ACTION_SURFACE` | Provider-visible direct/deferred affordance packet for the current actor body | `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md`, `probe/src/runtime/actionSurface.ts` |
+| `ACTOR_EPISODE_ACTOR_TURN` | Target replacement for the per-cycle goal/action/judgment hot path: Active Episode, Actor Turn, Action Cards, Evidence Trace, branch-only Deliberation | `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Terminology.md` |
+| `LOW_COST_SOCIAL_SIMULATION_CAMPAIGN` | Campaign-level spec, gates, social proof scenarios, and implementation sequence for proving cheap-model Actor Turn behavior | `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md` |
+| `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL` | Compact `/goal` companion for the current pivot: Actor Turn as hot path, PlanBeads as passive issue-like state, branch-only Deliberation | `Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`, `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | New Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing legacy planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `ACTOR_MEMORY_OBSERVATION_ACTION_SPACE` | Memory IO, raw observation, and Mineflayer action-space expansion plan | `Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`, `docs/research-archive/hermes-memory-system/`, `probe/src/memory/actorMemory.ts`, `probe/src/runtime/actionSurface.ts` |
-| `ACTION_INTENT_CONTRACT` | Physical actions require structured executable args; prose is not executable authority | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/test/socialActionIntentContracts.test.ts` |
+| `ACTOR_PERSISTENT_STATE_PLAN_BEADS` | Restart-safe actor work graph: PlanBeads, dependency edges, and ready fronts under LifeGoal | `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Terminology.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
+| `PLANBEADS_IMPLEMENTATION_CAMPAIGN` | Long-running parallel implementation campaign contract for PlanBeads work | `Architecture/PlanBeads-Implementation-Campaign.md`, `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Architecture/Implementation-Workstreams.md` |
+| `SOCIAL_CYCLE_LLM_INPUT_CLEANUP` | Legacy three-stage input projection cleanup that remains useful during migration to Actor Episode and Actor Turn | `Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `probe/src/provider/socialCycleProviderInputs.ts`, `probe/test/socialCycleRunner.test.ts` |
+| `ACTOR_EPISODE_IMPLEMENTATION_PLAN` | Detailed campaign plan and acceptance gates for making cheap-model Actor Turn behavior actionful, truthful, and socially visible | `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `.agents/skills/minecraft-agent-runtime-review/references/social-cycle-analysis-rubric.md` |
+| `RUNTIME_ACTION_CONTRACT` | Physical actions require structured executable parameters; prose is not executable authority | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/test/legacyPlannerActionContracts.test.ts` |
+| `ACTION_SELECTION_GATED_ACTION_SKILL_AUTHORING` | New action skill creation starts only from explicit Actor Turn `author_mineflayer_action` selection or explicit legacy planner migration, with schema-bound parameters, generated Mineflayer helper trials, and actor-workspace evidence | `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Bounded-Action-Skill-Creation.md`, `probe/src/provider/socialActorTurnProvider.ts`, `probe/src/runtime/goals/actorEpisode/resolver.ts`, `probe/src/skills/proposals/` |
+| `MINECRAFT_BASIC_GUIDE` | Provider-visible compact Minecraft mechanics guide for prerequisite flows, station requirements, blocker recovery, and repeated-observe limits | `Architecture/Minecraft-Basic-Guide.md`, `Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`, `Knowledge/Minecraft-Encyclopedia/Index.md`, `probe/src/provider/socialCycleProviderInputs.ts` |
 | `RUNTIME_RETRY_CONSTRAINT` | Exact repeated target/args blockers become runtime gates before another Mineflayer call | `Terminology.md`, `Architecture/Future-Works.md`, `probe/src/runtime/retryConstraints.ts` |
 | `WORLD_STATE_DIAGNOSTICS` | World scans must be query-neutral and scoped by loaded-world limits | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/src/tools/worldStateScan.ts` |
 | `CONTEXT_COMPACTION` | Preserve evidence-linked state without laundering weak evidence into progress | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/src/runtime/goals/socialCycleContextCompaction.ts` |
@@ -61,6 +71,7 @@ guidance.
 |--------------|---------|--------------------|
 | `HEADLESS_MINEFLAYER_PROBE` | Local server and headless Mineflayer runtime setup | `Setup/Headless-Server.md`, `Architecture/Minimal-Probe.md` |
 | `PROVIDER_USAGE_GUARD` | Provider usage ledger, budget guard, and post-run usage summaries | `Setup/Provider-Setup.md`, `Architecture/Transcript-And-Runtime-Artifacts.md`, `probe/src/provider/providerUsageTracker.ts` |
+| `PROVIDER_FREE_TIER_RESET_WINDOWS` | OpenAI and Gemini API free-tier daily reset windows and KST conversion rules | `Setup/Provider-Free-Tier-Reset-Windows.md`, `Setup/Provider-Setup.md`, `probe/src/provider/providerUsageTracker.ts` |
 | `GEMINI_API_SOCIAL_PROVIDER` | Lightweight live social-cycle provider path using Gemini API / Gemma | `Setup/Provider-Setup.md`, `README.md`, `probe/src/provider/geminiApiJsonProvider.ts` |
 | `OPENAI_CODEX_PROVIDER` | Game-runtime provider auth for `openai-codex`, not Codex CLI login | `Setup/Provider-Setup.md`, `AGENTS.md` |
 | `GAME_RUNTIME_CODEX_AUTH` | Repo-local ignored gameplay auth store | `Setup/Provider-Setup.md`, `AGENTS.md` |
@@ -83,11 +94,22 @@ For any onboarding developer or agent, read in this order:
 11. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
 12. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
 13. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
-14. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-15. `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-16. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-17. `docs/blog-doc/Setup/Headless-Server.md`
-18. `docs/blog-doc/Setup/Provider-Setup.md`
+14. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+15. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+16. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+17. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+18. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+19. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+20. `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+21. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+22. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+23. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+24. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+25. `docs/blog-doc/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+26. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+27. `docs/blog-doc/Setup/Headless-Server.md`
+28. `docs/blog-doc/Setup/Provider-Setup.md`
+29. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Active vs Archived
 

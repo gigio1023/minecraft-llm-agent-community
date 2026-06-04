@@ -1,3 +1,10 @@
+/**
+ * Local Minecraft server lifecycle helper for live smoke runs.
+ *
+ * @remarks Server setup is environment-sensitive and must report platform or
+ * process blockers as infrastructure evidence, not actor behavior or action
+ * skill failure.
+ */
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";

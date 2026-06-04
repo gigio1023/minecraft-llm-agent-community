@@ -80,6 +80,11 @@ Concrete rules:
 - A provider may choose building only when current observation, memory,
   relationship context, or CycleGoal makes building a reasonable action. The
   system should not push every social situation through house construction.
+- Do not hide tools or Action Cards through hardcoded Minecraft domain
+  heuristics such as item-family, station-family, construction-readiness,
+  survival-priority, shelter-first, or single-activity strategy filters. Tool
+  visibility and rejection must come from typed readiness/eligibility contracts,
+  explicit structured state, schemas, gates, retry constraints, and evidence.
 
 This mirrors the useful lesson from Codex-style tool runtimes: the core system
 does not hard-code a strategy for every programming language. It exposes tools,
@@ -107,13 +112,37 @@ substrate should expose raw Minecraft observations, query limits, positions,
 distances, and evidence refs; the provider chooses relevance under ActorSoul,
 LifeGoal, CycleGoal, action surface, and current evidence.
 
-Physical `ActionIntent` arguments are a contract, not a hint. Required arguments
+LLM-facing prose must never become hidden runtime policy. Do not parse
+`current_state_requirements`, `why_this_action`, Action Card descriptions,
+Minecraft Basic Guide text, memory notes, PlanBeads, or provider rationale with
+string `includes`, regexes, keyword lists, or similar heuristics to decide tool
+visibility, action eligibility, executable parameters, permissions, retry
+clearance, generated-source authority, or verifier success. Tool calling plus
+strict schemas/enums enforce the flow; within a selected tool/action, the LLM
+keeps decision freedom with full context and schema-bound logical parameters.
+This side project does not need compatibility compromises that keep prose
+parsing or hidden Minecraft-planner behavior in the hot path.
+
+`decision_frame` is not a planner result. It must not carry
+`parameter_candidates`, `top_eligible_action_cards`,
+`recommended_next_action_candidates`, generated chat text, coordinates, recipe
+decisions, or other pre-selected action payloads. The Actor Turn LLM chooses
+from visible `action_cards` and fills strict tool parameters itself.
+
+Providers may receive a compact `minecraft_basic_guide` for stable Minecraft
+mechanics such as item prerequisite flows, station requirements, tool usefulness,
+item-vs-world-block distinctions, and repeated-observe limits. This guide is
+background mechanics, not a strategy checklist, runtime permission, current
+state claim, or proof of progress.
+
+Physical runtime action arguments are a contract, not a hint. Required arguments
 for actions such as movement, mining, placement, crafting, storage, inspection,
-or building must be present in structured args before execution. Natural-language
-fields may explain why an action was chosen, but they are not executable
-authority. If `why_this_action` mentions a target coordinate while structured
-`args` are empty, the runtime should reject or repair the intent and record an
-`ActionIntent` contract failure rather than silently applying a movement default.
+or building must be present in structured parameters before execution.
+Natural-language rationale fields may explain why an action was chosen, but
+they are not executable authority. If rationale text mentions a target
+coordinate while structured parameters are empty, the runtime should reject or
+repair the action and record a runtime action contract failure rather than
+silently applying a movement default.
 
 Mineflayer-backed primitives should document the Mineflayer API assumptions they
 depend on: loaded-chunk visibility, target lookup, pathfinder behavior, timeout
@@ -127,6 +156,15 @@ container snapshots, known positions, recent blockers, recent judgments,
 world-state diagnostics, action-surface contracts, and artifact refs. It must
 not convert provider prose, memory notes, or weak observation into claimed
 physical progress.
+
+Actor-owned state that is required for continuity must survive process restarts.
+This includes identity, LifeGoal, actor work graph state, memory, relationships,
+action skill ownership, evidence, retry gates, provider snapshots, and
+checkpoint-ready context. PlanBeads are checkpointed actor-owned issue-like work
+items under LifeGoal. The PlanBeadGraph and its ready front guide CycleGoal
+selection without becoming executable authority or physical proof. PlanBeads are
+repo-owned actor-workspace records, not a dependency on external `bd`, `br`,
+`beads-mcp`, `.beads`, or downloaded Beads binaries.
 
 ## 3. Complete Spec Reading Map
 
@@ -148,32 +186,50 @@ Read these documents to understand the full spec:
 6. `docs/blog-doc/Documentation-Map.md`
    - documentation authority order, active/supporting/historical categories,
      and cleanup rules.
-7. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+7. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+   - compact current-goal routing for Actor Turn as hot path and PlanBeads as
+     passive actor-owned work state.
+8. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+   - active campaign gates for proving cheap-model Actor Turn behavior.
+9. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+   - Active Episode, Actor Turn, Action Cards, Evidence Trace, and branch-only
+     Deliberation architecture.
+10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+    - current implementation sequence and acceptance gates for the Actor Turn
+      migration.
+11. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
    - concrete Soul/LifeGoal/CycleGoal architecture.
-8. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
+12. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
    - hot path, runtime verification, and bounded execution.
-9. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
+13. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
    - transcript and artifact persistence contract.
-10. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+14. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
-11. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+15. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+   - restart-safe actor state, PlanBead work graph, dependencies, and ready front.
+16. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+    - Actor Turn-only generated Mineflayer action-skill authoring authority.
+17. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+    - provider-visible basic Minecraft mechanics guide.
+18. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
     - actor profiles, role context, and relationship state.
-12. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+19. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
     - current implementation state and next work.
-13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+20. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
     - repo-internal whole-project implementation map for current boundaries,
       runtime flow, evidence, and risks.
-14. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
+21. `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
     - latest architecture/implementation cross-check.
-15. `docs/blog-doc/Agent-Search-Index.md`
+22. `docs/blog-doc/Agent-Search-Index.md`
     - routing map and search tokens.
-16. `docs/blog-doc/Terminology.md`
+23. `docs/blog-doc/Terminology.md`
     - canonical terms such as `agent skill` and `action skill`.
 
 Setup docs:
 
 - `docs/blog-doc/Setup/Headless-Server.md`
 - `docs/blog-doc/Setup/Provider-Setup.md`
+- `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## 4. Non-Negotiable Direction
 
@@ -186,16 +242,24 @@ Setup docs:
 - Reviewers explain and propose repairs. They do not mutate actor truth directly.
 - Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
   agent skills.
-- Actor workspace is the source of truth for actor-owned memory, evidence,
-  active/candidate/retired action skills, goals, provider snapshots, reviews,
-  and relationships.
+- Actor workspace is the source of truth for actor-owned memory, PlanBead work
+  graph state, evidence, active/candidate/retired action skills, goals, provider
+  snapshots, reviews, and relationships.
+- Actor-owned continuity state must be restart-safe. Living multi-cycle work
+  should be represented as checkpointed PlanBeads and dependency edges under
+  LifeGoal, not as free-form memory notes or hidden domain planners.
 - Progress must be backed by world, inventory, position, block, container, chat,
   transcript, or verifier evidence.
 - Do not confuse animation, partial motion, optimistic text, reflection, or a
   terminal memory note with success.
 - Do not confuse a hidden programming default with a valid action. Missing
-  required physical `ActionIntent` args are a runtime contract failure unless a
-  documented repair path produces structured args and records that repair.
+  required physical runtime action args are a runtime contract failure unless a
+  documented repair path produces structured parameters and records that repair.
+- Do not confuse LLM-facing prose with runtime authority. `current_state_requirements`,
+  rationale, guide text, PlanBeads, and memory may explain context, but only
+  explicit schemas/enums, structured parameters, permission gates,
+  retry/safety constraints, source guards, timeouts, verifiers, and evidence
+  decide execution.
 - Absence claims about observed targets, blocks, items, entities, or hazards
   must be scoped by world-state diagnostic evidence and Mineflayer loaded-world
   limits.
@@ -217,7 +281,7 @@ The first meaningful proof is small:
 - real Minecraft actions such as gathering, crafting, storage, movement,
   block placement, communication, or settlement maintenance;
 - action attempts recorded whether passed, blocked, failed, or no-progress;
-- CycleGoal and ActionIntent derived from ActorSoul, LifeGoal, observation,
+- Actor Turn runtime actions derived from ActorSoul, LifeGoal, observation,
   world events, memory, relationships, and prior judgments;
 - CycleJudgment written from runtime evidence;
 - later cycles retrieve and use prior memory or judgment;
@@ -236,9 +300,9 @@ The proof is not:
 The runtime shape is:
 
 ```text
-ActorSoul + LifeGoal + observation + world events + memory
--> CycleGoal
--> ActionIntent
+ActorSoul + LifeGoal + PlanBeadGraph + observation + world events + memory
+-> Actor Turn function-tool selection
+-> ActorTurnResolvedAction or full-context generated-action authoring
 -> active action skill / primitive gate
 -> Mineflayer execution
 -> verifier evidence
@@ -286,7 +350,8 @@ Reference mechanisms must be translated into this project:
 - skill-library work -> actor-owned, evidence-backed action skill promotion;
 - curriculum work -> bounded capability scaffolding under ActorSoul/LifeGoal,
   not benchmark optimization;
-- reasoning/action work -> CycleGoal, ActionIntent, evidence, CycleJudgment;
+- reasoning/action work -> Actor Turn tool selection, runtime action,
+  evidence, CycleJudgment;
 - memory/reflection work -> artifact-grounded memory and review, not claimed
   progress;
 - affordance/interface work -> better runtime primitives, gates, context

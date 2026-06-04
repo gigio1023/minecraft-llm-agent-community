@@ -9,7 +9,7 @@ import { buildServerEnv, type ProbeConfig } from "../config.js";
 import { shouldRetryWithStandaloneCompose } from "./composeCommand.js";
 
 const SERVER_READY_POLL_MS = 1_000;
-const COMPOSE_MANAGEMENT_TIMEOUT_MS = 10_000;
+const COMPOSE_MANAGEMENT_TIMEOUT_MS = 30_000;
 const MIN_COMPOSE_STARTUP_TIMEOUT_MS = 60_000;
 
 export type ServerHandle = {

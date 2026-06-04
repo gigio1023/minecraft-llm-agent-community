@@ -173,7 +173,7 @@ export function loadProbeConfig(): ProbeConfig {
       hostPort: parsePortEnv(process.env.MC_HOST_PORT, 25565),
       containerPort: 25565,
       publishStrategy: "fixed-host-port",
-      pingTimeoutMs: 120000
+      pingTimeoutMs: parseNumberEnv(process.env.PROBE_SERVER_PING_TIMEOUT_MS, 120000)
     },
     bots: normalizeActorIds(envBots),
     dialogue: {

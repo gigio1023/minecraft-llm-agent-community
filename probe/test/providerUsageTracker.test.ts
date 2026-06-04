@@ -1,3 +1,4 @@
+/** Regression coverage for provider usage tracking and budget context. */
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -8,6 +9,7 @@ import {
   appendProviderUsageRecord,
   guardProviderUsageRequest,
   normalizeGeminiUsage,
+  normalizeOpenAiUsage,
   ProviderUsageBudgetError,
   summarizeProviderUsage
 } from "../src/provider/providerUsageTracker.js";
@@ -98,6 +100,172 @@ test("provider usage guard blocks a request beyond the configured daily budget",
   }
 });
 
+test("provider usage guard resets daily budget on UTC day boundary", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-utc-day-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    await withUsageEnv(
+      {
+        PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS: "1",
+        PROVIDER_USAGE_LEDGER_PATH: ledgerPath,
+        PROVIDER_USAGE_BUDGETS_JSON: JSON.stringify({
+          budgets: [
+            {
+              provider_id: "openai-api",
+              model: "gpt-5.4-mini",
+              total_token_limit_per_day: 100,
+              mode: "enforce"
+            }
+          ]
+        })
+      },
+      async () => {
+        await appendProviderUsageRecord({
+          providerId: "openai-api",
+          model: "gpt-5.4-mini",
+          status: "succeeded",
+          usageSource: "estimated",
+          usage: {
+            requests: 1,
+            input_tokens: 70,
+            output_tokens: 20,
+            thinking_tokens: 0,
+            total_tokens: 90
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-01T23:59:00.000Z")
+        });
+
+        const decision = await guardProviderUsageRequest({
+          providerId: "openai-api",
+          model: "gpt-5.4-mini",
+          estimatedUsage: {
+            requests: 1,
+            input_tokens: 50,
+            output_tokens: 1,
+            thinking_tokens: 0,
+            total_tokens: 51
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-02T00:01:00.000Z"),
+          maxAutoDelayMs: 0
+        });
+
+        assert.equal(decision.status, "allowed");
+        assert.equal(decision.projected?.day.total_tokens, 51);
+      }
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Gemini provider usage guard resets daily budget on Pacific day boundary", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-pacific-day-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    await withUsageEnv(
+      {
+        PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS: "1",
+        PROVIDER_USAGE_LEDGER_PATH: ledgerPath,
+        PROVIDER_USAGE_BUDGETS_JSON: JSON.stringify({
+          budgets: [
+            {
+              provider_id: "gemini-api",
+              model: "gemini-2.5-flash",
+              total_token_limit_per_day: 100,
+              mode: "enforce"
+            }
+          ]
+        })
+      },
+      async () => {
+        await appendProviderUsageRecord({
+          providerId: "gemini-api",
+          model: "gemini-2.5-flash",
+          status: "succeeded",
+          usageSource: "estimated",
+          usage: {
+            requests: 1,
+            input_tokens: 70,
+            output_tokens: 20,
+            thinking_tokens: 0,
+            total_tokens: 90
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-01T23:59:00.000Z")
+        });
+
+        await assert.rejects(
+          guardProviderUsageRequest({
+            providerId: "gemini-api",
+            model: "gemini-2.5-flash",
+            estimatedUsage: {
+              requests: 1,
+              input_tokens: 50,
+              output_tokens: 1,
+              thinking_tokens: 0,
+              total_tokens: 51
+            },
+            context: { ledgerPath },
+            now: new Date("2026-06-02T00:01:00.000Z"),
+            maxAutoDelayMs: 0
+          }),
+          (error) =>
+            error instanceof ProviderUsageBudgetError &&
+            /total_token_limit_per_day/.test(error.message)
+        );
+
+        const decision = await guardProviderUsageRequest({
+          providerId: "gemini-api",
+          model: "gemini-2.5-flash",
+          estimatedUsage: {
+            requests: 1,
+            input_tokens: 50,
+            output_tokens: 1,
+            thinking_tokens: 0,
+            total_tokens: 51
+          },
+          context: { ledgerPath },
+          now: new Date("2026-06-02T07:01:00.000Z"),
+          maxAutoDelayMs: 0
+        });
+
+        assert.equal(decision.status, "allowed");
+        assert.equal(decision.projected?.day.total_tokens, 51);
+      }
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("provider usage records include UTC quota day for OpenAI free-token auditing", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-record-day-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    const record = await appendProviderUsageRecord({
+      providerId: "openai-api",
+      model: "gpt-5.4-mini",
+      status: "succeeded",
+      usageSource: "estimated",
+      usage: {
+        requests: 1,
+        input_tokens: 1,
+        output_tokens: 1,
+        thinking_tokens: 0,
+        total_tokens: 2
+      },
+      context: { ledgerPath },
+      now: new Date("2026-06-02T00:01:00.000Z")
+    });
+
+    assert.equal(record.quota_day_utc, "2026-06-02");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("Gemini usage normalization counts thinking tokens as output tokens", () => {
   const normalized = normalizeGeminiUsage(
     {
@@ -122,6 +290,35 @@ test("Gemini usage normalization counts thinking tokens as output tokens", () =>
     output_tokens: 5,
     thinking_tokens: 2,
     total_tokens: 15
+  });
+});
+
+test("OpenAI usage normalization accepts Responses API token fields", () => {
+  const normalized = normalizeOpenAiUsage(
+    {
+      input_tokens: 11,
+      output_tokens: 7,
+      output_tokens_details: {
+        reasoning_tokens: 3
+      },
+      total_tokens: 18
+    },
+    {
+      requests: 1,
+      input_tokens: 1,
+      output_tokens: 1,
+      thinking_tokens: 0,
+      total_tokens: 2
+    }
+  );
+
+  assert.equal(normalized.source, "provider_reported");
+  assert.deepEqual(normalized.usage, {
+    requests: 1,
+    input_tokens: 11,
+    output_tokens: 7,
+    thinking_tokens: 3,
+    total_tokens: 18
   });
 });
 

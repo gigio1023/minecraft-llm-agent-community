@@ -1,3 +1,10 @@
+/**
+ * Smoke CLI for Gemini structured JSON calls.
+ *
+ * @remarks This validates provider setup and schema behavior only. A successful
+ * smoke call does not imply the Minecraft runtime loop or actor evidence path is
+ * working.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

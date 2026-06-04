@@ -1,3 +1,4 @@
+/** Regression coverage for action skill probe matrix CLI output. */
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -54,7 +55,14 @@ test("action skill probe matrix can narrow to selected implemented skills", () =
 
   assert.deepEqual(cases.map((entry) => entry.skillId), ["collectLogs", "craftCraftingTable"]);
   assert.deepEqual(cases.map((entry) => entry.roleId), ["gatherer", "crafter"]);
-  assert.deepEqual(cases.map((entry) => entry.preconditions), [[], ["inventory has planks"]]);
+  assert.deepEqual(cases.map((entry) => entry.preconditions), [
+    [],
+    [
+      "inventory has planks >= 4",
+      "no usable crafting_table already known",
+      "no crafting_table item already carried"
+    ]
+  ]);
   assert.deepEqual(cases.map((entry) => entry.probePreconditionMode), ["placed_logs", "inventory_planks_and_sticks"]);
 });
 

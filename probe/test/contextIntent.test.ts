@@ -1,3 +1,4 @@
+/** Regression coverage for context intent classification and contracts. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

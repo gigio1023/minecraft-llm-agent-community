@@ -1,3 +1,4 @@
+/** Regression coverage for stable Minecraft mechanics guide projections. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import minecraftData from "minecraft-data";

@@ -1,3 +1,4 @@
+/** Regression coverage for server lifecycle reporting as environment state. */
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
 import test from "node:test";

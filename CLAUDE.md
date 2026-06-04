@@ -13,6 +13,17 @@ has approved an operating-rule change.
 4. `docs/blog-doc/Documentation-Map.md`
 5. `docs/blog-doc/Agent-Search-Index.md`
 6. `docs/blog-doc/Terminology.md`
+7. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+8. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+9. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+11. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+12. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+13. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+14. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+15. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+16. `docs/blog-doc/Setup/Provider-Setup.md`
+17. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
@@ -20,15 +31,81 @@ This repo is not a generic Minecraft bot benchmark, Voyager clone, or
 house-building architecture. It is a bounded, observable headless Minecraft
 runtime for a Soul-grounded social simulation seed.
 
-Provider output proposes `CycleGoal`, `ActionIntent`, and `CycleJudgment`.
-Runtime code owns Minecraft truth: schema validation, structured args,
+Provider output proposes goals, runtime actions, and judgments.
+Runtime code owns Minecraft truth: schema validation, structured parameters,
 permission gates, Mineflayer execution, verifier evidence, artifacts, actor
 workspace state, and provider usage records.
+
+Never implement runtime policy by parsing LLM-facing prose with string
+`includes`, regexes, or keyword heuristics. `current_state_requirements`, Action
+Card descriptions, `why_this_action`, Minecraft Basic Guide text, memory, and
+PlanBeads are context, not executable authority. Tool calling plus strict
+schemas/enums enforce flow; within a selected visible tool/action, the LLM keeps
+decision freedom with full context and schema-bound logical parameters. Runtime
+then validates explicit params, schema, permission, retry/safety, source guards,
+timeouts, verifier/evidence, and artifacts.
+
+`decision_frame` is context, not a planner output. Do not add
+`parameter_candidates`, `top_eligible_action_cards`,
+`recommended_next_action_candidates`, generated chat text, coordinates, recipe
+decisions, or other pre-selected action payloads to it.
 
 Do not turn one domain activity, such as shelter, mining, storage, travel, or
 conversation, into always-on architecture. Improve autonomy substrate:
 `action_surface`, hooks, gates, diagnostics, context compaction, verification,
 and review artifacts.
+
+Do not hide Action Cards or tools through hardcoded Minecraft heuristics such as
+item-family, station-family, construction-readiness, survival-priority, or
+shelter-first filters. If a tool should be hidden or rejected, express that with
+typed readiness/eligibility contracts, structured state, schemas, gates, retry
+constraints, or evidence. The runtime must not become a hidden Minecraft
+planner. No compatibility or legacy compromise is required when removing prose
+parsing or hidden domain-planner behavior.
+
+## PlanBeads Intent
+
+PlanBeads are not a planning ritual. They are structured actor-owned work state
+for concerns the LLM actor would otherwise forget or blur in free-form prose.
+
+Use PlanBeads to make actor behavior more flexible, not less. A good PlanBeads
+implementation lets the NPC keep concern A open when concern B appears, link or
+defer work honestly, and choose a CycleGoal from current observation plus the
+ready front without becoming a checklist executor.
+
+Do not over-rotate this slice into verification for its own sake. Verification
+must catch silent errors, fake completion, and progress laundering, but the main
+purpose is state continuity under changing Minecraft/social context.
+
+Treat it as a failure if PlanBeads make the actor spend more time maintaining
+beads than acting, or if they grant executable authority. PlanBeads never supply
+missing primitive args, action permissions, physical success, or retry-constraint
+clearance.
+
+CycleJudgment may carry raw PlanBead operation proposal candidates. A malformed
+candidate should be rejected by the guarded PlanBead applier with an
+operation-result artifact, not silently dropped by failing the whole judgment.
+
+PlanBeads are Beads-inspired repo runtime state, not `bd`, `br`, `beads-mcp`,
+`.beads`, or a downloaded binary dependency. Do not add external Beads CLI calls
+to Minecraft actor state. Campaign work may use external task tools separately,
+but NPC PlanBeads live under actor workspace JSON records.
+
+## Action Skill Authoring
+
+During social-cycle runtime, new Minecraft action skill creation starts only
+from the action-selection stage. In Actor Turn mode, that means
+`author_mineflayer_action`, which resolves into the existing
+`author_and_trial_action_skill` runtime path. Background
+reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
+review, patch, re-trial, reject, promote, retire, or supersede an existing
+candidate, but they must not originate a new NPC action skill candidate.
+
+Generated Mineflayer code is encouraged through that explicit author-and-trial
+path, not as hidden background authority. The generated candidate must include
+schema-bound parameters, generated TypeScript source, helper API version,
+timeout, verifier, failure modes, promotion policy, helper-event evidence, and
+post-observation. Prose never supplies missing executable parameters.
 
 ## Karpathy Guidelines
 

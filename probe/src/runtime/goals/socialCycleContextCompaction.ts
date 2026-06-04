@@ -2,17 +2,18 @@ import type { ActionSurfacePacket } from "../actionSurface.js";
 import type { SettlementState } from "../settlement/settlementState.js";
 import type { SocialCycleContextPacket } from "./cycleContextAssembler.js";
 import type {
-  ActionIntent,
+  LegacyPlannerAction,
   ActorCycleGoal,
   ActorLifeGoal,
   ActorSoul
 } from "./types.js";
+import type { PlanBeadPacket } from "./planBeads/index.js";
 
 export const socialCycleAuthorityContextNames = [
   "ActorSoul",
   "ActorLifeGoal",
   "current CycleGoal",
-  "current ActionIntent",
+  "current LegacyPlannerAction",
   "latest observation summary/ref",
   "action_surface contracts",
   "verifier/evidence refs"
@@ -27,7 +28,8 @@ export type SocialCycleManifestContextName =
   | "relationship context"
   | "world events"
   | "settlement state"
-  | "runtime retry constraints";
+  | "runtime retry constraints"
+  | "plan bead packet";
 
 export type SocialCycleManifestRetention =
   | "full"
@@ -54,7 +56,7 @@ export type SocialCycleSummaryFactScope =
   | "identity_seed"
   | "life_goal_continuity"
   | "cycle_goal_context"
-  | "action_intent_context"
+  | "legacy_planner_action_context"
   | "observation_state"
   | "action_surface_contract"
   | "runtime_evidence_refs"
@@ -63,7 +65,8 @@ export type SocialCycleSummaryFactScope =
   | "world_event_context"
   | "relationship_context"
   | "settlement_state"
-  | "runtime_retry_constraints";
+  | "runtime_retry_constraints"
+  | "plan_bead_context";
 
 export type EvidenceBackedSocialCycleSummaryFact = {
   label: string;
@@ -94,7 +97,7 @@ export type SocialCycleRecentRefs = {
   inputContextRef: string;
   latestObservationRef: string;
   cycleGoalRef: string;
-  actionIntentRef?: string;
+  legacyPlannerActionRef?: string;
   recentActionRefs?: readonly string[];
   evidenceRefs?: readonly string[];
   verifierRefs?: readonly string[];
@@ -102,6 +105,8 @@ export type SocialCycleRecentRefs = {
   providerInputRefs?: readonly string[];
   providerOutputRefs?: readonly string[];
   memoryRefs?: readonly string[];
+  planBeadPacketRef?: string;
+  planBeadRefs?: readonly string[];
   reviewRefs?: readonly string[];
 };
 
@@ -114,6 +119,7 @@ export type SocialCycleContextPacketLike = {
   action_surface: ActionSurfacePacket;
   relationship_context?: SocialCycleContextPacket["relationship_context"];
   memory_packet?: SocialCycleContextPacket["memory_packet"];
+  plan_bead_packet?: PlanBeadPacket;
   settlement_state?: SettlementState;
   runtime_retry_constraints?: SocialCycleContextPacket["runtime_retry_constraints"];
   world_events?: SocialCycleContextPacket["world_events"];
@@ -126,7 +132,7 @@ export type BuildSocialCycleContextCheckpointInput<
   createdAt?: string;
   context: TContext;
   currentCycleGoal: ActorCycleGoal;
-  currentActionIntent?: ActionIntent | null;
+  currentLegacyPlannerAction?: LegacyPlannerAction | null;
   refs: SocialCycleRecentRefs;
   trigger: SocialCycleContextCompactionTrigger;
   reason: string;
@@ -368,7 +374,7 @@ function observationSummary(observation: unknown) {
   ].join("; ");
 }
 
-function actionTarget(intent: ActionIntent) {
+function actionTarget(intent: LegacyPlannerAction) {
   return intent.kind === "use_primitive"
     ? intent.primitive_id ?? "unknown_primitive"
     : intent.kind === "use_action_skill"
@@ -418,6 +424,32 @@ function summarizeRuntimeRetryConstraints(
   return `runtime retry constraints=${describeList(rows, "none")}`;
 }
 
+function summarizePlanBeadPacket(packet: PlanBeadPacket) {
+  const ready = packet.ready_beads.map((bead) => `${bead.bead_id}:${bead.title}`);
+  const inProgress = packet.in_progress_beads.map((bead) => `${bead.bead_id}:${bead.title}`);
+  const blocked = packet.blocked_beads.map((bead) => `${bead.bead_id}:${bead.title}`);
+  return [
+    `ready=${describeList(ready)}`,
+    `in_progress=${describeList(inProgress)}`,
+    `blocked=${describeList(blocked)}`,
+    `counts=${packet.graph_summary.ready_count}/${packet.graph_summary.blocked_count}/${packet.graph_summary.deferred_count}`,
+    "physical_progress_claim=false",
+    "context only"
+  ].join("; ");
+}
+
+function planBeadPacketEvidenceRefs(packet: PlanBeadPacket, refs: SocialCycleRecentRefs) {
+  return uniqueRefs([
+    refs.inputContextRef,
+    refs.planBeadPacketRef,
+    ...(refs.planBeadRefs ?? []),
+    ...packet.ready_beads.flatMap((bead) => bead.evidence_refs),
+    ...packet.in_progress_beads.flatMap((bead) => bead.evidence_refs),
+    ...packet.blocked_beads.flatMap((bead) => bead.evidence_refs),
+    ...packet.recently_closed_beads.flatMap((bead) => bead.evidence_refs)
+  ]);
+}
+
 function manifestEntry(input: {
   contextName: SocialCycleManifestContextName;
   present: boolean;
@@ -442,7 +474,7 @@ function manifestEntry(input: {
 function buildInputManifest(input: {
   context: SocialCycleContextPacketLike;
   currentCycleGoal: ActorCycleGoal;
-  currentActionIntent?: ActionIntent | null;
+  currentLegacyPlannerAction?: LegacyPlannerAction | null;
   refs: SocialCycleRecentRefs;
 }): SocialCycleContextManifest {
   const { context, refs } = input;
@@ -474,12 +506,12 @@ function buildInputManifest(input: {
         reason: "Current CycleGoal remains the active bounded objective."
       }),
       manifestEntry({
-        contextName: "current ActionIntent",
-        present: Boolean(input.currentActionIntent),
+        contextName: "current LegacyPlannerAction",
+        present: Boolean(input.currentLegacyPlannerAction),
         retention: "full",
-        refs: refs.actionIntentRef ? [refs.actionIntentRef] : [],
-        estimatedValue: input.currentActionIntent,
-        reason: "Current ActionIntent is a proposal only; runtime evidence owns success."
+        refs: refs.legacyPlannerActionRef ? [refs.legacyPlannerActionRef] : [],
+        estimatedValue: input.currentLegacyPlannerAction,
+        reason: "Current LegacyPlannerAction is a proposal only; runtime evidence owns success."
       }),
       manifestEntry({
         contextName: "latest observation summary/ref",
@@ -559,6 +591,17 @@ function buildInputManifest(input: {
         refs: [refs.inputContextRef, ...(refs.evidenceRefs ?? [])],
         estimatedValue: context.runtime_retry_constraints ?? [],
         reason: "Retry constraints are runtime gates over exact repeated target/args failures."
+      }),
+      manifestEntry({
+        contextName: "plan bead packet",
+        present: Boolean(context.plan_bead_packet),
+        retention: "full",
+        refs: [
+          refs.planBeadPacketRef ?? refs.inputContextRef,
+          ...(refs.planBeadRefs ?? [])
+        ],
+        estimatedValue: context.plan_bead_packet ?? null,
+        reason: "PlanBeads are actor-owned work context and never executable authority."
       })
     ]
   };
@@ -567,7 +610,7 @@ function buildInputManifest(input: {
 function buildReplacementManifest(input: {
   context: SocialCycleContextPacketLike;
   currentCycleGoal: ActorCycleGoal;
-  currentActionIntent?: ActionIntent | null;
+  currentLegacyPlannerAction?: LegacyPlannerAction | null;
   refs: SocialCycleRecentRefs;
   compactSummary: SocialCycleCompactSummary;
 }): SocialCycleContextManifest {
@@ -604,12 +647,12 @@ function buildReplacementManifest(input: {
         reason: "Replacement context keeps the current CycleGoal contract."
       }),
       manifestEntry({
-        contextName: "current ActionIntent",
-        present: Boolean(input.currentActionIntent),
+        contextName: "current LegacyPlannerAction",
+        present: Boolean(input.currentLegacyPlannerAction),
         retention: "full",
-        refs: input.refs.actionIntentRef ? [input.refs.actionIntentRef] : [],
-        estimatedValue: input.currentActionIntent,
-        reason: "Replacement context keeps the current ActionIntent contract when one exists."
+        refs: input.refs.legacyPlannerActionRef ? [input.refs.legacyPlannerActionRef] : [],
+        estimatedValue: input.currentLegacyPlannerAction,
+        reason: "Replacement context keeps the current LegacyPlannerAction contract when one exists."
       }),
       manifestEntry({
         contextName: "latest observation summary/ref",
@@ -686,6 +729,17 @@ function buildReplacementManifest(input: {
         refs: [input.refs.inputContextRef, ...(input.refs.evidenceRefs ?? [])],
         estimatedValue: retryConstraintsFact,
         reason: "Retry constraints are compacted as gate state, not as provider advice."
+      }),
+      manifestEntry({
+        contextName: "plan bead packet",
+        present: Boolean(input.context.plan_bead_packet),
+        retention: "summary_and_ref",
+        refs: [
+          input.refs.planBeadPacketRef ?? input.refs.inputContextRef,
+          ...(input.refs.planBeadRefs ?? [])
+        ],
+        estimatedValue: input.compactSummary.facts.filter((fact) => fact.scope === "plan_bead_context"),
+        reason: "PlanBead context is summarized without closing beads or claiming progress."
       })
     ]
   };
@@ -698,7 +752,7 @@ function countArray(value: unknown) {
 function buildCompactSummary(input: {
   context: SocialCycleContextPacketLike;
   currentCycleGoal: ActorCycleGoal;
-  currentActionIntent?: ActionIntent | null;
+  currentLegacyPlannerAction?: LegacyPlannerAction | null;
   refs: SocialCycleRecentRefs;
 }): SocialCycleCompactSummary {
   const { context, refs } = input;
@@ -746,12 +800,12 @@ function buildCompactSummary(input: {
     })
   ];
 
-  if (input.currentActionIntent) {
+  if (input.currentLegacyPlannerAction) {
     facts.push(buildFact({
-      label: "current ActionIntent",
-      scope: "action_intent_context",
-      summary: `ActionIntent proposes ${input.currentActionIntent.kind}:${actionTarget(input.currentActionIntent)} for ${input.currentActionIntent.cycle_id}; execution and success are outside compaction.`,
-      evidenceRefs: [requireRef("actionIntentRef", refs.actionIntentRef)]
+      label: "current LegacyPlannerAction",
+      scope: "legacy_planner_action_context",
+      summary: `LegacyPlannerAction proposes ${input.currentLegacyPlannerAction.kind}:${actionTarget(input.currentLegacyPlannerAction)} for ${input.currentLegacyPlannerAction.cycle_id}; execution and success are outside compaction.`,
+      evidenceRefs: [requireRef("legacyPlannerActionRef", refs.legacyPlannerActionRef)]
     }));
   }
 
@@ -788,6 +842,15 @@ function buildCompactSummary(input: {
         ...(refs.evidenceRefs ?? []),
         ...context.runtime_retry_constraints!.flatMap((constraint) => constraint.evidence_refs)
       ])
+    }));
+  }
+
+  if (context.plan_bead_packet) {
+    facts.push(buildFact({
+      label: "plan bead packet",
+      scope: "plan_bead_context",
+      summary: `${summarizePlanBeadPacket(context.plan_bead_packet)}. PlanBeads guide continuity but do not execute or verify work.`,
+      evidenceRefs: planBeadPacketEvidenceRefs(context.plan_bead_packet, refs)
     }));
   }
 
@@ -839,7 +902,7 @@ function recentTailRefs(input: {
   const orderedRefs = uniqueRefs([
     refs.inputContextRef,
     refs.cycleGoalRef,
-    refs.actionIntentRef,
+    refs.legacyPlannerActionRef,
     ...(refs.recentActionRefs ?? []),
     refs.latestObservationRef,
     ...(refs.evidenceRefs ?? []),
@@ -848,6 +911,8 @@ function recentTailRefs(input: {
     ...(refs.providerInputRefs ?? []),
     ...(refs.providerOutputRefs ?? []),
     ...(refs.memoryRefs ?? []),
+    refs.planBeadPacketRef,
+    ...(refs.planBeadRefs ?? []),
     ...(refs.reviewRefs ?? [])
   ]);
   return orderedRefs.slice(Math.max(0, orderedRefs.length - input.limit));
@@ -887,26 +952,26 @@ export function buildSocialCycleContextCheckpoint<
     latestObservationRef: requireRef("latestObservationRef", input.refs.latestObservationRef),
     cycleGoalRef: requireRef("cycleGoalRef", input.refs.cycleGoalRef)
   };
-  if (input.currentActionIntent) {
-    requireRef("actionIntentRef", refs.actionIntentRef);
+  if (input.currentLegacyPlannerAction) {
+    requireRef("legacyPlannerActionRef", refs.legacyPlannerActionRef);
   }
 
   const compactSummary = buildCompactSummary({
     context: input.context,
     currentCycleGoal: input.currentCycleGoal,
-    currentActionIntent: input.currentActionIntent,
+    currentLegacyPlannerAction: input.currentLegacyPlannerAction,
     refs
   });
   const inputManifest = buildInputManifest({
     context: input.context,
     currentCycleGoal: input.currentCycleGoal,
-    currentActionIntent: input.currentActionIntent,
+    currentLegacyPlannerAction: input.currentLegacyPlannerAction,
     refs
   });
   const replacementManifest = buildReplacementManifest({
     context: input.context,
     currentCycleGoal: input.currentCycleGoal,
-    currentActionIntent: input.currentActionIntent,
+    currentLegacyPlannerAction: input.currentLegacyPlannerAction,
     refs,
     compactSummary
   });
@@ -917,14 +982,14 @@ export function buildSocialCycleContextCheckpoint<
   const estimatedBefore = estimateSocialCycleContextTokens({
     context: input.context,
     currentCycleGoal: input.currentCycleGoal,
-    currentActionIntent: input.currentActionIntent,
+    currentLegacyPlannerAction: input.currentLegacyPlannerAction,
     refs
   });
   const estimatedAfter = estimateSocialCycleContextTokens({
     ActorSoul: input.context.ActorSoul,
     ActorLifeGoal: input.context.ActorLifeGoal,
     currentCycleGoal: input.currentCycleGoal,
-    currentActionIntent: input.currentActionIntent,
+    currentLegacyPlannerAction: input.currentLegacyPlannerAction,
     compactSummary,
     recent_tail_refs: recentRefs
   });

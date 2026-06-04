@@ -1,3 +1,4 @@
+/** Regression coverage for structured block-placement contracts. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -80,6 +81,43 @@ test("placeBlock places an inventory block and verifies world state", async () =
   assert.equal(result.beforeCount, 2);
   assert.equal(result.afterCount, 1);
   assert.equal(result.inventoryDelta, -1);
+  assert.deepEqual(result.targetPosition, { x: 1, y: 64, z: 0 });
+});
+
+test("placeBlock resolves a natural support surface to the replaceable block above it", async () => {
+  const bot = createPlacementBot({ itemName: "crafting_table", itemCount: 1 });
+  const result = await placeBlock({
+    bot,
+    itemName: "crafting_table",
+    targetPosition: { x: 1, y: 63, z: 0 }
+  });
+
+  assert.equal(result.status, "placed");
+  assert.equal(result.afterBlockName, "crafting_table");
+  assert.equal(result.targetResolution, "surface_position_above_requested_target");
+  assert.deepEqual(result.requestedTargetPosition, { x: 1, y: 63, z: 0 });
+  assert.deepEqual(result.supportPosition, { x: 1, y: 63, z: 0 });
+  assert.deepEqual(result.targetPosition, { x: 1, y: 64, z: 0 });
+});
+
+test("placeBlock resolves ordinary solid support surfaces without a fixed material list", async () => {
+  const bot = createPlacementBot({
+    itemName: "torch",
+    itemCount: 1,
+    occupiedTarget: {
+      name: "oak_log",
+      position: { x: 1, y: 63, z: 0 }
+    }
+  });
+  const result = await placeBlock({
+    bot,
+    itemName: "torch",
+    targetPosition: { x: 1, y: 63, z: 0 }
+  });
+
+  assert.equal(result.status, "placed");
+  assert.equal(result.afterBlockName, "torch");
+  assert.equal(result.targetResolution, "surface_position_above_requested_target");
   assert.deepEqual(result.targetPosition, { x: 1, y: 64, z: 0 });
 });
 

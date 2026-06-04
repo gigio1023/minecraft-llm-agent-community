@@ -83,12 +83,22 @@ Architecture:
 - `docs/blog-doc/Architecture/SPEC.md`
 - `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
 - `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
+- `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+- `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+- `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+- `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+- `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
 - `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
 - `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 - `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
 - `docs/blog-doc/Architecture/Action-Skill-Verification.md`
 - `docs/blog-doc/Architecture/Bounded-Action-Skill-Creation.md`
+- `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+- `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
 - `docs/blog-doc/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+- `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+- `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+- `docs/blog-doc/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
 - `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
 
 Current state and operations:
@@ -99,6 +109,7 @@ Current state and operations:
 - `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `docs/blog-doc/Setup/Headless-Server.md`
 - `docs/blog-doc/Setup/Provider-Setup.md`
+- `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 - `docs/blog-doc/Setup/OpenAI-Tier3-Free-Usage.md`
 
 Knowledge:

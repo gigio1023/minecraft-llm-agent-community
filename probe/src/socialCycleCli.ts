@@ -1,3 +1,10 @@
+/**
+ * CLI entrypoint for running the bounded social-cycle runtime.
+ *
+ * @remarks CLI defaults and flags should expose the core loop without hiding
+ * provider, server, persistence, or actor-workspace blockers behind optimistic
+ * status text.
+ */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
@@ -22,6 +29,9 @@ function parseArgs(argv: string[]) {
     worldSeed?: string;
     levelType?: string;
     prepareSpawnAccess?: boolean;
+    sharedStorageSocialSmoke?: boolean;
+    geminiModelRotation?: string[];
+    actionHotPath?: SocialCycleRunOptions["actionHotPath"];
   } = { worldEvents: [] };
 
   for (let index = 0; index < argv.length; index++) {
@@ -70,10 +80,25 @@ function parseArgs(argv: string[]) {
       index++;
     } else if (arg === "--prepare-spawn-access") {
       options.prepareSpawnAccess = true;
+    } else if (arg === "--shared-storage-social-smoke") {
+      options.sharedStorageSocialSmoke = true;
+    } else if ((arg === "--gemini-model-rotation" || arg === "--models") && next) {
+      options.geminiModelRotation = parseCsvList(next);
+      index++;
+    } else if (arg === "--action-hot-path" && next) {
+      options.actionHotPath = normalizeActionHotPath(next);
+      index++;
     }
   }
 
   return options;
+}
+
+function parseCsvList(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeSocialCycleProvider(value: string | undefined): SocialCycleProviderId | undefined {
@@ -81,6 +106,16 @@ function normalizeSocialCycleProvider(value: string | undefined): SocialCyclePro
     return value;
   }
   return undefined;
+}
+
+function normalizeActionHotPath(value: string | undefined): SocialCycleRunOptions["actionHotPath"] | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (value === "legacy" || value === "actor_turn") {
+    return value;
+  }
+  throw new Error("--action-hot-path must be legacy or actor_turn");
 }
 
 function defaultModelForProvider(providerId: SocialCycleProviderId) {
@@ -111,6 +146,13 @@ async function main() {
     normalizeSocialCycleProvider(process.env.SOCIAL_CYCLE_PROVIDER) ??
     "deterministic-social";
   const model = parsed.model ?? process.env.SOCIAL_CYCLE_MODEL ?? defaultModelForProvider(providerId);
+  const geminiModelRotation =
+    parsed.geminiModelRotation ??
+    parseCsvList(process.env.SOCIAL_CYCLE_GEMINI_MODEL_ROTATION || process.env.GEMINI_MODEL_ROTATION);
+  const actionHotPath =
+    parsed.actionHotPath ??
+    normalizeActionHotPath(process.env.SOCIAL_CYCLE_ACTION_HOT_PATH) ??
+    "actor_turn";
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const reportPath = parsed.report
@@ -133,6 +175,9 @@ async function main() {
     worldSeed: parsed.worldSeed,
     levelType: parsed.levelType,
     prepareSpawnAccess: parsed.prepareSpawnAccess,
+    sharedStorageSocialSmoke: parsed.sharedStorageSocialSmoke,
+    geminiModelRotation,
+    actionHotPath,
     reasoning: process.env.SOCIAL_CYCLE_REASONING,
     repoRoot
   });
@@ -147,6 +192,7 @@ async function main() {
       review_markdown_hint: reviewHint,
       runtime_status: result.report.runtime_status,
       agency_status: result.report.agency_status,
+      action_hot_path: result.report.action_hot_path,
       provider_usage: result.report.provider_usage ?? null,
       cycles: result.report.cycles.length,
       provider_error: result.report.provider_error ?? null

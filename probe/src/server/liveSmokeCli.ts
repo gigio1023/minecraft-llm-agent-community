@@ -1,3 +1,9 @@
+/**
+ * CLI wrapper for live Minecraft server smoke operations.
+ *
+ * @remarks Server readiness, status, and shutdown are environment concerns.
+ * Report failures as setup blockers rather than actor runtime failures.
+ */
 import {
   ensureLiveSmokeServer,
   formatLiveSmokeServerReport,

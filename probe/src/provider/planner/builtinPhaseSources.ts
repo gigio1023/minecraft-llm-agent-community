@@ -8,12 +8,12 @@ import type { LongPhaseId } from "../../objectives/longObjective/ladder.js";
  * - loading an active seed action skill from the gameplay registry;
  * - running a bundled action skill implementation by id.
  *
- * It IS the same execution shape as a generated program (`export async function run(ctx)`),
+ * It IS the same execution shape as a generated program (`export async function run(ctx, params)`),
  * but the TypeScript is checked into this repo per long-objective phase.
  */
 const builtinSourceByPhase: Partial<Record<LongPhaseId, string>> = {
   craft_current_run_stone_axe_1: `
-export async function run(ctx) {
+export async function run(ctx, params) {
   await ctx.ensureItem("wooden_pickaxe", 1);
   await ctx.ensureItem("cobblestone", 3);
   await ctx.ensureItem("stick", 2);
@@ -22,7 +22,7 @@ export async function run(ctx) {
 }
 `.trim(),
   craft_current_run_stone_pickaxe_1: `
-export async function run(ctx) {
+export async function run(ctx, params) {
   await ctx.ensureItem("wooden_pickaxe", 1);
   await ctx.ensureItem("cobblestone", 3);
   await ctx.ensureItem("stick", 2);
@@ -31,14 +31,14 @@ export async function run(ctx) {
 }
 `.trim(),
   obtain_current_run_iron_ingot_1: `
-export async function run(ctx) {
+export async function run(ctx, params) {
   await ctx.ensureItem("stone_pickaxe", 1);
   await ctx.mineBlock("iron_ore", "raw_iron", 1);
   return ctx.smeltItem("raw_iron", "iron_ingot", 1);
 }
 `.trim(),
   craft_current_run_iron_pickaxe_1: `
-export async function run(ctx) {
+export async function run(ctx, params) {
   await ctx.ensureItem("iron_ingot", 3);
   await ctx.ensureItem("stick", 2);
   await ctx.ensureCraftingTableNearby();
@@ -46,7 +46,7 @@ export async function run(ctx) {
 }
 `.trim(),
   locate_current_run_diamond_ore_1: `
-export async function run(ctx) {
+export async function run(ctx, params) {
   const blocks = ctx.scanNearbyBlocks(24);
   const ore = blocks.find((block) =>
     block.name === "diamond_ore" || block.name === "deepslate_diamond_ore"
@@ -55,7 +55,7 @@ export async function run(ctx) {
 }
 `.trim(),
   obtain_current_run_diamond_1: `
-export async function run(ctx) {
+export async function run(ctx, params) {
   await ctx.ensureItem("iron_pickaxe", 1);
   await ctx.mineBlock("diamond_ore", "diamond", 1);
   return ctx.inspectInventory();

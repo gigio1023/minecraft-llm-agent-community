@@ -1,3 +1,4 @@
+/** Regression coverage for actor workspace initialization and records. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -8,7 +9,13 @@ import {
   initializeActorWorkspaces,
   listActiveActorActionSkillRecords
 } from "../src/runtime/actorWorkspace.js";
-import { getActorWorkspacePaths } from "../src/runtime/actorWorkspacePaths.js";
+import {
+  getActorPlanBeadEventLogPath,
+  getActorPlanBeadHistorySnapshotPath,
+  getActorPlanBeadRecordPath,
+  getActorWorkspacePaths,
+  sanitizeWorkspaceFileId
+} from "../src/runtime/actorWorkspacePaths.js";
 import { readRelationshipEdge } from "../src/npc/relationships/relationshipStore.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +24,14 @@ const testArtifactRoot = path.resolve(
   "test-artifacts",
   `actor-workspace-${process.pid}-${Date.now()}`
 );
+
+test("workspace file ids are sanitized and bounded for filesystem limits", () => {
+  const id = `cycle-0009-${"blocked_actionintent_args_contract_failed_move_to_requires_structured_args_".repeat(8)}`;
+  const sanitized = sanitizeWorkspaceFileId(id);
+  assert.equal(/^[a-zA-Z0-9_.-]+$/.test(sanitized), true);
+  assert.equal(sanitized.length <= 120, true);
+  assert.match(sanitized, /-[a-f0-9]{12}$/);
+});
 
 test("initializes actor workspaces without deleting existing actor artifacts", async () => {
   const keepPath = path.join(
@@ -39,20 +54,60 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     "active",
     "craftCraftingTable.json"
   );
+  const learnedActiveSkillPath = path.join(
+    testArtifactRoot,
+    "npc_b",
+    "action-skills",
+    "active",
+    "learnedSayNeed.json"
+  );
+  const preExistingPaths = getActorWorkspacePaths(testArtifactRoot, "npc_b");
+  const stalePlanBeadPath = getActorPlanBeadRecordPath(
+    testArtifactRoot,
+    "npc_b",
+    "concern:A"
+  );
+  const stalePlanBeadEventPath = getActorPlanBeadEventLogPath(
+    testArtifactRoot,
+    "npc_b",
+    "concern:A"
+  );
+  const stalePlanBeadHistoryPath = getActorPlanBeadHistorySnapshotPath(
+    testArtifactRoot,
+    "npc_b",
+    "concern:A",
+    1,
+    "startup"
+  );
   await fs.mkdir(path.dirname(staleEvidencePath), { recursive: true });
   await fs.mkdir(path.dirname(staleProviderInputPath), { recursive: true });
   await fs.mkdir(path.dirname(staleProviderOutputPath), { recursive: true });
   await fs.mkdir(path.dirname(staleActiveSkillPath), { recursive: true });
+  await fs.mkdir(path.dirname(learnedActiveSkillPath), { recursive: true });
+  await fs.mkdir(path.dirname(stalePlanBeadPath), { recursive: true });
+  await fs.mkdir(path.dirname(preExistingPaths.planBeads.dependenciesFile), { recursive: true });
+  await fs.mkdir(path.dirname(stalePlanBeadEventPath), { recursive: true });
+  await fs.mkdir(path.dirname(stalePlanBeadHistoryPath), { recursive: true });
+  await fs.mkdir(path.dirname(preExistingPaths.planBeads.readyCacheFile), { recursive: true });
   await fs.writeFile(staleEvidencePath, "{\"category\":\"stale_failure\"}\n", "utf8");
   await fs.writeFile(staleProviderInputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
   await fs.writeFile(staleProviderOutputPath, "{\"turn_id\":\"stale\"}\n", "utf8");
+  await fs.writeFile(stalePlanBeadPath, "{\"schema\":\"actor-plan-bead/v1\"}\n", "utf8");
+  await fs.writeFile(
+    preExistingPaths.planBeads.dependenciesFile,
+    "{\"schema\":\"actor-plan-bead-dependency/v1\"}\n",
+    "utf8"
+  );
+  await fs.writeFile(stalePlanBeadEventPath, "{\"schema\":\"plan-bead-event/v1\"}\n", "utf8");
+  await fs.writeFile(stalePlanBeadHistoryPath, "{\"schema\":\"plan-bead-history/v1\"}\n", "utf8");
+  await fs.writeFile(preExistingPaths.planBeads.readyCacheFile, "{\"stale\":true}\n", "utf8");
   await fs.writeFile(
     path.join(testArtifactRoot, "npc_b", "action-skills", "index.json"),
     JSON.stringify({
       schema: "action-skill-library/v1",
       owner_actor_id: "npc_b",
       initialized_at: "2026-05-19T00:00:00.000Z",
-      active: ["craftCraftingTable"],
+      active: ["craftCraftingTable", "learnedSayNeed"],
       candidates: ["keep"],
       retired: ["oldShelterTrial"],
       rejected: ["unsafeDigTrial"]
@@ -75,6 +130,29 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       known_failure_modes: [],
       evidence_refs: [],
       review_refs: []
+    }, null, 2),
+    "utf8"
+  );
+  await fs.writeFile(
+    learnedActiveSkillPath,
+    JSON.stringify({
+      schema: "actor-action-skill/v1",
+      skill_id: "learnedSayNeed",
+      owner_actor_id: "npc_b",
+      source_kind: "learned",
+      status: "active",
+      created_at: "2026-05-19T00:00:00.000Z",
+      updated_at: "2026-05-19T00:00:00.000Z",
+      required_primitives: ["run_mineflayer_program"],
+      preconditions: ["passed generated trial"],
+      success_verifier: "generated-action-skill:helper_result_status",
+      known_failure_modes: ["target actor may be busy"],
+      evidence_refs: ["evidence/generated-trial.json"],
+      review_refs: [],
+      generated_source: "export async function run(ctx, params) { return ctx.say(params.text); }",
+      generated_source_language: "typescript",
+      generated_helper_allowlist: ["say"],
+      generated_timeout_ms: 5000
     }, null, 2),
     "utf8"
   );
@@ -126,30 +204,19 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
       )
     );
     assert.equal(actionSkillIndex.schema, "action-skill-library/v1");
-    assert.deepEqual(actionSkillIndex.active, ["collectLogs"]);
+    assert.deepEqual(actionSkillIndex.active, ["collectLogs", "learnedSayNeed"]);
     assert.deepEqual(actionSkillIndex.candidates, ["keep"]);
     assert.deepEqual(actionSkillIndex.retired, ["oldShelterTrial"]);
     assert.deepEqual(actionSkillIndex.rejected, ["unsafeDigTrial"]);
 
     const activeRecords = await listActiveActorActionSkillRecords(testArtifactRoot, "npc_b");
-    assert.deepEqual(activeRecords, [
-      {
-        schema: "actor-action-skill/v1",
-        skill_id: "collectLogs",
-        owner_actor_id: "npc_b",
-        source_kind: "seed",
-        status: "active",
-        created_at: "2026-05-20T00:00:00.000Z",
-        updated_at: "2026-05-20T00:00:00.000Z",
-        required_primitives: ["observe", "collect_logs", "wait"],
-        preconditions: [],
-        success_verifier: "runtime verifier for collectLogs",
-        known_failure_modes: [],
-        evidence_refs: [],
-        review_refs: [],
-        notes: "Mine nearby trees to gather logs"
-      }
+    assert.deepEqual(activeRecords.map((record) => record.skill_id), [
+      "collectLogs",
+      "learnedSayNeed"
     ]);
+    assert.equal(activeRecords[0]?.source_kind, "seed");
+    assert.equal(activeRecords[1]?.source_kind, "learned");
+    assert.match(activeRecords[1]?.generated_source ?? "", /ctx\.say/);
 
     await fs.access(paths.actionSkills.activeDir);
     await fs.access(paths.actionSkills.candidatesDir);
@@ -174,9 +241,34 @@ test("initializes actor workspaces without deleting existing actor artifacts", a
     assert.equal(relationshipEdge.friction, "none");
     await fs.access(paths.providerInputsDir);
     await fs.access(paths.providerOutputsDir);
+    await fs.access(paths.planBeads.rootDir);
+    await fs.access(paths.planBeads.beadsDir);
+    await fs.access(paths.planBeads.dependenciesDir);
+    await fs.access(paths.planBeads.eventsDir);
+    await fs.access(paths.planBeads.historyDir);
+    await fs.access(paths.planBeads.indexesDir);
+    assert.equal(paths.planBeads.dependenciesFile, preExistingPaths.planBeads.dependenciesFile);
+    assert.equal(paths.planBeads.readyCacheFile, preExistingPaths.planBeads.readyCacheFile);
     assert.equal(await fs.readFile(staleEvidencePath, "utf8"), "{\"category\":\"stale_failure\"}\n");
     assert.equal(await fs.readFile(staleProviderInputPath, "utf8"), "{\"turn_id\":\"stale\"}\n");
     assert.equal(await fs.readFile(staleProviderOutputPath, "utf8"), "{\"turn_id\":\"stale\"}\n");
+    assert.equal(await fs.readFile(stalePlanBeadPath, "utf8"), "{\"schema\":\"actor-plan-bead/v1\"}\n");
+    assert.equal(
+      await fs.readFile(preExistingPaths.planBeads.dependenciesFile, "utf8"),
+      "{\"schema\":\"actor-plan-bead-dependency/v1\"}\n"
+    );
+    assert.equal(
+      await fs.readFile(stalePlanBeadEventPath, "utf8"),
+      "{\"schema\":\"plan-bead-event/v1\"}\n"
+    );
+    assert.equal(
+      await fs.readFile(stalePlanBeadHistoryPath, "utf8"),
+      "{\"schema\":\"plan-bead-history/v1\"}\n"
+    );
+    assert.equal(
+      await fs.readFile(preExistingPaths.planBeads.readyCacheFile, "utf8"),
+      "{\"stale\":true}\n"
+    );
     await fs.access(path.join(testArtifactRoot, "index.json"));
   } finally {
     await fs.rm(testArtifactRoot, { recursive: true, force: true });

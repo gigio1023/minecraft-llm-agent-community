@@ -1,3 +1,9 @@
+/**
+ * Persistence for strategic goal artifacts.
+ *
+ * @remarks Strategic goals provide durable actor context under LifeGoal framing;
+ * they should not become fixed domain phases or primitive authority.
+ */
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 

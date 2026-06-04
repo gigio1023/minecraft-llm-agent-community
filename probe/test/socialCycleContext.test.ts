@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { assembleSocialCycleContext, contextCitesPreviousJudgment } from "../src/runtime/goals/cycleContextAssembler.js";
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
 import type { CycleJudgment } from "../src/runtime/goals/types.js";
+import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
 import { buildNpcBActionSkillRecord } from "./helpers/socialCycleTestHelpers.js";
 import { writeActorMemoryRecords } from "../src/memory/actorMemory.js";
 
@@ -73,6 +74,44 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
     relationship_event_proposals: [],
     next_goal_context: []
   };
+  const planBeadPacket: PlanBeadPacket = {
+    schema: "plan-bead-packet/v1",
+    physical_progress_claim: false,
+    ready_beads: [
+      {
+        bead_id: "bead-b",
+        kind: "concern",
+        status: "open",
+        priority: 1,
+        title: "Handle new storage concern",
+        description_summary: "B appears while prior work remains preserved.",
+        acceptance_evidence_required: ["runtime storage evidence"],
+        notes_next: ["Inspect the shared chest before acting."],
+        blockers: [],
+        labels: ["context-change"],
+        evidence_refs: ["plan-beads/beads/bead-b.json"],
+        dependency_refs: [],
+        checkpoint_version: 1,
+        checkpoint_ref: "plan-beads/beads/bead-b.json"
+      }
+    ],
+    in_progress_beads: [],
+    blocked_beads: [],
+    recently_closed_beads: [],
+    graph_summary: {
+      open_count: 1,
+      ready_count: 1,
+      blocked_count: 0,
+      deferred_count: 0,
+      closed_recent_count: 0
+    },
+    rules: {
+      beads_are_context_not_authority: true,
+      ready_front_guides_goal_selection: true,
+      action_surface_controls_execution: true,
+      runtime_verifies_physical_progress: true
+    }
+  };
 
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -121,7 +160,8 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
     ],
     evidenceRefs: ["evidence/cycle-0001-observe.json"],
     judgmentRefs: ["judgments/cycle-0001-action-01-judgment.json"],
-    memoryWriteCount: 1
+    memoryWriteCount: 1,
+    planBeadPacket
   });
 
   assert.equal(context.ActorSoul.actor_id, "npc_b");
@@ -171,4 +211,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   );
   assert.equal(context.settlement_state.blocker_histogram.length, 1);
   assert.equal(context.relationship_context.relationships.length, 0);
+  assert.equal(context.plan_bead_packet?.physical_progress_claim, false);
+  assert.equal(context.plan_bead_packet?.ready_beads[0]?.bead_id, "bead-b");
+  assert.equal((context.action_surface as Record<string, unknown>).plan_bead_packet, undefined);
 });

@@ -4,6 +4,19 @@ This encyclopedia serves as the canonical knowledge base for the headless Minecr
 
 ---
 
+## Relationship To Minecraft Basic Guide
+
+The encyclopedia is the broader reference surface. The provider-facing compact
+guide is `Architecture/Minecraft-Basic-Guide.md` and the runtime packet
+`minecraft_basic_guide`.
+
+Do not copy the full encyclopedia into social-cycle provider inputs. Promote
+only stable, high-impact mechanics into the Minecraft Basic Guide when they
+prevent common impossible actions, repeated observation loops, or missing
+prerequisite mistakes.
+
+---
+
 ## Version Baseline Specs
 The technical details in this encyclopedia are verified against the following version registry:
 *   **Minecraft Java Edition**: `1.21.11`

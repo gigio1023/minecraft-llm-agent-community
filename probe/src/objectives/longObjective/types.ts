@@ -1,3 +1,10 @@
+/**
+ * Data contracts for legacy long-objective planner, execution, and review
+ * reports.
+ *
+ * @remarks These types document the direct-generated objective path without
+ * making it the current social simulation runtime architecture.
+ */
 import type { GeneratedActionSkillHelperEvent } from "../../generatedActionSkills/directExecutor.js";
 import type { DirectGeneratedActionSkillRunResult } from "../../generatedActionSkills/directExecutor.js";
 import type { LongObjectiveId } from "./ladder.js";

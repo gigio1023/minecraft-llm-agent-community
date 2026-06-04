@@ -50,6 +50,12 @@ data/actors/
       beliefs/
       guardrails/
       index/
+    plan-beads/
+      beads/
+      dependencies/
+      events/
+      history/
+      indexes/
     evidence/
     reviews/
     provider-inputs/
@@ -145,6 +151,10 @@ Current code also:
 
 Future extensions:
 
+- initialize and persist `plan-beads/beads`, `plan-beads/dependencies`,
+  `plan-beads/events`, `plan-beads/history`, and `plan-beads/indexes` as the
+  durable home for actor-owned issue-like work state between LifeGoal and
+  CycleGoal;
 - production hardening for LLM reviewer prompt/scoring quality;
 - migration of any still-needed legacy skill-village generated-code behavior
   into actor-owned direct generated action skill trials or executable bounded

@@ -18,9 +18,11 @@ export type DirectGeneratedActionSkillRunInput<TContext extends DirectGeneratedA
   skillName: string;
   source: string;
   ctx: TContext;
+  params?: Record<string, unknown>;
   timeoutMs?: number;
   artifactDir?: string;
   helperEvents?: GeneratedActionSkillHelperEvent[];
+  helperAllowlist?: readonly string[];
   onTimeout?: () => void | Promise<void>;
 };
 
@@ -41,17 +43,76 @@ const defaultTimeoutMs = 30_000;
 const blockedGeneratedCodePattern =
   /\b(import|require|process|Bun|Deno|eval|Function|child_process|fs|node:fs|net|http|https)\b|while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/;
 
+const blockedGeneratedCtxPattern =
+  /\bctx\.(helpers|sharedStorage|bot)\b|\bctx\.mineflayer\s*\(\s*\)\s*\./;
+
 function sanitizeFileId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "generated_action_skill";
 }
 
+function runSignatureParameters(source: string) {
+  const match = /\bexport\s+async\s+function\s+run\s*\(/.exec(source);
+  if (!match) {
+    return null;
+  }
+  let depth = 1;
+  const start = match.index + match[0].length;
+  for (let index = start; index < source.length; index++) {
+    const char = source[index];
+    if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index);
+      }
+    }
+  }
+  return null;
+}
+
+function topLevelParameterNames(parameters: string) {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+  for (const char of parameters) {
+    if (char === "(" || char === "{" || char === "[" || char === "<") {
+      depth += 1;
+    } else if (char === ")" || char === "}" || char === "]" || char === ">") {
+      depth = Math.max(0, depth - 1);
+    }
+    if (char === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) {
+    parts.push(current);
+  }
+  return parts.map((part) => {
+    const trimmed = part.trim();
+    const name = trimmed.split(/[:=?\s]/, 1)[0];
+    return name?.trim() ?? "";
+  });
+}
+
 export function assertDirectGeneratedActionSkillSource(source: string) {
-  if (!source.includes("export async function run")) {
-    throw new Error("Generated action skill must export async function run(ctx)");
+  const parameterNames = runSignatureParameters(source);
+  const [firstParam, secondParam] = parameterNames
+    ? topLevelParameterNames(parameterNames)
+    : [];
+  if (firstParam !== "ctx" || secondParam !== "params") {
+    throw new Error("Generated action skill must export async function run(ctx, params)");
   }
 
   if (blockedGeneratedCodePattern.test(source)) {
     throw new Error("Generated action skill contains a blocked API or obvious unbounded loop");
+  }
+
+  if (blockedGeneratedCtxPattern.test(source)) {
+    throw new Error("Generated action skill must use direct helper API only; ctx.helpers, ctx.sharedStorage, ctx.bot, and ctx.mineflayer() object access are not supported");
   }
 }
 
@@ -73,13 +134,22 @@ async function writeGeneratedSource(input: {
 
 function withHelperLogging<TContext extends DirectGeneratedActionSkillContext>(
   ctx: TContext,
-  helperEvents: GeneratedActionSkillHelperEvent[]
+  helperEvents: GeneratedActionSkillHelperEvent[],
+  helperAllowlist?: readonly string[]
 ): TContext {
+  const allowedHelpers = helperAllowlist ? new Set(helperAllowlist) : undefined;
   return new Proxy(ctx, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof property !== "string" || typeof value !== "function" || property === "constructor") {
         return value;
+      }
+      if (allowedHelpers && !allowedHelpers.has(property)) {
+        return (...args: unknown[]) => {
+          const error = `Generated action skill helper ${property} is not in this candidate's helper_allowlist`;
+          helperEvents.push({ name: property, args, status: "failed", error });
+          throw new Error(error);
+        };
       }
 
       return (...args: unknown[]) => {
@@ -116,10 +186,10 @@ async function importGeneratedActionSkill(sourcePath: string) {
   const moduleUrl = `${pathToFileURL(sourcePath).href}?t=${Date.now()}`;
   const imported = await import(moduleUrl) as { run?: unknown };
   if (typeof imported.run !== "function") {
-    throw new Error("Generated action skill module must export run(ctx)");
+    throw new Error("Generated action skill module must export run(ctx, params)");
   }
 
-  return imported.run as (ctx: unknown) => Promise<unknown>;
+  return imported.run as (ctx: unknown, params?: Record<string, unknown>) => Promise<unknown>;
 }
 
 export async function runDirectGeneratedActionSkill<TContext extends DirectGeneratedActionSkillContext>(
@@ -135,8 +205,8 @@ export async function runDirectGeneratedActionSkill<TContext extends DirectGener
     assertDirectGeneratedActionSkillSource(input.source);
     sourcePath = await writeGeneratedSource(input);
     const run = await importGeneratedActionSkill(sourcePath);
-    const loggedCtx = withHelperLogging(input.ctx, helperEvents);
-    const runPromise = Promise.resolve(run(loggedCtx));
+    const loggedCtx = withHelperLogging(input.ctx, helperEvents, input.helperAllowlist);
+    const runPromise = Promise.resolve(run(loggedCtx, input.params ?? {}));
     const result = await Promise.race([
       runPromise,
       new Promise((resolve) => {

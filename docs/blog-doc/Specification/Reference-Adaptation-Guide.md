@@ -80,7 +80,8 @@ Mechanism:
 
 Adaptation:
 
-- use CycleGoal -> ActionIntent -> evidence -> CycleJudgment;
+- use Actor Turn tool selection -> runtime action validation -> evidence ->
+  CycleJudgment/runtime classifier;
 - do not treat chain-of-thought as authority;
 - store concise, artifact-grounded judgments for the next cycle.
 

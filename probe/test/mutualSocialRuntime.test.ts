@@ -1,3 +1,4 @@
+/** Regression coverage for legacy mutual social runtime behavior. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

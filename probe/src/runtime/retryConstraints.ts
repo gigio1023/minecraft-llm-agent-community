@@ -1,12 +1,21 @@
 import { createHash } from "node:crypto";
 
 import type { JsonValue } from "../provider/inputSnapshot.js";
-import type { ActionIntent, ActionIntentKind } from "./goals/types.js";
+import { validatePrimitiveActionParameters } from "./goals/actionParameterContracts.js";
+
+type RuntimeRetryComparableAction = {
+  kind: string;
+  primitive_id?: string;
+  action_skill_id?: string;
+  parameters?: Record<string, unknown>;
+  args?: Record<string, unknown>;
+  candidate?: { proposed_skill_id?: unknown } | null;
+};
 
 /**
  * Runtime retry constraints are exact retry gates, not planner strategy.
  *
- * @remarks They remember that a specific ActionIntent target plus structured
+ * @remarks They remember that a specific runtime action target plus structured
  * args hit the same blocker repeatedly. The executor can then block the next
  * identical attempt before Mineflayer work begins, while still leaving evidence
  * for provider context, review, and compaction.
@@ -14,7 +23,7 @@ import type { ActionIntent, ActionIntentKind } from "./goals/types.js";
 export const RUNTIME_RETRY_ATTEMPT_SCHEMA = "runtime-retry-attempt/v1" as const;
 export const RUNTIME_RETRY_CONSTRAINT_SCHEMA = "runtime-retry-constraint/v1" as const;
 
-export type RuntimeRetryTargetKind = "primitive" | "action_skill" | "control";
+export type RuntimeRetryTargetKind = "primitive" | "action_skill" | "action_skill_candidate" | "control";
 
 export type RuntimeRetryTarget = {
   kind: RuntimeRetryTargetKind;
@@ -29,7 +38,7 @@ export type RuntimeRetryAttempt = {
   cycle_id: string;
   turn_id: string;
   action_index?: number;
-  action_kind: ActionIntentKind;
+  action_kind: string;
   target: RuntimeRetryTarget;
   args_fingerprint: string;
   args_normalized: JsonValue;
@@ -44,7 +53,7 @@ export type RuntimeRetryConstraint = {
   schema: typeof RUNTIME_RETRY_CONSTRAINT_SCHEMA;
   constraint_id: string;
   actor_id: string;
-  action_kind: ActionIntentKind;
+  action_kind: string;
   target: RuntimeRetryTarget;
   args_fingerprint: string;
   args_normalized: JsonValue;
@@ -139,9 +148,43 @@ function normalizeJsonValue(value: unknown): JsonValue {
   return null;
 }
 
+function structuredRuntimeActionParameters(action: RuntimeRetryComparableAction): Record<string, unknown> {
+  if (isRecord(action.parameters)) {
+    return action.parameters;
+  }
+  if (isRecord(action.args)) {
+    return action.args;
+  }
+  return {};
+}
+
 /** Normalizes only structured args; rationale/prose never contributes to retry identity. */
-export function normalizedActionIntentArgs(intent: Pick<ActionIntent, "args">): JsonValue {
-  return normalizeJsonValue(intent.args ?? {});
+export function normalizedRuntimeActionArgs(
+  intent: RuntimeRetryComparableAction
+): JsonValue {
+  const args = structuredRuntimeActionParameters(intent);
+  if (intent.kind === "use_primitive" && intent.primitive_id === "move_to") {
+    const contract = validatePrimitiveActionParameters({
+      primitiveId: "move_to",
+      args
+    });
+    if (contract.target?.kind === "position") {
+      return {
+        targetPosition: {
+          x: contract.target.position.x,
+          y: contract.target.position.y,
+          z: contract.target.position.z
+        }
+      };
+    }
+    if (contract.target?.kind === "scout") {
+      return {
+        direction: contract.target.direction,
+        distance: contract.target.distance
+      };
+    }
+  }
+  return normalizeJsonValue(args);
 }
 
 /** Produces a stable short id for compact provider context and report diffs. */
@@ -149,8 +192,8 @@ export function fingerprintRuntimeRetryArgs(args: JsonValue) {
   return createHash("sha256").update(JSON.stringify(args)).digest("hex").slice(0, 16);
 }
 
-/** Separates the executable target from the broader ActionIntent envelope. */
-export function runtimeRetryTargetFromIntent(intent: ActionIntent): RuntimeRetryTarget {
+/** Separates the executable target from the broader runtime action envelope. */
+export function runtimeRetryTargetFromIntent(intent: RuntimeRetryComparableAction): RuntimeRetryTarget {
   if (intent.kind === "use_primitive") {
     const primitiveId = intent.primitive_id ?? "unknown_primitive";
     return {
@@ -165,6 +208,16 @@ export function runtimeRetryTargetFromIntent(intent: ActionIntent): RuntimeRetry
       kind: "action_skill",
       id: actionSkillId,
       action_skill_id: actionSkillId
+    };
+  }
+  if (intent.kind === "author_and_trial_action_skill" || intent.kind === "author_mineflayer_action") {
+    const candidateId = typeof intent.candidate?.proposed_skill_id === "string"
+      ? intent.candidate.proposed_skill_id
+      : "unknown_generated_candidate";
+    return {
+      kind: "action_skill_candidate",
+      id: candidateId,
+      action_skill_id: candidateId
     };
   }
   return {
@@ -239,14 +292,14 @@ export function buildRuntimeRetryAttempt(input: {
   cycleId: string;
   turnId: string;
   actionIndex?: number;
-  intent: ActionIntent;
+  intent: RuntimeRetryComparableAction;
   execution: RuntimeRetryExecutionLike;
 }): RuntimeRetryAttempt | null {
   const blocker = blockerFromExecution(input.execution);
   if (!blocker) {
     return null;
   }
-  const args = normalizedActionIntentArgs(input.intent);
+  const args = normalizedRuntimeActionArgs(input.intent);
   return {
     schema: RUNTIME_RETRY_ATTEMPT_SCHEMA,
     actor_id: input.actorId,
@@ -330,11 +383,11 @@ export function deriveRuntimeRetryConstraints(input: {
 
 /** Finds the first hard retry gate that would make this intent a known no-op. */
 export function findMatchingRuntimeRetryConstraint(
-  intent: ActionIntent,
+  intent: RuntimeRetryComparableAction,
   constraints: readonly RuntimeRetryConstraint[]
 ): RuntimeRetryConstraint | null {
   const target = runtimeRetryTargetFromIntent(intent);
-  const args = normalizedActionIntentArgs(intent);
+  const args = normalizedRuntimeActionArgs(intent);
   const argsFingerprint = fingerprintRuntimeRetryArgs(args);
   return constraints.find((constraint) =>
     constraint.target.kind === target.kind &&

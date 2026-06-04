@@ -1,3 +1,4 @@
+/** Regression coverage for active action skill primitive gates. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

@@ -1,3 +1,10 @@
+/**
+ * Validator for action skill recipes before trial or promotion.
+ *
+ * @remarks Recipe validation keeps primitive ids, role assumptions, and
+ * supersession rules explicit so generated behavior cannot broaden runtime
+ * authority by accident.
+ */
 import { runtimePrimitiveIds } from "../../gameplay/primitives/registry.js";
 import { canRoleUseTool } from "../../npc/roles/contracts.js";
 import type {

@@ -1,4 +1,9 @@
-import type { ActionIntent, CycleJudgment, CycleJudgmentOutcome } from "./goals/types.js";
+import type { CycleJudgment, CycleJudgmentOutcome } from "./goals/types.js";
+
+type JudgmentAction = {
+  kind: string;
+  action_skill_id?: string;
+};
 
 /** Primitives that refresh state but do not by themselves satisfy gather/craft cycle goals. */
 export const SOCIAL_OBSERVATION_ONLY_PRIMITIVES = new Set([
@@ -10,6 +15,12 @@ export const SOCIAL_OBSERVATION_ONLY_PRIMITIVES = new Set([
 
 export function isMeaningfulGameplayPrimitive(primitiveId: string): boolean {
   return !SOCIAL_OBSERVATION_ONLY_PRIMITIVES.has(primitiveId);
+}
+
+export function isDurableGameplayPrimitive(primitiveId: string): boolean {
+  return isMeaningfulGameplayPrimitive(primitiveId) &&
+    primitiveId !== "move_to" &&
+    primitiveId !== "inspect_chest";
 }
 
 export type SocialPrimitiveAttemptStatus = {
@@ -75,10 +86,33 @@ export function isMeaningfulProgressVerifier(
   );
 }
 
+export function isMovementOnlyVerifier(
+  verifierStatus: "passed" | "failed" | "not_applicable",
+  executedTools: string[]
+): boolean {
+  return (
+    verifierStatus === "passed" &&
+    executedTools.includes("move_to") &&
+    executedTools.every((tool) =>
+      tool === "move_to" || SOCIAL_OBSERVATION_ONLY_PRIMITIVES.has(tool)
+    )
+  );
+}
+
+export function isDurableProgressVerifier(
+  verifierStatus: "passed" | "failed" | "not_applicable",
+  executedTools: string[]
+): boolean {
+  return (
+    verifierStatus === "passed" &&
+    executedTools.some(isDurableGameplayPrimitive)
+  );
+}
+
 /** Rejects provider-written outcomes that are stronger than runtime evidence supports. */
 export function clampCycleJudgmentOutcome(input: {
   judgment: CycleJudgment;
-  actionIntent: ActionIntent;
+  action?: JudgmentAction;
   executedTools: string[];
   toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
 }): CycleJudgment {
@@ -89,8 +123,8 @@ export function clampCycleJudgmentOutcome(input: {
     return input.judgment;
   }
 
-  const meaningful = input.executedTools.filter(isMeaningfulGameplayPrimitive);
-  if (meaningful.length === 0) {
+  const durable = input.executedTools.filter(isDurableGameplayPrimitive);
+  if (durable.length === 0) {
     return { ...input.judgment, outcome: "no_progress" };
   }
 
@@ -118,9 +152,9 @@ export function clampCycleJudgmentOutcome(input: {
   }
 
   if (
-    input.actionIntent.kind === "use_action_skill" &&
-    input.actionIntent.action_skill_id === "runtimeObserveAndRemember" &&
-    meaningful.every((tool) => SOCIAL_OBSERVATION_ONLY_PRIMITIVES.has(tool))
+    input.action?.kind === "use_action_skill" &&
+    input.action.action_skill_id === "runtimeObserveAndRemember" &&
+    input.executedTools.every((tool) => SOCIAL_OBSERVATION_ONLY_PRIMITIVES.has(tool))
   ) {
     return { ...input.judgment, outcome: "no_progress" };
   }
@@ -134,7 +168,7 @@ export function deterministicJudgmentOutcome(input: {
   executedTools: string[];
   toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
 }): CycleJudgmentOutcome {
-  if (isMeaningfulProgressVerifier(input.verifierStatus, input.executedTools)) {
+  if (isDurableProgressVerifier(input.verifierStatus, input.executedTools)) {
     return "verified_progress";
   }
   if (

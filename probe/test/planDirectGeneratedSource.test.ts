@@ -1,3 +1,4 @@
+/** Regression coverage for direct-generated source planning constraints. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -18,8 +19,8 @@ const baseRequest: ObjectivePhasePlannerRequest = {
   prompt: "craft stone axe"
 };
 
-const validLlmSource = "export async function run(ctx) { return ctx.inspectInventory(); }";
-const blockedLlmSource = 'import fs from "node:fs"; export async function run(ctx) {}';
+const validLlmSource = "export async function run(ctx, params) { return ctx.inspectInventory(); }";
+const blockedLlmSource = 'import fs from "node:fs"; export async function run(ctx, params) {}';
 
 function stubPlanner(plan: DirectGeneratedSourcePlan): ObjectivePhasePlannerPort {
   return {

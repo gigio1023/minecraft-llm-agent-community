@@ -13,6 +13,17 @@ user has approved an operating-rule change.
 4. `docs/blog-doc/Documentation-Map.md`
 5. `docs/blog-doc/Agent-Search-Index.md`
 6. `docs/blog-doc/Terminology.md`
+7. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+8. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+9. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+11. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+12. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+13. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+14. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+15. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+16. `docs/blog-doc/Setup/Provider-Setup.md`
+17. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
@@ -23,6 +34,59 @@ benchmark project, or a house-building architecture.
 Providers propose goals, actions, and judgments. Runtime code owns Minecraft
 truth: schemas, structured args, permission gates, Mineflayer execution,
 verification, artifacts, actor workspace state, and provider usage records.
+
+Never parse LLM-facing prose with string `includes`, regexes, or keyword
+heuristics to decide runtime policy. `current_state_requirements`, Action Card
+descriptions, rationale, Minecraft Basic Guide text, memory, and PlanBeads are
+context, not executable authority. Tool calling plus strict schemas/enums
+enforce flow; within a selected visible tool/action, the LLM keeps decision
+freedom with full context and schema-bound logical parameters. Runtime then
+validates explicit params, schema, permission, retry/safety, source guards,
+timeouts, verifier/evidence, and artifacts.
+
+`decision_frame` is context, not a planner output. Do not add
+`parameter_candidates`, `top_eligible_action_cards`,
+`recommended_next_action_candidates`, generated chat text, coordinates, recipe
+decisions, or other pre-selected action payloads to it.
+
+Do not hide Action Cards or tools through hardcoded Minecraft heuristics such as
+item-family, station-family, construction-readiness, survival-priority, or
+shelter-first filters. Tool visibility and rejection must be represented with
+typed readiness/eligibility contracts, structured state, schemas, gates, retry
+constraints, or evidence. The runtime must not become a hidden Minecraft
+planner. No compatibility or legacy compromise is required when removing prose
+parsing or hidden domain-planner behavior.
+
+PlanBeads are structured actor-owned work state for concerns an LLM actor would
+otherwise forget or blur in free-form prose. They should make the NPC more
+flexible under changing Minecraft/social context, not checklist-bound. Do not
+let PlanBeads grant executable authority, action permissions, physical success,
+or retry-constraint clearance.
+
+CycleJudgment may carry raw PlanBead operation proposal candidates. A malformed
+candidate should remain visible as a rejected operation-result artifact from the
+guarded PlanBead applier, not disappear by failing the whole judgment.
+
+PlanBeads are Beads-inspired TypeScript/JSON runtime records in actor
+workspaces. They are not external Beads CLI integration, and this runtime must
+not require `bd`, `br`, `beads-mcp`, `.beads`, or downloaded Beads binaries for
+NPC state.
+
+## Action Skill Authoring
+
+During social-cycle runtime, new Minecraft action skill creation starts only
+from the action-selection stage. In Actor Turn mode, that means
+`author_mineflayer_action`, which resolves into the existing
+`author_and_trial_action_skill` runtime path. Background
+reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
+review, patch, re-trial, reject, promote, retire, or supersede an existing
+candidate, but they must not originate a new NPC action skill candidate.
+
+Generated Mineflayer code should be used through that explicit author-and-trial
+path with schema-bound parameters, generated TypeScript source, helper API
+version, timeout, verifier, failure modes, promotion policy, helper-event
+evidence, and post-observation. Prose never supplies missing executable
+parameters.
 
 ## Change Discipline
 

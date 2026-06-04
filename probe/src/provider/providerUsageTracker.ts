@@ -61,6 +61,7 @@ export type ProviderUsageRecord = {
   provider_id: string;
   model: string;
   created_at: string;
+  quota_day_utc?: string;
   pacific_day: string;
   utc_minute: string;
   status: "succeeded" | "failed";
@@ -121,6 +122,14 @@ const defaultGeminiBudgets: ProviderUsageBudget[] = [
     mode: "enforce",
     source:
       "operator_free_tier_reference; verify active project limits in Google AI Studio before long runs"
+  },
+  {
+    provider_id: "gemini-api",
+    model: "gemini-2.5-flash-lite",
+    request_limit_per_day: 20,
+    mode: "enforce",
+    source:
+      "observed Gemini API free-tier error on 2026-06-02: GenerateRequestsPerDayPerProjectPerModel-FreeTier limit 20 for gemini-2.5-flash-lite"
   }
 ];
 
@@ -258,6 +267,10 @@ function selectBudget(
   return [...budgets].reverse().find((budget) => matchesBudget(budget, providerId, model));
 }
 
+function utcDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function pacificDay(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -287,9 +300,20 @@ async function readUsageRecords(ledgerPath: string): Promise<ProviderUsageRecord
   }
 }
 
+function dailyQuotaDay(providerId: string, date: Date) {
+  return providerId === "gemini-api" ? pacificDay(date) : utcDay(date);
+}
+
+function recordDailyQuotaDay(record: ProviderUsageRecord) {
+  if (record.provider_id === "gemini-api") {
+    return record.pacific_day;
+  }
+  return record.quota_day_utc ?? record.created_at.slice(0, 10) ?? record.pacific_day;
+}
+
 function totalMatchingRecords(
   records: readonly ProviderUsageRecord[],
-  input: { providerId: string; model: string; pacificDay: string; utcMinute: string }
+  input: { providerId: string; model: string; quotaDay: string; utcMinute: string }
 ) {
   const minute = cloneCounts();
   const day = cloneCounts();
@@ -297,7 +321,7 @@ function totalMatchingRecords(
     if (record.provider_id !== input.providerId || record.model !== input.model) {
       continue;
     }
-    if (record.pacific_day === input.pacificDay) {
+    if (recordDailyQuotaDay(record) === input.quotaDay) {
       Object.assign(day, addCounts(day, record.usage));
     }
     if (record.utc_minute === input.utcMinute) {
@@ -379,7 +403,7 @@ export async function guardProviderUsageRequest(input: {
   const windows = totalMatchingRecords(records, {
     providerId: input.providerId,
     model: input.model,
-    pacificDay: pacificDay(now),
+    quotaDay: dailyQuotaDay(input.providerId, now),
     utcMinute: utcMinute(now)
   });
   const existingDay = addCounts(windows.day, budget.already_used ?? {});
@@ -445,8 +469,9 @@ export async function appendProviderUsageRecord(input: {
   elapsedMs?: number;
   rawUsage?: JsonValue;
   budgetDecision?: ProviderUsageBudgetDecision;
+  now?: Date;
 }): Promise<ProviderUsageRecord> {
-  const now = new Date();
+  const now = input.now ?? new Date();
   const ledgerPath = resolveProviderUsageLedgerPath({
     repoRoot: input.context?.repoRoot,
     ledgerPath: input.context?.ledgerPath
@@ -461,6 +486,7 @@ export async function appendProviderUsageRecord(input: {
     provider_id: input.providerId,
     model: input.model,
     created_at: now.toISOString(),
+    quota_day_utc: utcDay(now),
     pacific_day: pacificDay(now),
     utc_minute: utcMinute(now),
     status: input.status,
@@ -480,10 +506,21 @@ export function normalizeOpenAiUsage(raw: unknown, fallback: ProviderUsageCounts
     return { usage: fallback, source: "estimated" as ProviderUsageSource, rawUsage: undefined };
   }
   const record = raw as Record<string, unknown>;
+  const completionDetails =
+    typeof record.completion_tokens_details === "object" && record.completion_tokens_details !== null
+      ? record.completion_tokens_details as Record<string, unknown>
+      : undefined;
+  const outputDetails =
+    typeof record.output_tokens_details === "object" && record.output_tokens_details !== null
+      ? record.output_tokens_details as Record<string, unknown>
+      : undefined;
   const usage = toCounts({
     requests: 1,
-    input_tokens: sanitizeNumber(record.prompt_tokens),
-    output_tokens: sanitizeNumber(record.completion_tokens),
+    input_tokens: sanitizeNumber(record.prompt_tokens) || sanitizeNumber(record.input_tokens),
+    output_tokens: sanitizeNumber(record.completion_tokens) || sanitizeNumber(record.output_tokens),
+    thinking_tokens:
+      sanitizeNumber(completionDetails?.reasoning_tokens) ||
+      sanitizeNumber(outputDetails?.reasoning_tokens),
     total_tokens: sanitizeNumber(record.total_tokens)
   });
   return {

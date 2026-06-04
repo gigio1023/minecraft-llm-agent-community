@@ -1,3 +1,9 @@
+/**
+ * Factory for legacy objective phase planner adapters.
+ *
+ * @remarks Planner selection belongs to the direct-objective path and should not
+ * alter the active social-cycle provider authority model.
+ */
 import type { ProbeConfig } from "../../config.js";
 import { BuiltinPhasePlannerAdapter } from "./adapters/builtinPhasePlannerAdapter.js";
 import { GeminiObjectivePlannerAdapter } from "./adapters/geminiObjectivePlannerAdapter.js";

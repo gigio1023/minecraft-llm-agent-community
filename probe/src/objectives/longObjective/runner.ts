@@ -119,7 +119,7 @@ function buildPhasePrompt(input: {
   return [
     "Generate one TypeScript action skill for a Minecraft Mineflayer bot.",
     "Return only TypeScript source. Do not wrap it in markdown.",
-    "The source must export exactly: export async function run(ctx) { ... }",
+    "The source must export exactly: export async function run(ctx, params) { ... }",
     "Never use import, require, eval, or Node APIs.",
     "Use the ctx helper API instead of imports or Node APIs.",
     "Do not claim success; runtime verifiers decide pass/fail from current-run evidence.",

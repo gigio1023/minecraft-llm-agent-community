@@ -1,7 +1,8 @@
 # OpenAI API — Tier 3 data-sharing free daily usage
 
 Status: supporting reference. Active provider guard commands live in
-`docs/blog-doc/Setup/Provider-Setup.md`.
+`docs/blog-doc/Setup/Provider-Setup.md`. Daily reset windows and Korea-time
+conversions live in `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`.
 
 Recorded for this repo’s **`openai` provider** experiments (not `openai-codex` / ChatGPT Codex backend).
 
@@ -19,6 +20,9 @@ When your organization is eligible to share evaluation/traffic with OpenAI, dail
 | **Mini / nano** | Up to **10M tokens / day** | `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.1-codex-mini`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-4o-mini`, `o1-mini`, `o3-mini`, `o4-mini`, `codex-mini-latest` |
 
 Usage beyond these pools, and usage on models outside the lists, is billed at standard rates. Some limitations apply (see OpenAI help article above).
+OpenAI states that the complimentary-token counter refreshes daily at 00:00 UTC,
+and that a request crossing the quota is billed in full. The repo usage guard
+therefore tracks `quota_day_utc` for daily budget decisions.
 
 ## This repo
 

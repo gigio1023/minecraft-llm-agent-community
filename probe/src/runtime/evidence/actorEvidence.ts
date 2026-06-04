@@ -14,10 +14,19 @@ export type ActorEvidenceCategory =
   | "provider_snapshot"
   | "review_input"
   | "world_state_scan"
-  | "action_intent_contract_failure"
+  | "action_parameter_contract_failure"
+  | "action_skill_candidate_trial"
   | "retry_constraint_blocked"
   | "context_checkpoint";
 
+/**
+ * Actor workspace evidence record for facts that should survive transcript
+ * compaction and post-run review.
+ *
+ * @remarks These records are diagnostic artifacts, not provider claims. Physical
+ * progress still needs verifier-backed world, inventory, position, container, or
+ * transcript evidence.
+ */
 export type ActorEvidenceRecord = {
   schema: "actor-evidence/v1";
   evidence_id: string;
@@ -46,6 +55,10 @@ type FakeProgressEvidenceInput = {
   created_at?: string;
 };
 
+/**
+ * Creates the evidence artifact used when a tool looked successful in prose but
+ * the verifier could not find the required state delta.
+ */
 export function buildFakeProgressRejectionEvidence(
   input: FakeProgressEvidenceInput
 ): ActorEvidenceRecord {
@@ -67,6 +80,10 @@ export function buildFakeProgressRejectionEvidence(
   };
 }
 
+/**
+ * Writes evidence under the owning actor workspace and returns the artifact path
+ * that other records can cite.
+ */
 export async function writeActorEvidenceRecord(
   actorWorkspaceRootDir: string,
   evidence: ActorEvidenceRecord

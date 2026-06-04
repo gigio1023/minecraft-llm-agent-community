@@ -6,6 +6,7 @@ import {
   type ActorActionSkillStatusPath
 } from "../../runtime/actorWorkspacePaths.js";
 import {
+  addActorActionSkillToLibraryIndex,
   writeActorActionSkillRecord,
   type ActorActionSkillRecord
 } from "../../runtime/actorWorkspaceStore.js";
@@ -20,6 +21,12 @@ export type ActionSkillTrialResult = {
   verifier_reason: string;
 };
 
+/**
+ * Input for recording a bounded action skill trial.
+ *
+ * A trial record is evidence; it does not activate the action skill unless
+ * promotion separately succeeds.
+ */
 export type RecordActionSkillTrialInput = {
   actorWorkspaceRootDir: string;
   proposal: ActionSkillProposalRecord;
@@ -38,6 +45,8 @@ function now(input?: string) {
   return input ?? new Date().toISOString();
 }
 
+// Promotion requires both a passed verifier result and evidence refs, because an
+// active record becomes primitive authority for this actor.
 function assertPassedTrial(trial: ActionSkillTrialResult) {
   if (trial.status !== "passed") {
     throw new Error("Cannot promote action skill without a passed trial");
@@ -59,6 +68,10 @@ async function removeActionSkillRecordIfExists(
   });
 }
 
+/**
+ * Writes the trial evidence artifact used by promotion, review, and later
+ * retirement decisions.
+ */
 export async function recordActionSkillTrial(input: RecordActionSkillTrialInput) {
   const createdAt = now(input.created_at);
 
@@ -102,6 +115,14 @@ function buildActiveRecord(input: PromoteActionSkillInput): ActorActionSkillReco
   };
 }
 
+/**
+ * Promotes a proposal-backed recipe into an actor-owned active action skill
+ * after schema validation and a passed trial.
+ *
+ * @remarks This is the lifecycle boundary where candidate/generated code gains
+ * runtime authority. Failed trials, missing evidence, or invalid recipes are
+ * recorded or rejected before any active record is written.
+ */
 export async function promoteActionSkillAfterTrial(input: PromoteActionSkillInput) {
   assertPassedTrial(input.trial);
 
@@ -150,6 +171,13 @@ export async function promoteActionSkillAfterTrial(input: PromoteActionSkillInpu
     input.actorWorkspaceRootDir,
     activeRecord
   );
+  await addActorActionSkillToLibraryIndex({
+    rootDir: input.actorWorkspaceRootDir,
+    actorId: activeRecord.owner_actor_id,
+    status: "active",
+    skillId: activeRecord.skill_id,
+    updatedAt: now(input.created_at)
+  });
 
   return {
     activePath,

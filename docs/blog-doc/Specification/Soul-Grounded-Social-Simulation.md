@@ -64,10 +64,17 @@ Goal authority should remain layered:
 | LifeGoal | durable direction for the actor's social life |
 | observation | raw runtime evidence and world facts |
 | WorldEvent | event/context record; never a LifeGoal replacement |
-| StrategicGoal | medium-horizon interpretation of current evidence and context |
-| CycleGoal | bounded current-cycle objective |
-| ActionIntent | one proposed action or action skill |
+| PlanBead | checkpointed actor-owned issue-like work item under LifeGoal |
+| PlanBeadGraph | dependency graph whose ready front can guide Actor Turn continuity |
+| StrategicGoal | legacy-adjacent medium-horizon interpretation; use PlanBeads for new persistent work state |
+| CycleGoal | legacy-compatible bounded current-cycle objective |
+| Actor Turn | ordinary one-step tool-selection hot path |
+| runtime action | validated Action Card or generated-action path selected for execution/trial |
 | CycleJudgment | evidence-based interpretation of what happened |
+
+PlanBeads sit under LifeGoal and inform Active Episode / Actor Turn continuity.
+They preserve durable work state across cycles and restarts. The PlanBeadGraph's
+ready front is context, not executable authority or proof of progress.
 
 The implementation may start with one actor, but the structure must not erase
 future social dynamics. A single actor can still have obligations, shared

@@ -2,9 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { loadProbeConfig } from "../../config.js";
-import type { CycleJudgment, SocialCycleRunReport } from "./types.js";
+import { legacyPlannerActionParameters, type CycleJudgment, type SocialCycleRunReport } from "./types.js";
 import { readJsonIfExists } from "./goalJsonStore.js";
-import type { ActionIntent } from "./types.js";
+import type { LegacyPlannerAction } from "./types.js";
 
 export type MovementContractStatus =
   | "valid"
@@ -15,6 +15,8 @@ export type MovementContractStatus =
 
 export type CycleReviewRow = {
   cycle_id: string;
+  attempt_id?: string;
+  action_index?: number;
   cycle_goal_summary: string;
   action_kind: string;
   primitive_or_skill: string;
@@ -83,7 +85,7 @@ async function readJudgment(actorDir: string, ref: string) {
 }
 
 async function readIntent(actorDir: string, ref: string) {
-  return readActorRefJson<ActionIntent>(actorDir, ref);
+  return readActorRefJson<LegacyPlannerAction>(actorDir, ref);
 }
 
 async function readCycleGoalSummary(actorDir: string, ref: string) {
@@ -106,35 +108,36 @@ function hasPositionShape(value: unknown) {
     isFiniteNumber(value.z);
 }
 
-function movementContractStatus(intent: ActionIntent | null): MovementContractStatus {
+function movementContractStatus(intent: LegacyPlannerAction | null): MovementContractStatus {
   if (!intent) {
     return "missing_intent";
   }
   if (intent.kind !== "use_primitive" || intent.primitive_id !== "move_to") {
     return "not_move_to";
   }
-  if (!isRecord(intent.args)) {
+  const parameters = legacyPlannerActionParameters(intent);
+  if (!isRecord(parameters)) {
     return "invalid_args";
   }
-  if (Object.keys(intent.args).length === 0) {
+  if (Object.keys(parameters).length === 0) {
     return "empty_args";
   }
   if (
-    hasPositionShape(intent.args.position) ||
-    hasPositionShape(intent.args.targetPosition) ||
-    hasPositionShape(intent.args.target_position) ||
-    hasPositionShape(intent.args)
+    hasPositionShape(parameters.position) ||
+    hasPositionShape(parameters.targetPosition) ||
+    hasPositionShape(parameters.target_position) ||
+    hasPositionShape(parameters)
   ) {
     return "valid";
   }
 
-  const direction = typeof intent.args.direction === "string" ? intent.args.direction.toLowerCase() : null;
+  const direction = typeof parameters.direction === "string" ? parameters.direction.toLowerCase() : null;
   if (
     direction &&
     ["north", "south", "east", "west"].includes(direction) &&
-    isFiniteNumber(intent.args.distance) &&
-    intent.args.distance > 0 &&
-    intent.args.distance <= 12
+    isFiniteNumber(parameters.distance) &&
+    parameters.distance > 0 &&
+    parameters.distance <= 12
   ) {
     return "valid";
   }
@@ -281,23 +284,7 @@ export async function buildSocialCycleReviewSummary(
   const rows: CycleReviewRow[] = [];
 
   for (const cycle of report.cycles) {
-    const judgment = await readJudgment(actorDir, cycle.judgment_ref);
-    const intent = await readIntent(actorDir, cycle.action_intent_ref);
     const cycleGoalSummary = await readCycleGoalSummary(actorDir, cycle.cycle_goal_ref);
-
-    const outcome = judgment?.outcome ?? "missing";
-    const verifier = cycle.verifier_status;
-    outcome_counts[outcome] = (outcome_counts[outcome] ?? 0) + 1;
-    verifier_counts[verifier] = (verifier_counts[verifier] ?? 0) + 1;
-
-    const primitiveOrSkill =
-      intent?.kind === "use_primitive"
-        ? (intent.primitive_id ?? "?")
-        : intent?.kind === "use_action_skill"
-          ? (intent.action_skill_id ?? "?")
-          : (intent?.kind ?? "?");
-    primitive_counts[primitiveOrSkill] = (primitive_counts[primitiveOrSkill] ?? 0) + 1;
-
     const cycleGoalProviderInput = await readActorRefJson<{
       input?: { previous_cycle_judgments?: unknown[] };
     }>(actorDir, cycle.provider_input_refs[0] ?? "");
@@ -306,25 +293,56 @@ export async function buildSocialCycleReviewSummary(
       cycles_with_prior_judgment_context += 1;
     }
 
-    const scanSummary = await summarizeWorldScanRefs(actorDir, cycle.evidence_refs);
+    const attemptRows = cycle.action_attempts && cycle.action_attempts.length > 0
+      ? cycle.action_attempts
+      : [{
+          attempt_id: undefined,
+          action_index: undefined,
+          action_ref: cycle.action_ref,
+          judgment_ref: cycle.judgment_ref,
+          verifier_status: cycle.verifier_status,
+          evidence_refs: cycle.evidence_refs,
+          retry_constraint_blocked: cycle.action_attempts?.some((attempt) => attempt.retry_constraint_blocked === true) ?? false
+        }];
+    for (const attempt of attemptRows) {
+      const judgment = await readJudgment(actorDir, attempt.judgment_ref);
+      const intent = await readIntent(actorDir, attempt.action_ref);
 
-    rows.push({
-      cycle_id: cycle.cycle_id,
-      cycle_goal_summary: cycleGoalSummary,
-      action_kind: intent?.kind ?? "missing",
-      primitive_or_skill: primitiveOrSkill,
-      verifier_status: verifier,
-      judgment_outcome: outcome,
-      what_happened: judgment?.what_happened ?? "",
-      cites_prior: citesPrior,
-      evidence_count: cycle.evidence_refs.length,
-      world_scan_ref_count: scanSummary.worldScanRefs.length,
-      world_scan_refs: scanSummary.worldScanRefs,
-      world_scan_counts: scanSummary.worldScanCounts,
-      movement_contract_status: movementContractStatus(intent),
-      retry_constraint_blocked:
-        cycle.action_attempts?.some((attempt) => attempt.retry_constraint_blocked === true) ?? false
-    });
+      const outcome = judgment?.outcome ?? "missing";
+      const verifier = attempt.verifier_status;
+      outcome_counts[outcome] = (outcome_counts[outcome] ?? 0) + 1;
+      verifier_counts[verifier] = (verifier_counts[verifier] ?? 0) + 1;
+
+      const primitiveOrSkill =
+        intent?.kind === "use_primitive"
+          ? (intent.primitive_id ?? "?")
+          : intent?.kind === "use_action_skill"
+            ? (intent.action_skill_id ?? "?")
+            : (intent?.kind ?? "?");
+      primitive_counts[primitiveOrSkill] = (primitive_counts[primitiveOrSkill] ?? 0) + 1;
+
+      const evidenceRefs = attempt.evidence_refs ?? [];
+      const scanSummary = await summarizeWorldScanRefs(actorDir, evidenceRefs);
+
+      rows.push({
+        cycle_id: cycle.cycle_id,
+        ...(attempt.attempt_id ? { attempt_id: attempt.attempt_id } : {}),
+        ...(typeof attempt.action_index === "number" ? { action_index: attempt.action_index } : {}),
+        cycle_goal_summary: cycleGoalSummary,
+        action_kind: intent?.kind ?? "missing",
+        primitive_or_skill: primitiveOrSkill,
+        verifier_status: verifier,
+        judgment_outcome: outcome,
+        what_happened: judgment?.what_happened ?? "",
+        cites_prior: citesPrior,
+        evidence_count: evidenceRefs.length,
+        world_scan_ref_count: scanSummary.worldScanRefs.length,
+        world_scan_refs: scanSummary.worldScanRefs,
+        world_scan_counts: scanSummary.worldScanCounts,
+        movement_contract_status: movementContractStatus(intent),
+        retry_constraint_blocked: attempt.retry_constraint_blocked === true
+      });
+    }
   }
 
   return {
@@ -369,8 +387,8 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
     "",
     "## Cycle timeline",
     "",
-    "| cycle | outcome | verifier | action | scan refs | move contract | retry gate | CycleGoal (short) | cites prior |",
-    "|-------|---------|----------|--------|-----------|---------------|------------|-------------------|-------------|"
+    "| cycle/attempt | outcome | verifier | action | scan refs | move contract | retry gate | CycleGoal (short) | cites prior |",
+    "|---------------|---------|----------|--------|-----------|---------------|------------|-------------------|-------------|"
   ];
 
   for (const row of summary.rows) {
@@ -383,7 +401,7 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
       ? `${row.world_scan_ref_count}${scanCounts ? ` (${scanCounts})` : ""}`
       : "0";
     lines.push(
-      `| ${row.cycle_id} | ${row.judgment_outcome} | ${row.verifier_status} | ${action} | ${scanCell} | ${row.movement_contract_status} | ${row.retry_constraint_blocked ? "blocked" : "no"} | ${goal} | ${row.cites_prior ? "yes" : "no"} |`
+      `| ${row.attempt_id ?? row.cycle_id} | ${row.judgment_outcome} | ${row.verifier_status} | ${action} | ${scanCell} | ${row.movement_contract_status} | ${row.retry_constraint_blocked ? "blocked" : "no"} | ${goal} | ${row.cites_prior ? "yes" : "no"} |`
     );
   }
 

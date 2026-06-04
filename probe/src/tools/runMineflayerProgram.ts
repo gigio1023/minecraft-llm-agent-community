@@ -1,3 +1,11 @@
+/**
+ * Bounded execution harness for generated Mineflayer action skill source.
+ *
+ * @remarks Generated code is untrusted candidate behavior until it passes helper
+ * limits, timeout handling, verifier checks, and lifecycle promotion. This file
+ * is part of the safety boundary that keeps raw source from becoming direct
+ * runtime authority.
+ */
 import type { Bot } from "mineflayer";
 import { Vec3 } from "vec3";
 
@@ -47,10 +55,12 @@ export type RunMineflayerProgramInput = {
   bot: Bot;
   targetBot?: Bot;
   source: string;
+  parameters?: Record<string, unknown>;
   purpose?: string;
   expectedObservation?: string;
   artifactDir?: string;
   timeoutMs?: number;
+  helperAllowlist?: readonly string[];
   signal?: AbortSignal;
 };
 
@@ -105,8 +115,23 @@ function normalizeName(value: string) {
 
 function readTimeoutMs(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)
-    ? Math.max(500, Math.min(10_000, Math.floor(value)))
+    ? Math.max(500, Math.min(120_000, Math.floor(value)))
     : 8_000;
+}
+
+function readDelayMs(value: unknown) {
+  const candidate =
+    typeof value === "number"
+      ? value
+      : value && typeof value === "object" && !Array.isArray(value)
+        ? (value as { durationMs?: unknown; milliseconds?: unknown; ms?: unknown }).durationMs ??
+          (value as { durationMs?: unknown; milliseconds?: unknown; ms?: unknown }).milliseconds ??
+          (value as { durationMs?: unknown; milliseconds?: unknown; ms?: unknown }).ms
+        : undefined;
+  if (typeof candidate !== "number" || !Number.isFinite(candidate)) {
+    throw new Error("run_mineflayer_program wait requires a finite duration in milliseconds");
+  }
+  return Math.max(0, Math.min(Math.floor(candidate), 10_000));
 }
 
 function readPosition(value: unknown): Positioned | null {
@@ -146,7 +171,8 @@ function throwIfAborted(signal?: AbortSignal) {
   }
 }
 
-function delay(ms: number, signal?: AbortSignal) {
+function delay(duration: unknown, signal?: AbortSignal) {
+  const ms = readDelayMs(duration);
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
       reject(new Error("run_mineflayer_program wait was cancelled"));
@@ -158,7 +184,7 @@ function delay(ms: number, signal?: AbortSignal) {
         signal?.removeEventListener("abort", onAbort);
       }
       resolve();
-    }, Math.max(0, Math.min(ms, 10_000)));
+    }, ms);
     onAbort = () => {
       clearTimeout(timeout);
       reject(new Error("run_mineflayer_program wait was cancelled"));
@@ -216,7 +242,7 @@ async function runMineflayerMethod(input: {
       }
       const state = Boolean(args.state);
       input.bot.setControlState(control as ControlStateName, state);
-      if (state && typeof args.durationMs === "number") {
+      if (state && args.durationMs !== undefined) {
         await delay(args.durationMs, input.signal);
         input.bot.setControlState(control as ControlStateName, false);
       }
@@ -321,7 +347,7 @@ export async function runMineflayerProgram(
         dialogueState,
         memory
       }),
-    wait: (ms: number) => delay(ms, input.signal),
+    wait: (duration: unknown) => delay(duration, input.signal),
     collectLogs: (targetCount = 1) =>
       collectLogs({ bot: input.bot, targetCount: Math.max(1, Math.floor(targetCount)), signal: input.signal }),
     mineBlock: (blockName: string, targetCount = 1, searchDistance?: number) =>
@@ -376,8 +402,10 @@ export async function runMineflayerProgram(
     skillName: "socialCycleMineflayerProgram",
     source: input.source,
     ctx,
+    params: input.parameters ?? {},
     timeoutMs,
     artifactDir: input.artifactDir,
+    helperAllowlist: input.helperAllowlist,
     onTimeout: () => clearMovement(input.bot)
   });
   clearMovement(input.bot);

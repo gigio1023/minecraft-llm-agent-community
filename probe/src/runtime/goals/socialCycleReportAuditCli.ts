@@ -22,6 +22,39 @@ type WorldScanEvidenceSummary = {
   missingMetadataRefCount: number;
 };
 
+export type PlanBeadAuditCheckStatus =
+  | "DONE"
+  | "PARTIAL"
+  | "NOT_DONE"
+  | "UNVERIFIABLE";
+
+export type PlanBeadAuditCheck = {
+  subject: "ready_front" | "operation_result" | "cycle_selection";
+  status: PlanBeadAuditCheckStatus;
+  reason: string;
+  cycle_id?: string;
+  bead_id?: string;
+  ref?: string;
+  evidence_refs: string[];
+};
+
+export type PlanBeadAuditArtifact = {
+  schema: "plan-bead-audit/v1";
+  actor_id: string;
+  report_ref: string;
+  checked_at: string;
+  status: "passed" | "failed";
+  errors: string[];
+  summary: {
+    ready_front_count: number;
+    operation_result_count: number;
+    accepted_operation_count: number;
+    rejected_operation_count: number;
+    selected_cycle_count: number;
+  };
+  checks: PlanBeadAuditCheck[];
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -128,11 +161,20 @@ function resolveActorRefPath(actorDir: string, ref: string): ActorRefResolution 
 function collectReportRefs(report: SocialCycleRunReport) {
   const refs: string[] = [];
   for (const cycle of report.cycles) {
-    refs.push(cycle.cycle_goal_ref, cycle.action_intent_ref, cycle.judgment_ref);
+    refs.push(cycle.cycle_goal_ref, cycle.action_ref, cycle.judgment_ref);
+    if (cycle.plan_bead_packet_ref) {
+      refs.push(cycle.plan_bead_packet_ref);
+    }
+    refs.push(...(cycle.plan_bead_operation_result_refs ?? []));
     refs.push(...cycle.provider_input_refs);
     refs.push(...cycle.provider_output_refs);
     refs.push(...cycle.evidence_refs);
+    for (const attempt of cycle.action_attempts ?? []) {
+      refs.push(...(attempt.plan_bead_operation_result_refs ?? []));
+    }
   }
+  refs.push(...(report.plan_bead_ready_fronts ?? []).map((front) => front.ref));
+  refs.push(...(report.plan_bead_operation_results ?? []).map((result) => result.ref));
   return refs.filter((ref) => typeof ref === "string" && ref.length > 0);
 }
 
@@ -330,6 +372,20 @@ async function auditProviderInputs(actorDir: string, inputRefs: string[]) {
     ) {
       errors.push(`Provider input ${ref} missing ActorSoul or ActorLifeGoal`);
     }
+    const planBeadPacket = snapshot.input.plan_bead_packet;
+    if (isRecord(planBeadPacket)) {
+      if (planBeadPacket.physical_progress_claim !== false) {
+        errors.push(`Provider input ${ref} PlanBead packet claims physical progress`);
+      }
+      const rules = planBeadPacket.rules;
+      if (!isRecord(rules) || rules.beads_are_context_not_authority !== true) {
+        errors.push(`Provider input ${ref} PlanBead packet missing context-not-authority rule`);
+      }
+    }
+    const actionSurface = snapshot.input.action_surface;
+    if (isRecord(actionSurface) && "plan_bead_packet" in actionSurface) {
+      errors.push(`Provider input ${ref} leaks PlanBead packet into action_surface`);
+    }
   }
   return errors;
 }
@@ -393,47 +449,51 @@ function moveToPhysicalArgsStatus(args: unknown) {
   return "invalid_args" as const;
 }
 
-function isMoveToIntent(intent: unknown): intent is Record<string, unknown> & { args: unknown } {
-  return isRecord(intent) &&
-    intent.kind === "use_primitive" &&
-    intent.primitive_id === "move_to";
+function isMoveToRuntimeAction(action: unknown): action is Record<string, unknown> & { args: unknown } {
+  return isRecord(action) &&
+    action.kind === "use_primitive" &&
+    action.primitive_id === "move_to";
 }
 
-function collectActionIntentRefs(
+function runtimeActionParametersForAudit(action: Record<string, unknown>) {
+  return isRecord(action.parameters) ? action.parameters : action.args;
+}
+
+function collectRuntimeActionRefs(
   cycle: SocialCycleRunReport["cycles"][number]
 ) {
   const refs = new Set<string>();
-  if (cycle.action_intent_ref) {
-    refs.add(cycle.action_intent_ref);
+  if (cycle.action_ref) {
+    refs.add(cycle.action_ref);
   }
   for (const attempt of cycle.action_attempts ?? []) {
-    if (attempt.action_intent_ref) {
-      refs.add(attempt.action_intent_ref);
+    if (attempt.action_ref) {
+      refs.add(attempt.action_ref);
     }
   }
   return [...refs];
 }
 
-async function auditMoveToIntentContracts(input: {
+async function auditMoveToRuntimeActionContracts(input: {
   actorDir: string;
   cycle: SocialCycleRunReport["cycles"][number];
   cycleNumber: number;
   errors: string[];
 }) {
-  for (const ref of collectActionIntentRefs(input.cycle)) {
-    const intent = await readActorRefJson<Record<string, unknown>>(input.actorDir, ref);
-    if (!isMoveToIntent(intent)) {
+  for (const ref of collectRuntimeActionRefs(input.cycle)) {
+    const action = await readActorRefJson<Record<string, unknown>>(input.actorDir, ref);
+    if (!isMoveToRuntimeAction(action)) {
       continue;
     }
 
-    const status = moveToPhysicalArgsStatus(intent.args);
+    const status = moveToPhysicalArgsStatus(runtimeActionParametersForAudit(action));
     if (status === "empty_args") {
       input.errors.push(
-        `Cycle ${input.cycleNumber} move_to intent ${ref} has empty args; structured movement target args are required`
+        `Cycle ${input.cycleNumber} move_to action ${ref} has empty args; structured movement target args are required`
       );
     } else if (status === "invalid_args") {
       input.errors.push(
-        `Cycle ${input.cycleNumber} move_to intent ${ref} has invalid physical args; expected position/targetPosition/x,y,z or direction+distance within the movement policy`
+        `Cycle ${input.cycleNumber} move_to action ${ref} has invalid physical args; expected position/targetPosition/x,y,z or direction+distance within the movement policy`
       );
     }
   }
@@ -691,6 +751,316 @@ function auditSettlementEvidence(report: SocialCycleRunReport, errors: string[])
   }
 }
 
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+    : [];
+}
+
+function isStrongSatisfiedPlanBeadEvidenceRef(ref: string) {
+  return (
+    ref.startsWith("evidence/") ||
+    ref.startsWith("relationships/") ||
+    ref.startsWith("reviews/applied-relationship-proposals/") ||
+    ref.startsWith("settlement/")
+  );
+}
+
+function isSatisfiedPlanBeadCloseOperation(operation: unknown) {
+  if (!isRecord(operation) || operation.op !== "set_status") {
+    return false;
+  }
+  const patch = operation.patch;
+  return (
+    isRecord(patch) &&
+    patch.status === "closed" &&
+    patch.close_kind === "satisfied"
+  );
+}
+
+async function auditPlanBeadReport(input: {
+  actorDir: string;
+  report: SocialCycleRunReport;
+  errors: string[];
+}) {
+  for (const [index, front] of (input.report.plan_bead_ready_fronts ?? []).entries()) {
+    const frontNumber = index + 1;
+    if (front.schema !== "plan-bead-ready-front/v1") {
+      input.errors.push(`PlanBead ready front ${frontNumber} has invalid schema`);
+    }
+    if (front.physical_progress_claim !== false) {
+      input.errors.push(`PlanBead ready front ${frontNumber} claims physical progress`);
+    }
+    await auditRequiredActorRef({
+      actorDir: input.actorDir,
+      errors: input.errors,
+      cycleNumber: frontNumber,
+      label: "PlanBead ready-front artifact",
+      ref: front.ref
+    });
+    const artifact = await readActorRefJson<Record<string, unknown>>(input.actorDir, front.ref);
+    if (artifact && artifact.physical_progress_claim !== false) {
+      input.errors.push(`PlanBead ready-front artifact ${front.ref} claims physical progress`);
+    }
+  }
+
+  if (
+    input.report.plan_bead_graph_summary?.last_ready_front_ref &&
+    !(input.report.plan_bead_ready_fronts ?? []).some((front) =>
+      front.ref === input.report.plan_bead_graph_summary?.last_ready_front_ref
+    )
+  ) {
+    input.errors.push("PlanBead graph summary last_ready_front_ref is not present in ready-front report entries");
+  }
+
+  for (const [index, result] of (input.report.plan_bead_operation_results ?? []).entries()) {
+    const resultNumber = index + 1;
+    if (result.status !== "accepted" && result.status !== "rejected") {
+      input.errors.push(`PlanBead operation result ${resultNumber} has invalid status`);
+    }
+    await auditRequiredActorRef({
+      actorDir: input.actorDir,
+      errors: input.errors,
+      cycleNumber: resultNumber,
+      label: "PlanBead operation result artifact",
+      ref: result.ref
+    });
+    const artifact = await readActorRefJson<Record<string, unknown>>(input.actorDir, result.ref);
+    if (!artifact) {
+      continue;
+    }
+    if (artifact.schema !== "plan-bead-operation-result/v1") {
+      input.errors.push(`PlanBead operation result artifact ${result.ref} has invalid schema`);
+    }
+    if (artifact.status === "accepted") {
+      const evidenceRefs = asStringArray(artifact.evidence_refs);
+      if (evidenceRefs.length === 0) {
+        input.errors.push(`Accepted PlanBead operation result ${result.ref} has no evidence refs`);
+      }
+      for (const ref of evidenceRefs) {
+        await auditRequiredActorRef({
+          actorDir: input.actorDir,
+          errors: input.errors,
+          cycleNumber: resultNumber,
+          label: "PlanBead accepted operation evidence",
+          ref
+        });
+      }
+      if (
+        isSatisfiedPlanBeadCloseOperation(artifact.operation) &&
+        !evidenceRefs.some(isStrongSatisfiedPlanBeadEvidenceRef)
+      ) {
+        input.errors.push(
+          `Accepted satisfied PlanBead close ${result.ref} lacks runtime, guarded relationship, or settlement evidence refs`
+        );
+      }
+    }
+  }
+
+  for (const [index, cycle] of input.report.cycles.entries()) {
+    const cycleNumber = index + 1;
+    if ((cycle.selected_plan_bead_refs?.length ?? 0) > 0 && !cycle.plan_bead_packet_ref) {
+      input.errors.push(`Cycle ${cycleNumber} selected PlanBeads without a plan_bead_packet_ref`);
+    }
+    if ((cycle.plan_bead_operation_result_refs?.length ?? 0) > 0) {
+      for (const ref of cycle.plan_bead_operation_result_refs ?? []) {
+        await auditRequiredActorRef({
+          actorDir: input.actorDir,
+          errors: input.errors,
+          cycleNumber,
+          label: "cycle PlanBead operation result",
+          ref
+        });
+      }
+    }
+  }
+}
+
+async function buildReadyFrontAuditChecks(input: {
+  actorDir: string | null;
+  report: SocialCycleRunReport;
+}) {
+  const checks: PlanBeadAuditCheck[] = [];
+  for (const front of input.report.plan_bead_ready_fronts ?? []) {
+    const baseCheck = {
+      subject: "ready_front" as const,
+      cycle_id: front.cycle_id,
+      ref: front.ref,
+      evidence_refs: [] as string[]
+    };
+    if (front.physical_progress_claim !== false) {
+      checks.push({
+        ...baseCheck,
+        status: "NOT_DONE",
+        reason: "ready-front report entry claims physical progress"
+      });
+      continue;
+    }
+    if (!input.actorDir) {
+      checks.push({
+        ...baseCheck,
+        status: "UNVERIFIABLE",
+        reason: "actor workspace could not be resolved"
+      });
+      continue;
+    }
+    const artifact = await readActorRefJson<Record<string, unknown>>(
+      input.actorDir,
+      front.ref
+    );
+    if (!artifact) {
+      checks.push({
+        ...baseCheck,
+        status: "UNVERIFIABLE",
+        reason: "ready-front artifact ref is missing"
+      });
+      continue;
+    }
+    checks.push({
+      ...baseCheck,
+      status: artifact.physical_progress_claim === false ? "DONE" : "NOT_DONE",
+      reason: artifact.physical_progress_claim === false
+        ? "ready-front artifact is present and context-only"
+        : "ready-front artifact claims physical progress"
+    });
+  }
+  return checks;
+}
+
+async function buildOperationResultAuditChecks(input: {
+  actorDir: string | null;
+  report: SocialCycleRunReport;
+}) {
+  const checks: PlanBeadAuditCheck[] = [];
+  for (const result of input.report.plan_bead_operation_results ?? []) {
+    const baseCheck = {
+      subject: "operation_result" as const,
+      cycle_id: result.cycle_id,
+      bead_id: result.bead_id,
+      ref: result.ref,
+      evidence_refs: [] as string[]
+    };
+    if (!input.actorDir) {
+      checks.push({
+        ...baseCheck,
+        status: "UNVERIFIABLE",
+        reason: "actor workspace could not be resolved"
+      });
+      continue;
+    }
+    const artifact = await readActorRefJson<Record<string, unknown>>(
+      input.actorDir,
+      result.ref
+    );
+    if (!artifact) {
+      checks.push({
+        ...baseCheck,
+        status: "UNVERIFIABLE",
+        reason: "operation-result artifact ref is missing"
+      });
+      continue;
+    }
+    const evidenceRefs = asStringArray(artifact.evidence_refs);
+    if (artifact.status === "rejected") {
+      checks.push({
+        ...baseCheck,
+        status: "DONE",
+        reason: "invalid or blocked PlanBead operation was recorded as rejected",
+        evidence_refs: evidenceRefs
+      });
+      continue;
+    }
+    if (artifact.status !== "accepted") {
+      checks.push({
+        ...baseCheck,
+        status: "NOT_DONE",
+        reason: "operation-result artifact has an invalid status",
+        evidence_refs: evidenceRefs
+      });
+      continue;
+    }
+    if (
+      isSatisfiedPlanBeadCloseOperation(artifact.operation) &&
+      !evidenceRefs.some(isStrongSatisfiedPlanBeadEvidenceRef)
+    ) {
+      checks.push({
+        ...baseCheck,
+        status: "NOT_DONE",
+        reason: "accepted satisfied PlanBead close lacks strong runtime, guarded relationship, or settlement evidence",
+        evidence_refs: evidenceRefs
+      });
+      continue;
+    }
+    checks.push({
+      ...baseCheck,
+      status: evidenceRefs.length > 0 ? "DONE" : "NOT_DONE",
+      reason: evidenceRefs.length > 0
+        ? "accepted PlanBead operation cites evidence refs"
+        : "accepted PlanBead operation lacks evidence refs",
+      evidence_refs: evidenceRefs
+    });
+  }
+  return checks;
+}
+
+function buildCycleSelectionAuditChecks(report: SocialCycleRunReport) {
+  const checks: PlanBeadAuditCheck[] = [];
+  for (const cycle of report.cycles) {
+    if ((cycle.selected_plan_bead_refs?.length ?? 0) === 0) {
+      continue;
+    }
+    checks.push({
+      subject: "cycle_selection",
+      cycle_id: cycle.cycle_id,
+      ref: cycle.plan_bead_packet_ref,
+      status: cycle.plan_bead_packet_ref ? "DONE" : "NOT_DONE",
+      reason: cycle.plan_bead_packet_ref
+        ? "cycle selected PlanBeads with a ready-front packet ref"
+        : "cycle selected PlanBeads without a ready-front packet ref",
+      evidence_refs: [...(cycle.evidence_refs ?? [])]
+    });
+  }
+  return checks;
+}
+
+export async function buildPlanBeadAuditArtifact(
+  reportPath: string,
+  checkedAt = new Date().toISOString()
+): Promise<PlanBeadAuditArtifact> {
+  const absoluteReportPath = path.resolve(reportPath);
+  const report = JSON.parse(await fs.readFile(absoluteReportPath, "utf8")) as ReportWithMetadata;
+  const errors = await auditSocialCycleReport(absoluteReportPath);
+  const resolvedActorDir = report.schema === "social-cycle-run-report/v1"
+    ? await resolveActorDir(report, absoluteReportPath)
+    : { actorDir: null };
+  const actorDir = resolvedActorDir.actorDir;
+  const operationResults = report.plan_bead_operation_results ?? [];
+  const checks = [
+    ...await buildReadyFrontAuditChecks({ actorDir, report }),
+    ...await buildOperationResultAuditChecks({ actorDir, report }),
+    ...buildCycleSelectionAuditChecks(report)
+  ];
+
+  return {
+    schema: "plan-bead-audit/v1",
+    actor_id: typeof report.actor_id === "string" ? report.actor_id : "unknown",
+    report_ref: reportPath,
+    checked_at: checkedAt,
+    status: errors.length === 0 ? "passed" : "failed",
+    errors,
+    summary: {
+      ready_front_count: report.plan_bead_ready_fronts?.length ?? 0,
+      operation_result_count: operationResults.length,
+      accepted_operation_count: operationResults.filter((result) => result.status === "accepted").length,
+      rejected_operation_count: operationResults.filter((result) => result.status === "rejected").length,
+      selected_cycle_count: report.cycles.filter((cycle) =>
+        (cycle.selected_plan_bead_refs?.length ?? 0) > 0
+      ).length
+    },
+    checks
+  };
+}
+
 export async function auditSocialCycleReport(reportPath: string): Promise<string[]> {
   const absoluteReportPath = path.resolve(reportPath);
   const report = JSON.parse(await fs.readFile(absoluteReportPath, "utf8")) as ReportWithMetadata;
@@ -711,7 +1081,7 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
 
   for (const [index, cycle] of report.cycles.entries()) {
     const cycleNumber = index + 1;
-    if (!cycle.cycle_goal_ref || !cycle.action_intent_ref || !cycle.judgment_ref) {
+    if (!cycle.cycle_goal_ref || !cycle.action_ref || !cycle.judgment_ref) {
       errors.push(`Cycle ${cycleNumber} missing goal, intent, or judgment artifact ref`);
     }
     if (report.runtime_status === "passed" && cycle.evidence_refs.length === 0) {
@@ -730,7 +1100,7 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
         errors,
         cycleNumber,
         label: "action intent artifact",
-        ref: cycle.action_intent_ref
+        ref: cycle.action_ref
       });
       await auditRequiredActorRef({
         actorDir,
@@ -763,7 +1133,7 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
 
       const inputErrors = await auditProviderInputs(actorDir, cycle.provider_input_refs);
       errors.push(...inputErrors);
-      await auditMoveToIntentContracts({
+      await auditMoveToRuntimeActionContracts({
         actorDir,
         cycle,
         cycleNumber,
@@ -815,6 +1185,9 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
   }
 
   auditSettlementEvidence(report, errors);
+  if (actorDir) {
+    await auditPlanBeadReport({ actorDir, report, errors });
+  }
 
   if (actorDir) {
     const lifeGoal = await readJsonIfExists<{ objective?: string }>(
@@ -842,14 +1215,35 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
 }
 
 async function main() {
-  const reportPath = process.argv[2];
+  const args = process.argv.slice(2);
+  const reportPath = args[0];
   if (!reportPath) {
-    console.error("Usage: bun run src/runtime/goals/socialCycleReportAuditCli.ts <report.json>");
+    console.error("Usage: bun run src/runtime/goals/socialCycleReportAuditCli.ts <report.json> [--audit-report <path>]");
     process.exitCode = 1;
     return;
   }
 
-  const errors = await auditSocialCycleReport(reportPath);
+  const auditReportIndex = args.indexOf("--audit-report");
+  const auditReportPath = auditReportIndex >= 0 ? args[auditReportIndex + 1] : undefined;
+  if (auditReportIndex >= 0 && !auditReportPath) {
+    console.error("--audit-report requires a path");
+    process.exitCode = 1;
+    return;
+  }
+  const auditArtifact = auditReportPath
+    ? await buildPlanBeadAuditArtifact(reportPath)
+    : null;
+  const errors = auditArtifact?.errors ?? await auditSocialCycleReport(reportPath);
+
+  if (auditReportPath) {
+    await fs.mkdir(path.dirname(path.resolve(auditReportPath)), { recursive: true });
+    await fs.writeFile(
+      path.resolve(auditReportPath),
+      `${JSON.stringify(auditArtifact, null, 2)}\n`,
+      "utf8"
+    );
+  }
+
   if (errors.length > 0) {
     for (const error of errors) {
       console.error(error);

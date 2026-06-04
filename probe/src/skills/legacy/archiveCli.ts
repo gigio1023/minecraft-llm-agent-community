@@ -1,3 +1,9 @@
+/**
+ * CLI for archiving legacy generated action skill files.
+ *
+ * @remarks Archival keeps old exploratory output visible without treating it as
+ * current actor workspace memory or executable authority.
+ */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 

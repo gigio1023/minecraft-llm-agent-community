@@ -20,6 +20,7 @@ import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import { listActorMemoryRefs } from "../memory/actorMemory.js";
+import { buildGoalMindProviderInput } from "./socialCycleProviderInputs.js";
 
 const cycleGoalProviderSchema = {
   type: "object",
@@ -107,6 +108,12 @@ function normalizeCycleGoalFields(
   };
 }
 
+function selectedPlanBeadRefs(context: SocialCycleContextPacket) {
+  return context.plan_bead_packet?.ready_beads
+    .slice(0, 1)
+    .map((bead) => bead.checkpoint_ref) ?? [];
+}
+
 function cycleGoalFromLlm(input: {
   context: SocialCycleContextPacket;
   cycleId: string;
@@ -135,7 +142,10 @@ function cycleGoalFromLlm(input: {
       world_event_refs: worldEventRefs,
       memory_refs: memoryRefs,
       relationship_refs: [],
-      previous_cycle_judgment_refs: judgmentRefs
+      previous_cycle_judgment_refs: judgmentRefs,
+      ...(selectedPlanBeadRefs(input.context).length > 0
+        ? { plan_bead_refs: selectedPlanBeadRefs(input.context) }
+        : {})
     },
     success_condition: {
       verifier: cg.success_verifier,
@@ -174,10 +184,7 @@ export async function runSocialCycleGoalProvider(input: {
 }): Promise<CycleGoalProviderResult> {
   const snapshotId = `goal-mind-${input.cycleId}-${randomUUID()}`;
   const turnId = input.cycleId;
-  const providerInput = {
-    stage: "goal_mind",
-    ...input.context
-  } as JsonValue;
+  const providerInput = buildGoalMindProviderInput(input.context);
 
   const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-input-snapshot/v1",
@@ -212,6 +219,10 @@ export async function runSocialCycleGoalProvider(input: {
       allowedPrimitiveIds: input.allowedPrimitiveIds,
       source: "runtime_rule"
     });
+    const planBeadRefs = selectedPlanBeadRefs(input.context);
+    if (planBeadRefs.length > 0) {
+      cycleGoal.derived_from.plan_bead_refs = planBeadRefs;
+    }
     await writeStrategicGoal(input.actorWorkspaceRootDir, input.actorId, strategic);
     const { ref: cycleGoalRef } = await writeCycleGoal(
       input.actorWorkspaceRootDir,
@@ -245,16 +256,19 @@ ActorSoul and ActorLifeGoal are constitutional; never replace LifeGoal with a Wo
 WorldEvents are context only. The word social means the actor has ActorSoul, an actor profile, and relationships; it does not mean every action must be chat or coordination.
 Choose an ordinary Minecraft CycleGoal when the situation calls for it. A Minecraft action is socially relevant when observation, memory, role context, or relationships make it relevant.
 Treat observation as raw runtime evidence. Do not wait for the runtime to label what matters; inspect the raw facts, memory, blockers, relationships, and current action surface yourself.
+minecraft_basic_guide is an always-visible Minecraft mechanics guide. Use known_item_flows, station_requirements, blocked_recovery_guides, and observe_stop_guides to avoid impossible goals such as using an inventory-only crafting_table as a placed station, trying table recipes before a reachable placed table exists, observing forever for a known missing prerequisite, assuming an unloaded scan proves global absence, or treating block removal as item pickup.
 Vitals such as health, food, saturation, held item, and edible inventory are raw observation fields. Decide whether they matter under the current ActorSoul/LifeGoal instead of expecting a runtime survival label.
 The runtime provides the executable affordance surface separately; do not narrow the actor's body to a hand-coded strategy. Use the goal text, evidence requirements, and stop conditions to express priorities and blockers.
-The output schema still contains allowed_action_skill_ids and allowed_primitive_ids for compatibility. Treat them as broad mirrors of the current action surface, not as a narrow policy list. The runtime will expose the executable body through action_surface and runtime gates.
-Use action_surface as the current actor body and affordance catalog. Direct entries are usable now; deferred entries are diagnostics about missing or non-exposed affordances. Mineflayer expansion opportunities show body capabilities that may become bounded adapters or action skill candidates later, but they are not executable authority in this cycle.
-When the next useful step is better expressed by generated helper code, describe that need in the CycleGoal instead of inventing a fixed domain phase. The action planner can select run_mineflayer_program only when the direct action surface exposes it and current evidence justifies it.
+The output schema still contains allowed_action_skill_ids and allowed_primitive_ids for compatibility. Treat them as broad mirrors of the current action body summary, not as a narrow policy list. The runtime will expose the executable body through action planner gates.
+Use action_surface_summary as a coarse actor body summary. It intentionally hides detailed action skill search; only the action planner receives direct_action_skills and candidate_action_skill_search.
+When the next useful step is better expressed by generated helper code, describe that need in the CycleGoal instead of inventing a fixed domain phase. The action planner can author and trial generated Mineflayer code only when the direct action surface exposes it and current evidence justifies it.
 For survival and settlement goals, reason from raw evidence and the available action surface. Do not use fixed material-family, station-family, construction-readiness, or tech-tree categories as mandatory planning headings.
-Use settlement_state and settlement_checklist as runtime-owned observation/evidence about what is already complete, blocked, or pending. They are compatibility packets, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
+Use settlement_state as runtime-owned observation/evidence about what is already complete, blocked, or pending. It is a compatibility packet, not a universal domain plan. Do not turn a satisfied checklist item into the next CycleGoal unless new evidence makes it relevant again.
 Do not make any single domain activity an always-on CycleGoal. Building is one possible action among many, selected only when ActorSoul/LifeGoal, WorldEvents, memory, or observation makes it relevant.
 If blocker_histogram shows repeated blockers, select a CycleGoal that pivots or repairs the blocker rather than repeating the same failed primitive.
 If runtime_retry_constraints are present, treat them as hard evidence that the exact target plus structured args should not be selected again until context changes.
+plan_bead_packet is always present as read-only continuity context. If it has ready or in_progress beads, let them influence CycleGoal continuity when they still fit current observation, LifeGoal, and action_surface_summary. If it is empty, that means no durable work graph exists yet; do not invent hidden plan state, but choose goals whose later judgments can create useful PlanBeads for blockers or unfinished work. PlanBeads do not provide executable args, action permissions, or proof of progress.
+If recent judgments show repeated remember-only cycles for the same blocker, choose a CycleGoal that gathers fresh evidence, repairs with a different affordance, or deliberately defers that work-state; do not make another blocker note the main goal unless new evidence appeared.
 If observation or previous judgments include blocked evidence, use that context when setting the next CycleGoal, but do not force a fixed strategy. Choose from current affordances and evidence. Output JSON only.`;
 
   const user = JSON.stringify(providerInput);

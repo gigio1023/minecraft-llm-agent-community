@@ -590,7 +590,7 @@ function createActionSkillProbeProvider(
             purpose: "probe bounded generated helper execution",
             expectedObservation: "source, helper events, delivered chat, and post-observation are recorded",
             source: `
-              export async function run(ctx) {
+              export async function run(ctx, params) {
                 await ctx.observe();
                 return ctx.say("I can report what I just saw.");
               }

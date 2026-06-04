@@ -44,6 +44,7 @@ function ownedSeedActionSkills(
 }
 
 type ExistingActionSkillIndex = {
+  active: string[];
   candidates: string[];
   retired: string[];
   rejected: string[];
@@ -59,6 +60,7 @@ async function readExistingActionSkillIndex(indexFile: string): Promise<Existing
   try {
     const index = JSON.parse(await fs.readFile(indexFile, "utf8")) as Record<string, unknown>;
     return {
+      active: stringArray(index.active),
       candidates: stringArray(index.candidates),
       retired: stringArray(index.retired),
       rejected: stringArray(index.rejected)
@@ -66,6 +68,7 @@ async function readExistingActionSkillIndex(indexFile: string): Promise<Existing
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return {
+        active: [],
         candidates: [],
         retired: [],
         rejected: []
@@ -74,6 +77,10 @@ async function readExistingActionSkillIndex(indexFile: string): Promise<Existing
 
     throw error;
   }
+}
+
+function uniqueSorted(values: readonly string[]) {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
 
 /**
@@ -119,6 +126,18 @@ export async function initializeActorWorkspaces(
       actor.actor_id,
       options.seedActionSkillOwnership
     ).map((record) => materializeSeedActionSkillRecord(record, initializedAt));
+    const existingActiveRecords = await listActorActionSkillRecords(
+      options.rootDir,
+      actor.actor_id,
+      "active"
+    );
+    const preservedActiveRecords = existingActiveRecords.filter(
+      (record) =>
+        record.owner_actor_id === actor.actor_id &&
+        record.status === "active" &&
+        record.source_kind !== "seed" &&
+        !activeRecords.some((activeRecord) => activeRecord.skill_id === record.skill_id)
+    );
 
     await Promise.all(
       activeRecords.map((record) => writeActorActionSkillRecord(options.rootDir, record))
@@ -129,7 +148,13 @@ export async function initializeActorWorkspaces(
       schema: "action-skill-library/v1",
       owner_actor_id: actor.actor_id,
       initialized_at: initializedAt,
-      active: activeRecords.map((record) => record.skill_id),
+      active: uniqueSorted([
+        ...activeRecords.map((record) => record.skill_id),
+        ...preservedActiveRecords.map((record) => record.skill_id),
+        ...existingIndex.active.filter((skillId) =>
+          preservedActiveRecords.some((record) => record.skill_id === skillId)
+        )
+      ]),
       candidates: existingIndex.candidates,
       retired: existingIndex.retired,
       rejected: existingIndex.rejected

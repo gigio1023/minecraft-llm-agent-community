@@ -1,3 +1,9 @@
+/**
+ * Gemini authentication helpers for provider smoke and planner paths.
+ *
+ * @remarks Auth failures are provider setup blockers. Do not reinterpret them as
+ * actor hesitation, Minecraft failure, or action skill behavior.
+ */
 import { promises as fs } from "node:fs";
 import path from "node:path";
 

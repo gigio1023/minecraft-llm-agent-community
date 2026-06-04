@@ -37,7 +37,7 @@ export function compileActorSoulFromProfile(actorId: string, societyId = "settle
     action_skill_policy: {
       prefer_owned_action_skills: true,
       allow_primitive_fallback: true,
-      allow_generated_action_skill_trials: false
+      allow_generated_action_skill_trials: true
     },
     memory_policy: {
       retrieve_layers: ["episodic", "social", "procedural", "belief", "guardrail"],

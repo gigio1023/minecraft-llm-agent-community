@@ -1,3 +1,9 @@
+/**
+ * Persistence for provider input snapshots.
+ *
+ * @remarks Input snapshots are audit artifacts that show what context the model
+ * saw; they are not evidence that the suggested action succeeded.
+ */
 import path from "node:path";
 
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "../runtime/actorWorkspacePaths.js";

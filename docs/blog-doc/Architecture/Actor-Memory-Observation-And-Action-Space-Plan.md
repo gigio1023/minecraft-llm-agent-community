@@ -84,6 +84,12 @@ Memory outputs should also be explicit:
 | action-skill notes | action-skill review/promotion | candidate evidence, not active behavior by itself |
 | compaction summary | later cycles | retain evidence refs, drop unverified chatter |
 
+Large multi-cycle work is handled by checkpointed PlanBeads and dependency
+edges, not by piling more free-form summaries into ordinary memory records. See
+`Actor-Persistent-State-And-PlanBeads.md` for the durable actor-state contract.
+Ordinary memory remains the evidence-linked past; PlanBeads are the actor-owned
+work graph that must survive restarts and compaction.
+
 ## Hermes Lessons Adapted
 
 Hermes memory is useful because of its contracts, not because its personal

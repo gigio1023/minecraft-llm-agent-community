@@ -1,3 +1,4 @@
+/** Regression coverage for table-bound crafting evidence and blockers. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

@@ -1,3 +1,10 @@
+/**
+ * Per-actor async reviewer queue and artifact coordination.
+ *
+ * @remarks Reviewers may analyze, patch, reject, or retire existing evidence and
+ * candidates, but they must not originate runtime action skill authority outside
+ * the action-selection path.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -276,10 +283,16 @@ function evidenceRefs(job: ActorReviewJob) {
 }
 
 function shouldProposeActionSkillRepair(job: ActorReviewJob) {
+  const hasActionSelectionCandidate = job.input_refs.some(
+    (inputRef) => inputRef.kind === "action_skill_candidate"
+  );
   return (
-    job.reason === "fake_progress_rejection" ||
-    job.reason === "verification_failure" ||
-    job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial")
+    hasActionSelectionCandidate &&
+    (
+      job.reason === "fake_progress_rejection" ||
+      job.reason === "verification_failure" ||
+      job.input_refs.some((inputRef) => inputRef.kind === "action_skill_direct_trial")
+    )
   );
 }
 

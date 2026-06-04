@@ -13,7 +13,7 @@ export type SayResult =
 
 type SayArgs = {
   actor: ChatActor;
-  target: ChatActor;
+  target?: ChatActor;
   dialogueState: DialogueState;
   text: string;
 };
@@ -30,6 +30,16 @@ export async function say({
   dialogueState,
   text
 }: SayArgs): Promise<SayResult> {
+  if (!target) {
+    actor.chat(text);
+    return {
+      status: "delivered",
+      actorId: actor.username,
+      targetId: "world_chat",
+      text
+    };
+  }
+
   const talkResult = dialogueState.requestTalk(actor.username, target.username);
 
   if (talkResult.status !== "available") {

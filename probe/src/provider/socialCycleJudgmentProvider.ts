@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
-import type { ActionIntent, ActorCycleGoal, CycleJudgment } from "../runtime/goals/types.js";
+import type { LegacyPlannerAction, ActorCycleGoal, CycleJudgment } from "../runtime/goals/types.js";
+import type { PlanBeadOperation } from "../runtime/goals/planBeads/index.js";
 import { validateCycleJudgment } from "../runtime/goals/types.js";
 import { writeCycleJudgment } from "../runtime/goals/cycleJudgmentStore.js";
 import {
@@ -16,6 +17,30 @@ import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import type { ProviderUsageRecord } from "./providerUsageTracker.js";
+import { buildCycleJudgmentProviderInput } from "./socialCycleProviderInputs.js";
+
+const planBeadOperationSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    schema: { type: "string", enum: ["plan-bead-operation/v1"] },
+    actor_id: { type: "string" },
+    op: {
+      type: "string",
+      enum: ["create", "update_notes", "set_status", "add_dependency"]
+    },
+    bead_id: { type: "string" },
+    rationale: { type: "string" },
+    evidence_refs: { type: "array", items: { type: "string" } },
+    confidence: {
+      type: "string",
+      enum: ["observed", "reviewed", "inferred", "uncertain"]
+    },
+    expected_checkpoint_version: { type: "number" },
+    patch: { type: "object" }
+  },
+  required: ["schema", "actor_id", "op", "rationale", "evidence_refs", "confidence", "patch"]
+} as const;
 
 const judgmentSchema = {
   type: "object",
@@ -67,6 +92,10 @@ const judgmentSchema = {
             required: ["target_actor_id", "kind", "evidence_refs"]
           }
         },
+        bead_op_proposals: {
+          type: "array",
+          items: planBeadOperationSchema
+        },
         next_goal_context: { type: "array", items: { type: "string" } }
       },
       required: [
@@ -76,6 +105,7 @@ const judgmentSchema = {
         "verifier_status",
         "memory_writes",
         "relationship_event_proposals",
+        "bead_op_proposals",
         "next_goal_context"
       ]
     }
@@ -108,16 +138,54 @@ export function extractCycleJudgmentPayload(payload: Record<string, unknown>) {
   return {};
 }
 
+type ProviderCycleJudgmentPayload = {
+  outcome: CycleJudgment["outcome"];
+  what_happened: string;
+  why_it_mattered_for_life_goal: string;
+  verifier_status: CycleJudgment["verifier_status"];
+  memory_writes: CycleJudgment["memory_writes"];
+  relationship_event_proposals: CycleJudgment["relationship_event_proposals"];
+  bead_op_proposals: unknown[];
+  next_goal_context: string[];
+};
+
+type CycleJudgmentBody = Omit<
+  CycleJudgment,
+  "schema" | "actor_id" | "cycle_id" | "cycle_goal_id" | "evidence_refs"
+>;
+
+export function buildCycleJudgmentBodyFromPayload(
+  raw: Record<string, unknown>,
+  verifierStatus: CycleJudgment["verifier_status"]
+): CycleJudgmentBody {
+  return {
+    outcome: raw.outcome as CycleJudgment["outcome"],
+    what_happened: String(raw.what_happened ?? ""),
+    why_it_mattered_for_life_goal: String(raw.why_it_mattered_for_life_goal ?? ""),
+    verifier_status: verifierStatus,
+    memory_writes: Array.isArray(raw.memory_writes)
+      ? (raw.memory_writes as CycleJudgment["memory_writes"])
+      : [],
+    relationship_event_proposals: Array.isArray(raw.relationship_event_proposals)
+      ? (raw.relationship_event_proposals as CycleJudgment["relationship_event_proposals"])
+      : [],
+    bead_op_proposals: Array.isArray(raw.bead_op_proposals)
+      ? [...raw.bead_op_proposals]
+      : [],
+    next_goal_context: asStringArray(raw.next_goal_context)
+  };
+}
+
 function buildRuntimeFallbackJudgmentBody(input: {
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   executedTools: string[];
   toolStatuses?: Array<{ tool: string; status: string }>;
   verifierStatus: CycleJudgment["verifier_status"];
   validationErrors: readonly string[];
-}): Omit<CycleJudgment, "schema" | "actor_id" | "cycle_id" | "cycle_goal_id" | "evidence_refs"> {
+}): CycleJudgmentBody {
   const tools = input.executedTools.length > 0
     ? input.executedTools.join(", ")
-    : input.actionIntent.kind;
+    : input.legacyPlannerAction.kind;
   return {
     outcome: deterministicJudgmentOutcome({
       verifierStatus: input.verifierStatus,
@@ -136,10 +204,270 @@ function buildRuntimeFallbackJudgmentBody(input: {
       }
     ],
     relationship_event_proposals: [],
+    bead_op_proposals: [],
     next_goal_context: [
       "Use runtime evidence from the previous action; do not rely on the malformed provider judgment text."
     ]
   };
+}
+
+function deterministicBeadOpProposals(input: {
+  actorId: string;
+  cycleGoal: ActorCycleGoal;
+  context: SocialCycleContextPacket;
+  evidenceRefs: readonly string[];
+}): PlanBeadOperation[] {
+  if (input.evidenceRefs.length === 0 || !input.context.plan_bead_packet) {
+    return [];
+  }
+
+  const selectedRefs = input.cycleGoal.derived_from.plan_bead_refs ?? [];
+  const selectedReady = input.context.plan_bead_packet.ready_beads.find((bead) =>
+    selectedRefs.includes(bead.checkpoint_ref)
+  );
+  if (selectedReady) {
+    return [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: input.actorId,
+        op: "set_status",
+        bead_id: selectedReady.bead_id,
+        rationale:
+          "The current CycleGoal selected this ready PlanBead; mark it in_progress as work-state context only.",
+        evidence_refs: [...input.evidenceRefs],
+        confidence: "observed",
+        patch: {
+          status: "in_progress"
+        }
+      }
+    ];
+  }
+
+  const current = input.context.plan_bead_packet.in_progress_beads[0];
+  if (!current) {
+    return [];
+  }
+  return [
+    {
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "update_notes",
+      bead_id: current.bead_id,
+      rationale:
+        "Preserve current in-progress PlanBead continuity after the cycle judgment.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: "observed",
+      patch: {
+        in_progress: [
+          ...current.notes_next,
+          `Cycle ${input.cycleGoal.cycle_id} kept this bead in active context.`
+        ]
+      }
+    }
+  ];
+}
+
+function actionLabel(intent: LegacyPlannerAction) {
+  return intent.kind === "use_action_skill"
+    ? intent.action_skill_id ?? "unknown_action_skill"
+    : intent.kind === "use_primitive"
+      ? intent.primitive_id ?? "unknown_primitive"
+      : intent.kind;
+}
+
+function runtimeStatusText(value: JsonValue) {
+  return isRecord(value) && typeof value.status === "string" ? value.status : undefined;
+}
+
+function toolStatusText(statuses: readonly { tool: string; status: string }[] = []) {
+  return statuses.map((entry) => `${entry.tool}:${entry.status}`);
+}
+
+function isContinuityOnlyAction(intent: LegacyPlannerAction, executedTools: readonly string[]) {
+  const action = actionLabel(intent);
+  const toolSet = new Set(executedTools);
+  return (
+    action === "observe" ||
+    action === "wait" ||
+    action === "remember" ||
+    (executedTools.length > 0 &&
+      [...toolSet].every((tool) => tool === "observe" || tool === "wait" || tool === "remember"))
+  );
+}
+
+function firstSelectedPlanBead(input: {
+  context: SocialCycleContextPacket;
+  cycleGoal: ActorCycleGoal;
+}) {
+  const packet = input.context.plan_bead_packet;
+  if (!packet) {
+    return undefined;
+  }
+  const selectedRefs = input.cycleGoal.derived_from.plan_bead_refs ?? [];
+  return (
+    packet.in_progress_beads[0] ??
+    packet.ready_beads.find((bead) => selectedRefs.includes(bead.checkpoint_ref)) ??
+    packet.ready_beads[0] ??
+    packet.blocked_beads[0]
+  );
+}
+
+function buildPlanBeadOperationGuidance(input: {
+  actorId: string;
+  cycleGoal: ActorCycleGoal;
+  legacyPlannerAction: LegacyPlannerAction;
+  context: SocialCycleContextPacket;
+  runtimeResult: JsonValue;
+  evidenceRefs: readonly string[];
+  executedTools: readonly string[];
+  toolStatuses?: readonly { tool: string; status: string }[];
+  verifierStatus: CycleJudgment["verifier_status"];
+}): JsonValue {
+  const packet = input.context.plan_bead_packet;
+  const action = actionLabel(input.legacyPlannerAction);
+  const statuses = toolStatusText(input.toolStatuses);
+  const runtimeStatus = runtimeStatusText(input.runtimeResult);
+  const hasEvidence = input.evidenceRefs.length > 0;
+  const hasExistingWork =
+    Boolean(packet) &&
+    (
+      packet!.ready_beads.length > 0 ||
+      packet!.in_progress_beads.length > 0 ||
+      packet!.blocked_beads.length > 0
+    );
+  const blockedLike =
+    input.verifierStatus === "failed" ||
+    runtimeStatus === "blocked" ||
+    runtimeStatus === "failed" ||
+    runtimeStatus === "timeout" ||
+    statuses.some((entry) =>
+      entry.includes(":blocked") || entry.includes(":failed") || entry.includes(":timeout")
+    );
+  const usefulProgress = input.verifierStatus === "passed";
+  const selected = firstSelectedPlanBead({
+    context: input.context,
+    cycleGoal: input.cycleGoal
+  });
+  const shouldConsider =
+    hasEvidence &&
+    !isContinuityOnlyAction(input.legacyPlannerAction, input.executedTools) &&
+    (blockedLike || usefulProgress || action.includes("Shelter") || action.includes("craft"));
+  const candidateOperations: PlanBeadOperation[] = [];
+
+  if (shouldConsider && usefulProgress && selected) {
+    candidateOperations.push({
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "set_status",
+      bead_id: selected.bead_id,
+      rationale:
+        "Current runtime evidence may satisfy the selected PlanBead; close only if the evidence actually matches its acceptance criteria.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: "observed",
+      expected_checkpoint_version: selected.checkpoint_version,
+      patch: {
+        status: "closed",
+        close_kind: "satisfied",
+        close_reason: `Runtime verifier passed for ${action}.`
+      }
+    });
+  } else if (shouldConsider && blockedLike && selected) {
+    candidateOperations.push({
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "update_notes",
+      bead_id: selected.bead_id,
+      rationale:
+        "The current action produced blocker evidence; update the existing PlanBead instead of losing the blocker across cycles.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: "observed",
+      expected_checkpoint_version: selected.checkpoint_version,
+      patch: {
+        blockers: [`${action} blocked or failed: ${runtimeStatus ?? statuses.join(", ")}`],
+        next: ["Choose a different valid affordance, repair structured args, or observe before retrying."]
+      }
+    });
+  } else if (shouldConsider && !hasExistingWork) {
+    candidateOperations.push({
+      schema: "plan-bead-operation/v1",
+      actor_id: input.actorId,
+      op: "create",
+      rationale:
+        "The actor hit an unfinished or blocked concern without an existing PlanBead; create a compact work item so future cycles can pivot instead of forgetting it.",
+      evidence_refs: [...input.evidenceRefs],
+      confidence: blockedLike ? "observed" : "inferred",
+      patch: {
+        kind: input.legacyPlannerAction.kind === "use_action_skill" ? "action_skill_followup" : "blocker_repair",
+        title: `Resolve ${action} continuity`,
+        description:
+          `Track the unresolved ${action} result under the LifeGoal without turning it into executable authority.`,
+        acceptance_evidence_required: [
+          "runtime evidence that the blocker was repaired, the work became irrelevant, or a better path was chosen"
+        ],
+        notes_next: [
+          "Use current observation, action_surface_summary, memory, and retry constraints before retrying this work."
+        ],
+        priority: blockedLike ? 1 : 2
+      }
+    });
+  }
+
+  return {
+    schema: "plan-bead-operation-guidance/v1",
+    graph_summary: packet?.graph_summary ?? null,
+    should_consider_plan_bead_op: shouldConsider,
+    reasons: [
+      blockedLike ? "current action has blocker/failure/timeout evidence" : "",
+      usefulProgress ? "current verifier passed and may satisfy selected work" : "",
+      !hasExistingWork ? "no existing open PlanBead is available yet" : ""
+    ].filter(Boolean),
+    selected_or_nearest_bead_id: selected?.bead_id ?? null,
+    candidate_operations_are_examples_not_commands: true,
+    candidate_operations: candidateOperations as unknown as JsonValue,
+    rules: {
+      use_empty_array_when_no_useful_update: true,
+      create_beads_for_unfinished_multi_cycle_work_or_repeated_blockers: true,
+      update_existing_beads_before_creating_duplicates: true,
+      close_only_with_runtime_or_guarded_relationship_evidence: true,
+      never_put_executable_args_or_permissions_in_a_bead: true
+    }
+  } as JsonValue;
+}
+
+function buildActionSkillFeedbackGuidance(input: {
+  legacyPlannerAction: LegacyPlannerAction;
+  executedTools: readonly string[];
+  toolStatuses?: readonly { tool: string; status: string }[];
+  verifierStatus: CycleJudgment["verifier_status"];
+}): JsonValue {
+  const action = actionLabel(input.legacyPlannerAction);
+  const statuses = toolStatusText(input.toolStatuses);
+  const actionSkillId =
+    input.legacyPlannerAction.kind === "use_action_skill"
+      ? input.legacyPlannerAction.action_skill_id ?? null
+      : null;
+  const failed =
+    input.verifierStatus === "failed" ||
+    statuses.some((entry) =>
+      entry.includes(":blocked") || entry.includes(":failed") || entry.includes(":timeout")
+    );
+  return {
+    schema: "action-skill-feedback-guidance/v1",
+    action_or_skill: action,
+    action_skill_id: actionSkillId,
+    should_consider_procedural_memory:
+      Boolean(actionSkillId) || (!isContinuityOnlyAction(input.legacyPlannerAction, input.executedTools) && failed),
+    should_consider_action_skill_followup_plan_bead: Boolean(actionSkillId && failed),
+    memory_write_hint:
+      actionSkillId && failed
+        ? `If evidence shows why ${actionSkillId} failed, add one procedural memory_writes item with the reusable blocker or repair hint.`
+        : "Use procedural memory only for reusable action-skill or primitive execution lessons, not ordinary diary text.",
+    rules: {
+      procedural_memory_must_cite_current_evidence_refs: true,
+      action_skill_feedback_is_not_runtime_authority: true,
+      "do_not_promote_or_rewrite_action_skills_from_provider_text_alone": true
+    }
+  } as JsonValue;
 }
 
 /**
@@ -154,7 +482,7 @@ export async function runSocialCycleJudgmentProvider(input: {
   actorId: string;
   cycleId: string;
   cycleGoal: ActorCycleGoal;
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   context: SocialCycleContextPacket;
   runtimeResult: JsonValue;
   evidenceRefs: string[];
@@ -169,27 +497,35 @@ export async function runSocialCycleJudgmentProvider(input: {
 }): Promise<CycleJudgmentProviderResult> {
   const turnId = input.turnId ?? input.cycleId;
   const snapshotId = `cycle-judgment-${turnId}-${randomUUID()}`;
-  const providerInput = {
-    stage: "cycle_judgment",
-    turn_id: turnId,
-    action_index: input.actionIndex,
-    ActorSoul: input.context.ActorSoul,
-    ActorLifeGoal: input.context.ActorLifeGoal,
-    cycle_goal: input.cycleGoal,
-    action_intent: input.actionIntent,
-    runtime_result: input.runtimeResult,
-    evidence_refs: input.evidenceRefs,
-    executed_tools: input.executedTools,
-    tool_statuses: input.toolStatuses ?? [],
-    verifier_status: input.verifierStatus,
-    world_events: input.context.world_events,
-    relationship_context: input.context.relationship_context,
-    memory_packet: input.context.memory_packet,
-    action_surface: input.context.action_surface,
-    previous_cycle_judgments: input.context.previous_cycle_judgments,
-    settlement_state: input.context.settlement_state,
-    settlement_checklist: input.context.settlement_state.checklist
-  } as JsonValue;
+  const providerInput = buildCycleJudgmentProviderInput({
+    context: input.context,
+    turnId,
+    actionIndex: input.actionIndex,
+    cycleGoal: input.cycleGoal,
+    legacyPlannerAction: input.legacyPlannerAction,
+    runtimeResult: input.runtimeResult,
+    evidenceRefs: input.evidenceRefs,
+    executedTools: input.executedTools,
+    toolStatuses: input.toolStatuses,
+    verifierStatus: input.verifierStatus,
+    planBeadOperationGuidance: buildPlanBeadOperationGuidance({
+      actorId: input.actorId,
+      cycleGoal: input.cycleGoal,
+      legacyPlannerAction: input.legacyPlannerAction,
+      context: input.context,
+      runtimeResult: input.runtimeResult,
+      evidenceRefs: input.evidenceRefs,
+      executedTools: input.executedTools,
+      toolStatuses: input.toolStatuses,
+      verifierStatus: input.verifierStatus
+    }) as unknown as JsonValue,
+    actionSkillFeedbackGuidance: buildActionSkillFeedbackGuidance({
+      legacyPlannerAction: input.legacyPlannerAction,
+      executedTools: input.executedTools,
+      toolStatuses: input.toolStatuses,
+      verifierStatus: input.verifierStatus
+    }) as unknown as JsonValue
+  });
 
   const inputPath = await writeProviderInputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-input-snapshot/v1",
@@ -202,7 +538,7 @@ export async function runSocialCycleJudgmentProvider(input: {
     input: providerInput
   });
 
-  let judgmentBody: Omit<CycleJudgment, "schema" | "actor_id" | "cycle_id" | "cycle_goal_id" | "evidence_refs">;
+  let judgmentBody: CycleJudgmentBody;
   let usageRecord: ProviderUsageRecord | undefined;
   let providerRawOutputText = "";
   let providerParsedPayload: JsonValue | undefined;
@@ -214,30 +550,40 @@ export async function runSocialCycleJudgmentProvider(input: {
         executedTools: input.executedTools,
         toolStatuses: input.toolStatuses
       }),
-      what_happened: `Runtime ${input.verifierStatus} for ${input.actionIntent.kind}`,
+      what_happened: `Runtime ${input.verifierStatus} for ${input.legacyPlannerAction.kind}`,
       why_it_mattered_for_life_goal:
         "Baseline cycle records truthful runtime evidence against gatherer LifeGoal.",
       verifier_status: input.verifierStatus,
       memory_writes: [
         {
           layer: "episodic",
-          summary: input.actionIntent.why_this_action,
+          summary: input.legacyPlannerAction.why_this_action,
           confidence: "observed"
         }
       ],
       relationship_event_proposals: [],
       next_goal_context: input.context.previous_cycle_judgments.length
         ? ["Consider prior judgment when choosing the next CycleGoal"]
-        : ["Continue settlement contribution under LifeGoal"]
+        : ["Continue settlement contribution under LifeGoal"],
+      bead_op_proposals: deterministicBeadOpProposals({
+        actorId: input.actorId,
+        cycleGoal: input.cycleGoal,
+        context: input.context,
+        evidenceRefs: input.evidenceRefs
+      })
     };
   } else {
     const providerCall = {
       schemaName: "social_cycle_judgment",
       schema: judgmentSchema,
-      system: `Write CycleJudgment from runtime evidence only. Treat observation as raw evidence; decide what mattered from ActorSoul, LifeGoal, role context, relationships, memory, blockers, and runtime facts.
+      system: `Write CycleJudgment from runtime evidence only. Treat observation as raw evidence; decide what mattered from ActorSoul, LifeGoal, role context, relationships, memory, blockers, PlanBead context, and runtime facts.
 Do not claim verified_progress unless executed_tools include a meaningful gameplay primitive (for example collect_logs, mine_block, craft_item, consume_item) with supporting evidence_refs and, for action-skill bundles, passing postcondition_results.
+Use minecraft_basic_guide when interpreting failures. Examples: known_item_flows define missing prerequisites, blocked_recovery_guides define the next executable repair, observe_stop_guides keep repeated scans from looking like progress, a held crafting_table item is not a placed station, table-sized recipes need a reachable placed crafting_table, blocked place_block on grass_block/dirt means the target cell was occupied unless runtime evidence says it resolved a support surface, block removal is not inventory pickup, and a bounded scan cannot prove global absence.
 Use partial_verified_progress only when runtime_result/tool_statuses show current-run world, inventory, movement, container, or block mutation but the final verifier or action-skill postcondition did not pass.
-observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks. ActorSoul, ActorLifeGoal, memory_packet, relationship_context, action_surface, and world_events must inform why_it_mattered_for_life_goal without inventing facts. JSON only.`,
+observe-only cycles are no_progress, not verified_progress. memory_writes are evidence-linked summaries or blocker/action-skill notes, not a diary of completed tasks.
+plan_bead_packet is always present and read-only continuity context, even when the graph is empty. Use plan_bead_operation_guidance as an affordance hint, not as a command. When an action reveals an unfinished multi-cycle concern, a repeated blocker, an action-skill followup, or evidence that selected work is satisfied, propose bead_op_proposals so the actor can remember, update, block, defer, link, close, or replace the work item. Use [] when no useful PlanBead update is justified; do not create beads for every observe/wait/remember cycle. Prefer updating an existing ready or in_progress PlanBead over creating duplicates. If repeated remember-only cycles add no new evidence, update the existing bead once and consider set_status {status:"deferred"} or a next note that requires fresh observation before retry; do not keep making the same memory note look like progress. For update_notes or set_status, copy the target bead's current checkpoint_version into expected_checkpoint_version; omit expected_checkpoint_version for create operations. Use these operation shapes: create.patch={kind,title,description,acceptance_evidence_required,notes_next,priority}; update_notes.patch may include completed,in_progress,blockers,next,key_decisions string arrays; set_status.patch={status,close_kind?,close_reason?}; add_dependency.patch={bead_id,depends_on_bead_id,type,rationale,evidence_refs}. Every operation evidence_refs entry must cite current actor-workspace artifacts. A closed/satisfied PlanBead needs runtime evidence, guarded relationship evidence, or settlement evidence; provider prose, memory, judgment text, or plan_bead_packet alone cannot satisfy it.
+Use action_skill_feedback_guidance when writing memory_writes. If an action skill or reusable primitive fails, add a concise procedural memory write with the repair lesson or blocker. If it passed, record only reusable evidence-backed lessons, not generic praise. Procedural memory and PlanBeads help future choices but never grant execution authority.
+ActorSoul, ActorLifeGoal, memory_packet, relationship_context, coarse action_surface_summary, and world_events must inform why_it_mattered_for_life_goal without inventing facts. Detailed action skill search is not available in judgment; do not invent new action skills here. JSON only.`,
       user: JSON.stringify(providerInput),
       usageContext: {
         runId: input.runId,
@@ -247,28 +593,12 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
       }
     };
     const result = input.providerId === "gemini-api" ? await callGeminiJsonSchema<{
-      cycle_judgment: {
-        outcome: CycleJudgment["outcome"];
-        what_happened: string;
-        why_it_mattered_for_life_goal: string;
-        verifier_status: CycleJudgment["verifier_status"];
-        memory_writes: CycleJudgment["memory_writes"];
-        relationship_event_proposals: CycleJudgment["relationship_event_proposals"];
-        next_goal_context: string[];
-      };
+      cycle_judgment: ProviderCycleJudgmentPayload;
     }>({
       config: input.gemini!,
       ...providerCall
     }) : await callOpenAiJsonSchema<{
-      cycle_judgment: {
-        outcome: CycleJudgment["outcome"];
-        what_happened: string;
-        why_it_mattered_for_life_goal: string;
-        verifier_status: CycleJudgment["verifier_status"];
-        memory_writes: CycleJudgment["memory_writes"];
-        relationship_event_proposals: CycleJudgment["relationship_event_proposals"];
-        next_goal_context: string[];
-      };
+      cycle_judgment: ProviderCycleJudgmentPayload;
     }>({
       config: input.openAi!,
       ...providerCall
@@ -300,19 +630,7 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
     providerRawOutputText = result.rawText;
     providerParsedPayload = payload as unknown as JsonValue;
     const raw = extractCycleJudgmentPayload(payload);
-    judgmentBody = {
-      outcome: raw.outcome as CycleJudgment["outcome"],
-      what_happened: String(raw.what_happened ?? ""),
-      why_it_mattered_for_life_goal: String(raw.why_it_mattered_for_life_goal ?? ""),
-      verifier_status: input.verifierStatus,
-      memory_writes: Array.isArray(raw.memory_writes)
-        ? (raw.memory_writes as CycleJudgment["memory_writes"])
-        : [],
-      relationship_event_proposals: Array.isArray(raw.relationship_event_proposals)
-        ? (raw.relationship_event_proposals as CycleJudgment["relationship_event_proposals"])
-        : [],
-      next_goal_context: asStringArray(raw.next_goal_context)
-    };
+    judgmentBody = buildCycleJudgmentBodyFromPayload(raw, input.verifierStatus);
   }
 
   const judgment: CycleJudgment = clampCycleJudgmentOutcome({
@@ -325,7 +643,7 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
       ...(input.runId ? { run_id: input.runId } : {}),
       ...judgmentBody
     },
-    actionIntent: input.actionIntent,
+    action: input.legacyPlannerAction,
     executedTools: input.executedTools,
     toolStatuses: input.toolStatuses
   });
@@ -346,14 +664,14 @@ observe-only cycles are no_progress, not verified_progress. memory_writes are ev
         evidence_refs: [...input.evidenceRefs],
         ...(input.runId ? { run_id: input.runId } : {}),
         ...buildRuntimeFallbackJudgmentBody({
-          actionIntent: input.actionIntent,
+          legacyPlannerAction: input.legacyPlannerAction,
           executedTools: input.executedTools,
           toolStatuses: input.toolStatuses,
           verifierStatus: input.verifierStatus,
           validationErrors: validated.errors
         })
       },
-      actionIntent: input.actionIntent,
+      action: input.legacyPlannerAction,
       executedTools: input.executedTools,
       toolStatuses: input.toolStatuses
     });

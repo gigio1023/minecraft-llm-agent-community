@@ -1,3 +1,11 @@
+/**
+ * Canonical path builder for actor workspace artifacts.
+ *
+ * @remarks The actor workspace is the source of truth for actor-owned action
+ * skills, evidence, memory, PlanBeads, and review records. Path sanitization
+ * keeps provider text from shaping filesystem layout directly.
+ */
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 export type ActorWorkspacePaths = {
@@ -31,6 +39,16 @@ export type ActorWorkspacePaths = {
   cycleGoalsDir: string;
   judgmentsDir: string;
   worldEventsDir: string;
+  planBeads: {
+    rootDir: string;
+    beadsDir: string;
+    dependenciesDir: string;
+    dependenciesFile: string;
+    eventsDir: string;
+    historyDir: string;
+    indexesDir: string;
+    readyCacheFile: string;
+  };
   actionSkills: {
     rootDir: string;
     indexFile: string;
@@ -60,13 +78,19 @@ export type ActorMemoryLayerPath =
   | "guardrail";
 
 export function sanitizeWorkspaceFileId(id: string) {
-  return id.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const sanitized = id.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  if (sanitized.length <= 120) {
+    return sanitized;
+  }
+  const digest = createHash("sha256").update(sanitized).digest("hex").slice(0, 12);
+  return `${sanitized.slice(0, 107)}-${digest}`;
 }
 
 export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorWorkspacePaths {
   const actorDir = path.join(rootDir, actorId);
   const actionSkillRootDir = path.join(actorDir, "action-skills");
   const memoryRootDir = path.join(actorDir, "memory");
+  const planBeadsRootDir = path.join(actorDir, "plan-beads");
 
   return {
     rootDir,
@@ -99,6 +123,16 @@ export function getActorWorkspacePaths(rootDir: string, actorId: string): ActorW
     cycleGoalsDir: path.join(actorDir, "goals", "cycle"),
     judgmentsDir: path.join(actorDir, "judgments"),
     worldEventsDir: path.join(actorDir, "world-events"),
+    planBeads: {
+      rootDir: planBeadsRootDir,
+      beadsDir: path.join(planBeadsRootDir, "beads"),
+      dependenciesDir: path.join(planBeadsRootDir, "dependencies"),
+      dependenciesFile: path.join(planBeadsRootDir, "dependencies", "dependencies.jsonl"),
+      eventsDir: path.join(planBeadsRootDir, "events"),
+      historyDir: path.join(planBeadsRootDir, "history"),
+      indexesDir: path.join(planBeadsRootDir, "indexes"),
+      readyCacheFile: path.join(planBeadsRootDir, "indexes", "ready-cache.json")
+    },
     actionSkills: {
       rootDir: actionSkillRootDir,
       indexFile: path.join(actionSkillRootDir, "index.json"),
@@ -170,4 +204,44 @@ export function getActorMemoryRecordPath(
 ) {
   const paths = getActorWorkspacePaths(rootDir, actorId);
   return path.join(getActorMemoryLayerDir(paths, layer), `${sanitizeWorkspaceFileId(memoryId)}.json`);
+}
+
+export function getActorPlanBeadRecordPath(
+  rootDir: string,
+  actorId: string,
+  beadId: string
+) {
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+  return path.join(paths.planBeads.beadsDir, `${sanitizeWorkspaceFileId(beadId)}.json`);
+}
+
+export function getActorPlanBeadEventLogPath(
+  rootDir: string,
+  actorId: string,
+  beadId: string
+) {
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+  return path.join(paths.planBeads.eventsDir, `${sanitizeWorkspaceFileId(beadId)}.jsonl`);
+}
+
+export function getActorPlanBeadHistoryDir(
+  rootDir: string,
+  actorId: string,
+  beadId: string
+) {
+  const paths = getActorWorkspacePaths(rootDir, actorId);
+  return path.join(paths.planBeads.historyDir, sanitizeWorkspaceFileId(beadId));
+}
+
+export function getActorPlanBeadHistorySnapshotPath(
+  rootDir: string,
+  actorId: string,
+  beadId: string,
+  sequence: number | string,
+  kind: string
+) {
+  return path.join(
+    getActorPlanBeadHistoryDir(rootDir, actorId, beadId),
+    `${sanitizeWorkspaceFileId(String(sequence))}-${sanitizeWorkspaceFileId(kind)}.json`
+  );
 }

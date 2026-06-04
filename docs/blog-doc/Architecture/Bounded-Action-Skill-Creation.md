@@ -4,6 +4,13 @@ sidebar_position: 3
 
 # Bounded Action Skill Creation
 
+Status note: this page remains the baseline lifecycle and evidence contract for
+action skill creation. The newer
+`Action-Selection-Gated-Action-Skill-Authoring-Plan.md` updates the generated
+code decision by allowing an explicit `author_and_trial_action_skill` ActionIntent
+mode. That mode is the only approved path for first creating a generated action
+skill candidate during social-cycle runtime.
+
 This page defines how this repo should add the future ability to create,
 improve, supersede, and retire Minecraft action skills.
 
@@ -12,28 +19,32 @@ runtime behavior, while an agent skill is a `.agents/skills/*/SKILL.md`
 capability for coding agents.
 
 The decision is intentionally not "copy Voyager" or "pick one reference repo".
-The useful pattern is evidence-backed action skill evolution. The unsafe pattern is
-runtime code generation that immediately enters the hot loop.
+The useful pattern is evidence-backed action skill evolution. The unsafe pattern
+is generated code becoming hidden runtime authority or entering the loop without
+an explicit action-selection decision, schema validation, helper-event evidence,
+and verifier-backed trial.
 
 ## Core Decision
 
 Action skill creation in this repo should mean:
 
 ```text
-runtime evidence -> action skill proposal -> bounded recipe -> validation
--> live trial -> actor-owned promotion or rejection
+action-selection decision -> schema-bound candidate -> bounded helper/source
+validation -> live trial -> actor-owned promotion or rejection
 ```
 
 It should not mean:
 
 ```text
-LLM writes JavaScript or TypeScript -> runtime imports/evals it -> bot runs it
+background reviewer writes JavaScript or TypeScript -> runtime imports/evals it
+-> bot runs it as an active skill
 ```
 
-The runtime already has a bounded action loop. New action skills should first
-compose existing trusted primitives and verifiers. Generated code can be
-considered later, but only outside the hot loop and only after review, tests, and
-explicit promotion.
+The runtime already has a bounded action loop. New action skills should be
+created only when the action planner explicitly chooses the creation path.
+Generated code is allowed as a bounded trial artifact when it is schema-bound,
+helper-limited, recorded, and verified. It is not automatically active action
+skill memory until lifecycle promotion succeeds.
 
 ## Atomic Gameplay Boundaries
 
@@ -113,16 +124,23 @@ changed".
 
 ### Generated Code Bundle
 
-Generated code is now a direct objective propagation artifact. It can run during
-an objective trial, but its result is treated like proposed behavior until
-current-run evidence verifies the objective. Background reviewers can later turn
-useful generated code into bounded recipes.
+Generated code is now a direct objective propagation artifact and, under the
+action-selection-gated authoring plan, a social-cycle candidate trial artifact.
+It can run during a bounded trial, but its result is treated like proposed
+behavior until current-run evidence verifies the objective or action skill
+postcondition. Background reviewers can improve, review, reject, or promote an
+existing candidate, but they must not originate a new action skill candidate
+outside the action-selection gate.
 
 ## Lifecycle
 
 ### 1. Trigger
 
-Create an action skill proposal only from real evidence:
+Create an action skill proposal only from an explicit action-selection decision
+or from offline/manual implementation work. In social-cycle runtime, the first
+candidate record must originate from `author_and_trial_action_skill`.
+
+The decision should be grounded in real evidence:
 
 - a repeated failure in transcript or artifacts;
 - a human-visible behavior note, such as "pretends to chop" or "walks away in
@@ -134,7 +152,9 @@ Create an action skill proposal only from real evidence:
 ### 2. Propose
 
 The proposer consumes artifacts, current seed action skills, primitive
-contracts, actor role ownership, and review notes. It emits a proposal, not code.
+contracts, actor role ownership, and review notes. In the new social-cycle path,
+the proposer emits a schema-bound candidate plus generated TypeScript source for
+trial; the runtime still treats it as a proposal, not active code.
 
 Required proposal fields:
 
@@ -153,6 +173,10 @@ type ActionSkillProposalRecord = {
   known_failure_modes: string[];
   created_at: string;
   updated_at: string;
+  generated_candidate?: GeneratedActionSkillCandidate;
+  generated_parameters?: JsonObject;
+  generated_lifecycle_status?: "trial_failed" | "promotable";
+  generated_trial?: GeneratedActionSkillTrial;
   notes?: string;
 };
 ```
@@ -183,8 +207,9 @@ type ActionSkillRecipe = {
 };
 ```
 
-Recipes must not include arbitrary code, imports, filesystem access, network
-access, or unbounded loops.
+Recipes and generated source must not include imports, filesystem access,
+network access, process access, eval, Function, child processes, or unbounded
+loops.
 
 ### 4. Validate
 
@@ -239,6 +264,10 @@ Lifecycle statuses:
 - `retired`: consistently unhelpful or obsolete;
 - `rejected`: invalid, unsafe, or unsupported by evidence.
 
+For the initial generated-authoring implementation, `trial_failed` and
+`promotable` are stored as `generated_lifecycle_status` metadata on the draft
+proposal. They are not active action skill record statuses yet.
+
 Supersession should preserve history. Do not delete failed variants just because
 they are embarrassing; they are useful anti-repeat evidence.
 
@@ -254,13 +283,15 @@ Action skill creation should be split across small modules:
 - `gameplay/verification/`: deterministic success/failure checks;
 - `transcript/`: evidence persistence.
 
-The hot loop should only execute active action skills through the same bounded
-action runner used by ordinary tool proposals. It should not generate code,
-import new modules, or mutate the action skill registry during an action.
+The hot loop should execute active action skills through the same bounded action
+runner used by ordinary tool proposals. It may generate and trial a new
+candidate only through the explicit action-selection-gated authoring path. It
+must not import arbitrary generated modules, mutate the active registry, or
+create candidate records from background side effects.
 
 ## First Implementation Slice
 
-The first practical slice should be deliberately small:
+The original first practical slice was deliberately small:
 
 1. Add an `ActionSkillRecipe` schema and validator.
 2. Add a candidate proposal store under build or data artifacts.
@@ -268,10 +299,23 @@ The first practical slice should be deliberately small:
 4. Add tests that reject unknown primitives, planned primitives, missing
    verifiers, and role-incompatible recipes.
 5. Add transcript fields for candidate action skill trial evidence.
-6. Promote nothing automatically.
+6. Promote nothing automatically unless a later plan explicitly enables
+   evidence-gated auto-promotion for the run.
 
 This gives the project the ability to learn from runs without pretending it has
 open-ended autonomous action skill generation.
+
+The current generated-authoring slice builds on that baseline:
+
+1. `author_and_trial_action_skill` is a first-class ActionIntent kind.
+2. `parameters` are the executable authority, with `args` kept as a migration
+   alias.
+3. Generated TypeScript runs as `run(ctx, params)` through a helper allowlist.
+4. Candidate proposals, generated source refs, helper events, trial evidence,
+   verifier status, and generated lifecycle status are persisted in the actor
+   workspace.
+5. Background reviewers cannot originate a generated candidate without an
+   existing action-selection candidate ref.
 
 ## Review Checklist
 

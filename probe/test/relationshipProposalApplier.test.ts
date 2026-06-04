@@ -1,3 +1,4 @@
+/** Regression coverage for reviewer-applied relationship proposal updates. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";

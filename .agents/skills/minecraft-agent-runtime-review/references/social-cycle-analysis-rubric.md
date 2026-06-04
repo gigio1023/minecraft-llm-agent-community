@@ -44,12 +44,14 @@ Report:
 - outcome distribution;
 - verifier distribution;
 - runtime attempt statuses;
-- action intent distribution by primitive/action skill;
+- Actor Turn selection or legacy action distribution by Action Card, primitive,
+  action skill, or `author_mineflayer_action`;
 - executed tool distribution;
 - observe/wait/remember share;
 - observation-to-next-action distribution;
 - action-surface utilization: direct primitives/action skills exposed, used as
-  top-level intents, used as executed tools, and unused;
+  top-level Actor Turn selections or legacy actions, used as executed tools, and
+  unused;
 - action concentration: top 5 and top 6 action share over total cycles;
 - social signal coverage: visible actors, `say`, shared storage, relationship
   events, obligations, and handoff/deposit actions;

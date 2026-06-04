@@ -50,6 +50,12 @@ Provider-backed calls must be auditable before and after a run:
 - the ignored global ledger appends one JSONL row per provider request;
 - the social-cycle report includes `provider_usage` totals for the run.
 
+For daily free-tier reset windows and Korea-time conversions, read
+`docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` before long live
+runs. In short: OpenAI API complimentary-token budgets reset at `00:00 UTC`
+(`09:00 KST`), while Gemini API daily `RPD` budgets reset at midnight Pacific
+time (`16:00 KST` during PDT, `17:00 KST` during PST).
+
 Default ignored ledger path:
 
 ```text
@@ -87,9 +93,21 @@ run. Use it when AI Studio or another provider dashboard says the project has
 already consumed part of the free-tier pool. This is intentionally local and
 ignored; do not commit personal usage state.
 
+Daily provider budget windows are provider-specific. `openai-api` uses
+`quota_day_utc`, because OpenAI's complimentary-token counter refreshes at
+00:00 UTC. `gemini-api` uses `pacific_day`, because Gemini API daily RPD resets
+at midnight Pacific time.
+
 The built-in `gemma-4-31b-it` budget is an operator guardrail, not an official
 quota guarantee. Google documents that Gemini API limits vary by project, tier,
 and model, and that active limits should be checked in AI Studio.
+
+The repo also carries a conservative `gemini-2.5-flash-lite` guard at 20
+requests per Pacific day. This is based on a live Gemini API error observed on
+2026-06-02 during an Actor Turn social-cycle run:
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier` returned `quotaValue: 20`
+for `gemini-2.5-flash-lite`. Treat this as a project/model safety cap, not a
+universal Gemini quota.
 
 ## Social-Cycle Gemini API
 
@@ -123,6 +141,30 @@ bun run probe:social-cycle -- \
   --report ../tmp/social-cycle-npc-b-gemma31b-offline.json \
   --no-dashboard
 ```
+
+Experimental Actor Turn bridge check:
+
+```bash
+cd probe
+bun run probe:social-cycle -- \
+  --provider deterministic-social \
+  --model deterministic-social \
+  --actor npc_b \
+  --cycles 2 \
+  --max-actions-per-cycle 2 \
+  --offline \
+  --action-hot-path actor_turn \
+  --report ../tmp/social-cycle-actor-turn-cli-smoke.json \
+  --no-dashboard
+```
+
+This check should write `actor-turn-input/v1` provider snapshots and
+`action_hot_path: "actor_turn"` in the report. In this mode ordinary turn
+judgment is runtime-classified, so per-action `cycle-judgment` provider
+snapshots should not appear. A two-cycle non-branch smoke should show one
+initial `goal_mind` provider input, four `actor-turn` provider inputs, the same
+`active_episode_ref` on both cycles, and no `deliberation_branch_refs`. Offline
+runs can still end as `blocked` because they cannot prove Minecraft mutation.
 
 Live social-cycle run:
 

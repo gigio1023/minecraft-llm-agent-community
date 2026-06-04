@@ -1,3 +1,4 @@
+/** Regression coverage for the generated Mineflayer program sandbox contract. */
 import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
@@ -51,7 +52,7 @@ test("run_mineflayer_program stores source, helper events, and post-observation 
       export async function run(ctx: {
         observe(): Promise<unknown>;
         say(text: string): Promise<unknown>;
-      }) {
+      }, params: Record<string, never>) {
         await ctx.observe();
         return ctx.say("I can report what I just saw.");
       }
@@ -68,4 +69,42 @@ test("run_mineflayer_program stores source, helper events, and post-observation 
     ["observe", "say"]
   );
   assert.equal((result.postObservation as any).status, "ok");
+});
+
+test("run_mineflayer_program wait accepts structured duration args", async () => {
+  const { bot } = createTestBot("npc_b", 0);
+  const result = await runMineflayerProgram({
+    actorId: "npc_b",
+    bot,
+    source: `
+      export async function run(ctx, params) {
+        await ctx.wait({ durationMs: 1 });
+        return { status: "waited" };
+      }
+    `
+  });
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.errorMessage, undefined);
+  assert.equal((result.helperEvents[1] as any)?.name, "wait");
+  assert.equal((result.helperEvents[1] as any)?.status, "completed");
+});
+
+test("run_mineflayer_program wait rejects non-finite durations", async () => {
+  const { bot } = createTestBot("npc_b", 0);
+  const result = await runMineflayerProgram({
+    actorId: "npc_b",
+    bot,
+    source: `
+      export async function run(ctx, params) {
+        await ctx.wait({ durationMs: "soon" });
+        return { status: "waited" };
+      }
+    `
+  });
+
+  assert.equal(result.status, "skill_error");
+  assert.match(result.errorMessage ?? "", /finite duration/);
+  assert.equal((result.helperEvents[1] as any)?.name, "wait");
+  assert.equal((result.helperEvents[1] as any)?.status, "failed");
 });

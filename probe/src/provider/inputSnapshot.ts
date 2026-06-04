@@ -1,3 +1,9 @@
+/**
+ * JSON value model shared by provider input/output snapshots.
+ *
+ * @remarks Snapshot records intentionally store serializable context so provider
+ * decisions can be audited without replaying the whole runtime.
+ */
 export type JsonValue =
   | string
   | number

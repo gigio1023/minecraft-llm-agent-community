@@ -1,3 +1,4 @@
+/** Regression coverage for turn-phased actor mailbox behavior. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

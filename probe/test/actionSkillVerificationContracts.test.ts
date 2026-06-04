@@ -1,3 +1,4 @@
+/** Regression coverage for action skill verifier contract definitions. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";

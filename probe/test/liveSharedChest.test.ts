@@ -1,3 +1,4 @@
+/** Regression coverage for live shared-chest evidence and container semantics. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

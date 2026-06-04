@@ -31,6 +31,129 @@ Not current delivery targets:
 - long-run autonomy as a product goal;
 - large multi-actor society behavior before single-actor competence is trustworthy.
 
+## PlanBeads Intent Rule
+
+PlanBeads exist because free-form strings are too weak to manage what an actor is
+trying to do, why it matters, what remains open, and how work should survive
+context changes. They are a structured state/work-management substrate for
+LLM-based actors, not a replacement for actor freedom.
+
+The intended effect is to give the LLM actor more room to behave naturally in
+Minecraft and social simulation, because important concerns, blockers,
+dependencies, and resumable work are explicit instead of buried in prose.
+
+The primary pain PlanBeads address is forgetting or muddying multi-cycle work
+state. Execution and verification remain important, but the first PlanBeads
+implementation should not become a verification project for its own sake. It
+must prevent silent error hiding, fake completion, and progress laundering, while
+keeping the main emphasis on clear state continuity.
+
+The first meaningful proof is context-change behavior:
+
+- the actor is working on concern A;
+- a new concern B appears through observation, relationship pressure, blocker,
+  or runtime evidence;
+- the runtime preserves A's open/in-progress/blocked/deferred state;
+- B can be added, prioritized, deferred, or linked without erasing A;
+- the next CycleGoal can choose from current observation and the ready front
+  without becoming a checklist executor.
+
+Treat it as a design failure if the actor spends more effort maintaining
+PlanBeads than acting in the world, or if PlanBeads make the NPC stiff,
+checklist-bound, or less capable of free LLM-based behavior. Bead updates should
+be small, evidence-linked, and in service of Minecraft action and social
+simulation, not a new activity that displaces them.
+
+PlanBeads must never become executable authority. They do not supply missing
+primitive args, grant action-skill permissions, decide physical success, clear
+runtime retry constraints, or replace runtime action validation. If an
+implementation pushes PlanBeads toward deterministic domain planning, reject or
+reframe it.
+
+CycleJudgment may carry raw PlanBead operation proposal candidates, including
+malformed candidates. Do not make the entire judgment fail only because one
+candidate is invalid. The guarded PlanBead applier owns per-operation
+validation, acceptance, rejection, and operation-result artifacts. This keeps
+LLM proposal freedom visible while preventing unguarded state mutation.
+
+PlanBeads are Beads-inspired, not Beads CLI integration. The runtime must not
+shell out to `bd`, `br`, `beads-mcp`, `.beads`, or downloaded Beads binaries for
+NPC state. Actor PlanBeads are repo-owned TypeScript/JSON actor-workspace
+records under each actor directory. External Beads-style tools may be used only
+for repo implementation campaign management, never as Minecraft runtime state
+or as a required device-level dependency.
+
+Parallel GPT-5.5-xhigh workers may be used for speed and context isolation, but
+parallelism does not change runtime authority. Workers operate under lane
+contracts, produce artifacts or patches, and coordinator verification decides
+what lands.
+
+## Action Skill Authoring Gate
+
+New Minecraft action skill creation during social-cycle runtime must originate
+only from the action-selection stage. In Actor Turn mode, the provider may
+choose `author_mineflayer_action`, which the runtime resolves into full-context
+generated action authoring and trial. Legacy planner paths may still produce
+`author_and_trial_action_skill` while they remain in explicit migration scope.
+In either mode, current observation, CycleGoal or Active Episode, memory,
+PlanBeads, relationship context, retry constraints, and the action surface must
+justify creating a new actor-owned behavior candidate.
+
+Background reviewers, async sidecars, PlanBead operations, legacy generated
+skill importers, and offline maintenance scripts must not originate new action
+skill candidates for an NPC during runtime. They may review, patch, reject,
+retire, supersede, promote, or re-trial an existing action-selection candidate
+with evidence. They may also propose PlanBeads that say a new action skill is
+needed, but PlanBeads do not create source, parameters, permissions, or
+executable authority.
+
+Generated Mineflayer code should be used more actively through this explicit
+author-and-trial path. It must be schema-bound and helper-limited:
+
+- provider output must include an input schema, current parameters, generated
+  TypeScript source, helper API version, timeout, verifier, failure modes, and
+  promotion policy;
+- primitive and action-skill parameters must validate against JSON
+  Schema/OpenAPI-style contracts before execution;
+- prose fields such as `why_this_action` never supply missing parameters;
+- generated source must run through bounded helpers and record helper events,
+  post-observation, verifier output, and actor-workspace evidence;
+- a passed trial is not active action skill authority until lifecycle promotion
+  succeeds.
+
+Use `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+as the active implementation plan for this rule.
+
+## Tool Calling And Prose-Parsing Anti-Pattern
+
+The strongest current anti-pattern is treating LLM-facing prose as executable
+runtime policy. Do not parse `current_state_requirements`, `why_this_action`,
+Action Card descriptions, Minecraft Basic Guide text, memory notes, PlanBeads,
+or provider rationale with string `includes`, regexes, keyword lists, or similar
+text heuristics to decide tool visibility, action eligibility, primitive
+arguments, permissions, retry clearance, or generated-code authority.
+
+Tool calling and strict schemas/enums must enforce the Actor Turn flow. The
+provider may choose only a visible function tool or `author_mineflayer_action`.
+Within that selected tool/action, the LLM keeps decision freedom with full
+context, rich rationale, and schema-bound logical parameters. The runtime then
+validates explicit structured params, schema conformance, permission gates,
+retry/safety constraints, generated-source guardrails, timeouts, verifier output,
+and evidence artifacts.
+
+The runtime must not become a hidden Minecraft planner. Do not hide Action Cards
+or tools through hardcoded Minecraft domain heuristics such as item-family,
+station-family, construction-readiness, survival-priority, shelter-first, or
+single-activity strategy filters. If an action should be unavailable or rejected,
+represent that with typed readiness/eligibility contracts, structured state,
+explicit schemas, permission gates, retry constraints, or verifier evidence.
+`decision_frame` is context, not a planner output. Do not add
+`parameter_candidates`, `top_eligible_action_cards`,
+`recommended_next_action_candidates`, generated chat text, coordinates, recipe
+decisions, or other pre-selected action payloads to it.
+No compatibility or legacy compromise is required for this side project when
+removing prose parsing or hidden domain-planner behavior.
+
 ## Project Identity vs External References
 
 External Minecraft-agent and LLM-agent papers are references, not product specs.
@@ -55,8 +178,8 @@ Use external references by translating their mechanisms into this project:
   not raw eval loops or global skill reuse detached from the actor;
 - curriculum papers imply bounded capability scaffolding under ActorSoul/LifeGoal, not a
   universal benchmark objective;
-- reasoning/action papers imply CycleGoal -> ActionIntent -> evidence ->
-  CycleJudgment loops, not unconstrained chain-of-thought as authority;
+- reasoning/action papers imply Actor Turn tool selection -> runtime action ->
+  evidence -> CycleJudgment loops, not unconstrained chain-of-thought as authority;
 - memory/reflection papers imply artifact-grounded memory and review, not
   reflection text that can claim world progress;
 - affordance/interface papers imply better runtime primitives, gates, and context
@@ -99,18 +222,27 @@ Read these first:
 9. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
 10. `docs/blog-doc/Documentation-Map.md`
 11. `docs/blog-doc/Agent-Search-Index.md`
-12. `docs/blog-doc/Terminology.md`
-13. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
-14. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
-15. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-16. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-17. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-18. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-19. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-20. `docs/blog-doc/Architecture/Minimal-Probe.md`
-21. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-22. `docs/blog-doc/Setup/Headless-Server.md`
-23. `docs/blog-doc/Setup/Provider-Setup.md`
+12. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+13. `docs/blog-doc/Terminology.md`
+14. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
+15. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
+16. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+17. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+18. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
+19. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+20. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+21. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+22. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+23. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+24. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
+25. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
+26. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
+27. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
+28. `docs/blog-doc/Architecture/Minimal-Probe.md`
+29. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
+30. `docs/blog-doc/Setup/Headless-Server.md`
+31. `docs/blog-doc/Setup/Provider-Setup.md`
+32. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -282,9 +414,12 @@ Important search tokens:
 - `GAME_RUNTIME_CODEX_AUTH`
 - `CODEX_CLI_IS_NOT_GAME_PROVIDER_AUTH`
 - `PROVIDER_USAGE_GUARD`
+- `PROVIDER_FREE_TIER_RESET_WINDOWS`
 - `GEMINI_API_SOCIAL_PROVIDER`
 - `WORLD_STATE_DIAGNOSTICS`
-- `ACTION_INTENT_CONTRACT`
+- `MINECRAFT_BASIC_GUIDE`
+- `ACTOR_PERSISTENT_STATE_PLAN_BEADS`
+- `RUNTIME_ACTION_CONTRACT`
 - `RUNTIME_RETRY_CONSTRAINT`
 - `CONTEXT_COMPACTION`
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW`
@@ -351,29 +486,35 @@ Important search tokens:
   World context is evidence substrate: raw Minecraft names, positions,
   distances, limits, and query refs. The provider decides what matters from
   ActorSoul/LifeGoal, CycleGoal, action surface, and evidence.
+- Do expose the compact `minecraft_basic_guide` to social-cycle provider stages
+  as stable background mechanics. It should help the provider apply basic item
+  flows, station requirements, tool usefulness, item-vs-world-block distinctions,
+  blocker recovery, and repeated-observe limits. It is a guide, not a strategy
+  checklist, runtime permission, current-state claim, runtime action contract, or
+  proof of progress.
 - It is acceptable for a specific action skill implementation to query a
   specific Minecraft block or item family as part of its own primitive contract.
   It is not acceptable to turn those families into always-present planner
   context, summary headings, or goal interpretation.
-- Treat physical `ActionIntent` arguments as a contract. For actions such as
+- Treat physical runtime action arguments as a contract. For actions such as
   `move_to`, `mine_block`, `place_block`, `craft_item`, `inspect_chest`,
   `deposit_shared`, or structure/building primitives, required target/item/count
   arguments must be present in structured args before execution.
-- Direct `use_primitive` intents must not carry `action_skill_id` or
+- Direct `use_primitive` actions must not carry `action_skill_id` or
   `args.actionSkillId`. Actor-owned action skill fallback authority exists only
-  after a `use_action_skill` intent is resolved by the runtime.
+  after a `use_action_skill` action is resolved by the runtime.
 - Safe-looking control actions such as `wait` and `remember` are still runtime
   primitives. They must pass CycleGoal and active action-skill gates.
 - Do not silently convert missing physical arguments into movement or gameplay
   defaults. A hidden default that makes the bot move can still be a product
-  failure. Reject, repair, or ask the provider for a valid intent, then record
+  failure. Reject, repair, or ask the provider for a valid action, then record
   the contract failure in artifacts.
 - Natural-language fields such as `why_this_action` explain intent but are not
   executable authority. If prose mentions a coordinate and structured args are
   empty or contradictory, the runtime must treat the structured intent as
   invalid rather than guessing from prose.
 - Repeated identical blocker evidence should become a `runtime-retry-constraint/v1`
-  gate over the exact ActionIntent target and structured args. This is a
+  gate over the exact runtime action target and structured args. This is a
   runtime safety rule, not a domain strategy or memory suggestion. It must block
   before Mineflayer execution and write evidence when the provider repeats the
   prohibited target/args.
@@ -401,6 +542,9 @@ Important search tokens:
   `bot.dig(...)` resolves or fails; do not stop to check progress mid-dig,
   because that resets block-breaking progress.
 - Actor workspace is the source of truth for actor-owned action skill state.
+- Actor workspace should also become the source of truth for actor-owned
+  PlanBead work graph state when that slice is implemented. The purpose is
+  state continuity under changing circumstances, not more planning prose.
 - Treat `build/generated-skills` as legacy exploratory output, not as active or
   candidate actor-owned action skill memory.
 - Prefer structured domain models, typed records, discriminated unions, schemas,
@@ -419,15 +563,34 @@ practice.
 
 - Prefer readable names, narrow functions, and explicit types before adding a
   comment. A comment should not restate what TypeScript already proves.
+- This repo should use more explanatory comments than a typical CRUD or library
+  project because product policy, runtime authority, evidence semantics, and
+  actor-continuity intent are part of the implementation contract. Preserve the
+  "why this boundary exists" and "what this code must not imply" background in
+  code when it prevents future agents from accidentally changing product
+  direction.
 - Use `/** ... */` documentation comments for exported APIs, cross-module
   contracts, and code a caller needs to understand. Use `//` comments for local
   implementation notes.
 - Comments should explain intent, background, why a runtime boundary exists,
   what invariant is being protected, what failure mode is being rejected, or
   what Minecraft/Mineflayer behavior is non-obvious.
+- It is acceptable and often desirable for comments to include project intent,
+  design background, and policy constraints when the code implements rules from
+  `SPEC.md`, ActorSoul/LifeGoal continuity, PlanBeads, runtime action contracts,
+  actor workspace evidence, provider usage/auth boundaries, retry constraints,
+  or generated action skill lifecycle. Do not force readers to reconstruct these
+  constraints from distant docs when a short local note can prevent misuse.
 - For gameplay code, prioritize comments around verification, timeout,
   cancellation, reconnect/session freshness, fake-progress rejection, actor
   workspace initialization, action skill ownership, and transcript semantics.
+- For provider-facing code, document which fields are prompt context only and
+  which fields may become executable authority after validation. Prose fields,
+  memory, PlanBeads, and decision-frame hints should be explicitly described as
+  non-authoritative wherever that distinction is easy to blur.
+- For persistence and artifact code, document what record is the source of truth,
+  what evidence survives compaction, and which claims are only diagnostic context
+  rather than proof of Minecraft progress.
 - Do not add decorative section banners, obvious parameter descriptions, or
   comments that merely narrate the next line of code.
 - Keep comments short enough to review. If a comment needs a long explanation,
@@ -440,6 +603,11 @@ practice.
 - During comment passes, explicitly inspect every TypeScript file with zero
   comments. Either add a high-signal contract/invariant comment or leave it
   uncommented only when the file is a trivial CLI/re-export/declarative constant.
+- A file with zero comments is acceptable only after inspection when it is a
+  re-export, a tiny CLI shim, a declarative constant table with self-explanatory
+  names, or a small pure helper whose behavior and policy implications are
+  obvious from types and tests. Large provider, runtime, validation, Mineflayer
+  tool, memory, artifact, or lifecycle files should not remain comment-free.
 - When the user explicitly requests a comment pass, report whether existing
   guidance was sufficient, then update only comments that clarify contracts,
   invariants, runtime evidence, or non-obvious Mineflayer behavior. Tests may
@@ -576,6 +744,14 @@ Live provider calls must be explicit and auditable.
   `PROVIDER_USAGE_BUDGETS_JSON` or
   `build/provider-usage/free-tier-budgets.json` as `already_used` before running
   long or repeated live provider tests.
+- Before long OpenAI or Gemini API free-tier runs, read
+  `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` and use its reset
+  windows when deciding whether the budget has refreshed:
+  - OpenAI API data-sharing complimentary tokens reset at `00:00 UTC`, which is
+    `09:00 KST`.
+  - Gemini API `RPD` quotas reset at midnight Pacific time, which is `16:00 KST`
+    during PDT and `17:00 KST` during PST. Convert from
+    `America/Los_Angeles`; do not assume a fixed KST calendar-day boundary.
 - Treat a usage-budget block as a provider setup/budget blocker, not as actor
   behavior or action-skill failure.
 

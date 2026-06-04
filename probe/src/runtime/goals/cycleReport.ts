@@ -1,3 +1,9 @@
+/**
+ * Builds compact social-cycle report summaries.
+ *
+ * @remarks Reports should preserve evidence refs and blocker context without
+ * turning provider prose or repeated observation into progress claims.
+ */
 import type { SocialCycleRunReport } from "./types.js";
 
 export function createEmptySocialCycleReport(input: {
@@ -6,6 +12,7 @@ export function createEmptySocialCycleReport(input: {
   providerId: SocialCycleRunReport["provider"]["provider_id"];
   model: string;
   reasoning: string;
+  actionHotPath?: SocialCycleRunReport["action_hot_path"];
 }): SocialCycleRunReport {
   return {
     schema: "social-cycle-run-report/v1",
@@ -16,6 +23,7 @@ export function createEmptySocialCycleReport(input: {
       model: input.model,
       reasoning: input.reasoning
     },
+    action_hot_path: input.actionHotPath,
     runtime_status: "blocked",
     agency_status: {
       life_goal_source: "actor_soul",
@@ -35,6 +43,8 @@ export function createEmptySocialCycleReport(input: {
     },
     cycles: [],
     postcondition_results: [],
+    plan_bead_ready_fronts: [],
+    plan_bead_operation_results: [],
     relationship_application_results: [],
     memory_reuse: {
       retrieved_memory_refs: 0,

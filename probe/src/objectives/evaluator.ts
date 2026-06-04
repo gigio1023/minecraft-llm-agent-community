@@ -1,3 +1,10 @@
+/**
+ * Legacy objective evaluator for direct-generated gameplay runs.
+ *
+ * @remarks Objective scoring is useful probe evidence, but it is not the social
+ * runtime's north-star architecture. Keep evaluator claims tied to artifacts so
+ * they do not overwrite ActorSoul/LifeGoal continuity.
+ */
 import { promises as fs } from "node:fs";
 import path from "node:path";
 

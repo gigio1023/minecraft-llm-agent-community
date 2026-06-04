@@ -6,10 +6,16 @@ import {
   validateActorCycleGoal,
   validateActorLifeGoal,
   validateActorSoul,
-  validateActionIntent,
+  validateLegacyPlannerAction,
   validateCycleJudgment
 } from "../src/runtime/goals/types.js";
+import type { LegacyPlannerAction } from "../src/runtime/goals/types.js";
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
+import {
+  buildLegacyPlannerActionRegenerationGuidance,
+  repairNonExecutableLegacyPlannerActionMetadata,
+  shouldRegenerateLegacyPlannerAction
+} from "../src/provider/socialActionPlannerProvider.js";
 
 test("ActorSoul and LifeGoal validators accept canonical records", () => {
   const soul = compileActorSoulFromProfile("npc_b");
@@ -48,10 +54,10 @@ test("validateActorCycleGoal rejects wrong schema", () => {
   assert.equal(result.ok, false);
 });
 
-test("validateActionIntent rejects shallow or mismatched action plans", () => {
+test("validateLegacyPlannerAction rejects shallow or mismatched action plans", () => {
   assert.equal(
-    validateActionIntent({
-      schema: "action-intent/v1",
+    validateLegacyPlannerAction({
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "g1",
@@ -65,8 +71,8 @@ test("validateActionIntent rejects shallow or mismatched action plans", () => {
   );
 
   assert.equal(
-    validateActionIntent({
-      schema: "action-intent/v1",
+    validateLegacyPlannerAction({
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "g1",
@@ -77,6 +83,184 @@ test("validateActionIntent rejects shallow or mismatched action plans", () => {
       fallback_if_blocked: "wait"
     }).ok,
     true
+  );
+});
+
+test("validateLegacyPlannerAction accepts action-selection generated candidate authoring shape", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "author_and_trial_action_skill",
+    args: {},
+    parameters: { text: "bring logs to the shared chest" },
+    candidate: {
+      schema: "generated-action-skill-candidate/v1",
+      proposed_skill_id: "saySettlementNeed",
+      purpose: "Say a concrete settlement need with helper evidence.",
+      source_language: "typescript",
+      source: "export async function run(ctx, params) { return ctx.say(params.text); }",
+      input_schema: {
+        type: "object",
+        required: ["text"],
+        additionalProperties: false,
+        properties: { text: { type: "string" } }
+      },
+      helper_api_version: "mineflayer-action-skill-helper/v1",
+      helper_allowlist: ["say"],
+      timeout_ms: 5_000,
+      verifier: { kind: "helper_result_status", helper: "say", status: "delivered" },
+      promotion_policy: "promote_after_passed_trial",
+      known_failure_modes: []
+    },
+    why_this_action: "create a reusable bounded speaking action",
+    expected_evidence: ["helper say delivered"],
+    fallback_if_blocked: "remember blocker"
+  };
+  const result = validateLegacyPlannerAction(intent);
+
+  assert.equal(result.ok, true);
+});
+
+test("generated candidate contract failures request one guided regeneration", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "author_and_trial_action_skill",
+    args: {},
+    parameters: {},
+    candidate: {
+      schema: "generated-action-skill-candidate/v1",
+      proposed_skill_id: "badLoop",
+      purpose: "Bad candidate",
+      source_language: "typescript",
+      source: "export async function run(ctx, params) { while (true) {} }",
+      input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
+      helper_api_version: "mineflayer-action-skill-helper/v1",
+      helper_allowlist: ["wait"],
+      timeout_ms: 5_000,
+      verifier: { kind: "helper_event_progress" },
+      promotion_policy: "promote_after_passed_trial",
+      known_failure_modes: []
+    },
+    why_this_action: "test regeneration",
+    expected_evidence: ["corrected source"],
+    fallback_if_blocked: "observe"
+  };
+  const error =
+    "Generated action skill candidate contract failed: Generated action skill contains a blocked API or obvious unbounded loop";
+
+  assert.equal(shouldRegenerateLegacyPlannerAction(intent, error), true);
+  const guidance = buildLegacyPlannerActionRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
+  assert.equal(guidance.rejected_error, error);
+  assert.equal(guidance.rules.do_not_repeat_blocked_source_or_helper_shape, true);
+});
+
+test("direct primitive parameter contract failures request one guided regeneration", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: {},
+    parameters: {},
+    why_this_action: "scout nearby",
+    expected_evidence: ["position delta"],
+    fallback_if_blocked: "observe current state"
+  };
+  const error =
+    "LegacyPlannerAction parameters contract failed: move_to requires structured args with x/y/z, position, targetPosition, target_position, or explicit scout direction and distance 2..12";
+
+  assert.equal(shouldRegenerateLegacyPlannerAction(intent, error), true);
+  const guidance = buildLegacyPlannerActionRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
+  assert.equal(guidance.rejected_error, error);
+  assert.equal(guidance.rules.use_runtime_affordance_args_contract, true);
+  assert.equal(guidance.rules.parameters_must_satisfy_selected_action_contract, true);
+});
+
+test("missing required action intent narrative fields request one guided regeneration", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    primitive_id: "observe",
+    args: {},
+    parameters: {},
+    why_this_action: "",
+    expected_evidence: ["observation"],
+    fallback_if_blocked: ""
+  };
+  const error = "why_this_action must be a non-empty string; fallback_if_blocked must be a non-empty string";
+
+  assert.equal(shouldRegenerateLegacyPlannerAction(intent, error), true);
+  const guidance = buildLegacyPlannerActionRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(guidance.rejected_error, error);
+  assert.equal(guidance.rules.fix_the_reported_error_directly, true);
+});
+
+test("non-executable action intent metadata can be repaired after guided regeneration fails", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    primitive_id: "move_to",
+    args: { targetPosition: { x: 1, y: 64, z: 1 } },
+    parameters: { targetPosition: { x: 1, y: 64, z: 1 } },
+    why_this_action: "",
+    expected_evidence: [],
+    fallback_if_blocked: ""
+  };
+
+  const repaired = repairNonExecutableLegacyPlannerActionMetadata({
+    intent,
+    errors: [
+      "why_this_action must be a non-empty string",
+      "fallback_if_blocked must be a non-empty string"
+    ]
+  });
+
+  assert.ok(repaired);
+  assert.equal(repaired.repairs.length, 2);
+  assert.deepEqual(repaired.intent.parameters, intent.parameters);
+  assert.equal(validateLegacyPlannerAction(repaired.intent).ok, true);
+  assert.match(repaired.intent.why_this_action, /Provider omitted why_this_action/);
+});
+
+test("action intent metadata repair does not cover executable contract failures", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    kind: "use_primitive",
+    args: {},
+    parameters: {},
+    why_this_action: "",
+    expected_evidence: [],
+    fallback_if_blocked: ""
+  };
+
+  assert.equal(
+    repairNonExecutableLegacyPlannerActionMetadata({
+      intent,
+      errors: [
+        "why_this_action must be a non-empty string",
+        "fallback_if_blocked must be a non-empty string",
+        "primitive_id must be a non-empty string"
+      ]
+    }),
+    null
   );
 });
 
@@ -114,6 +298,70 @@ test("validateCycleJudgment accepts partial verified progress as a bounded evide
     memory_writes: [],
     relationship_event_proposals: [],
     next_goal_context: ["Continue from verified partial evidence or pivot if blocked."]
+  });
+
+  assert.equal(result.ok, true);
+});
+
+test("validateCycleJudgment accepts typed PlanBead operation proposals", () => {
+  const result = validateCycleJudgment({
+    schema: "cycle-judgment/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    outcome: "no_progress",
+    what_happened: "Observed a blocker that should stay in work-state context.",
+    why_it_mattered_for_life_goal: "The next cycle should not forget the blocker.",
+    verifier_status: "not_applicable",
+    evidence_refs: ["evidence/cycle-0001-observe.json"],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    bead_op_proposals: [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: "npc_b",
+        op: "create",
+        rationale: "Track the blocker as context, not as executable authority.",
+        evidence_refs: ["evidence/cycle-0001-observe.json"],
+        confidence: "observed",
+        patch: {
+          kind: "blocker_repair",
+          title: "Resolve unreachable log target",
+          description: "The actor needs a different route or target before trying again.",
+          acceptance_evidence_required: ["runtime evidence of a reachable target or successful collection"],
+          notes_next: ["Choose a different visible log or inspect nearby terrain."],
+          priority: 2
+        }
+      }
+    ],
+    next_goal_context: ["Pick an action that repairs or avoids the blocker."]
+  });
+
+  assert.equal(result.ok, true);
+});
+
+test("validateCycleJudgment lets guarded PlanBead applier reject malformed proposals", () => {
+  const result = validateCycleJudgment({
+    schema: "cycle-judgment/v1",
+    actor_id: "npc_b",
+    cycle_id: "cycle-0001",
+    cycle_goal_id: "g1",
+    outcome: "no_progress",
+    what_happened: "The model proposed a malformed work-state update.",
+    why_it_mattered_for_life_goal: "The judgment should survive so the applier can record a rejected operation artifact.",
+    verifier_status: "not_applicable",
+    evidence_refs: ["evidence/cycle-0001-observe.json"],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    bead_op_proposals: [
+      {
+        schema: "plan-bead-operation/v1",
+        actor_id: "npc_b",
+        op: "set_status",
+        patch: { status: "in_progress" }
+      }
+    ],
+    next_goal_context: ["Continue without trusting the malformed proposal."]
   });
 
   assert.equal(result.ok, true);

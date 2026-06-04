@@ -7,6 +7,14 @@ export type ActiveActionSkillGate = {
   allowedPrimitives: AllowedTool[];
 };
 
+/**
+ * Runtime permission derived from actor-owned active action skills.
+ *
+ * @remarks This gate is intentionally narrower than the provider's prose
+ * intent. A primitive can run only when at least one active record owned by the
+ * actor requires it; PlanBeads, memory, or Action Card text do not grant this
+ * authority.
+ */
 export type ActiveActionSkillPermission =
   | {
       allowed: true;
@@ -24,6 +32,14 @@ function assertKnownRuntimePrimitive(primitive: string): asserts primitive is Al
   }
 }
 
+/**
+ * Builds the primitive allowlist for one actor from active actor workspace
+ * records.
+ *
+ * @remarks Throwing on a missing active record is deliberate: a runtime without
+ * active action skill ownership should fail loudly instead of falling back to a
+ * broad global primitive surface.
+ */
 export function buildActiveActionSkillGate(input: {
   actorId: string;
   activeActionSkills: readonly ActorActionSkillRecord[];

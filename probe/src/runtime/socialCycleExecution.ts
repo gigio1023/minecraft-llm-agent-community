@@ -6,18 +6,27 @@ import { Vec3 } from "vec3";
 
 import type { AllowedTool } from "../tools/index.js";
 import { validateProposal } from "../tools/index.js";
-import type { ActionIntent } from "./goals/types.js";
-import type { ActorCycleGoal } from "./goals/types.js";
 import {
-  validatePrimitiveActionIntentArgs,
+  legacyPlannerActionParameters,
+  type ActorCycleGoal,
+  type GeneratedActionSkillCandidate,
+  type LegacyPlannerAction
+} from "./goals/types.js";
+import type { ActorTurnResolvedAction } from "./goals/actorEpisode/index.js";
+import {
+  validatePrimitiveActionParameters,
   type MoveToTargetMetadata
-} from "./goals/actionIntentContracts.js";
+} from "./goals/actionParameterContracts.js";
 import {
   buildActiveActionSkillGate,
   checkActiveActionSkillPermission,
   type ActiveActionSkillGate
 } from "./activeActionSkillGate.js";
-import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
+import {
+  addActorActionSkillToLibraryIndex,
+  writeActorActionSkillRecord,
+  type ActorActionSkillRecord
+} from "./actorWorkspaceStore.js";
 import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
 import type { ActorEvidenceCategory } from "./evidence/actorEvidence.js";
 import { createDialogueState } from "./dialogueState.js";
@@ -66,6 +75,70 @@ import {
   findMatchingRuntimeRetryConstraint,
   type RuntimeRetryConstraint
 } from "./retryConstraints.js";
+import { writeActionSkillProposal } from "../skills/proposals/proposalStore.js";
+import type { ActionSkillProposalRecord } from "../skills/proposals/types.js";
+import {
+  generatedCandidateRequiredPrimitives,
+  generatedCandidateSuccessVerifier,
+  validateGeneratedActionSkillTrialRequest,
+  type GeneratedActionSkillLifecycleStatus
+} from "../skills/generated/authoringSchemas.js";
+import { evaluateGeneratedActionSkillTrialVerifier } from "../skills/generated/verifierEvaluation.js";
+
+function actorTurnActionParameters(action: ActorTurnResolvedAction): Record<string, unknown> {
+  return action.parameters as Record<string, unknown>;
+}
+
+function actorTurnActionFromLegacyPlannerAction(
+  action: LegacyPlannerAction
+): ActorTurnResolvedAction {
+  const parameters = legacyPlannerActionParameters(action) as ActorTurnResolvedAction["parameters"];
+  if (action.kind === "use_action_skill") {
+    return {
+      schema: "actor-turn-resolved-action/v1",
+      actor_id: action.actor_id,
+      cycle_id: action.cycle_id,
+      cycle_goal_id: action.cycle_goal_id,
+      kind: "use_action_skill",
+      action_card_id: `legacy:${action.action_skill_id ?? "missing-action-skill"}`,
+      action_skill_id: action.action_skill_id ?? "",
+      parameters,
+      why_this_action: action.why_this_action,
+      expected_evidence: action.expected_evidence,
+      fallback_if_blocked: action.fallback_if_blocked
+    };
+  }
+  if (action.kind === "author_and_trial_action_skill") {
+    return {
+      schema: "actor-turn-resolved-action/v1",
+      actor_id: action.actor_id,
+      cycle_id: action.cycle_id,
+      cycle_goal_id: action.cycle_goal_id,
+      kind: "author_mineflayer_action",
+      parameters,
+      candidate: action.candidate as GeneratedActionSkillCandidate,
+      why_this_action: action.why_this_action,
+      expected_evidence: action.expected_evidence,
+      fallback_if_blocked: action.fallback_if_blocked
+    };
+  }
+  const primitiveId = action.kind === "use_primitive"
+    ? (action.primitive_id ?? "")
+    : action.kind;
+  return {
+    schema: "actor-turn-resolved-action/v1",
+    actor_id: action.actor_id,
+    cycle_id: action.cycle_id,
+    cycle_goal_id: action.cycle_goal_id,
+    kind: "use_primitive",
+    action_card_id: `legacy:${primitiveId || "missing-primitive"}`,
+    primitive_id: primitiveId,
+    parameters,
+    why_this_action: action.why_this_action,
+    expected_evidence: action.expected_evidence,
+    fallback_if_blocked: action.fallback_if_blocked
+  };
+}
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "observe",
@@ -200,7 +273,7 @@ async function writeRetryConstraintEvidence(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
-  intent: ActionIntent;
+  action: ActorTurnResolvedAction;
   constraint: RuntimeRetryConstraint;
 }) {
   const result: JsonValue = {
@@ -208,7 +281,7 @@ async function writeRetryConstraintEvidence(input: {
     reason:
       "runtime_retry_constraint blocked the same action target and structured args after repeated matching blockers",
     retry_constraint: input.constraint as unknown as JsonValue,
-    action_intent: input.intent as unknown as JsonValue
+    action: input.action as unknown as JsonValue
   };
   return writeToolEvidence({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -216,7 +289,7 @@ async function writeRetryConstraintEvidence(input: {
     cycleId: input.cycleId,
     evidenceId: `${input.cycleId}-${input.constraint.constraint_id}-blocked`,
     tool: `retry_constraint:${input.constraint.target.kind}:${input.constraint.target.id}`,
-    args: input.intent.args,
+    args: actorTurnActionParameters(input.action),
     result,
     verifierReason: input.constraint.blocker_reason,
     category: "retry_constraint_blocked"
@@ -251,6 +324,13 @@ function readOptionalString(args: Record<string, unknown>, key: string) {
 
 function readGeneratedSource(args: Record<string, unknown>) {
   return typeof args.source === "string" ? args.source : "";
+}
+
+function readOptionalRecord(args: Record<string, unknown>, key: string) {
+  const value = args[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 function readOptionalCount(args: Record<string, unknown>) {
@@ -416,11 +496,36 @@ function normalizeCraftItemName(bot: Bot, itemName: string) {
   return normalized;
 }
 
-function argsForPrimitive(intent: ActionIntent, primitive: AllowedTool) {
+function argsForPrimitive(
+  action: ActorTurnResolvedAction,
+  primitive: AllowedTool,
+  actionSkillRecord?: ActorActionSkillRecord
+) {
+  const parameters = actorTurnActionParameters(action);
+  if (
+    primitive === "run_mineflayer_program" &&
+    actionSkillRecord &&
+    isGeneratedMineflayerActionSkill(actionSkillRecord)
+  ) {
+    return {
+      ...parameters,
+      source: actionSkillRecord.generated_source,
+      purpose: actionSkillRecord.notes ?? actionSkillRecord.success_verifier,
+      expectedObservation: action.expected_evidence.join("; "),
+      timeoutMs: actionSkillRecord.generated_timeout_ms,
+      parameters,
+      helperAllowlist: actionSkillRecord.generated_helper_allowlist ?? [],
+      ...(action.kind === "use_action_skill"
+        ? { actionSkillId: action.action_skill_id }
+        : {}),
+      primitiveId: primitive
+    };
+  }
+
   return {
-    ...intent.args,
-    ...(intent.kind === "use_action_skill" && intent.action_skill_id
-      ? { actionSkillId: intent.action_skill_id }
+    ...parameters,
+    ...(action.kind === "use_action_skill" && action.action_skill_id
+      ? { actionSkillId: action.action_skill_id }
       : {}),
     primitiveId: primitive
   };
@@ -489,6 +594,19 @@ function choosePlaceBlockItemName(input: {
 }
 
 function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positioned {
+  const surfacePosition =
+    readPositionedObject(args.surfacePosition) ??
+    readPositionedObject(args.surface_position) ??
+    readPositionedObject(args.supportPosition) ??
+    readPositionedObject(args.support_position);
+  if (surfacePosition) {
+    return {
+      x: surfacePosition.x,
+      y: surfacePosition.y + 1,
+      z: surfacePosition.z
+    };
+  }
+
   return (
     readPositionedObject(args.targetPosition) ??
     readPositionedObject(args.target_position) ??
@@ -591,7 +709,7 @@ async function runSocialMoveTo(input: {
   movementPolicy?: SocialMovementPolicy;
 }): Promise<JsonValue> {
   const before = positionOf(input.bot);
-  const argsContract = validatePrimitiveActionIntentArgs({
+  const argsContract = validatePrimitiveActionParameters({
     primitiveId: "move_to",
     args: input.args,
     actionSkillId: readOptionalString(input.args, "actionSkillId")
@@ -601,10 +719,10 @@ async function runSocialMoveTo(input: {
       status: "blocked",
       beforePosition: before,
       distanceMoved: 0,
-      action_intent_contract: argsContract,
+      action_parameter_contract: argsContract,
       reason: argsContract.ok
         ? "move_to contract did not resolve a target"
-        : `ActionIntent args contract failed: ${argsContract.error}`
+        : `Actor Turn action parameter contract failed: ${argsContract.error}`
     } as JsonValue;
   }
   const requestedTarget = moveTargetFromContract(argsContract.target, before);
@@ -620,7 +738,7 @@ async function runSocialMoveTo(input: {
       distanceMoved: 0,
       distanceToTarget: round(requestedDistance),
       movementPolicy,
-      action_intent_contract: argsContract,
+      action_parameter_contract: argsContract,
       reason: `move_to target is ${round(requestedDistance)} blocks away, above bounded social movement limit ${movementPolicy.maxDistanceBlocks}.`
     } as JsonValue;
   }
@@ -678,7 +796,7 @@ async function runSocialMoveTo(input: {
     pathfinderFailureReason,
     manualFallbackUsed,
     movementPolicy,
-    action_intent_contract: argsContract,
+    action_parameter_contract: argsContract,
     reason: arrived
       ? "move_to reached the bounded scouting waypoint."
       : moved
@@ -773,15 +891,21 @@ async function runSocialPrimitive(input: {
     case "run_mineflayer_program": {
       const source = readGeneratedSource(proposal.args);
       const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
+      const helperAllowlist = [
+        ...readStringArray(proposal.args, "helperAllowlist"),
+        ...readStringArray(proposal.args, "helper_allowlist")
+      ];
       return (await runMineflayerProgram({
         actorId: input.actorId,
         bot: input.bot,
         targetBot: input.targetBot,
         source,
+        parameters: readOptionalRecord(proposal.args, "parameters"),
         purpose: readOptionalString(proposal.args, "purpose"),
         expectedObservation: readOptionalString(proposal.args, "expectedObservation") ??
           readOptionalString(proposal.args, "expected_observation"),
         timeoutMs: typeof proposal.args.timeoutMs === "number" ? proposal.args.timeoutMs : undefined,
+        ...(helperAllowlist.length > 0 ? { helperAllowlist } : {}),
         artifactDir: path.join(paths.actorDir, "action-skills", "direct-trials"),
         signal: input.signal
       })) as unknown as JsonValue;
@@ -895,7 +1019,9 @@ async function runSocialPrimitive(input: {
     case "say":
       return (await say({
         actor: input.bot as unknown as Parameters<typeof say>[0]["actor"],
-        target: (input.targetBot ?? input.bot) as unknown as Parameters<typeof say>[0]["target"],
+        ...(input.targetBot
+          ? { target: input.targetBot as unknown as Parameters<typeof say>[0]["target"] }
+          : {}),
         dialogueState,
         text: readString(proposal.args, "text", "acknowledged")
       })) as unknown as JsonValue;
@@ -975,7 +1101,7 @@ async function executePrimitiveWithEvidence(input: {
           {
             schema: "runtime-action-hook/v1",
             phase: "pre",
-            hook_id: "action_intent_args_contract",
+            hook_id: "action_parameter_contract",
             status: "blocked",
             reason
           }
@@ -990,7 +1116,7 @@ async function executePrimitiveWithEvidence(input: {
         args: input.args,
         result: toolResult,
         verifierReason: reason,
-        category: "action_intent_contract_failure"
+        category: "action_parameter_contract_failure"
       });
       return {
         toolResult,
@@ -1002,7 +1128,7 @@ async function executePrimitiveWithEvidence(input: {
     }
   }
 
-  const argsContract = validatePrimitiveActionIntentArgs({
+  const argsContract = validatePrimitiveActionParameters({
     primitiveId: input.tool,
     args: input.args,
     actionSkillId: input.allowActionSkillFallback
@@ -1013,15 +1139,15 @@ async function executePrimitiveWithEvidence(input: {
     const toolResult = attachRuntimeHooksToResult({
       result: {
         status: "blocked",
-        reason: `ActionIntent args contract failed: ${argsContract.error}`,
-        action_intent_contract: argsContract as unknown as JsonValue
+        reason: `Actor Turn action parameter contract failed: ${argsContract.error}`,
+        action_parameter_contract: argsContract as unknown as JsonValue
       },
       hooks: [
         ...preHooks.records,
         {
           schema: "runtime-action-hook/v1",
           phase: "pre",
-          hook_id: "action_intent_args_contract",
+          hook_id: "action_parameter_contract",
           status: "blocked",
           reason: argsContract.error
         }
@@ -1036,7 +1162,7 @@ async function executePrimitiveWithEvidence(input: {
       args: input.args,
       result: toolResult,
       verifierReason: argsContract.error,
-      category: "action_intent_contract_failure"
+      category: "action_parameter_contract_failure"
     });
     return {
       toolResult,
@@ -1100,13 +1226,416 @@ async function executePrimitiveWithEvidence(input: {
   };
 }
 
-export async function executeSocialActionIntent(input: {
+function toJsonValue(value: unknown): JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  try {
+    return JSON.parse(JSON.stringify(value)) as JsonValue;
+  } catch {
+    return String(value) as JsonValue;
+  }
+}
+
+function generatedTrialLifecycleStatus(
+  verifierStatus: "passed" | "failed" | "not_applicable"
+): GeneratedActionSkillLifecycleStatus {
+  return verifierStatus === "passed" ? "promotable" : "trial_failed";
+}
+
+function isGeneratedMineflayerActionSkill(record: ActorActionSkillRecord) {
+  return (
+    record.source_kind === "learned" &&
+    record.generated_source_language === "typescript" &&
+    typeof record.generated_source === "string" &&
+    record.generated_source.trim().length > 0
+  );
+}
+
+function sourceRefFromToolResult(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  toolResult: JsonValue;
+}) {
+  if (
+    typeof input.toolResult !== "object" ||
+    input.toolResult === null ||
+    Array.isArray(input.toolResult) ||
+    typeof (input.toolResult as { sourcePath?: unknown }).sourcePath !== "string"
+  ) {
+    return undefined;
+  }
+  const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
+  return evidenceRefFromPath(paths.actorDir, (input.toolResult as { sourcePath: string }).sourcePath);
+}
+
+function helperEventsFromToolResult(toolResult: JsonValue) {
+  if (
+    typeof toolResult === "object" &&
+    toolResult !== null &&
+    !Array.isArray(toolResult) &&
+    Array.isArray((toolResult as { helperEvents?: unknown }).helperEvents)
+  ) {
+    return (toolResult as { helperEvents: unknown[] }).helperEvents.map(toJsonValue);
+  }
+  return [];
+}
+
+function buildGeneratedActionSkillProposal(input: {
+  actorId: string;
+  turnId: string;
+  candidate: GeneratedActionSkillCandidate;
+  parameters: Record<string, unknown>;
+  evidenceRefs: string[];
+  lifecycleStatus: GeneratedActionSkillLifecycleStatus;
+  verifierStatus: "passed" | "failed" | "not_applicable";
+  sourceRef?: string;
+  helperEvents: JsonValue[];
+  verifierOutput: JsonValue;
+  reason: string;
+  now: string;
+}): ActionSkillProposalRecord {
+  const proposalId = `${input.turnId}-author-${input.candidate.proposed_skill_id}`;
+  return {
+    schema: "action-skill-proposal/v1",
+    proposal_id: proposalId,
+    skill_id: input.candidate.proposed_skill_id,
+    owner_actor_id: input.actorId,
+    source_kind: "learned",
+    status: "draft",
+    task_intent: input.candidate.purpose,
+    evidence_refs: [...input.evidenceRefs],
+    preconditions: ["authored during action selection", "generated source passed runtime source guard"],
+    required_primitives: generatedCandidateRequiredPrimitives(input.candidate),
+    proposed_recipe_id: `generated-source:${proposalId}`,
+    success_verifier: generatedCandidateSuccessVerifier(input.candidate),
+    known_failure_modes: [...input.candidate.known_failure_modes],
+    created_at: input.now,
+    updated_at: input.now,
+    legacy_generated_code: input.candidate.source,
+    legacy_generated_code_language: "typescript",
+    generated_candidate: input.candidate,
+    generated_parameters: input.parameters,
+    generated_lifecycle_status: input.lifecycleStatus,
+    generated_trial: {
+      schema: "generated-action-skill-trial/v1",
+      status: input.lifecycleStatus,
+      verifier_status: input.verifierStatus,
+      evidence_refs: [...input.evidenceRefs],
+      ...(input.sourceRef ? { source_ref: input.sourceRef } : {}),
+      helper_events: input.helperEvents,
+      verifier_output: input.verifierOutput,
+      reason: input.reason
+    },
+    notes:
+      input.lifecycleStatus === "promotable"
+        ? "Generated in the action-selection stage. Passed trial is eligible for runtime active-record promotion."
+        : "Generated in the action-selection stage. Failed trial remains candidate evidence until repaired."
+  };
+}
+
+function buildGeneratedActiveActionSkillRecord(input: {
+  actorId: string;
+  candidate: GeneratedActionSkillCandidate;
+  proposalRef: string;
+  sourceRef?: string;
+  trialEvidenceRef: string;
+  parameters: Record<string, unknown>;
+  evidenceRefs: string[];
+  now: string;
+}): ActorActionSkillRecord {
+  return {
+    schema: "actor-action-skill/v1",
+    skill_id: input.candidate.proposed_skill_id,
+    owner_actor_id: input.actorId,
+    source_kind: "learned",
+    status: "active",
+    created_at: input.now,
+    updated_at: input.now,
+    required_primitives: ["run_mineflayer_program"],
+    preconditions: [
+      "authored in action selection",
+      "generated source passed source guard",
+      "trial completed with verifier-classified helper evidence"
+    ],
+    success_verifier: generatedCandidateSuccessVerifier(input.candidate),
+    known_failure_modes: [...input.candidate.known_failure_modes],
+    evidence_refs: [...input.evidenceRefs, input.trialEvidenceRef, input.proposalRef],
+    review_refs: [],
+    generated_source: input.candidate.source,
+    generated_source_language: "typescript",
+    ...(input.sourceRef ? { generated_source_ref: input.sourceRef } : {}),
+    generated_candidate_ref: input.proposalRef,
+    generated_input_schema: input.candidate.input_schema,
+    generated_helper_allowlist: [...input.candidate.helper_allowlist],
+    generated_timeout_ms: input.candidate.timeout_ms,
+    generated_verifier: input.candidate.verifier,
+    notes:
+      `Generated Mineflayer action skill promoted from ${input.proposalRef}. ` +
+      `Example parameters from trial: ${JSON.stringify(input.parameters)}`
+  };
+}
+
+async function writeGeneratedActiveActionSkill(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  candidate: GeneratedActionSkillCandidate;
+  proposalRef: string;
+  sourceRef?: string;
+  trialEvidenceRef: string;
+  parameters: Record<string, unknown>;
+  evidenceRefs: string[];
+  now: string;
+}) {
+  const activeRecord = buildGeneratedActiveActionSkillRecord(input);
+  const activePath = await writeActorActionSkillRecord(
+    input.actorWorkspaceRootDir,
+    activeRecord
+  );
+  await addActorActionSkillToLibraryIndex({
+    rootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    status: "active",
+    skillId: activeRecord.skill_id,
+    updatedAt: input.now
+  });
+  const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
+  return {
+    activeRecord,
+    activePath,
+    activeRef: evidenceRefFromPath(paths.actorDir, activePath)
+  };
+}
+
+async function executeAuthorAndTrialActionSkill(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  turnId: string;
+  action: Extract<ActorTurnResolvedAction, { kind: "author_mineflayer_action" }>;
+  activeActionSkills: readonly ActorActionSkillRecord[];
+  bot?: Bot;
+  targetBot?: Bot;
+}): Promise<Omit<SocialCycleExecutionResult, "observation">> {
+  const validation = validateGeneratedActionSkillTrialRequest(input.action);
+  if (!validation.ok) {
+    const reason = validation.errors.join("; ");
+    const toolResult: JsonValue = {
+      status: "blocked",
+      reason,
+      action_parameter_contract: {
+        schema: "generated-action-skill-candidate-contract/v1",
+        ok: false,
+        errors: validation.errors
+      }
+    };
+    const ref = await writeToolEvidence({
+      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+      actorId: input.actorId,
+      cycleId: input.turnId,
+      evidenceId: `${input.turnId}-author-action-skill-contract-blocked`,
+      tool: "author_and_trial_action_skill",
+      args: actorTurnActionParameters(input.action),
+      result: toolResult,
+      verifierReason: reason,
+      category: "action_parameter_contract_failure"
+    });
+    return {
+      runtimeResult: toolResult,
+      evidenceRefs: [ref],
+      executedTools: [],
+      toolStatuses: [],
+      verifierStatus: "not_applicable",
+      gateBlocked: true,
+      contractBlocked: true,
+      retryConstraintBlocked: false,
+      actionSkillExecutionUnit: false,
+      postconditionResults: [],
+      toolResults: []
+    };
+  }
+
+  let gate: ActiveActionSkillGate;
+  try {
+    gate = buildActiveActionSkillGate({
+      actorId: input.actorId,
+      activeActionSkills: input.activeActionSkills
+    });
+  } catch (error) {
+    return {
+      runtimeResult: {
+        status: "blocked",
+        reason: error instanceof Error ? error.message : String(error)
+      },
+      evidenceRefs: [],
+      executedTools: [],
+      toolStatuses: [],
+      verifierStatus: "not_applicable",
+      gateBlocked: true,
+      contractBlocked: false,
+      retryConstraintBlocked: false,
+      actionSkillExecutionUnit: false,
+      postconditionResults: [],
+      toolResults: []
+    };
+  }
+
+  const generatedArgs = {
+    source: validation.candidate.source,
+    purpose: validation.candidate.purpose,
+    expectedObservation: input.action.expected_evidence.join("; "),
+    timeoutMs: validation.candidate.timeout_ms,
+    parameters: validation.parameters,
+    helperAllowlist: validation.candidate.helper_allowlist
+  };
+  const step = await executePrimitiveWithEvidence({
+    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    cycleId: input.turnId,
+    tool: "run_mineflayer_program",
+    args: generatedArgs,
+    bot: input.bot,
+    targetBot: input.targetBot,
+    gate,
+    allowActionSkillFallback: false
+  });
+  const toolStatuses = [{ tool: "run_mineflayer_program", status: step.status }];
+  const generatedVerifier = evaluateGeneratedActionSkillTrialVerifier({
+    candidate: validation.candidate,
+    runtimeResult: step.toolResult
+  });
+  const verifierStatus = generatedVerifier.status;
+  const lifecycleStatus = generatedTrialLifecycleStatus(verifierStatus);
+  const sourceRef = sourceRefFromToolResult({
+    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    toolResult: step.toolResult
+  });
+  const helperEvents = helperEventsFromToolResult(step.toolResult);
+  const now = new Date().toISOString();
+  const trialReason =
+    verifierStatus === "passed"
+      ? generatedVerifier.reason
+      : `Generated candidate trial verifier failed: ${generatedVerifier.reason}`;
+
+  const proposal = buildGeneratedActionSkillProposal({
+    actorId: input.actorId,
+    turnId: input.turnId,
+    candidate: validation.candidate,
+    parameters: validation.parameters,
+    evidenceRefs: [step.evidenceRef],
+    lifecycleStatus,
+    verifierStatus,
+    sourceRef,
+    helperEvents,
+    verifierOutput: generatedVerifier as unknown as JsonValue,
+    reason: trialReason,
+    now
+  });
+  const proposalPath = await writeActionSkillProposal(input.actorWorkspaceRootDir, proposal);
+  const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
+  const proposalRef = evidenceRefFromPath(paths.actorDir, proposalPath);
+  const trialEvidencePath = await writeActorEvidenceRecord(input.actorWorkspaceRootDir, {
+    schema: "actor-evidence/v1",
+    evidence_id: `${input.turnId}-generated-action-skill-trial-${validation.candidate.proposed_skill_id}`,
+    actor_id: input.actorId,
+    category: "action_skill_candidate_trial",
+    created_at: now,
+    turn_id: input.turnId,
+    target: validation.candidate.proposed_skill_id,
+    verifier_reason: trialReason,
+    data: {
+      schema: "generated-action-skill-trial/v1",
+      candidate_proposal_ref: proposalRef,
+      generated_lifecycle_status: lifecycleStatus,
+      verifier_status: verifierStatus,
+      verifier_output: generatedVerifier as unknown as JsonValue,
+      source_ref: sourceRef ?? null,
+      parameters: validation.parameters as JsonValue,
+      helper_events: helperEvents,
+      runtime_result: step.toolResult
+    } as JsonValue
+  });
+  const trialEvidenceRef = evidenceRefFromPath(paths.actorDir, trialEvidencePath);
+  await writeActionSkillProposal(input.actorWorkspaceRootDir, {
+    ...proposal,
+    evidence_refs: [step.evidenceRef, trialEvidenceRef],
+    generated_trial: {
+      ...proposal.generated_trial!,
+      evidence_refs: [step.evidenceRef, trialEvidenceRef]
+    }
+  });
+  const activePromotion =
+    lifecycleStatus === "promotable"
+      ? await writeGeneratedActiveActionSkill({
+          actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+          actorId: input.actorId,
+          candidate: validation.candidate,
+          proposalRef,
+          sourceRef,
+          trialEvidenceRef,
+          parameters: validation.parameters,
+          evidenceRefs: [step.evidenceRef],
+          now
+        })
+      : null;
+
+  const evidenceRefs = [
+    step.evidenceRef,
+    trialEvidenceRef,
+    proposalRef,
+    ...(activePromotion ? [activePromotion.activeRef] : [])
+  ];
+  const runtimeResult: JsonValue = {
+    status: lifecycleStatus,
+    action_authoring: {
+      schema: "author-and-trial-action-skill-result/v1",
+      candidate_proposal_ref: proposalRef,
+      trial_evidence_ref: trialEvidenceRef,
+      active_action_skill_ref: activePromotion?.activeRef ?? null,
+      generated_lifecycle_status: lifecycleStatus,
+      verifier_status: verifierStatus,
+      promotion_policy: validation.candidate.promotion_policy,
+      active_promotion_performed: Boolean(activePromotion)
+    },
+    executed_tools: ["run_mineflayer_program"],
+    tool_statuses: toolStatuses as unknown as JsonValue,
+    last_tool_result: step.toolResult
+  };
+
+  return {
+    runtimeResult,
+    evidenceRefs,
+    executedTools: ["run_mineflayer_program"],
+    toolStatuses,
+    verifierStatus,
+    gateBlocked: step.gateBlocked,
+    contractBlocked: step.contractBlocked,
+    retryConstraintBlocked: false,
+    actionSkillExecutionUnit: false,
+    postconditionResults: [],
+    toolResults: [
+      {
+        tool: "run_mineflayer_program",
+        status: step.status,
+        result: step.toolResult,
+        evidence_ref: step.evidenceRef
+      }
+    ]
+  };
+}
+
+export async function executeActorTurnAction(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
   turnId?: string;
   cycleGoal: ActorCycleGoal;
-  intent: ActionIntent;
+  action: ActorTurnResolvedAction;
   activeActionSkills: readonly ActorActionSkillRecord[];
   runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
   bot?: Bot;
@@ -1126,8 +1655,9 @@ export async function executeSocialActionIntent(input: {
   let contractBlocked = false;
   let actionSkillExecutionUnit = false;
   const memory = createMemory(8);
+  const actionParameters = actorTurnActionParameters(input.action);
   const matchingRetryConstraint = findMatchingRuntimeRetryConstraint(
-    input.intent,
+    input.action,
     input.runtimeRetryConstraints ?? []
   );
 
@@ -1139,7 +1669,7 @@ export async function executeSocialActionIntent(input: {
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
       cycleId: turnId,
-      intent: input.intent,
+      action: input.action,
       constraint: matchingRetryConstraint
     });
     return {
@@ -1163,11 +1693,30 @@ export async function executeSocialActionIntent(input: {
     };
   }
 
-  if (input.intent.kind === "wait" || input.intent.kind === "remember") {
+  if (input.action.kind === "author_mineflayer_action") {
+    const authoringResult = await executeAuthorAndTrialActionSkill({
+      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+      actorId: input.actorId,
+      turnId,
+      action: input.action,
+      activeActionSkills: input.activeActionSkills,
+      bot: input.bot,
+      targetBot: input.targetBot
+    });
+    return {
+      observation,
+      ...authoringResult
+    };
+  }
+
+  if (
+    input.action.kind === "use_primitive" &&
+    (input.action.primitive_id === "wait" || input.action.primitive_id === "remember")
+  ) {
     // wait/remember do not mutate Minecraft directly, but they still influence
     // future cycles. Keep them inside the active action-skill authority model
     // so they cannot become an unchecked escape hatch.
-    const controlTool = input.intent.kind as AllowedTool;
+    const controlTool = input.action.primitive_id as AllowedTool;
     let controlGate: ActiveActionSkillGate;
     try {
       controlGate = buildActiveActionSkillGate({
@@ -1215,7 +1764,7 @@ export async function executeSocialActionIntent(input: {
         cycleId: turnId,
         evidenceId: `${turnId}-${controlTool}-gate-blocked`,
         tool: controlTool,
-        args: input.intent.args,
+        args: actionParameters,
         result: toolResult,
         verifierReason: permission.reason
       });
@@ -1245,15 +1794,15 @@ export async function executeSocialActionIntent(input: {
       };
     }
 
-    const argsContract = validatePrimitiveActionIntentArgs({
+    const argsContract = validatePrimitiveActionParameters({
       primitiveId: controlTool,
-      args: input.intent.args
+      args: actionParameters
     });
     if (!argsContract.ok) {
       const toolResult: JsonValue = {
         status: "blocked",
-        reason: `ActionIntent args contract failed: ${argsContract.error}`,
-        action_intent_contract: argsContract as unknown as JsonValue
+        reason: `Actor Turn action parameter contract failed: ${argsContract.error}`,
+        action_parameter_contract: argsContract as unknown as JsonValue
       };
       const ref = await writeToolEvidence({
         actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -1261,10 +1810,10 @@ export async function executeSocialActionIntent(input: {
         cycleId: turnId,
         evidenceId: `${turnId}-${controlTool}-args-contract-blocked`,
         tool: controlTool,
-        args: input.intent.args,
+        args: actionParameters,
         result: toolResult,
         verifierReason: argsContract.error,
-        category: "action_intent_contract_failure"
+        category: "action_parameter_contract_failure"
       });
       evidenceRefs.push(ref);
       executedTools.push(controlTool);
@@ -1299,7 +1848,7 @@ export async function executeSocialActionIntent(input: {
         cycleId: turnId,
         evidenceId: `synthetic-${turnId}-${randomUUID()}`,
         tool: controlTool,
-        args: input.intent.args,
+        args: actionParameters,
         result: { status: "ok", synthetic: true },
         verifierReason: `synthetic ${controlTool}`
       });
@@ -1323,9 +1872,9 @@ export async function executeSocialActionIntent(input: {
     }
 
     const result =
-      input.intent.kind === "wait"
-        ? await wait({ ticks: readTicks(input.intent.args) })
-        : remember({ memory, note: readString(input.intent.args, "note", "social cycle note") });
+      input.action.primitive_id === "wait"
+        ? await wait({ ticks: readTicks(actionParameters) })
+        : remember({ memory, note: readString(actionParameters, "note", "social cycle note") });
 
     const ref = await writeToolEvidence({
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -1333,7 +1882,7 @@ export async function executeSocialActionIntent(input: {
       cycleId: turnId,
       evidenceId: `${turnId}-${controlTool}`,
       tool: controlTool,
-      args: input.intent.args,
+      args: actionParameters,
       result: result as unknown as JsonValue,
       verifierReason: "status" in result ? String(result.status) : "ok"
     });
@@ -1360,9 +1909,15 @@ export async function executeSocialActionIntent(input: {
     };
   }
 
-  const resolved = resolvePrimitivesForSocialIntent(input.intent, input.activeActionSkills);
+  const resolved = resolvePrimitivesForActorTurnAction(input.action, input.activeActionSkills);
   let primitivesToRun = resolved.primitives;
   actionSkillExecutionUnit = resolved.actionSkillExecutionUnit;
+  const actionSkillId = input.action.kind === "use_action_skill"
+    ? input.action.action_skill_id
+    : undefined;
+  const selectedActionSkill = actionSkillId
+    ? input.activeActionSkills.find((skill) => skill.skill_id === actionSkillId)
+    : undefined;
 
   if (resolved.blockedReason) {
     return {
@@ -1384,7 +1939,7 @@ export async function executeSocialActionIntent(input: {
   if (primitivesToRun.length === 0) {
     return {
       observation,
-      runtimeResult: { status: "blocked", reason: "No primitive resolved for intent" },
+      runtimeResult: { status: "blocked", reason: "No primitive resolved for action" },
       evidenceRefs,
       executedTools,
       toolStatuses,
@@ -1433,11 +1988,11 @@ export async function executeSocialActionIntent(input: {
       actorId: input.actorId,
       cycleId: turnId,
       tool: primitive,
-      args: argsForPrimitive(input.intent, primitive),
+      args: argsForPrimitive(input.action, primitive, selectedActionSkill),
       bot: input.bot,
       targetBot: input.targetBot,
       gate,
-      allowActionSkillFallback: input.intent.kind === "use_action_skill"
+      allowActionSkillFallback: input.action.kind === "use_action_skill"
     });
     evidenceRefs.push(step.evidenceRef);
     executedTools.push(primitive);
@@ -1466,10 +2021,10 @@ export async function executeSocialActionIntent(input: {
   }
 
   const postconditionResults =
-    actionSkillExecutionUnit && input.intent.action_skill_id
+    actionSkillExecutionUnit && input.action.kind === "use_action_skill"
       ? [
           evaluateSocialActionSkillPostcondition({
-            actionSkillId: input.intent.action_skill_id,
+            actionSkillId: input.action.action_skill_id,
             toolResults,
             evidenceRefs
           })
@@ -1504,42 +2059,67 @@ export async function executeSocialActionIntent(input: {
   };
 }
 
-export function resolvePrimitivesForSocialIntent(
-  intent: ActionIntent,
+export async function executeLegacyPlannerAction(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  cycleId: string;
+  turnId?: string;
+  cycleGoal: ActorCycleGoal;
+  action: LegacyPlannerAction;
+  activeActionSkills: readonly ActorActionSkillRecord[];
+  runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
+  bot?: Bot;
+  targetBot?: Bot;
+}): Promise<SocialCycleExecutionResult> {
+  return executeActorTurnAction({
+    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    cycleId: input.cycleId,
+    turnId: input.turnId,
+    cycleGoal: input.cycleGoal,
+    action: actorTurnActionFromLegacyPlannerAction(input.action),
+    activeActionSkills: input.activeActionSkills,
+    runtimeRetryConstraints: input.runtimeRetryConstraints,
+    bot: input.bot,
+    targetBot: input.targetBot
+  });
+}
+
+export function resolvePrimitivesForActorTurnAction(
+  action: ActorTurnResolvedAction,
   activeActionSkills: readonly ActorActionSkillRecord[]
 ): {
   primitives: AllowedTool[];
   actionSkillExecutionUnit: boolean;
   blockedReason?: string;
 } {
-  if (intent.kind === "use_primitive" && intent.primitive_id) {
-    if (intent.action_skill_id) {
+  if (action.kind === "use_primitive" && action.primitive_id) {
+    if (!isSocialExecutablePrimitive(action.primitive_id)) {
       return {
         primitives: [],
         actionSkillExecutionUnit: false,
-        blockedReason: "Direct primitive intents cannot carry action_skill_id; use use_action_skill for actor-owned action skill execution"
-      };
-    }
-    if (!isSocialExecutablePrimitive(intent.primitive_id)) {
-      return {
-        primitives: [],
-        actionSkillExecutionUnit: false,
-        blockedReason: `Primitive ${intent.primitive_id} is not executable in the social cycle runtime`
+        blockedReason: `Primitive ${action.primitive_id} is not executable in the social cycle runtime`
       };
     }
     return {
-      primitives: [intent.primitive_id as AllowedTool],
+      primitives: [action.primitive_id as AllowedTool],
       actionSkillExecutionUnit: false
     };
   }
 
-  if (intent.kind === "use_action_skill" && intent.action_skill_id) {
-    const owned = activeActionSkills.find((skill) => skill.skill_id === intent.action_skill_id);
+  if (action.kind === "use_action_skill" && action.action_skill_id) {
+    const owned = activeActionSkills.find((skill) => skill.skill_id === action.action_skill_id);
     if (!owned || owned.required_primitives.length === 0) {
       return {
         primitives: [],
         actionSkillExecutionUnit: false,
-        blockedReason: "No owned action skill primitives for intent"
+        blockedReason: "No owned action skill primitives for action"
+      };
+    }
+    if (isGeneratedMineflayerActionSkill(owned)) {
+      return {
+        primitives: ["run_mineflayer_program"],
+        actionSkillExecutionUnit: true
       };
     }
     if (!owned.required_primitives.every(isSocialExecutablePrimitive)) {
@@ -1558,8 +2138,34 @@ export function resolvePrimitivesForSocialIntent(
   return {
     primitives: [],
     actionSkillExecutionUnit: false,
-    blockedReason: "No primitive resolved for intent"
+    blockedReason: "No primitive resolved for action"
   };
+}
+
+export function resolvePrimitivesForLegacyPlannerAction(
+  action: LegacyPlannerAction,
+  activeActionSkills: readonly ActorActionSkillRecord[]
+): {
+  primitives: AllowedTool[];
+  actionSkillExecutionUnit: boolean;
+  blockedReason?: string;
+} {
+  const parameters = legacyPlannerActionParameters(action);
+  if (
+    action.kind === "use_primitive" &&
+    typeof action.action_skill_id === "string"
+  ) {
+    return {
+      primitives: [],
+      actionSkillExecutionUnit: false,
+      blockedReason:
+        "Direct primitive intents cannot carry action_skill_id or args.actionSkillId; use use_action_skill for actor-owned action skill execution"
+    };
+  }
+  return resolvePrimitivesForActorTurnAction(
+    actorTurnActionFromLegacyPlannerAction(action),
+    activeActionSkills
+  );
 }
 
 /** Role-safe runtime affordances for the Soul/LifeGoal cycle; social context is not a hardcoded strategy funnel. */

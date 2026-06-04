@@ -1,8 +1,8 @@
 import { runtimePrimitives } from "../gameplay/primitives/registry.js";
 import {
-  primitiveArgsContractSummary,
-  type PrimitiveArgsContractSummary
-} from "./goals/actionIntentContracts.js";
+  primitiveParameterContractSummary,
+  type PrimitiveParameterContractSummary
+} from "./goals/actionParameterContracts.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 
 export type ActionSurfaceExposure = "direct" | "deferred";
@@ -14,13 +14,14 @@ export type ActionSurfacePrimitive = {
   executable: boolean;
   reason: string;
   description: string;
-  args_contract: PrimitiveArgsContractSummary;
+  args_contract: PrimitiveParameterContractSummary;
 };
 
 export type ActionSurfaceActionSkill = {
   action_skill_id: string;
   exposure: ActionSurfaceExposure;
   executable: boolean;
+  input_schema?: Record<string, unknown>;
   required_primitives: string[];
   missing_primitives: string[];
   preconditions: string[];
@@ -61,14 +62,14 @@ const primitiveDescriptions: Record<string, string> = {
   observe: "Refresh live inventory, nearby blocks, actors, and memory-facing state.",
   move_to: "Move to an explicit position or bounded scout waypoint.",
   collect_logs: "Gather reachable low log blocks; success requires inventory evidence.",
-  mine_block: "Mine an explicitly requested block when tool and reachability evidence allow it.",
-  craft_item: "Craft an inventory recipe when ingredients exist.",
-  craft_with_table: "Craft a table-bound recipe when a crafting table is nearby.",
+  mine_block: "Mine an explicitly requested block when tool, reachability, and expected-drop evidence allow it.",
+  craft_item: "Craft an inventory-grid recipe such as planks, sticks, or crafting_table when exact ingredients exist.",
+  craft_with_table: "Craft a table-bound recipe such as wooden_pickaxe against a placed crafting table, placing a carried table locally when possible. Do not use for planks, sticks, or crafting_table.",
   consume_item: "Consume an explicit edible inventory item and verify inventory or vitals changed.",
   run_mineflayer_program: "Run a bounded generated Mineflayer helper program and record source, helper calls, result, and post-observation evidence.",
-  place_block: "Place one explicit inventory block and verify the world block afterward.",
+  place_block: "Place one explicit inventory block into an empty/replaceable target cell, or onto a named support surface, and verify the world block afterward.",
   build_pattern: "Run one bounded block-pattern executor only when current context makes building relevant.",
-  inspect_chest: "Inspect a nearby shared chest and record a container snapshot.",
+  inspect_chest: "Inspect a nearby shared chest and record container snapshot, reachability, or openability evidence without generated code.",
   deposit_shared: "Deposit role-allowed useful inventory into shared storage.",
   withdraw_shared: "Withdraw a specific item from shared storage when it enables the current goal.",
   say: "Speak when communication matters for the current relationship or role context.",
@@ -126,15 +127,11 @@ function primitiveDescription(primitiveId: string) {
 function primitiveReason(input: {
   primitiveId: string;
   roleAllowedPrimitiveIds: Set<string>;
-  activePrimitiveIds: Set<string>;
 }) {
   if (!input.roleAllowedPrimitiveIds.has(input.primitiveId)) {
     return "not role-allowed in the current actor contract";
   }
-  if (!input.activePrimitiveIds.has(input.primitiveId)) {
-    return "not backed by an active actor-owned action skill";
-  }
-  return "role-allowed and backed by active actor-owned action skills";
+  return "role-allowed runtime primitive with strict parameter and evidence requirements";
 }
 
 function actionSkillExposure(input: {
@@ -149,6 +146,9 @@ function actionSkillExposure(input: {
     action_skill_id: input.record.skill_id,
     exposure: executable ? "direct" : "deferred",
     executable,
+    ...(input.record.generated_input_schema
+      ? { input_schema: input.record.generated_input_schema }
+      : {}),
     required_primitives: [...input.record.required_primitives],
     missing_primitives: missing,
     preconditions: [...input.record.preconditions],
@@ -190,14 +190,7 @@ export function buildActionSurfacePacket(input: {
   recentBlockers?: Array<{ key: string; count: number; example: string }>;
 }): ActionSurfacePacket {
   const roleAllowedPrimitiveIds = new Set(input.allowedPrimitiveIds);
-  const activePrimitiveIds = new Set(
-    input.activeActionSkills.flatMap((record) =>
-      record.status === "active" ? record.required_primitives : []
-    )
-  );
-  const executablePrimitiveIds = new Set(
-    [...roleAllowedPrimitiveIds].filter((primitiveId) => activePrimitiveIds.has(primitiveId))
-  );
+  const executablePrimitiveIds = new Set(roleAllowedPrimitiveIds);
 
   const primitiveRows = runtimePrimitives.map((primitive) => {
     const executable = executablePrimitiveIds.has(primitive.id);
@@ -208,11 +201,10 @@ export function buildActionSurfacePacket(input: {
       executable,
       reason: primitiveReason({
         primitiveId: primitive.id,
-        roleAllowedPrimitiveIds,
-        activePrimitiveIds
+        roleAllowedPrimitiveIds
       }),
       description: primitiveDescription(primitive.id),
-      args_contract: primitiveArgsContractSummary(primitive.id)
+      args_contract: primitiveParameterContractSummary(primitive.id)
     };
   });
 

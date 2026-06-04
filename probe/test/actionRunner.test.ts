@@ -1,3 +1,4 @@
+/** Regression coverage for runtime action runner gate behavior. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

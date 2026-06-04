@@ -288,7 +288,7 @@ type WorldEvent = {
 
 ```ts
 type ActionIntent = {
-  schema: "action-intent/v1";
+  schema: "legacy-planner-action/v1";
   actor_id: string;
   cycle_id: string;
   cycle_goal_id: string;

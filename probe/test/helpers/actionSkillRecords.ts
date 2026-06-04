@@ -1,3 +1,4 @@
+/** Test fixture builders for actor-owned action skill records. */
 import type { ActorActionSkillRecord } from "../../src/runtime/actorWorkspaceStore.js";
 
 export function testActionSkillRecord(

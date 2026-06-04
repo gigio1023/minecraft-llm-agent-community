@@ -1,3 +1,9 @@
+/**
+ * CLI for summarizing and auditing social-cycle run reports.
+ *
+ * @remarks Review summaries are post-run diagnosis aids and should keep success,
+ * stall, blocker, and evidence-gap claims traceable to artifacts.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 

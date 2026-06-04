@@ -1,3 +1,9 @@
+/**
+ * CLI for long-objective direct-generated Mineflayer probes.
+ *
+ * @remarks This path can stress codegen and verifier behavior, but the active
+ * rebuild target remains a bounded actor runtime with evidence artifacts.
+ */
 import type { ObjectivePlannerPathId } from "../../provider/planner/types.js";
 import { runLongObjective } from "./runner.js";
 

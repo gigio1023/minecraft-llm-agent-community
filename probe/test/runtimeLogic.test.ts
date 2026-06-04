@@ -1118,6 +1118,14 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(actor.chatLog, ["hi npc_b"]);
   assert.deepEqual(target.chatLog, []);
 
+  assert.deepEqual(await say({ actor, dialogueState, text: "shared storage update" }), {
+    status: "delivered",
+    actorId: "npc_a",
+    targetId: "world_chat",
+    text: "shared storage update"
+  });
+  assert.deepEqual(actor.chatLog, ["hi npc_b", "shared storage update"]);
+
   assert.deepEqual(remember({ memory, note: "npc_b answered" }), {
     status: "remembered",
     note: "npc_b answered"

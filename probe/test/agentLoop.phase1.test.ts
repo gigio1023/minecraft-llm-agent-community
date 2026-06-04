@@ -1,3 +1,4 @@
+/** Regression coverage for the initial agent-loop runtime path. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";

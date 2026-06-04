@@ -1,3 +1,4 @@
+/** Integration coverage for shared-chest runtime evidence and mutations. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

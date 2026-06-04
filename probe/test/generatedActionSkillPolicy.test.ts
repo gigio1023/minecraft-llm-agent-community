@@ -1,3 +1,4 @@
+/** Regression coverage for generated action skill policy gates. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -43,7 +44,7 @@ test("archives legacy generated TypeScript into actor workspace candidates", asy
     await fs.mkdir(generatedSkillsDir, { recursive: true });
     await fs.writeFile(
       sourcePath,
-      "export async function run(ctx) { return ctx.collectLogs(); }\n",
+      "export async function run(ctx, params) { return ctx.collectLogs(); }\n",
       "utf8"
     );
 
