@@ -1,3 +1,9 @@
+/**
+ * Builds compact social-cycle report summaries.
+ *
+ * @remarks Reports should preserve evidence refs and blocker context without
+ * turning provider prose or repeated observation into progress claims.
+ */
 import type { SocialCycleRunReport } from "./types.js";
 
 export function createEmptySocialCycleReport(input: {

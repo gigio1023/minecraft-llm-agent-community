@@ -1,3 +1,10 @@
+/**
+ * Mineflayer helper for bounded block placement patterns.
+ *
+ * @remarks Pattern building can look successful from motion or partial
+ * placement, so callers need structured target cells, explicit materials, and
+ * verifier evidence before treating it as physical progress.
+ */
 import { placeBlock, type PlaceBlockResult, type Positioned } from "./placeBlock.js";
 import { Vec3 } from "vec3";
 

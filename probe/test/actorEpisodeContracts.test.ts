@@ -1,12 +1,14 @@
+/** Regression coverage for Actor Episode and review-summary contracts. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
   auditEpisodeReviewSummary,
+  buildMineflayerCodegenSkillProjection,
   validateActionCard,
   validateActiveEpisode,
   validateActorTurnInput,
-  validateActorTurnOutput,
+  validateActorTurnExecutionDraft,
   validateDeliberationBranch,
   validateDeliberationOutput,
   validateEpisodeReviewSummary,
@@ -79,7 +81,7 @@ function actorTurnInput(): ActorTurnInput {
       priority_order: [
         "use decision_frame current_truths before older episode wording",
         "consume completed_work and do_not_repeat before choosing an action",
-        "choose one top_eligible_action_card with schema-valid parameters"
+        "choose one visible action_cards entry with schema-valid parameters"
 	      ],
 	      episode_focus: "Place or regain access to a crafting table, then continue toolmaking.",
 	      episode_focus_status: {
@@ -98,22 +100,6 @@ function actorTurnInput(): ActorTurnInput {
 	      recent_action_verdicts: [],
 	      do_not_repeat: ["do not reuse the blocked placement target from turn-001"],
 	      open_progress_front: [],
-	      parameter_candidates: [],
-	      top_eligible_action_cards: [
-	        {
-	          action_card_id: "card-place-block-nearby",
-	          title: "Place a block in a nearby valid cell",
-	          why_now: "crafting table access remains unresolved and the actor has the item"
-	        }
-	      ],
-	      recommended_next_action_candidates: [
-	        {
-	          action_card_id: "card-place-block-nearby",
-	          title: "Place a block in a nearby valid cell",
-	          parameters: {},
-	          why: "crafting table access remains unresolved and the actor has the item"
-	        }
-	      ],
 	      next_action_guidance: [
 	        "choose a new explicit placement cell or record the blocker if no valid cell exists"
 	      ]
@@ -208,6 +194,7 @@ function actorTurnInput(): ActorTurnInput {
       blocker_recovery_guides: ["if placement target is occupied, pick another adjacent valid cell"],
       observe_stop_guides: ["do not repeat observe after scan-backed blocker evidence"]
     },
+    mineflayer_codegen_skill: buildMineflayerCodegenSkillProjection(),
     provider_budget_hint: {
       provider_id: "gemini-api",
       model: "gemma-4-31b-it",
@@ -281,8 +268,8 @@ test("Actor Episode contract validators accept the deterministic vertical-slice 
 });
 
 test("Actor Turn output uses Action Cards instead of primitive or action-skill authority", () => {
-  const valid = validateActorTurnOutput({
-    schema: "actor-turn-output/v1",
+  const valid = validateActorTurnExecutionDraft({
+    schema: "actor-turn-execution-draft/v1",
     choice: "use_existing_action",
     action_card_id: "card-place-block-nearby",
     parameters: { item: "crafting_table", position: { x: 1, y: 64, z: 1 } },
@@ -292,8 +279,8 @@ test("Actor Turn output uses Action Cards instead of primitive or action-skill a
   });
   assert.equal(valid.ok, true);
 
-  const invalid = validateActorTurnOutput({
-    schema: "actor-turn-output/v1",
+  const invalid = validateActorTurnExecutionDraft({
+    schema: "actor-turn-execution-draft/v1",
     choice: "use_existing_action",
     action_card_id: "card-place-block-nearby",
     primitive_id: "place_block",
@@ -312,25 +299,26 @@ test("Actor Turn output uses Action Cards instead of primitive or action-skill a
 });
 
 test("Actor Turn output accepts bounded Mineflayer authoring without raw execution authority", () => {
-  const result = validateActorTurnOutput({
-    schema: "actor-turn-output/v1",
+  const result = validateActorTurnExecutionDraft({
+    schema: "actor-turn-execution-draft/v1",
     choice: "author_mineflayer_action",
     proposed_action_skill_id: "findNearbyCraftingTableCell",
     purpose: "Find a valid adjacent cell and place the crafting table there.",
     input_schema: {
       type: "object",
       required: ["item"],
+      additionalProperties: false,
       properties: { item: { const: "crafting_table" } }
     },
     parameters: { item: "crafting_table" },
     source_language: "typescript",
-    source: "export async function run(ctx, params) { await ctx.placeNearby(params.item); }",
+    source: "export async function run(ctx, params) { await ctx.placeBlock(params.item, { x: 1, y: 64, z: 0 }); }",
     helper_api_version: "mineflayer-action-skill-helper/v1",
-    helper_allowlist: ["placeNearby", "observe"],
+    helper_allowlist: ["placeBlock", "observe"],
     timeout_ms: 8000,
     verifier: { kind: "block_or_inventory_delta", item: "crafting_table" },
     known_failure_modes: ["no adjacent replaceable cell"],
-    promotion_policy: "record_candidate_only",
+    promotion_policy: "promote_after_passed_trial",
     why_this_action: "Existing placement attempts keep selecting occupied targets.",
     expected_evidence: ["helper events", "post-observation"],
     fallback_if_blocked: "record blocker and branch to Deliberation"

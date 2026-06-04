@@ -1,3 +1,9 @@
+/**
+ * Minimal runner for recipe-based action skill trials.
+ *
+ * @remarks Trial execution produces evidence for review and promotion decisions;
+ * a passed trial is necessary but still distinct from active runtime authority.
+ */
 import type { ToolResult } from "../../mutual/types.js";
 import { runAction } from "../../runtime/actions/actionRunner.js";
 import type { ActionSkillProposalRecord } from "../proposals/types.js";

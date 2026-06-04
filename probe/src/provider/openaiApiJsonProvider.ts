@@ -1,4 +1,10 @@
 import OpenAI from "openai";
+import type {
+  Response,
+  ResponseCreateParamsNonStreaming,
+  ResponseStatus
+} from "openai/resources/responses/responses";
+import type { ReasoningEffort } from "openai/resources/shared";
 
 import {
   appendProviderUsageRecord,
@@ -17,6 +23,9 @@ export type OpenAiJsonProviderConfig = {
   reasoning?: string;
   maxCompletionTokens?: number;
   maxRetries?: number;
+  responsesBackground?: boolean;
+  responsePollIntervalMs?: number;
+  responsePollTimeoutMs?: number;
   repoRoot?: string;
   usageLedgerPath?: string;
 };
@@ -52,6 +61,125 @@ export type OpenAiJsonCallResult<T> =
     };
 
 type OpenAiErrorKind = Extract<OpenAiJsonCallResult<unknown>, { ok: false }>["errorKind"];
+
+const OPENAI_REASONING_EFFORTS: ReadonlySet<NonNullable<ReasoningEffort>> = new Set([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh"
+]);
+
+export function normalizeOpenAiReasoningEffort(
+  value: string | undefined
+): NonNullable<ReasoningEffort> | undefined {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  if (OPENAI_REASONING_EFFORTS.has(normalized as NonNullable<ReasoningEffort>)) {
+    return normalized as NonNullable<ReasoningEffort>;
+  }
+  return undefined;
+}
+
+function envFlag(name: string, defaultValue: boolean) {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return defaultValue;
+  }
+  return /^(1|true|yes|on)$/i.test(raw);
+}
+
+function responsesBackgroundEnabled(config: OpenAiJsonProviderConfig) {
+  return config.responsesBackground ?? envFlag("OPENAI_RESPONSES_BACKGROUND", true);
+}
+
+export function buildOpenAiJsonSchemaResponseRequest(input: {
+  model: string;
+  maxCompletionTokens: number;
+  reasoning?: string;
+  background?: boolean;
+  schemaName: string;
+  schema: Record<string, unknown>;
+  system: string;
+  user: string;
+}): ResponseCreateParamsNonStreaming {
+  const reasoningEffort = normalizeOpenAiReasoningEffort(input.reasoning);
+  const background = input.background === true;
+  return {
+    model: input.model,
+    instructions: input.system,
+    input: input.user,
+    max_output_tokens: input.maxCompletionTokens,
+    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
+    ...(background ? { background: true, store: true } : { store: false }),
+    text: {
+      format: {
+        type: "json_schema",
+        name: input.schemaName,
+        // Strict mode requires every object property in `required`; social
+        // LegacyPlannerAction args vary by primitive and are validated after parse.
+        strict: false,
+        schema: input.schema
+      }
+    }
+  };
+}
+
+function isPendingResponseStatus(status: ResponseStatus | undefined) {
+  return status === "queued" || status === "in_progress";
+}
+
+async function awaitOpenAiResponse(input: {
+  client: OpenAI;
+  response: Response;
+  pollIntervalMs: number;
+  timeoutMs: number;
+}) {
+  let response = input.response;
+  const started = Date.now();
+  while (isPendingResponseStatus(response.status)) {
+    if (Date.now() - started > input.timeoutMs) {
+      throw new Error(`OpenAI Responses API polling timed out for ${response.id}`);
+    }
+    await delay(input.pollIntervalMs);
+    response = await input.client.responses.retrieve(response.id);
+  }
+  return response;
+}
+
+function collectResponseOutputText(response: Response) {
+  const helperText = (response as { output_text?: unknown }).output_text;
+  if (typeof helperText === "string" && helperText.trim()) {
+    return helperText;
+  }
+
+  const chunks: string[] = [];
+  for (const item of response.output ?? []) {
+    if (item.type !== "message") {
+      continue;
+    }
+    for (const part of item.content ?? []) {
+      if (part.type === "output_text") {
+        chunks.push(part.text);
+      }
+    }
+  }
+  return chunks.join("");
+}
+
+function responseFailureMessage(response: Response) {
+  const status = response.status ?? "unknown";
+  const error = response.error
+    ? `: ${response.error.code ?? "error"} ${response.error.message}`
+    : "";
+  const incomplete = response.incomplete_details
+    ? `: incomplete reason ${response.incomplete_details.reason}`
+    : "";
+  return `OpenAI Responses API returned status ${status}${error}${incomplete}`;
+}
 
 function classifyOpenAiError(error: unknown): OpenAiErrorKind {
   const message = error instanceof Error ? error.message : String(error);
@@ -137,7 +265,7 @@ function delay(ms: number) {
 }
 
 /**
- * Calls OpenAI Chat Completions with JSON schema response format.
+ * Calls OpenAI Responses with JSON schema output and optional background polling.
  * Never logs or returns the API key.
  */
 export async function callOpenAiJsonSchema<T>(input: {
@@ -152,6 +280,11 @@ export async function callOpenAiJsonSchema<T>(input: {
   const model = input.config.model;
   const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
   const maxRetries = input.config.maxRetries ?? Number(process.env.OPENAI_JSON_MAX_RETRIES ?? 2);
+  const useBackgroundResponses = responsesBackgroundEnabled(input.config);
+  const responsePollIntervalMs =
+    input.config.responsePollIntervalMs ?? Number(process.env.OPENAI_RESPONSES_POLL_INTERVAL_MS ?? 2_000);
+  const responsePollTimeoutMs =
+    input.config.responsePollTimeoutMs ?? Number(process.env.OPENAI_RESPONSES_POLL_TIMEOUT_MS ?? 300_000);
   const usageContext = {
     repoRoot: input.config.repoRoot,
     ledgerPath: input.config.usageLedgerPath,
@@ -199,29 +332,27 @@ export async function callOpenAiJsonSchema<T>(input: {
     }
 
     try {
-      const response = await client.chat.completions.create({
+      const initialResponse = await client.responses.create(buildOpenAiJsonSchemaResponseRequest({
         model,
-        max_completion_tokens: maxCompletionTokens,
-        messages: [
-          { role: "system", content: input.system },
-          { role: "user", content: input.user }
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: input.schemaName,
-            // Strict mode requires every object property in `required`; social
-            // ActionIntent args vary by primitive and are validated after parse.
-            strict: false,
-            schema: input.schema
-          }
-        }
+        maxCompletionTokens,
+        reasoning: input.config.reasoning,
+        background: useBackgroundResponses,
+        schemaName: input.schemaName,
+        schema: input.schema,
+        system: input.system,
+        user: input.user
+      }));
+      const response = await awaitOpenAiResponse({
+        client,
+        response: initialResponse,
+        pollIntervalMs: responsePollIntervalMs,
+        timeoutMs: responsePollTimeoutMs
       });
       const normalizedUsage = normalizeOpenAiUsage(response.usage, estimatedUsage);
       const usageRecord = await appendProviderUsageRecord({
         providerId: "openai-api",
         model,
-        status: "succeeded",
+        status: response.status === "completed" ? "succeeded" : "failed",
         usage: normalizedUsage.usage,
         usageSource: normalizedUsage.source,
         context: usageContext,
@@ -230,7 +361,20 @@ export async function callOpenAiJsonSchema<T>(input: {
         budgetDecision
       });
 
-      const rawText = response.choices[0]?.message?.content ?? "";
+      if (response.status !== "completed") {
+        return {
+          ok: false,
+          errorKind: "api_error",
+          message: responseFailureMessage(response),
+          elapsedMs: Date.now() - started,
+          model,
+          rawText: collectResponseOutputText(response),
+          usageRecord,
+          budgetDecision
+        };
+      }
+
+      const rawText = collectResponseOutputText(response);
       if (!rawText.trim()) {
         lastFailure = {
           ok: false,

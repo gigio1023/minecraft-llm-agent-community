@@ -1,3 +1,10 @@
+/**
+ * Helper API exposed to long-objective generated Mineflayer programs.
+ *
+ * @remarks The helper surface is deliberately bounded: generated source may use
+ * helpers to act and observe, but promotion still depends on verifier evidence
+ * and actor-owned lifecycle records.
+ */
 import type { Bot } from "mineflayer";
 
 type InventoryBot = Bot & {

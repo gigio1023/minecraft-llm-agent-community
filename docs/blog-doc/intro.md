@@ -16,12 +16,13 @@ leaving enough runtime evidence to explain the result.
 
 - starts or connects to a local Minecraft server;
 - runs Mineflayer actors through a bounded TypeScript loop;
-- lets a provider propose one action at a time;
-- exposes an `action_surface` packet with direct/deferred runtime affordances;
+- lets Actor Turn choose one visible Action Card or
+  `author_mineflayer_action` at a time;
+- exposes Action Cards projected from the current action surface;
 - exposes query-neutral world-state diagnostics with scan limits, not gameplay
   strategy categories;
-- rejects malformed physical `ActionIntent` args before hidden executor defaults
-  can look like progress;
+- rejects malformed physical runtime action parameters before hidden executor
+  defaults can look like progress;
 - derives `runtime_retry_constraints` after exact repeated target/args blockers
   and blocks another identical attempt before Mineflayer execution;
 - verifies progress from Minecraft state, not model text;
@@ -47,19 +48,19 @@ Reviewer and repair work runs after the turn from saved artifacts.
 flowchart TD
   Workspace["actor workspace"]
   Context["bounded provider context"]
-  Surface["action_surface"]
-  Proposal["CycleGoal / ActionIntent proposal"]
+  Cards["Action Cards"]
+  Proposal["Actor Turn tool selection"]
   Gate["active action skill gate"]
   Action["Mineflayer action skill or primitive"]
   Evidence["runtime evidence"]
-  Contract["ActionIntent args contract"]
+  Contract["runtime action parameters contract"]
   Retry["runtime_retry_constraints"]
   Judgment["CycleJudgment and memory"]
   Review["async reviewer sidecars"]
 
   Workspace --> Context
-  Context --> Surface
-  Surface --> Proposal
+  Context --> Cards
+  Cards --> Proposal
   Proposal --> Contract
   Contract --> Gate
   Retry --> Gate

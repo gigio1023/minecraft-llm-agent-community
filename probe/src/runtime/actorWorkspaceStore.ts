@@ -20,6 +20,13 @@ export type ActorActionSkillStatus =
   | "retired"
   | "rejected";
 
+/**
+ * Actor-owned action skill authority as persisted in the actor workspace.
+ *
+ * @remarks Active records are runtime authority for primitive exposure. Candidate
+ * and generated fields are evidence and review material until lifecycle
+ * promotion writes an active record.
+ */
 export type ActorActionSkillRecord = {
   schema: "actor-action-skill/v1";
   skill_id: string;
@@ -61,6 +68,11 @@ type ActionSkillLibraryIndex = {
   rejected: string[];
 };
 
+/**
+ * Atomically writes JSON artifacts so runtime evidence and action skill records
+ * are not left half-written when a probe exits or reconnect handling interrupts
+ * the process.
+ */
 export async function writeJson(filePath: string, value: unknown) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tempPath = path.join(
@@ -160,6 +172,10 @@ export function materializeSeedActionSkillRecord(
   };
 }
 
+/**
+ * Persists a single action skill record under the status-specific actor
+ * workspace directory.
+ */
 export async function writeActorActionSkillRecord(
   rootDir: string,
   record: ActorActionSkillRecord
@@ -174,6 +190,10 @@ export async function writeActorActionSkillRecord(
   return filePath;
 }
 
+/**
+ * Updates the lightweight library index used to present the actor's action
+ * skill surface without scanning every status directory.
+ */
 export async function addActorActionSkillToLibraryIndex(input: {
   rootDir: string;
   actorId: string;
@@ -200,6 +220,12 @@ export async function addActorActionSkillToLibraryIndex(input: {
   });
 }
 
+/**
+ * Lists actor action skill records for one lifecycle bucket.
+ *
+ * Missing directories are treated as an empty bucket because fresh workspaces are
+ * initialized incrementally during probes.
+ */
 export async function listActorActionSkillRecords(
   rootDir: string,
   actorId: string,
@@ -228,6 +254,11 @@ export async function listActorActionSkillRecords(
   return records;
 }
 
+/**
+ * Declares the actor workspace directories that must exist before runtime
+ * artifacts, memory, relationship state, PlanBeads, and action skill records are
+ * written.
+ */
 export function getRequiredActorWorkspaceDirs(rootDir: string, actorId: string) {
   const paths = getActorWorkspacePaths(rootDir, actorId);
 

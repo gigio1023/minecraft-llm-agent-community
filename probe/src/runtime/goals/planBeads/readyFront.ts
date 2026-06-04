@@ -226,8 +226,9 @@ function closedSummary(bead: ActorPlanBead): PlanBeadPacket["recently_closed_bea
 
 /**
  * Computes the read-only PlanBead ready front. The returned packet-shaped data
- * is context for CycleGoal selection only; ActionIntent validation and runtime
- * evidence remain the authority for executable work and physical progress.
+ * is context for CycleGoal/Actor Turn continuity only; runtime action
+ * validation and runtime evidence remain the authority for executable work and
+ * physical progress.
  */
 export function computeReadyPlanBeads(input: ComputeReadyPlanBeadsInput): PlanBeadReadyFront {
   const maxReady =

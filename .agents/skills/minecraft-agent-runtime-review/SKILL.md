@@ -127,8 +127,8 @@ For each actor, answer:
 For `social-cycle-run-report/v1`, also answer:
 - Did observation change the next action, and how often did that next action
   produce verified progress?
-- How much of the exposed action surface was used as top-level intent and as
-  executed tools?
+- How much of the exposed action surface was used as top-level Actor Turn
+  selection or legacy action and as executed tools?
 - Did action choices concentrate into a narrow gather/craft/place loop?
 - Did verified primitive evidence update settlement checklist/state?
 - Were there social signals: visible actors, `say`, shared storage, relationship

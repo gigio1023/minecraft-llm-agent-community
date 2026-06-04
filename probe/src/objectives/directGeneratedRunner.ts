@@ -189,7 +189,7 @@ function isDirectSubstrateManagedItem(itemName: string) {
 
 function directGeneratedStoneAxeFallbackSource() {
   return `
-export async function run(ctx) {
+export async function run(ctx, params) {
   await ctx.ensureItem("wooden_pickaxe", 1);
   await ctx.ensureItem("cobblestone", 3);
   await ctx.ensureItem("stick", 2);
@@ -215,7 +215,7 @@ function buildSourcePrompt(input: {
   return [
     "Generate one TypeScript action skill for a Minecraft Mineflayer bot.",
     "Return only TypeScript source. Do not wrap it in markdown.",
-    "The source must export async function run(ctx).",
+    "The source must export async function run(ctx, params).",
     "Use the ctx helper API instead of imports or Node APIs.",
     "Choose your own plan. Do not claim success; the runtime will verify inventory evidence after execution.",
     "Available helpers:",

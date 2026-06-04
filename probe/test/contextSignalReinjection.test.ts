@@ -1,3 +1,4 @@
+/** Regression coverage for preserving relationship context signals across turns. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

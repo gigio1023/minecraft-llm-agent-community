@@ -1,3 +1,4 @@
+/** Regression coverage for NPC goal stack state behavior. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

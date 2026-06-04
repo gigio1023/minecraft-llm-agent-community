@@ -1,3 +1,9 @@
+/**
+ * Error taxonomy for Gemini planner/provider failures.
+ *
+ * @remarks Classifying provider failures keeps setup, quota, schema, and model
+ * issues separate from runtime action evidence.
+ */
 export type GeminiPlannerErrorKind =
   | "auth_missing"
   | "auth_invalid"

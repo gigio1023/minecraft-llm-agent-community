@@ -32,7 +32,7 @@ should directly link this brief; this brief then routes workers to the active
 spec, implementation, handoff, provider, and budget documents.
 
 ```text
-Finish the Actor Turn + passive PlanBeads campaign for this repo. Use docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md as the routing spec, with AGENTS.md and SPEC.md as authority and docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md for latest evidence. Keep Actor Turn as the ordinary hot path, PlanBeads passive, and generated Mineflayer action authoring gated through Actor Turn. Verify with focused tests, typecheck, docs build, and budget-guarded 30/60-cycle live evidence. Do not mark complete from green tests alone.
+Finish the Actor Turn + passive PlanBeads campaign for this repo. Use docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md as the routing spec; read AGENTS.md, SPEC.md, and Current-Handoff-And-Next-Work.md first. Make Actor Turn the normal hot path: choose one visible Action Card with schema-valid params, or author_mineflayer_action when a new actor-owned Mineflayer action skill is justified. Keep PlanBeads passive issue-like state only, never executable authority. Make provider input/output contracts auditable, including current_state, Action Cards, Minecraft Basic Guide, runtime action schema validation, Evidence Trace, generated-action-skill artifacts, and branch-only Deliberation. Verify with focused tests, typecheck, docs build, and budget-guarded 30-cycle live evidence; 60 cycles only when provider quota allows. Do not complete from green tests alone.
 ```
 
 ## Correct Link Set
@@ -87,7 +87,7 @@ Good PlanBeads behavior:
 Bad PlanBeads behavior:
 
 - choosing primitive or action-skill execution;
-- supplying missing ActionIntent args;
+- supplying missing runtime action args;
 - acting as a Minecraft strategy planner;
 - closing work from provider prose, movement, observe, wait, or memory notes;
 - requiring the actor to maintain PlanBeads instead of acting in Minecraft.
@@ -96,7 +96,7 @@ Bad PlanBeads behavior:
 
 ```text
 Actor Turn LLM
--> ActionIntent
+-> ActorTurnResolvedAction or full-context generated-action authoring
 -> Mineflayer runtime execution
 -> Evidence Trace append
 -> branch classifier

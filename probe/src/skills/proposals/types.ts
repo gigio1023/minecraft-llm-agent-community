@@ -1,3 +1,9 @@
+/**
+ * Data contracts for proposed actor-owned action skills.
+ *
+ * @remarks These records preserve why a behavior was proposed, but source and
+ * parameters still need schema validation, bounded trial, and promotion.
+ */
 import type { ActorActionSkillSourceKind } from "../../runtime/actorWorkspaceStore.js";
 import type { GeneratedActionSkillCandidate } from "../../runtime/goals/types.js";
 import type { GeneratedActionSkillLifecycleStatus } from "../generated/authoringSchemas.js";
@@ -30,6 +36,7 @@ export type ActionSkillProposalRecord = {
     evidence_refs: string[];
     source_ref?: string;
     helper_events?: unknown[];
+    verifier_output?: unknown;
     reason: string;
   };
   notes?: string;

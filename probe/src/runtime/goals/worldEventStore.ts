@@ -1,3 +1,9 @@
+/**
+ * Persistence for world events used as social-cycle context.
+ *
+ * @remarks World events can influence goal selection, but they are contextual
+ * observations and not replacements for runtime evidence of physical progress.
+ */
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 

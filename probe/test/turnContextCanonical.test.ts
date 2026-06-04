@@ -1,3 +1,4 @@
+/** Regression coverage for canonical Actor Turn context assembly. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

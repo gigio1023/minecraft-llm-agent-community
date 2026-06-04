@@ -1,3 +1,10 @@
+/**
+ * CLI entrypoint for running the bounded social-cycle runtime.
+ *
+ * @remarks CLI defaults and flags should expose the core loop without hiding
+ * provider, server, persistence, or actor-workspace blockers behind optimistic
+ * status text.
+ */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
@@ -145,7 +152,7 @@ async function main() {
   const actionHotPath =
     parsed.actionHotPath ??
     normalizeActionHotPath(process.env.SOCIAL_CYCLE_ACTION_HOT_PATH) ??
-    "legacy";
+    "actor_turn";
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const reportPath = parsed.report

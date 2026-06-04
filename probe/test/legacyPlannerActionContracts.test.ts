@@ -1,21 +1,22 @@
+/** Regression coverage for social LegacyPlannerAction contract validation. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION,
-  validateDirectPrimitiveActionIntentArgs,
-  validatePrimitiveActionIntentArgs,
-  type ActionIntentPrimitiveArgsContractResult
-} from "../src/runtime/goals/actionIntentContracts.js";
-import type { ActionIntent } from "../src/runtime/goals/types.js";
+  ACTION_PARAMETER_CONTRACT_VERSION,
+  validateDirectPrimitiveLegacyPlannerActionParameters,
+  validatePrimitiveActionParameters,
+  type ActionParameterContractResult
+} from "../src/runtime/goals/actionParameterContracts.js";
+import type { LegacyPlannerAction } from "../src/runtime/goals/types.js";
 
 function primitiveIntent(input: {
   primitiveId: string;
   args: Record<string, unknown>;
   why?: string;
-}): ActionIntent {
+}): LegacyPlannerAction {
   return {
-    schema: "action-intent/v1",
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-1",
@@ -28,16 +29,16 @@ function primitiveIntent(input: {
   };
 }
 
-function assertRejected(result: ActionIntentPrimitiveArgsContractResult, message: string) {
+function assertRejected(result: ActionParameterContractResult, message: string) {
   if (result.ok) {
     assert.fail(`Expected ${result.primitiveId} contract rejection`);
   }
-  assert.equal(result.contractVersion, ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION);
+  assert.equal(result.contractVersion, ACTION_PARAMETER_CONTRACT_VERSION);
   assert.match(result.error, new RegExp(message));
 }
 
 test("move_to rejects prose coordinates when structured args are empty", () => {
-  const result = validateDirectPrimitiveActionIntentArgs(
+  const result = validateDirectPrimitiveLegacyPlannerActionParameters(
     primitiveIntent({
       primitiveId: "move_to",
       args: {},
@@ -57,10 +58,10 @@ test("move_to accepts explicit position shapes and records target source", () =>
   ] as const;
 
   for (const [args, source] of cases) {
-    const result = validatePrimitiveActionIntentArgs({ primitiveId: "move_to", args });
+    const result = validatePrimitiveActionParameters({ primitiveId: "move_to", args });
     assert.equal(result.ok, true);
     assert.equal(result.primitiveId, "move_to");
-    assert.equal(result.contractVersion, ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION);
+    assert.equal(result.contractVersion, ACTION_PARAMETER_CONTRACT_VERSION);
     assert.equal(result.target?.kind, "position");
     assert.equal(result.target?.source, source);
     assert.deepEqual(result.target?.position, { x: 1, y: 64, z: 2 });
@@ -68,7 +69,7 @@ test("move_to accepts explicit position shapes and records target source", () =>
 });
 
 test("move_to accepts only explicit bounded scout args", () => {
-  const result = validatePrimitiveActionIntentArgs({
+  const result = validatePrimitiveActionParameters({
     primitiveId: "move_to",
     args: { direction: "north", distance: 12 }
   });
@@ -82,18 +83,18 @@ test("move_to accepts only explicit bounded scout args", () => {
   });
 
   assertRejected(
-    validatePrimitiveActionIntentArgs({ primitiveId: "move_to", args: { direction: "north" } }),
+    validatePrimitiveActionParameters({ primitiveId: "move_to", args: { direction: "north" } }),
     "direction and distance"
   );
   assertRejected(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "move_to",
       args: { direction: "north", distance: 13 }
     }),
     "distance 2..12"
   );
   assertRejected(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "move_to",
       args: { direction: "up", distance: 4 }
     }),
@@ -116,7 +117,7 @@ test("physical primitives reject hidden executor defaults", () => {
   ] as const;
 
   for (const [primitiveId, args, message] of rejectedCases) {
-    assertRejected(validatePrimitiveActionIntentArgs({ primitiveId, args }), message);
+    assertRejected(validatePrimitiveActionParameters({ primitiveId, args }), message);
   }
 });
 
@@ -127,26 +128,26 @@ test("provider-direct primitive validation uses parameters before legacy args", 
   });
   intent.parameters = { itemName: "stick" };
 
-  assert.equal(validateDirectPrimitiveActionIntentArgs(intent).ok, true);
+  assert.equal(validateDirectPrimitiveLegacyPlannerActionParameters(intent).ok, true);
 });
 
 test("placement and building primitives accept explicit executable args", () => {
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "place_block",
       args: { itemName: "dirt", targetPosition: { x: 1, y: 64, z: 0 } }
     }).ok,
     true
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "place_block",
       args: { blockName: "crafting_table", position: { x: 2, y: 64, z: 0 } }
     }).ok,
     true
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "place_block",
       args: { itemName: "crafting_table", surfacePosition: { x: 2, y: 63, z: 0 } }
     }).ok,
@@ -158,25 +159,26 @@ test("placement and building primitives accept explicit executable args", () => 
     { position: { x: 4, y: 64, z: 4 } },
     { targetPosition: { x: 4, y: 64, z: 4 } }
   ]) {
-    assert.equal(validatePrimitiveActionIntentArgs({ primitiveId: "build_pattern", args }).ok, true);
+    assert.equal(validatePrimitiveActionParameters({ primitiveId: "build_pattern", args }).ok, true);
   }
 });
 
 test("craft primitives require itemName unless actionSkillId fallback is present", () => {
   for (const primitiveId of ["craft_item", "craft_with_table"] as const) {
     assertRejected(
-      validatePrimitiveActionIntentArgs({ primitiveId, args: {} }),
+      validatePrimitiveActionParameters({ primitiveId, args: {} }),
       "requires itemName"
     );
     assert.equal(
-      validatePrimitiveActionIntentArgs({
+      validatePrimitiveActionParameters({
         primitiveId,
-        args: { actionSkillId: "craftPlanksAndSticks" }
+        args: {},
+        actionSkillId: "craftPlanksAndSticks"
       }).ok,
       true
     );
     assert.equal(
-      validatePrimitiveActionIntentArgs({
+      validatePrimitiveActionParameters({
         primitiveId,
         args: {},
         actionSkillId: "craftPlanksAndSticks"
@@ -185,11 +187,11 @@ test("craft primitives require itemName unless actionSkillId fallback is present
     );
   }
   assert.equal(
-    validatePrimitiveActionIntentArgs({ primitiveId: "craft_item", args: { itemName: "stick" } }).ok,
+    validatePrimitiveActionParameters({ primitiveId: "craft_item", args: { itemName: "stick" } }).ok,
     true
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "craft_with_table",
       args: { itemName: "wooden_pickaxe" }
     }).ok,
@@ -200,7 +202,7 @@ test("craft primitives require itemName unless actionSkillId fallback is present
 test("craft_with_table rejects direct inventory-grid recipe items", () => {
   for (const itemName of ["crafting_table", "stick", "sticks", "planks", "acacia_planks"]) {
     assertRejected(
-      validatePrimitiveActionIntentArgs({
+      validatePrimitiveActionParameters({
         primitiveId: "craft_with_table",
         args: { itemName }
       }),
@@ -209,9 +211,10 @@ test("craft_with_table rejects direct inventory-grid recipe items", () => {
   }
 
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "craft_with_table",
-      args: { itemName: "crafting_table", actionSkillId: "craftWoodenPickaxe" }
+      args: { itemName: "crafting_table" },
+      actionSkillId: "craftWoodenPickaxe"
     }).ok,
     true
   );
@@ -219,10 +222,10 @@ test("craft_with_table rejects direct inventory-grid recipe items", () => {
 
 test("generated Mineflayer program primitive requires source authority", () => {
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "run_mineflayer_program",
       args: {
-        source: "export async function run(ctx) { return ctx.observe(); }",
+        source: "export async function run(ctx, params) { return ctx.observe(); }",
         purpose: "refresh observation through generated helper source"
       }
     }).ok,
@@ -232,20 +235,21 @@ test("generated Mineflayer program primitive requires source authority", () => {
 
 test("consume_item requires itemName unless action-skill fallback is present", () => {
   assertRejected(
-    validatePrimitiveActionIntentArgs({ primitiveId: "consume_item", args: {} }),
+    validatePrimitiveActionParameters({ primitiveId: "consume_item", args: {} }),
     "requires itemName"
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "consume_item",
       args: { itemName: "bread" }
     }).ok,
     true
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "consume_item",
-      args: { actionSkillId: "eatFoodWhenHungry" }
+      args: {},
+      actionSkillId: "eatFoodWhenHungry"
     }).ok,
     true
   );
@@ -253,7 +257,7 @@ test("consume_item requires itemName unless action-skill fallback is present", (
 
 test("provider-direct primitive validation cannot spoof action-skill fallback args", () => {
   assertRejected(
-    validateDirectPrimitiveActionIntentArgs(
+    validateDirectPrimitiveLegacyPlannerActionParameters(
       primitiveIntent({
         primitiveId: "place_block",
         args: { actionSkillId: "placeCraftingTable" }
@@ -263,15 +267,16 @@ test("provider-direct primitive validation cannot spoof action-skill fallback ar
   );
 
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "place_block",
-      args: { actionSkillId: "placeCraftingTable" }
+      args: {},
+      actionSkillId: "placeCraftingTable"
     }).ok,
     true
   );
 
   assertRejected(
-    validateDirectPrimitiveActionIntentArgs(
+    validateDirectPrimitiveLegacyPlannerActionParameters(
       primitiveIntent({
         primitiveId: "deposit_shared",
         args: { actionSkillId: "depositSharedItems" }
@@ -281,7 +286,7 @@ test("provider-direct primitive validation cannot spoof action-skill fallback ar
   );
 
   assertRejected(
-    validateDirectPrimitiveActionIntentArgs(
+    validateDirectPrimitiveLegacyPlannerActionParameters(
       primitiveIntent({
         primitiveId: "consume_item",
         args: { actionSkillId: "eatFoodWhenHungry" }
@@ -293,43 +298,44 @@ test("provider-direct primitive validation cannot spoof action-skill fallback ar
 
 test("direct shared transfer primitives require explicit positive counts", () => {
   assertRejected(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "deposit_shared",
       args: { itemName: "minecraft_item" }
     }),
     "count or targetCount"
   );
   assertRejected(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "withdraw_shared",
       args: { itemName: "minecraft_item", count: 0 }
     }),
     "count or targetCount"
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "deposit_shared",
       args: { itemName: "minecraft_item", count: 2 }
     }).ok,
     true
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "withdraw_shared",
       args: { itemName: "minecraft_item", targetCount: 1 }
     }).ok,
     true
   );
   assert.equal(
-    validatePrimitiveActionIntentArgs({
+    validatePrimitiveActionParameters({
       primitiveId: "deposit_shared",
-      args: { actionSkillId: "depositSharedItems" }
+      args: {},
+      actionSkillId: "depositSharedItems"
     }).ok,
     true
   );
 });
 
 test("wait and remember keep existing permissive arg behavior", () => {
-  assert.equal(validatePrimitiveActionIntentArgs({ primitiveId: "wait", args: {} }).ok, true);
-  assert.equal(validatePrimitiveActionIntentArgs({ primitiveId: "remember", args: {} }).ok, true);
+  assert.equal(validatePrimitiveActionParameters({ primitiveId: "wait", args: {} }).ok, true);
+  assert.equal(validatePrimitiveActionParameters({ primitiveId: "remember", args: {} }).ok, true);
 });

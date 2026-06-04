@@ -1,3 +1,9 @@
+/**
+ * Persistence helpers for async reviewer artifacts.
+ *
+ * @remarks Reviewer records are evidence and recommendations. Runtime action
+ * skill authority still flows through actor workspace lifecycle records.
+ */
 import path from "node:path";
 
 import type { RelationshipEventKind } from "../npc/relationships/relationshipLedger.js";

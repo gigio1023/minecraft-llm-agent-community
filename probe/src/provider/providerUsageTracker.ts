@@ -506,10 +506,21 @@ export function normalizeOpenAiUsage(raw: unknown, fallback: ProviderUsageCounts
     return { usage: fallback, source: "estimated" as ProviderUsageSource, rawUsage: undefined };
   }
   const record = raw as Record<string, unknown>;
+  const completionDetails =
+    typeof record.completion_tokens_details === "object" && record.completion_tokens_details !== null
+      ? record.completion_tokens_details as Record<string, unknown>
+      : undefined;
+  const outputDetails =
+    typeof record.output_tokens_details === "object" && record.output_tokens_details !== null
+      ? record.output_tokens_details as Record<string, unknown>
+      : undefined;
   const usage = toCounts({
     requests: 1,
-    input_tokens: sanitizeNumber(record.prompt_tokens),
-    output_tokens: sanitizeNumber(record.completion_tokens),
+    input_tokens: sanitizeNumber(record.prompt_tokens) || sanitizeNumber(record.input_tokens),
+    output_tokens: sanitizeNumber(record.completion_tokens) || sanitizeNumber(record.output_tokens),
+    thinking_tokens:
+      sanitizeNumber(completionDetails?.reasoning_tokens) ||
+      sanitizeNumber(outputDetails?.reasoning_tokens),
     total_tokens: sanitizeNumber(record.total_tokens)
   });
   return {

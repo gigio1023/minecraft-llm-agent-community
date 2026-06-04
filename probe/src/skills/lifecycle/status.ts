@@ -1,3 +1,9 @@
+/**
+ * Allowed status transitions for actor-owned action skills.
+ *
+ * @remarks Lifecycle transitions protect runtime authority from jumping directly
+ * from draft or rejected records into active execution.
+ */
 import type { ActorActionSkillStatus } from "../../runtime/actorWorkspaceStore.js";
 
 const allowedTransitions = new Set<string>([

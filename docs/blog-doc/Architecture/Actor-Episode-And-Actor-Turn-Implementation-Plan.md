@@ -6,11 +6,23 @@ sidebar_position: 41
 
 Search token: `ACTOR_EPISODE_IMPLEMENTATION_PLAN`.
 
-Status: active implementation campaign plan.
+Status: historical implementation campaign plan; superseded for outer Actor Turn
+tool selection by `Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`.
 
 Recorded: 2026-06-03 (`Asia/Seoul`).
 
 ## Planning Method
+
+Current application rule:
+
+- Keep this plan's Active Episode, evidence trace, Deliberation branching, and
+  passive PlanBeads ideas.
+- Do not use this plan's older `ActorTurnOutput -> legacy planner action` bridge as the
+  active hot path.
+- Ordinary Actor Turn now selects exactly one strict function tool: a visible
+  Action Card with logical `parameters`, or `author_mineflayer_action`.
+- Mineflayer codegen receives full `ActorTurnInput`, raw outer function call,
+  parsed author args, and injected codegen agent skill markdown.
 
 This plan implements `Low-Cost-Social-Simulation-Campaign-Spec.md`. It should
 stay detailed about sequencing, gates, and evidence, but avoid becoming a
@@ -42,7 +54,7 @@ and first low-cost smoke evidence:
 
 | Slice | Why now | Smallest proof | Primary gates |
 |-------|---------|----------------|---------------|
-| Redundant material crafting control | A 30-cycle cheap-model run can still overuse one broad crafting action after the immediate need is satisfied. | Actor Turn hides, downgrades, or rejects redundant material-crafting cards when inventory and episode evidence already satisfy the current need, while still allowing crafting for a new need. | `actionfulness-gate`, `current-state-consumption-gate` |
+| Redundant material crafting control | A 30-cycle cheap-model run can still overuse one broad crafting action after the immediate need is satisfied. | Actor Turn exposes current inventory/evidence and retry context while keeping visible tools available; the provider must choose a schema-valid next action or codegen path, and runtime validators/verifiers decide whether execution was real. | `actionfulness-gate`, `current-state-consumption-gate` |
 | Container and station blocker clarity | Chest/table uncertainty can drift into repeated inspection or generated probes instead of a direct useful action. | A blocked open/inspect/container concern produces a clear Action Card or explicit blocker update, not repeated vague generated probes. | `current-state-consumption-gate`, `planbead-lifecycle-gate` |
 | PlanBead blocker reconciliation | Repeated failed generated trials or shelter attempts should update durable work state without fake closure. | Repeated related failures produce a guarded PlanBead blocker update with matching evidence refs and no executable fields. | `planbead-continuity-gate`, `planbead-lifecycle-gate` |
 | Richer social surface | Shared-storage fixture proof is useful but too thin for broader social simulation. | A low-cost run includes a visible actor, chat target, relationship event, or later actor consumption, and the review cites runtime-visible social consequence refs. | `social-plausibility-gate`, `budget-gate` |
@@ -66,19 +78,16 @@ Implementation checkpoint, 2026-06-03:
   can project direct affordances into `action-card/v1` records, build
   `actor-turn-input/v1`, and expose an Actor Turn provider schema/prompt
   boundary.
-- Existing `social-action-planner-input/v1` snapshots now carry
-  `actor_turn_contract` and `action_cards` as migration context while the legacy
-  action planner still owns live ActionIntent production.
-- Phase 4 initial Runtime Action Resolver bridge is implemented. It maps
-  `use_existing_action` Action Cards back to primitive or actor-owned action
-  skill `ActionIntent` records, maps `author_mineflayer_action` into the
-  existing `author_and_trial_action_skill` path, and rejects unmapped cards,
-  record-only generated policies, and generated parameters that fail
-  `input_schema`.
-- The runner now has an experimental `actionHotPath: "actor_turn"` option. In
-  that mode, deterministic social-cycle runs write `actor-turn-input/v1`
-  provider snapshots, resolve Actor Turn output back to existing `ActionIntent`
-  artifacts, and keep the legacy judgment/execution/report path intact.
+- Actor Turn provider snapshots now carry visible Action Cards and strict
+  function-tool contracts. Legacy action planner snapshots remain only for the
+  explicit legacy path.
+- Runtime Action Resolver now resolves Actor Turn function-tool selections into
+  `ActorTurnResolvedAction` and full-context `author_mineflayer_action` codegen
+  rather than using a provider-facing legacy planner action as the boundary.
+- The runner has an `actionHotPath: "actor_turn"` option. In that mode,
+  provider calls write `actor-turn-input/v1` snapshots, execute resolved Actor
+  Turn actions directly, and keep compatibility CycleGoal/CycleJudgment/report
+  artifacts only so old review readers can still inspect runs.
 - The social-cycle CLI can select the bridge with
   `--action-hot-path actor_turn` or `SOCIAL_CYCLE_ACTION_HOT_PATH=actor_turn`.
   Reports record `action_hot_path` so review scripts and humans can tell which
@@ -107,7 +116,7 @@ Implementation checkpoint, 2026-06-03:
 - A dedicated branch-time Deliberation provider contract is implemented. Its
   output may reframe `active-episode/v1` and carry raw PlanBead operation
   proposals for the guarded applier, but validators reject executable authority
-  such as `ActionIntent`, `ActionCard`, `primitive_id`, `action_skill_id`,
+  such as `legacy planner action`, `ActionCard`, `primitive_id`, `action_skill_id`,
   generated source, helper settings, `args`, or executable parameters.
 - Deterministic Deliberation provider tests prove that branch-time reframing
   writes `deliberation-output/v1`, persists the next Active Episode, and keeps
@@ -179,23 +188,25 @@ Implementation checkpoint, 2026-06-03:
   social-cycle progress by itself. It can update known state, but a run still
   needs later inventory, shared-storage, relationship, block, chat, or other
   episode-relevant mutation to pass behavior gates.
-- Generic Mineflayer program runners are hidden from `use_existing_action`
-  Action Cards. Low-cost providers were dumping long TypeScript into the generic
-  runner and truncating JSON. Fresh generated source now belongs to
+- Generic Mineflayer program runners are excluded from ordinary existing Action
+  Cards. Low-cost providers were dumping long TypeScript into the generic
+  runner and truncating JSON. Fresh generated source belongs to
   `author_mineflayer_action`; specific promoted actor-owned behaviors can still
   appear as ordinary Action Cards.
 - Runtime Action Resolver now rejects table-bound recipes such as
   `wooden_pickaxe` when a provider routes them through the inventory-grid
   `craft_item` card. This turns the live `craft_item(wooden_pickaxe)` failure
   into contract repair before Mineflayer execution.
-- Runtime Action Resolver now enforces known inventory-grid and table-bound
-  recipe counts before Mineflayer execution. Actor Turn input also annotates
-  `Craft Item` and `Craft With Table` cards with currently feasible recipes and
-  missing common recipe ingredients. This is intentionally a Minecraft basic
-  mechanics contract, not a domain strategy.
-- Actor Turn repair input now hides the Action Card that was just rejected when
-  another card remains available. A cheap provider still gets one repair turn,
-  but it is no longer shown the exact same invalid card as an equal option.
+- Superseded: Runtime Action Resolver must not enforce recipe counts by parsing
+  Action Card prose or `current_state_requirements`. Recipe facts belong in
+  `minecraft_basic_guide`, current inventory evidence, strict parameters, and
+  verifier/runtime outcomes. Actor Turn input may expose context, but it must
+  not compute hidden recipe eligibility or reject the provider's choice through
+  string matching.
+- Superseded: Actor Turn repair input previously removed the rejected Action
+  Card. The current direction keeps tool visibility governed by schemas and
+  gates, while repair context carries the rejection evidence so the provider can
+  change parameters, choose another visible tool, or author a bounded helper.
 - Direct `Say` is now a current-state-checked card requiring a visible target
   actor. Actor-owned social action skills that deliver chat must likewise carry
   target visibility when the current single-bot runtime cannot deliver chat to
@@ -223,14 +234,11 @@ Implementation checkpoint, 2026-06-03:
   the scenario. It also leaves a remaining repetition risk: after a table is
   already present, repeated `placeCraftingTable` can still pass as
   `already_present` instead of pivoting to the next useful episode.
-- The first `current-state-consumption-gate` fix is implemented for crafting
-  table station state. `placeCraftingTable` now requires
-  `no usable crafting_table already known`; Actor Turn input hides that
-  station-specific Action Card when current state already proves a placed,
-  nearby, known, or checklist-satisfied crafting table, and Runtime Action
-  Resolver rejects stale choices before Mineflayer execution. This preserves
-  direct `place_block` freedom for explicit useful placement while removing the
-  already-satisfied station loop.
+- Superseded: the first `current-state-consumption-gate` fix used Action Card
+  hiding and resolver rejection for station state. The current direction rejects
+  that hidden planner pattern. Crafting-table state is provider context and
+  runtime evidence; strict tool args, action-skill schemas, retry constraints,
+  and verifier outcomes are executable authority.
 - The first `planbead-lifecycle-gate` slice is implemented for ordinary Actor
   Turn runtime evidence. Runtime evidence from `deposit_shared:deposited`,
   `inspect_chest:inspected`, `craft_item:crafted`, and
@@ -282,11 +290,12 @@ Implementation checkpoint, 2026-06-03:
   `tmp/social-smoke-openai-nano-2cycle-rerun6.json` passed with
   `inspect_chest -> deposit_shared`, and
   `tmp/social-smoke-openai-nano-3cycle-rerun7.json` passed with completed
-  `oak_log` deposit followed by non-repeat Actor Turn inputs where
-  `Deposit Shared` and `Deposit Shared Items` were hidden. This proves the
-  first shared-storage social consequence and completed-request non-repeat
-  slices. It does not yet prove a strong follow-up after completion; the third
-  cycle still preferred remember/inspect rather than a richer next action.
+  `oak_log` deposit followed by non-repeat Actor Turn inputs. That evidence was
+  collected before the direct tool-calling/no-hidden-planner cleanup, so do not
+  treat any Action Card hiding in that run as current architecture. The run
+  proves the first shared-storage social consequence, but it does not yet prove
+  a strong follow-up after completion; the third cycle still preferred
+  remember/inspect rather than a richer next action.
 - Latest post-`decision_frame` evidence:
   `tmp/social-smoke-openai-nano-3cycle-decision-frame-v2.json` passed with
   `deposit_shared -> craftPlanksAndSticks -> craftCraftingTable`, 4 provider
@@ -419,7 +428,7 @@ the next workstream. The durable plan should keep:
 | W0 spec routing | Land the target architecture, plan, terminology, search index, and sidebar routing | Docs build passes and search tokens route to the new docs |
 | W1 versioned contracts | Define `active-episode/v1`, `actor-turn-input/v1`, `actor-turn-output/v1`, `action-card/v1`, `evidence-trace/v1`, and `deliberation-branch/v1` | Contract fixtures validate and report refs can resolve |
 | W2 Action Cards | Project primitives and actor-owned action skills into unified provider-visible cards | Provider no longer chooses primitive vs action skill as the primary decision |
-| W3 Actor Turn provider | Replace hot-path goal plus action planner calls with one Actor Turn call | One turn produces one valid `use_existing_action` or `author_mineflayer_action` proposal |
+| W3 Actor Turn provider | Replace hot-path goal plus action planner calls with one Actor Turn call | One turn produces exactly one visible Action Card tool call or `author_mineflayer_action` |
 | W4 Runtime Action Resolver | Map Action Cards to existing primitive/action-skill/generated-action paths | Parameters validate before execution and retry constraints block repeated exact blockers |
 | W5 Evidence Trace | Append turn evidence with post-action observation where possible | Next Actor Turn can see what changed without mandatory re-observe |
 | W6 only-on-branch Deliberation | Move per-cycle goal mind into branch-triggered episode reframing | Deliberation runs only on branch conditions and cannot choose actions |
@@ -519,7 +528,7 @@ Deliverables:
 
 - Action Card projection from existing primitives and actor-owned action skills;
 - Actor Turn provider input and output snapshots;
-- resolver mapping from `use_existing_action` to current executable records;
+- resolver mapping from selected Action Card tools to current executable records;
 - compatibility bridge to existing social-cycle report fields.
 
 Acceptance:
@@ -621,8 +630,9 @@ Hard requirements:
 - zero misleading episode passes;
 - every claimed mutation has runtime evidence;
 - movement-only `position_delta` is recorded as context, not verified mutation;
-- repeated observe after `no_progress` is suppressed or becomes a truthful
-  branch/blocker, not another observe-only turn;
+- repeated observe after `no_progress` is either justified by changed context or
+  becomes a truthful branch/blocker, not another observe-only turn hidden by
+  ad hoc card suppression;
 - repeated inspect of unchanged shared storage does not count as another
   mutation;
 - malformed `author_mineflayer_action` output either repairs into a valid
@@ -713,7 +723,7 @@ surface changes:
 
 ```bash
 bun run typecheck
-bun test probe/test/socialActionIntentContracts.test.ts
+bun test probe/test/sociallegacy planner actionContracts.test.ts
 bun test probe/test/socialCycleRunner.test.ts
 git diff --check
 cd docs && npm run build

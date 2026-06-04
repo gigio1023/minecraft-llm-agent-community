@@ -1,3 +1,12 @@
+/**
+ * Consolidates settlement-facing runtime state such as shared storage,
+ * contribution evidence, known positions, and recent blockers.
+ *
+ * @remarks Settlement state is context for social simulation and Actor Turn
+ * selection. It summarizes evidence without becoming proof of physical progress
+ * unless the cited artifacts verify world, inventory, container, or position
+ * changes.
+ */
 import type { JsonValue } from "../../provider/inputSnapshot.js";
 import type { ObserveResult } from "../../tools/observe.js";
 import type { ActorActionSkillRecord } from "../actorWorkspaceStore.js";

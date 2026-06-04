@@ -1,3 +1,7 @@
+import type { GeneratedActionSkillCandidate } from "../types.js";
+
+export type { GeneratedActionSkillCandidate };
+
 export type JsonValue =
   | string
   | number
@@ -163,6 +167,13 @@ export type RelationshipContextProjection = {
   obligations: string[];
 };
 
+/**
+ * Actor Turn view of current Minecraft and settlement state.
+ *
+ * @remarks This projection is evidence substrate for choosing the next action.
+ * It should not launder absence claims: world scans must carry limitations and
+ * `absence_claims_exhaustive` explicitly.
+ */
 export type ActorTurnCurrentStateProjection = {
   schema: "actor-turn-current-state/v1";
   observer_id: string;
@@ -221,6 +232,14 @@ export type ActorTurnCurrentStateProjection = {
   };
 };
 
+/**
+ * Compact decision context for the Actor Turn provider.
+ *
+ * @remarks The frame summarizes evidence and branch context only. It must not
+ * rank tools, inject parameters, hide Action Cards, or become a second
+ * Minecraft planner. Only a validated Actor Turn resolved action with
+ * structured parameters can become executable runtime work.
+ */
 export type ActorTurnDecisionFrame = {
   schema: "actor-turn-decision-frame/v1";
   priority_order: string[];
@@ -252,24 +271,6 @@ export type ActorTurnDecisionFrame = {
     next_theme: string;
     evidence_refs: string[];
   }>;
-  parameter_candidates: Array<{
-    action_card_title: string;
-    itemName?: string;
-    count?: number;
-    reason: string;
-    evidence_refs: string[];
-  }>;
-  top_eligible_action_cards: Array<{
-    action_card_id: string;
-    title: string;
-    why_now: string;
-  }>;
-  recommended_next_action_candidates: Array<{
-    action_card_id: string;
-    title: string;
-    parameters: JsonObject;
-    why: string;
-  }>;
   next_action_guidance: string[];
 };
 
@@ -280,6 +281,23 @@ export type MinecraftBasicGuideProjection = {
   station_requirements: string[];
   blocker_recovery_guides: string[];
   observe_stop_guides: string[];
+};
+
+export type MineflayerCodegenSkillProjection = {
+  schema: "mineflayer-codegen-skill/v1";
+  skill_ref: string;
+  skill_markdown: string;
+  upstream_ref: string;
+  applies_when: "outer Actor Turn selected author_mineflayer_action";
+  helper_api_version: "mineflayer-action-skill-helper/v1";
+  allowed_ctx_helpers: string[];
+  bounded_mineflayer_methods: string[];
+  output_schema_rules: string[];
+  helper_call_contracts: string[];
+  mineflayer_api_notes: string[];
+  forbidden_source_patterns: string[];
+  verifier_and_evidence_rules: string[];
+  common_failure_modes: string[];
 };
 
 export type ActiveEpisode = {
@@ -312,6 +330,7 @@ export type ActionCard = {
   description: string;
   parameters_schema_ref: string;
   parameter_hints: string[];
+  /** Advisory provider context for selection only; runtime validators still require explicit structured args. */
   current_state_requirements: string[];
   expected_evidence: string[];
   likely_blockers: string[];
@@ -334,12 +353,13 @@ export type ActorTurnInput = {
   runtime_retry_constraints: RuntimeRetryConstraintSummary[];
   action_cards: ActionCard[];
   minecraft_basic_guide: MinecraftBasicGuideProjection;
+  mineflayer_codegen_skill: MineflayerCodegenSkillProjection;
   provider_budget_hint: ProviderBudgetHint;
 };
 
-export type ActorTurnOutput =
+export type ActorTurnExecutionDraft =
   | {
-      schema: "actor-turn-output/v1";
+      schema: "actor-turn-execution-draft/v1";
       choice: "use_existing_action";
       action_card_id: string;
       parameters: JsonObject;
@@ -348,7 +368,7 @@ export type ActorTurnOutput =
       fallback_if_blocked: string;
     }
   | {
-      schema: "actor-turn-output/v1";
+      schema: "actor-turn-execution-draft/v1";
       choice: "author_mineflayer_action";
       proposed_action_skill_id: string;
       purpose: string;
@@ -361,7 +381,47 @@ export type ActorTurnOutput =
       timeout_ms: number;
       verifier: JsonObject;
       known_failure_modes: string[];
-      promotion_policy: "record_candidate_only" | "promote_after_passed_trial";
+      promotion_policy: "promote_after_passed_trial";
+      why_this_action: string;
+      expected_evidence: string[];
+      fallback_if_blocked: string;
+};
+
+export type ActorTurnResolvedAction =
+  | {
+      schema: "actor-turn-resolved-action/v1";
+      actor_id: string;
+      cycle_id: string;
+      cycle_goal_id: string;
+      kind: "use_primitive";
+      action_card_id: string;
+      primitive_id: string;
+      parameters: JsonObject;
+      why_this_action: string;
+      expected_evidence: string[];
+      fallback_if_blocked: string;
+    }
+  | {
+      schema: "actor-turn-resolved-action/v1";
+      actor_id: string;
+      cycle_id: string;
+      cycle_goal_id: string;
+      kind: "use_action_skill";
+      action_card_id: string;
+      action_skill_id: string;
+      parameters: JsonObject;
+      why_this_action: string;
+      expected_evidence: string[];
+      fallback_if_blocked: string;
+    }
+  | {
+      schema: "actor-turn-resolved-action/v1";
+      actor_id: string;
+      cycle_id: string;
+      cycle_goal_id: string;
+      kind: "author_mineflayer_action";
+      parameters: JsonObject;
+      candidate: GeneratedActionSkillCandidate;
       why_this_action: string;
       expected_evidence: string[];
       fallback_if_blocked: string;
@@ -378,6 +438,20 @@ export type EvidenceTraceEntry = {
   post_observation_ref?: string;
   provider_usage_ref?: string;
   outcome: EvidenceTraceOutcome;
+  selected_action?: {
+    kind: string;
+    id: string;
+    action_card_id?: string;
+    title?: string;
+  };
+  parameters?: JsonObject;
+  rationale?: {
+    why_this_action?: string;
+    fallback_if_blocked?: string;
+  };
+  runtime_status?: string;
+  tool_statuses?: Array<{ tool: string; status: string }>;
+  blocker_reason?: string;
   compact_summary: string;
 };
 

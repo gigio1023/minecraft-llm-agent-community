@@ -115,7 +115,7 @@ function normalizeName(value: string) {
 
 function readTimeoutMs(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)
-    ? Math.max(500, Math.min(10_000, Math.floor(value)))
+    ? Math.max(500, Math.min(120_000, Math.floor(value)))
     : 8_000;
 }
 

@@ -93,7 +93,7 @@ The core authority split is:
 
 | Layer | Owns | Must not own |
 |-------|------|--------------|
-| Provider | goal proposals, action-intent proposals, judgment wording | physical success, tool expansion, unverified world claims |
+| Provider | goal proposals, action-legacy-planner-action proposals, judgment wording | physical success, tool expansion, unverified world claims |
 | Runtime loop | primitive dispatch, active action skill gate, timeout/cancel behavior, transcript events | high-level narrative success |
 | Mineflayer tools | direct world interaction and inventory/container/block evidence | social meaning or long-horizon goal authority |
 | Verifiers | pass/fail/progress interpretation from tool evidence | optimistic completion without evidence |

@@ -16,10 +16,17 @@ import {
 import type { ActorCycleGoal, CycleJudgment } from "../src/runtime/goals/types.js";
 import { buildNpcBActionSkillRecord } from "./helpers/socialCycleTestHelpers.js";
 import {
+  buildGeminiFunctionDeclarationsFromTools,
+  normalizeGeminiFunctionCalls
+} from "../src/provider/geminiApiToolProvider.js";
+import {
   buildRepairActorTurnInput,
-  buildActorTurnProviderPayload,
-  parseActorTurnProviderOutput
+  buildMineflayerCodegenRequest,
+  buildActorTurnToolSelectionPayload,
+  parseMineflayerCodegenProviderOutput,
+  parseActorTurnToolSelection
 } from "../src/provider/socialActorTurnProvider.js";
+import type { ActorTurnInput } from "../src/runtime/goals/actorEpisode/index.js";
 import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -117,7 +124,7 @@ function planBeadPacket(): PlanBeadPacket {
 
 function primitiveContract(primitiveId: string) {
   return {
-    schema: "action-intent-primitive-args/v1" as const,
+    schema: "actor-turn-action-parameters/v1" as const,
     primitive_id: primitiveId,
     required_structured_args: [],
     accepted_forms: [],
@@ -269,7 +276,7 @@ function buildHandoffItemAtChestRecord() {
   };
 }
 
-test("Action Card projection hides primitive/action-skill choice behind cards", async () => {
+test("Action Card projection exposes primitive/action-skill choice through cards", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const judgment: CycleJudgment = {
     schema: "cycle-judgment/v1",
@@ -372,10 +379,10 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
   );
   const placeBlockNearbyCard = projection.action_cards.find((card) => card.title === "Place Block Nearby");
   assert.ok(placeBlockNearbyCard);
-  assert.match(placeBlockNearbyCard.description, /Preconditions that must be true/);
+  assert.match(placeBlockNearbyCard.description, /Advisory current-state hints/);
   assert.ok(
     placeBlockNearbyCard.parameter_hints.some((hint) =>
-      hint.includes("Required current_state evidence: inventory contains the block item")
+      hint.includes("Advisory current_state hint: inventory contains the block item")
     )
   );
   assert.ok(
@@ -383,7 +390,7 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
   );
   assert.ok(
     placeBlockNearbyCard.likely_blockers.some((blocker) =>
-      blocker.includes("do not choose until current_state satisfies")
+      blocker.includes("risky if current_state lacks support")
     )
   );
   const placeBlockCard = projection.action_cards.find((card) => card.title === "Place Block");
@@ -430,7 +437,7 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
       remaining_turns_hint: 30
     }
   });
-  const suppressedObserveTurn = buildActorTurnInput({
+  const repeatedObserveTurn = buildActorTurnInput({
     turnId: "turn-002",
     context,
     activeEpisode,
@@ -440,7 +447,7 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
         schema: "evidence-trace/v1",
         turn_id: "turn-001",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/intents/turn-001-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/turn-001-legacy-planner-action.json",
         runtime_gate_ref: "runtime-gates/turn-001.json",
         outcome: "no_progress",
         compact_summary: "turn-001 observe -> completed"
@@ -448,11 +455,17 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
     ]
   });
   assert.equal(
-    suppressedObserveTurn.actorTurnInput.action_cards.some((card) => card.title === "Observe"),
-    false
+    repeatedObserveTurn.actorTurnInput.action_cards.some((card) => card.title === "Observe"),
+    true
   );
   assert.ok(
-    suppressedObserveTurn.actorTurnInput.action_cards.some((card) => card.title === "Place Block")
+    repeatedObserveTurn.actorTurnInput.action_cards.some((card) => card.title === "Place Block")
+  );
+  assert.equal(
+    repeatedObserveTurn.actionCardProjection.missing_affordances.some((reason) =>
+      reason.includes("observe suppressed")
+    ),
+    false
   );
 
   assert.ok(actionCardProjection.action_cards.length <= projection.action_cards.length);
@@ -470,7 +483,7 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
   const actorTurnPlaceBlockCard = actorTurnInput.action_cards.find((card) => card.title === "Place Block");
   assert.ok(actorTurnPlaceBlockCard);
   assert.ok(
-    actorTurnPlaceBlockCard.current_state_requirements.includes("inventory has the requested block item")
+    actorTurnPlaceBlockCard.current_state_requirements.includes("check whether inventory has the requested block item")
   );
   assert.equal(actorTurnInput.runtime_retry_constraints.length, 1);
   assert.equal(actorTurnInput.compact_plan_bead_hints[0]?.bead_id, "bead-crafting-table-access");
@@ -494,31 +507,39 @@ test("Action Card projection hides primitive/action-skill choice behind cards", 
   );
   assert.equal(actorTurnInput.relationship_context.visible_actor_ids[0], "npc_a");
   assert.match(actorTurnInput.minecraft_basic_guide.item_flows.join("\n"), /log -> matching planks/);
+  assert.match(actorTurnInput.mineflayer_codegen_skill.skill_markdown, /# Mineflayer Code Generation/);
+  assert.match(actorTurnInput.mineflayer_codegen_skill.skill_markdown, /Required Output Shape/);
 
-  const providerPayload = buildActorTurnProviderPayload({ actorTurnInput, runId: "run-1" });
-  assert.equal(providerPayload.schemaName, "actor_turn");
-  assert.equal(providerPayload.usageContext.stage, "actor_turn");
-  assert.match(providerPayload.system, /do not output primitive_id or action_skill_id/);
-  assert.match(providerPayload.system, /requires_current_state_check/);
-  assert.match(providerPayload.system, /choose the nearest prerequisite action/);
-  assert.match(providerPayload.system, /contract rejection/);
-  assert.match(providerPayload.system, /Supported helper names are exactly/);
-  assert.match(providerPayload.system, /export async function run\(ctx, params\)/);
-
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "use_existing_action",
-      action_card_id: placeBlockCard.action_card_id,
-      parameters: { itemName: "crafting_table", targetPosition: { x: 0, y: 64, z: 1 } },
-      why_this_action: "Place the table into a different explicit adjacent cell.",
-      expected_evidence: ["block delta"],
-      fallback_if_blocked: "choose another adjacent cell or branch to Deliberation"
-    }
+  const toolPayload = buildActorTurnToolSelectionPayload({
+    actorTurnInput,
+    actionCardProjection,
+    runId: "run-1"
   });
-  assert.equal(parsed.ok, true);
+  assert.match(toolPayload.user, /# Mineflayer Code Generation/);
+  assert.match(toolPayload.user, /Required Output Shape/);
+  assert.equal(toolPayload.usageContext.stage, "actor_turn_tool_selection");
+  assert.match(toolPayload.system, /Call exactly one function tool/);
+  assert.match(toolPayload.system, /current_state, Action Card hints, or runtime code/);
+  assert.match(toolPayload.system, /do not include TypeScript source/);
+  assert.match(toolPayload.system, /never add context_to_preserve/);
+  const placeBlockTool = toolPayload.tools.find((tool) =>
+    toolPayload.actionCardToolMappings.some((mapping) =>
+      mapping.action_card_id === placeBlockCard.action_card_id && mapping.tool_name === tool.name
+    )
+  );
+  assert.ok(placeBlockTool);
+  assert.equal(placeBlockTool.strict, true);
+  assert.equal(
+    (placeBlockTool.parameters as { additionalProperties?: unknown }).additionalProperties,
+    false
+  );
+  assert.equal(
+    toolPayload.tools.some((tool) => tool.name === "author_mineflayer_action" && tool.strict === true),
+    true
+  );
 });
 
-test("Actor Turn input hides exact empty-args Action Card blocked by runtime retry constraint", async () => {
+test("Actor Turn input keeps retry-constrained Action Cards visible while exposing structured retry args", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -577,21 +598,16 @@ test("Actor Turn input hides exact empty-args Action Card blocked by runtime ret
     currentObservationRefs: ["observations/retry-collectlogs.json"]
   });
 
-  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Collect Logs"), false);
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Collect Logs"), true);
   assert.ok(
     actorTurnInput.runtime_retry_constraints.some((constraint) =>
       constraint.target_summary === "use_action_skill:action_skill:collectLogs"
     )
   );
   assert.deepEqual(actorTurnInput.runtime_retry_constraints[0]?.args_normalized, {});
-  assert.ok(
+  assert.equal(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("Collect Logs hidden because runtime_retry_constraint already blocks")
-    )
-  );
-  assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
-      candidate.title === "Collect Logs"
     ),
     false
   );
@@ -661,7 +677,7 @@ test("Actor Turn input exposes normalized retry args for blocked move_to targets
   });
 });
 
-test("Actor Turn input suppresses Remember after repeated no-progress memory turns", async () => {
+test("Actor Turn input keeps Remember visible after repeated no-progress memory turns", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -702,7 +718,7 @@ test("Actor Turn input suppresses Remember after repeated no-progress memory tur
         schema: "evidence-trace/v1",
         turn_id: "turn-012",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/intents/turn-012-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/turn-012-legacy-planner-action.json",
         runtime_gate_ref: "runtime-gates/turn-012.json",
         outcome: "no_progress",
         compact_summary: "turn-012 remember -> wrote a status note without runtime progress"
@@ -711,7 +727,7 @@ test("Actor Turn input suppresses Remember after repeated no-progress memory tur
         schema: "evidence-trace/v1",
         turn_id: "turn-013",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/intents/turn-013-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/turn-013-legacy-planner-action.json",
         runtime_gate_ref: "runtime-gates/turn-013.json",
         outcome: "no_progress",
         compact_summary: "turn-013 remember -> repeated the same blocker note"
@@ -719,22 +735,19 @@ test("Actor Turn input suppresses Remember after repeated no-progress memory tur
     ]
   });
 
-  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Remember"), false);
-  assert.equal(
-    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) => card.title === "Remember"),
-    false
-  );
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Remember"), true);
   assert.ok(
     actorTurnInput.action_cards.some((card) => card.title === "Collect Logs" || card.title === "Move To")
   );
-  assert.ok(
+  assert.equal(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("remember suppressed after repeated no-progress")
-    )
+    ),
+    false
   );
 });
 
-test("Actor Turn input suppresses Move To after repeated movement without durable progress", async () => {
+test("Actor Turn input keeps Move To visible after repeated movement without durable progress", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -775,7 +788,7 @@ test("Actor Turn input suppresses Move To after repeated movement without durabl
         schema: "evidence-trace/v1",
         turn_id: "turn-010",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/intents/turn-010-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/turn-010-legacy-planner-action.json",
         runtime_gate_ref: "runtime-gates/turn-010.json",
         outcome: "position_delta",
         compact_summary: "turn-010 move_to -> completed"
@@ -784,7 +797,7 @@ test("Actor Turn input suppresses Move To after repeated movement without durabl
         schema: "evidence-trace/v1",
         turn_id: "turn-011",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/intents/turn-011-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/turn-011-legacy-planner-action.json",
         runtime_gate_ref: "runtime-gates/turn-011.json",
         outcome: "no_progress",
         compact_summary: "turn-011 move_to -> completed"
@@ -792,8 +805,14 @@ test("Actor Turn input suppresses Move To after repeated movement without durabl
     ]
   });
 
-  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Move To"), false);
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Move To"), true);
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Collect Logs"));
+  assert.equal(
+    actionCardProjection.missing_affordances.some((reason) =>
+      reason.includes("move_to suppressed")
+    ),
+    false
+  );
 });
 
 test("Actor Turn input does not recommend empty parameters for target-required primitives", async () => {
@@ -840,19 +859,12 @@ test("Actor Turn input does not recommend empty parameters for target-required p
 
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Block"));
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone"));
-  assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
-      candidate.title === "Mine Block" && Object.keys(candidate.parameters).length === 0
-    ),
-    false
-  );
-  assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates[0]?.title,
-    "Mine Cobblestone"
+  assert.ok(
+    actorTurnInput.current_state.nearby_block_hints.some((block) => block.name === "stone")
   );
 });
 
-test("Actor Turn input demotes cobblestone mining after stockpile is sufficient", async () => {
+test("Actor Turn input keeps cobblestone mining available after repeated successful mining", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -899,7 +911,7 @@ test("Actor Turn input demotes cobblestone mining after stockpile is sufficient"
       schema: "evidence-trace/v1" as const,
       turn_id: `turn-mine-${index}`,
       episode_id: activeEpisode.episode_id,
-      action_ref: `goals/cycle/intents/turn-mine-${index}-intent.json`,
+      action_ref: `goals/cycle/legacy-planner-actions/turn-mine-${index}-legacy-planner-action.json`,
       runtime_gate_ref: `runtime-gates/turn-mine-${index}.json`,
       outcome: "verified_mutation" as const,
       compact_summary: `turn-mine-${index} observe,mine_block,wait -> completed`
@@ -908,35 +920,20 @@ test("Actor Turn input demotes cobblestone mining after stockpile is sufficient"
 
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone"));
   assert.equal(
-    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+    actorTurnInput.action_cards.some((card) =>
       card.title === "Mine Cobblestone"
     ),
-    false
+    true
   );
   assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+    actorTurnInput.action_cards.some((candidate) =>
       candidate.title === "Mine Cobblestone"
     ),
-    false
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
-      entry.includes("do not keep selecting Mine Cobblestone")
-    )
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.current_truths.some((entry) =>
-      entry.includes("cobblestone_stockpile=sufficient")
-    )
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.next_action_guidance.some((entry) =>
-      entry.includes("current inventory already has a cobblestone buffer")
-    )
+    true
   );
 });
 
-test("Actor Turn input keeps cobblestone mining prioritized for an explicit shortage", async () => {
+test("Actor Turn input keeps cobblestone mining visible for an explicit shortage", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -983,7 +980,7 @@ test("Actor Turn input keeps cobblestone mining prioritized for an explicit shor
       schema: "evidence-trace/v1" as const,
       turn_id: `turn-mine-shortage-${index}`,
       episode_id: activeEpisode.episode_id,
-      action_ref: `goals/cycle/intents/turn-mine-shortage-${index}-intent.json`,
+      action_ref: `goals/cycle/legacy-planner-actions/turn-mine-shortage-${index}-legacy-planner-action.json`,
       runtime_gate_ref: `runtime-gates/turn-mine-shortage-${index}.json`,
       outcome: "verified_mutation" as const,
       compact_summary: `turn-mine-shortage-${index} observe,mine_block,wait -> completed`
@@ -992,12 +989,12 @@ test("Actor Turn input keeps cobblestone mining prioritized for an explicit shor
 
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone"));
   assert.ok(
-    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+    actorTurnInput.action_cards.some((card) =>
       card.title === "Mine Cobblestone"
     )
   );
   assert.ok(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+    actorTurnInput.action_cards.some((candidate) =>
       candidate.title === "Mine Cobblestone"
     )
   );
@@ -1009,7 +1006,7 @@ test("Actor Turn input keeps cobblestone mining prioritized for an explicit shor
   );
 });
 
-test("Actor Turn repair input removes a rejected Action Card from decision-frame candidates", async () => {
+test("Actor Turn repair input keeps a rejected Action Card visible with contract evidence", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -1062,7 +1059,7 @@ test("Actor Turn repair input removes a rejected Action Card from decision-frame
   const repairInput = buildRepairActorTurnInput({
     actorTurnInput,
     rejectedOutput: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: rejectedCard.action_card_id,
       parameters: {},
@@ -1070,29 +1067,57 @@ test("Actor Turn repair input removes a rejected Action Card from decision-frame
       expected_evidence: ["mine_block evidence"],
       fallback_if_blocked: "choose another visible card"
     },
-    errors: [`${rejectedCard.action_card_id} current_state requirement not satisfied`]
+    errors: [`${rejectedCard.action_card_id} parameters.blockName is required by input_schema`],
+    rawRejectedToolCall: {
+      type: "function_call",
+      name: "action_card_mine_cobblestone",
+      call_id: "call-rejected-mine",
+      arguments: JSON.stringify({
+        parameters: {},
+        situation_assessment: "The actor should mine now.",
+        why_this_tool: "Mine Cobblestone looked useful.",
+        success_evidence: ["cobblestone inventory delta"],
+        failure_handling: "Try a prerequisite."
+      })
+    }
   });
 
   assert.equal(
     repairInput.action_cards.some((card) => card.action_card_id === rejectedCard.action_card_id),
-    false
+    true
   );
   assert.equal(
-    repairInput.decision_frame.top_eligible_action_cards.some((card) =>
+    repairInput.action_cards.some((card) =>
       card.action_card_id === rejectedCard.action_card_id
     ),
-    false
-  );
-  assert.equal(
-    repairInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
-      candidate.action_card_id === rejectedCard.action_card_id
-    ),
-    false
+    true
   );
   assert.ok(
     repairInput.decision_frame.do_not_repeat.some((entry) =>
-      entry.includes(`Action Card ${rejectedCard.action_card_id}`)
+      entry.includes(`previous Action Card ${rejectedCard.action_card_id} failed contract validation`)
     )
+  );
+  assert.ok(
+    repairInput.decision_frame.next_action_guidance.some((entry) =>
+      entry.includes("no Action Card is removed merely because the previous arguments were invalid")
+    )
+  );
+  assert.deepEqual(
+    repairInput.runtime_retry_constraints[0]?.args_normalized,
+    {
+      raw_rejected_function_call: {
+        type: "function_call",
+        name: "action_card_mine_cobblestone",
+        call_id: "call-rejected-mine",
+        arguments: JSON.stringify({
+          parameters: {},
+          situation_assessment: "The actor should mine now.",
+          why_this_tool: "Mine Cobblestone looked useful.",
+          success_evidence: ["cobblestone inventory delta"],
+          failure_handling: "Try a prerequisite."
+        })
+      }
+    }
   );
 });
 
@@ -1193,19 +1218,24 @@ test("Actor Turn input exposes shared-storage deposit candidates from inventory 
   );
   assert.ok(
     handoffCard.parameter_hints.some((hint) =>
-      hint.includes("parameters.itemName plus parameters.count")
+      hint.includes("provide explicit itemName and count")
     )
   );
   assert.equal(actorTurnInput.decision_frame.episode_focus_status.status, "open");
   assert.deepEqual(actorTurnInput.decision_frame.open_social_requests.map((request) => request.itemName), [
     "oak_log"
   ]);
-  assert.deepEqual(actorTurnInput.decision_frame.parameter_candidates, [
+  assert.deepEqual(actorTurnInput.current_state.deposit_candidates
+    .filter((candidate) => candidate.socially_requested)
+    .map((candidate) => ({
+      itemName: candidate.itemName,
+      suggestedCount: candidate.suggestedCount,
+      evidence_refs: candidate.evidence_refs
+    })),
+  [
     {
-      action_card_title: "Deposit Shared",
       itemName: "oak_log",
-      count: 1,
-      reason: "structured parameters for the open shared-storage request",
+      suggestedCount: 1,
       evidence_refs: ["world-events/evt-shared-storage-handoff.json"]
     }
   ]);
@@ -1262,18 +1292,12 @@ test("Actor Turn input marks Inspect Chest as the bounded container openability 
   assert.ok(inspectCard);
   assert.ok(
     inspectCard.parameter_hints.some((hint) =>
-      hint.includes("bounded shared-chest container snapshot") &&
-      hint.includes("do not author generated code")
+      hint.includes("bounded shared-chest container snapshot")
     )
   );
   assert.ok(
     inspectCard.parameter_hints.some((hint) =>
       hint.includes("Current shared_storage status")
-    )
-  );
-  assert.ok(
-    inspectCard.likely_blockers.some((blocker) =>
-      blocker.includes("use it before authoring a generated chest/openability probe")
     )
   );
 });
@@ -1367,19 +1391,29 @@ test("Actor Turn input does not keep a completed one-item shared-storage request
   assert.equal(leafLitterCandidate.socially_requested, false);
   assert.deepEqual(leafLitterCandidate.request_summaries, []);
   const depositCard = actorTurnInput.action_cards.find((card) => card.title === "Deposit Shared");
-  assert.equal(depositCard, undefined);
-  assert.equal(actorTurnInput.action_cards.find((card) => card.title === "Deposit Shared Items"), undefined);
-  assert.equal(actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest"), undefined);
-  assert.equal(actorTurnInput.action_cards.find((card) => card.title === "Inspect Shared Chest"), undefined);
+  assert.ok(depositCard);
+  assert.ok(actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest"));
   assert.ok(
-    actionCardProjection.missing_affordances.some((reason) =>
-      reason.includes("Deposit Shared hidden because shared storage already has contribution evidence")
+    depositCard.parameter_hints.some((hint) =>
+      hint.includes("Current deposit candidates") && !hint.includes("socially_requested")
     )
   );
   assert.ok(
+    depositCard.parameter_hints.some((hint) =>
+      hint.includes("provide explicit itemName and count")
+    )
+  );
+  assert.equal(
+    actionCardProjection.missing_affordances.some((reason) =>
+      reason.includes("Deposit Shared hidden because shared storage already has contribution evidence")
+    ),
+    false
+  );
+  assert.equal(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("Inspect Chest hidden because shared storage already has contribution evidence")
-    )
+    ),
+    false
   );
   assert.equal(actorTurnInput.decision_frame.episode_focus_status.status, "satisfied");
   assert.deepEqual(actorTurnInput.decision_frame.open_social_requests, []);
@@ -1390,17 +1424,8 @@ test("Actor Turn input does not keep a completed one-item shared-storage request
   );
   assert.ok(
     actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
-      entry.includes("do not deposit again")
+      entry.includes("shared-storage contribution already has evidence")
     )
-  );
-  assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
-      candidate.title === "Deposit Shared" ||
-        candidate.title === "Deposit Shared Items" ||
-        candidate.title === "Inspect Chest" ||
-        candidate.title === "Inspect Shared Chest"
-    ),
-    false
   );
 });
 
@@ -1554,16 +1579,13 @@ test("Actor Turn input does not retarget a specific missing item request onto un
     ]
   );
   assert.deepEqual(actorTurnInput.decision_frame.open_social_requests, []);
-  assert.deepEqual(actorTurnInput.decision_frame.parameter_candidates, []);
   assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
-      candidate.title === "Deposit Shared" || candidate.title === "Deposit Shared Items"
-    ),
+    actorTurnInput.current_state.deposit_candidates.some((candidate) => candidate.socially_requested),
     false
   );
 });
 
-test("Action Card projection hides generic Mineflayer runner from existing-action choices", () => {
+test("Action Card projection excludes generic Mineflayer runner from existing-action choices", () => {
   const projection = buildActionCardProjection({
     schema: "action-surface/v1",
     actor_id: "npc_b",
@@ -1636,7 +1658,67 @@ test("Action Card projection hides generic Mineflayer runner from existing-actio
   );
 });
 
-test("Actor Turn input hides crafting-table placement after current_state already has a usable table", async () => {
+test("Action Card tool schema exposes generated action-skill input schema", () => {
+  const generatedInputSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["text"],
+    properties: {
+      text: { type: "string" }
+    }
+  };
+  const projection = buildActionCardProjection({
+    schema: "action-surface/v1",
+    actor_id: "npc_b",
+    direct_primitives: [],
+    deferred_primitives: [],
+    direct_action_skills: [
+      {
+        action_skill_id: "saySharedChestNeed",
+        exposure: "direct",
+        executable: true,
+        input_schema: generatedInputSchema,
+        required_primitives: ["run_mineflayer_program"],
+        missing_primitives: [],
+        preconditions: [],
+        success_verifier: "helper say delivered",
+        reason: "promoted generated action skill"
+      }
+    ],
+    deferred_action_skills: [],
+    recent_blockers: [],
+    missing_affordances: [],
+    mineflayer_expansion_opportunities: [],
+    rules: {
+      exposes_actor_body_not_strategy: true,
+      domain_goals_are_context_not_core_architecture: true,
+      runtime_verification_required: true,
+      mineflayer_is_capability_substrate: true,
+      raw_mineflayer_api_not_provider_authority: true,
+      generated_programs_require_helper_evidence: true
+    }
+  });
+  const payload = buildActorTurnToolSelectionPayload({
+    actorTurnInput: {
+      schema: "actor-turn-input/v1",
+      turn_id: "turn-generated-schema",
+      active_episode: { actor_id: "npc_b" },
+      action_cards: projection.action_cards,
+      mineflayer_codegen_skill: { skill_markdown: "# Mineflayer Code Generation" }
+    } as unknown as ActorTurnInput,
+    actionCardProjection: projection
+  });
+  const actionTool = payload.tools.find((tool) =>
+    tool.name.includes("say_shared_chest_need")
+  );
+  assert.ok(actionTool);
+  const schema = actionTool.parameters as Record<string, unknown>;
+  const properties = schema.properties as Record<string, unknown>;
+  const parameters = properties.parameters as Record<string, unknown>;
+  assert.deepEqual(parameters, generatedInputSchema);
+});
+
+test("Actor Turn input keeps crafting-table placement visible with advisory current-state requirements", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -1678,27 +1760,31 @@ test("Actor Turn input hides crafting-table placement after current_state alread
     currentObservationRefs: ["observations/cycle-0003.json"]
   });
 
-  assert.equal(
-    actorTurnInput.action_cards.some((card) => card.title === "Place Crafting Table"),
-    false
+  const placeCraftingTableCard = actorTurnInput.action_cards.find((card) =>
+    card.title === "Place Crafting Table"
+  );
+  assert.ok(placeCraftingTableCard);
+  assert.ok(
+    placeCraftingTableCard.current_state_requirements.includes("no usable crafting_table already known")
   );
   assert.equal(
     actionCardProjection.runtime_mappings.some((mapping) =>
       mapping.kind === "use_action_skill" && mapping.action_skill_id === "placeCraftingTable"
     ),
-    false
+    true
   );
   assert.ok(
     actorTurnInput.action_cards.some((card) => card.title === "Place Block")
   );
-  assert.ok(
+  assert.equal(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("no usable crafting_table already known")
-    )
+    ),
+    false
   );
 });
 
-test("Actor Turn input hides crafting-table crafting after current_state already has a usable table", async () => {
+test("Actor Turn input keeps crafting-table crafting visible with advisory current-state requirements", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -1740,24 +1826,28 @@ test("Actor Turn input hides crafting-table crafting after current_state already
     currentObservationRefs: ["observations/cycle-0003-craft-table.json"]
   });
 
-  assert.equal(
-    actorTurnInput.action_cards.some((card) => card.title === "Craft Crafting Table"),
-    false
+  const craftCraftingTableCard = actorTurnInput.action_cards.find((card) =>
+    card.title === "Craft Crafting Table"
+  );
+  assert.ok(craftCraftingTableCard);
+  assert.ok(
+    craftCraftingTableCard.current_state_requirements.includes("no usable crafting_table already known")
   );
   assert.equal(
     actionCardProjection.runtime_mappings.some((mapping) =>
       mapping.kind === "use_action_skill" && mapping.action_skill_id === "craftCraftingTable"
     ),
-    false
+    true
   );
-  assert.ok(
+  assert.equal(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("Craft Crafting Table") && reason.includes("no usable crafting_table already known")
-    )
+    ),
+    false
   );
 });
 
-test("Actor Turn input hides broad planks-and-sticks crafting after basic materials are already sufficient", async () => {
+test("Actor Turn input keeps broad planks-and-sticks crafting available after basic materials are sufficient", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -1807,30 +1897,34 @@ test("Actor Turn input hides broad planks-and-sticks crafting after basic materi
     currentObservationRefs: ["observations/cycle-0008-materials.json"]
   });
 
-  assert.equal(
-    actorTurnInput.action_cards.some((card) => card.title === "Craft Planks And Sticks"),
-    false
+  const craftPlanksAndSticksCard = actorTurnInput.action_cards.find((card) =>
+    card.title === "Craft Planks And Sticks"
+  );
+  assert.ok(craftPlanksAndSticksCard);
+  assert.ok(
+    craftPlanksAndSticksCard.current_state_requirements.includes("basic planks/sticks need not already satisfied")
   );
   assert.equal(
     actionCardProjection.runtime_mappings.some((mapping) =>
       mapping.kind === "use_action_skill" && mapping.action_skill_id === "craftPlanksAndSticks"
     ),
-    false
+    true
   );
   assert.ok(
     actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone")
   );
   assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+    actorTurnInput.action_cards.some((candidate) =>
       candidate.title === "Craft Planks And Sticks"
     ),
-    false
+    true
   );
-  assert.ok(
+  assert.equal(
     actionCardProjection.missing_affordances.some((reason) =>
       reason.includes("Craft Planks And Sticks") &&
       reason.includes("basic planks/sticks need not already satisfied")
-    )
+    ),
+    false
   );
 });
 
@@ -1891,13 +1985,13 @@ test("Actor Turn input keeps planks-and-sticks crafting visible when sticks are 
     )
   );
   assert.ok(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+    actorTurnInput.action_cards.some((candidate) =>
       candidate.title === "Craft Planks And Sticks"
     )
   );
 });
 
-test("Actor Turn input demotes generic wood collection after starter stockpile is sufficient", async () => {
+test("Actor Turn input keeps generic wood collection available after starter stockpile is present", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -1953,39 +2047,20 @@ test("Actor Turn input demotes generic wood collection after starter stockpile i
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Collect Logs"));
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Craft Planks And Sticks"));
   assert.equal(
-    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+    actorTurnInput.action_cards.some((card) =>
       card.title === "Collect Logs" || card.title === "Craft Planks And Sticks"
     ),
-    false
+    true
   );
   assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+    actorTurnInput.action_cards.some((candidate) =>
       candidate.title === "Collect Logs" || candidate.title === "Craft Planks And Sticks"
     ),
-    false
-  );
-  assert.equal(
-    actorTurnInput.decision_frame.top_eligible_action_cards[0]?.title,
-    "Place Crafting Table"
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.current_truths.some((entry) =>
-      entry.includes("wood_material_stockpile=sufficient")
-    )
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
-      entry.includes("do not keep selecting Collect Logs or Craft Planks And Sticks")
-    )
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.next_action_guidance.some((entry) =>
-      entry.includes("starter wood-material buffer")
-    )
+    true
   );
 });
 
-test("Actor Turn input keeps wood collection prioritized for an explicit shortage", async () => {
+test("Actor Turn input keeps wood collection visible for an explicit shortage", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -2039,7 +2114,7 @@ test("Actor Turn input keeps wood collection prioritized for an explicit shortag
   });
 
   assert.ok(
-    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+    actorTurnInput.action_cards.some((card) =>
       card.title === "Collect Logs" || card.title === "Craft Planks And Sticks"
     )
   );
@@ -2051,7 +2126,7 @@ test("Actor Turn input keeps wood collection prioritized for an explicit shortag
   );
 });
 
-test("Actor Turn input demotes impossible building, placement, and generic mining when only sticks are carried", async () => {
+test("Actor Turn input keeps building, placement, and generic mining cards visible when only sticks are carried", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -2096,43 +2171,48 @@ test("Actor Turn input demotes impossible building, placement, and generic minin
     currentObservationRefs: ["observations/cycle-0032-stick-only.json"]
   });
 
-  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Place Block"), false);
-  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Build Pattern"), false);
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Place Block"), true);
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Build Pattern"), true);
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Mine Block"), true);
   assert.equal(
-    actorTurnInput.decision_frame.top_eligible_action_cards.some((card) =>
+    actorTurnInput.action_cards.some((card) =>
       card.title === "Mine Block" || card.title === "Place Block" || card.title === "Build Pattern"
     ),
-    false
+    true
   );
   assert.equal(
-    actorTurnInput.decision_frame.recommended_next_action_candidates.some((candidate) =>
+    actorTurnInput.action_cards.some((candidate) =>
       candidate.title === "Mine Block" || candidate.title === "Place Block" || candidate.title === "Build Pattern"
+    ),
+    true
+  );
+  assert.equal(
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("solid_build_material=none")
     ),
     false
   );
-  assert.ok(
-    actorTurnInput.decision_frame.current_truths.some((entry) =>
-      entry.includes("solid_build_material=none")
-    )
-  );
-  assert.ok(
+  assert.equal(
     actorTurnInput.decision_frame.current_truths.some((entry) =>
       entry.includes("placeable_block_item=none")
-    )
+    ),
+    false
   );
-  assert.ok(
+  assert.equal(
     actorTurnInput.decision_frame.current_truths.some((entry) =>
       entry.includes("generic_mine_block_demoted")
-    )
+    ),
+    false
   );
-  assert.ok(
+  assert.equal(
     actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
       entry.includes("stick is not a place_block item")
-    )
+    ),
+    false
   );
 });
 
-test("Actor Turn input hides current-state-impossible action cards but keeps reachable prerequisites", async () => {
+test("Actor Turn input keeps current-state requirement cards visible while exposing reachable prerequisites", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -2206,15 +2286,21 @@ test("Actor Turn input hides current-state-impossible action cards but keeps rea
   });
   const cardTitles = actorTurnInput.action_cards.map((card) => card.title);
   assert.ok(cardTitles.includes("Collect Logs"));
-  assert.equal(cardTitles.includes("Craft Planks And Sticks"), false);
-  assert.ok(
+  assert.equal(cardTitles.includes("Craft Planks And Sticks"), true);
+  const craftPlanksAndSticksCard = actorTurnInput.action_cards.find((card) =>
+    card.title === "Craft Planks And Sticks"
+  );
+  assert.ok(craftPlanksAndSticksCard);
+  assert.ok(craftPlanksAndSticksCard.current_state_requirements.includes("inventory has logs"));
+  assert.equal(
     actionCardProjection.missing_affordances.some((entry) =>
       entry.includes("Craft Planks And Sticks") && entry.includes("inventory has logs")
-    )
+    ),
+    false
   );
 });
 
-test("Actor Turn input hides social action cards until social preconditions are evidence-backed", async () => {
+test("Actor Turn input keeps social action cards visible with advisory preconditions", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const activeActionSkills = [
     {
@@ -2306,18 +2392,30 @@ test("Actor Turn input hides social action cards until social preconditions are 
     currentObservationRefs: ["observations/social-blocked.json"]
   });
   const blockedTitles = blockedInput.actorTurnInput.action_cards.map((card) => card.title);
-  assert.equal(blockedTitles.includes("Announce Resource Discovery"), false);
-  assert.equal(blockedTitles.includes("Handoff Item At Chest"), false);
-  assert.equal(blockedTitles.includes("Say"), false);
+  assert.equal(blockedTitles.includes("Announce Resource Discovery"), true);
+  assert.equal(blockedTitles.includes("Handoff Item At Chest"), true);
+  assert.equal(blockedTitles.includes("Say"), true);
   assert.ok(
-    blockedInput.actionCardProjection.missing_affordances.some((entry) =>
-      entry.includes("Announce Resource Discovery") && entry.includes("resource found")
-    )
+    blockedInput.actorTurnInput.action_cards
+      .find((card) => card.title === "Announce Resource Discovery")
+      ?.current_state_requirements.includes("resource found")
   );
   assert.ok(
+    blockedInput.actorTurnInput.action_cards
+      .find((card) => card.title === "Handoff Item At Chest")
+      ?.current_state_requirements.includes("obligation pending")
+  );
+  assert.equal(
+    blockedInput.actionCardProjection.missing_affordances.some((entry) =>
+      entry.includes("Announce Resource Discovery") && entry.includes("resource found")
+    ),
+    false
+  );
+  assert.equal(
     blockedInput.actionCardProjection.missing_affordances.some((entry) =>
       entry.includes("Handoff Item At Chest") && entry.includes("obligation pending")
-    )
+    ),
+    false
   );
 
   const readyContext = await assembleSocialCycleContext({
@@ -2376,7 +2474,237 @@ test("Actor Turn input hides social action cards until social preconditions are 
   assert.equal(validateActorTurnInput(readyInput.actorTurnInput).ok, true);
 });
 
-test("Actor Turn input annotates table-bound recipe cards with current feasible recipes", async () => {
+test("Actor Turn input keeps Say visible with social follow-up context after shared-storage contribution", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [
+      {
+        schema: "world-event/v1",
+        event_id: "evt-npc-a-oak-log-request",
+        kind: "scenario_event",
+        authority: "context_only",
+        summary: "npc_a requested npc_b deposit one oak_log into shared storage.",
+        actor_refs: ["npc_a", "npc_b"],
+        evidence_refs: ["events/npc-a-oak-log-request.json"],
+        created_at: "2026-06-03T00:00:00.000Z"
+      }
+    ],
+    previousJudgments: [],
+    activeActionSkills: [],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      visibleActors: [],
+      inventory: [{ name: "stick", count: 2 }],
+      nearbyBlocks: [{ name: "chest", position: { x: 1, y: 64, z: 1 } }]
+    },
+    allowedPrimitiveIds: ["observe", "say", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 2,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: [],
+    recentToolResults: [
+      {
+        tool: "deposit_shared",
+        status: "deposited",
+        evidence_ref: "evidence/cycle-0001-action-01-deposit_shared.json",
+        result: {
+          status: "deposited",
+          chestId: "shared-chest-1",
+          itemName: "oak_log",
+          movedCount: 1,
+          items: [{ name: "oak_log", count: 1 }]
+        }
+      }
+    ]
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-social-followup",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Follow up after completing npc_a's shared-storage request.",
+      allowed_primitive_ids: ["observe", "say", "wait", "remember"]
+    },
+    startedAtTurnRef: "turns/turn-social-followup.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-social-followup",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/social-followup.json"]
+  });
+
+  assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Say"));
+  assert.ok(
+    actorTurnInput.decision_frame.next_action_guidance.some((entry) =>
+      entry.includes("if choosing Say, write your own schema-valid text")
+    )
+  );
+  assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
+});
+
+test("Actor Turn input keeps Say visible after recent no-progress chat follow-up", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [
+      {
+        schema: "world-event/v1",
+        event_id: "evt-npc-a-oak-log-request-repeat",
+        kind: "scenario_event",
+        authority: "context_only",
+        summary: "npc_a requested npc_b deposit one oak_log into shared storage.",
+        actor_refs: ["npc_a", "npc_b"],
+        evidence_refs: ["events/npc-a-oak-log-request-repeat.json"],
+        created_at: "2026-06-03T00:00:00.000Z"
+      }
+    ],
+    previousJudgments: [],
+    activeActionSkills: [],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      visibleActors: [],
+      inventory: [{ name: "dirt", count: 1 }],
+      nearbyBlocks: [{ name: "chest", position: { x: 1, y: 64, z: 1 } }]
+    },
+    allowedPrimitiveIds: ["observe", "say", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 3,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: [],
+    recentToolResults: [
+      {
+        tool: "deposit_shared",
+        status: "deposited",
+        evidence_ref: "evidence/cycle-0001-action-01-deposit_shared.json",
+        result: {
+          status: "deposited",
+          chestId: "shared-chest-1",
+          itemName: "oak_log",
+          movedCount: 1,
+          items: [{ name: "oak_log", count: 1 }]
+        }
+      }
+    ]
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-social-followup-no-repeat",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Follow up after completing npc_a's shared-storage request.",
+      allowed_primitive_ids: ["observe", "say", "wait", "remember"]
+    },
+    startedAtTurnRef: "turns/turn-social-followup-no-repeat.json"
+  });
+
+  const { actorTurnInput, actionCardProjection } = buildActorTurnInput({
+    turnId: "turn-social-followup-no-repeat",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/social-followup-no-repeat.json"],
+    recentEvidenceTrace: [
+      {
+        schema: "evidence-trace/v1",
+        turn_id: "cycle-0002-action-01",
+        episode_id: "episode-social-followup-no-repeat",
+        action_ref: "goals/cycle/legacy-planner-actions/cycle-0002-action-01-legacy-planner-action.json",
+        runtime_gate_ref: "runtime-gates/cycle-0002-action-01.json",
+        execution_ref: "evidence/cycle-0002-action-01-say.json",
+        verifier_ref: "judgments/cycle-0002-action-01-judgment.json",
+        outcome: "no_progress",
+        compact_summary: "cycle-0002-action-01 say -> completed"
+      }
+    ]
+  });
+
+  assert.equal(actorTurnInput.action_cards.some((card) => card.title === "Say"), true);
+  assert.equal(actionCardProjection.runtime_mappings.some((mapping) =>
+    actorTurnInput.action_cards.some((card) =>
+      card.action_card_id === mapping.action_card_id && card.title === "Say"
+    )
+  ), true);
+  assert.equal(
+    actionCardProjection.missing_affordances.some((entry) => entry.includes("say suppressed")),
+    false
+  );
+  assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
+});
+
+test("Actor Turn input keeps table-bound tool crafting visible when table is usable", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [
+      buildCraftPlanksAndSticksRecord(),
+      buildCraftWoodenPickaxeRecord()
+    ],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 10, y: 71, z: -20 },
+      visibleActors: [],
+      inventory: [
+        { name: "oak_log", count: 1 },
+        { name: "oak_planks", count: 3 },
+        { name: "stick", count: 2 }
+      ],
+      nearbyBlocks: [{ name: "crafting_table", position: { x: 11, y: 71, z: -21 }, distance: 2 }]
+    },
+    allowedPrimitiveIds: ["observe", "craft_item", "craft_with_table", "wait", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 5,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+  const activeEpisode = buildActiveEpisodeFromCycleGoal({
+    episodeId: "episode-table-tool-before-more-planks",
+    context,
+    cycleGoal: {
+      ...cycleGoal(),
+      summary: "Use the known crafting table and existing materials before making more generic wood supplies.",
+      allowed_primitive_ids: ["observe", "craft_item", "craft_with_table", "wait", "remember"]
+    },
+    startedAtTurnRef: "turns/turn-table-tool-before-more-planks.json"
+  });
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-table-tool-before-more-planks",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/table-tool-before-more-planks.json"]
+  });
+  const actionTitles = actorTurnInput.action_cards.map((card) => card.title);
+
+  assert.ok(actionTitles.includes("Craft Wooden Pickaxe"));
+  assert.ok(actionTitles.includes("Craft Planks And Sticks"));
+  assert.ok(
+    actorTurnInput.current_state.nearby_block_hints.some((block) => block.name === "crafting_table")
+  );
+  assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
+});
+
+test("Actor Turn input gives table-bound recipe cards context without computing recipe eligibility", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -2441,17 +2769,12 @@ test("Actor Turn input annotates table-bound recipe cards with current feasible 
   assert.ok(craftWithTable);
   assert.ok(
     craftWithTable.parameter_hints.some((hint) =>
-      hint.includes("Current feasible table-bound recipes from inventory: furnace")
-    )
-  );
-  assert.ok(
-    craftWithTable.parameter_hints.some((hint) =>
-      hint.includes("wooden_pickaxe missing sticks 0/2")
+      hint.includes("Use current_state.inventory_counts plus minecraft_basic_guide")
     )
   );
 });
 
-test("Actor Turn input hides Craft Item when no inventory-grid recipe is currently feasible", async () => {
+test("Actor Turn input keeps Craft Item visible and leaves inventory-grid recipe choice to the LLM", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -2500,261 +2823,362 @@ test("Actor Turn input hides Craft Item when no inventory-grid recipe is current
     currentObservationRefs: ["observations/no-inventory-grid-recipe.json"]
   });
   const titles = actorTurnInput.action_cards.map((card) => card.title);
-  assert.equal(titles.includes("Craft Item"), false);
+  assert.equal(titles.includes("Craft Item"), true);
+  const craftItemCard = actorTurnInput.action_cards.find((card) => card.title === "Craft Item");
+  assert.ok(craftItemCard);
   assert.ok(
+    craftItemCard.parameter_hints.some((hint) =>
+      hint.includes("Use current_state.inventory_counts plus minecraft_basic_guide")
+    )
+  );
+  assert.equal(
     actionCardProjection.missing_affordances.some((entry) =>
       entry.includes("Craft Item") &&
         entry.includes("inventory has ingredients for the requested inventory-grid recipe")
-    )
+    ),
+    false
   );
 });
 
-test("Actor Turn parser strips non-authority card fields from authoring output", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "author_mineflayer_action",
-      action_card_id: "action-card-022",
-      proposed_action_skill_id: "trialCraftWoodenPickaxe",
-      purpose: "Trial a bounded table craft helper.",
-      input_schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {}
-      },
-      parameters: {},
-      source_language: "typescript",
-      source: "export async function run(ctx) { return { ok: true }; }",
-      helper_api_version: "mineflayer-action-skill-helper/v1",
-      helper_allowlist: ["inventory"],
-      timeout_ms: 1000,
-      verifier: { kind: "inventory_delta", itemName: "wooden_pickaxe" },
-      known_failure_modes: ["missing ingredients"],
-      promotion_policy: "record_candidate_only",
-      why_this_action: "No existing card covers this exact helper.",
-      expected_evidence: ["candidate trial evidence"],
-      fallback_if_blocked: "Use existing prerequisite Action Cards."
-    }
-  });
-
-  assert.equal(parsed.ok, true);
-  if (parsed.ok) {
-    assert.equal(parsed.output.choice, "author_mineflayer_action");
-    assert.equal((parsed.output as Record<string, unknown>).action_card_id, undefined);
-    assert.equal(parsed.output.promotion_policy, "promote_after_passed_trial");
-  }
-});
-
-test("Actor Turn parser gives malformed authoring output a repairable candidate id", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "author_mineflayer_action",
-      action_card_id: "",
-      proposed_action_skill_id: "",
-      purpose: "Check nearby crafting table reachability",
-      input_schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {}
-      },
-      parameters: {},
-      source_language: "typescript",
-      source: "async function run(ctx) { return {}; }",
-      helper_api_version: "mineflayer-action-skill-helper/v1",
-      helper_allowlist: ["runBoundedMineflayerProgram"],
-      timeout_ms: 8000,
-      verifier: { kind: "world_scan" },
-      known_failure_modes: ["loaded cache misses the block"],
-      promotion_policy: "record_candidate_only",
-      why_this_action: "A bounded generated scan might answer a missing station question.",
-      expected_evidence: ["candidate trial evidence"],
-      fallback_if_blocked: "Use existing prerequisite Action Cards."
-    }
-  });
-
-  assert.equal(parsed.ok, true);
-  if (parsed.ok) {
-    assert.equal(parsed.output.choice, "author_mineflayer_action");
-    assert.match(parsed.output.proposed_action_skill_id, /^trialCheckNearbyCrafting/);
-    assert.equal(parsed.output.promotion_policy, "promote_after_passed_trial");
-  }
-});
-
-test("Actor Turn parser hoists and strips generated metadata nested inside authoring parameters", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "author_mineflayer_action",
-      proposed_action_skill_id: "trialChestProbe",
-      purpose: "Probe a nearby chest with the bounded helper API.",
-      input_schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {}
-      },
-      parameters: {
-        source_language: "typescript",
-        source: "export async function run(ctx, params) { return await ctx.observe({ radius: 6 }); }",
-        helper_api_version: "mineflayer-action-skill-helper/v1",
-        helper_allowlist: ["observe"],
-        timeout_ms: 1500,
-        verifier: { kind: "world_scan" },
-        known_failure_modes: ["no chest in scan"],
-        promotion_policy: "record_candidate_only"
-      },
-      why_this_action: "No existing card can probe this container state.",
-      expected_evidence: ["world scan"],
-      fallback_if_blocked: "Move to a specific chest candidate."
-    }
-  });
-
-  assert.equal(parsed.ok, true);
-  if (parsed.ok && parsed.output.choice === "author_mineflayer_action") {
-    assert.equal(parsed.output.source_language, "typescript");
-    assert.deepEqual(parsed.output.parameters, {});
-    assert.deepEqual(parsed.output.helper_allowlist, ["observe"]);
-    assert.equal(parsed.output.promotion_policy, "promote_after_passed_trial");
-  }
-});
-
-test("Actor Turn parser normalizes sparse authoring input_schema from parameters", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "author_mineflayer_action",
-      proposed_action_skill_id: "",
-      purpose: "Trial a minimal chest interaction probe.",
-      input_schema: {},
-      parameters: { note: "probe nearby chest", timeoutMs: 2500 },
-      source_language: "typescript",
-      source: "export async function run(ctx, params) { await ctx.wait({ ms: params.timeoutMs }); return { note: params.note }; }",
-      helper_api_version: "mineflayer-action-skill-helper/v1",
-      helper_allowlist: ["wait"],
-      timeout_ms: 3000,
-      verifier: { kind: "helper_event_progress" },
-      known_failure_modes: ["wait helper unavailable"],
-      promotion_policy: "promote_after_passed_trial",
-      why_this_action: "No existing card can probe this interaction.",
-      expected_evidence: ["helper event"],
-      fallback_if_blocked: "Choose a visible Action Card."
-    }
-  });
-
-  assert.equal(parsed.ok, true);
-  if (parsed.ok && parsed.output.choice === "author_mineflayer_action") {
-    assert.deepEqual(parsed.output.input_schema, {
-      type: "object",
-      properties: {
-        note: { type: "string" },
-        timeoutMs: { type: "integer" }
-      },
-      additionalProperties: false
-    });
-  }
-});
-
-test("Actor Turn parser recovers generated source fields split beside actor_turn wrapper", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "author_mineflayer_action",
-      proposed_action_skill_id: "trialInspectContainer",
-      purpose: "Open and inspect a nearby shared container.",
-      input_schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          require_distance_max: { type: "number" }
+test("Actor Turn tool parser maps a visible Action Card function call to runtime parameters", () => {
+  const parsed = parseActorTurnToolSelection({
+    functionCalls: [
+      {
+        type: "function_call",
+        name: "action_card_001_craft_item",
+        call_id: "call-1",
+        arguments: JSON.stringify({
+          parameters: { itemName: "oak_planks" },
+          situation_assessment: "Current inventory has oak_log and planks are the next inventory-grid prerequisite.",
+          why_this_tool: "Craft Item is the visible Action Card for inventory-grid recipes.",
+          success_evidence: ["inventory_delta for oak_planks"],
+          failure_handling: "Record the missing ingredient blocker and choose resource collection."
+        })
+      }
+    ],
+    actionCardToolMappings: [
+      {
+        tool_name: "action_card_001_craft_item",
+        action_card_id: "action-card-001",
+        title: "Craft Item",
+        runtime_mapping_ref: "action-card-mappings/action-card-001.json",
+        card: {
+          schema: "action-card/v1",
+          action_card_id: "action-card-001",
+          title: "Craft Item",
+          description: "Craft an inventory-grid recipe.",
+          parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/craft_item.json",
+          parameter_hints: ["itemName is required."],
+          current_state_requirements: ["inventory has ingredients for the requested inventory-grid recipe"],
+          expected_evidence: ["inventory delta"],
+          likely_blockers: ["missing itemName"],
+          readiness: "requires_current_state_check",
+          runtime_mapping_ref: "action-card-mappings/action-card-001.json"
         }
-      },
-      parameters: { require_distance_max: 3 }
-    },
-    source_language: "typescript",
-    source: "export async function run(ctx) { return await ctx.inspectChest({ maxDistance: 3 }); }",
-    helper_api_version: "mineflayer-action-skill-helper/v1",
-    helper_allowlist: ["inspect_chest"],
-    timeout_ms: 12000,
-    verifier: { kind: "container_snapshot" },
-    known_failure_modes: ["no chest in reach"],
-    promotion_policy: "promote_after_passed_trial",
-    why_this_action: "No existing card can inspect the target container this turn.",
-    expected_evidence: ["container snapshot or denial evidence"],
-    fallback_if_blocked: "Move closer to the chest and retry once."
+      }
+    ]
   });
 
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
-    assert.equal(parsed.output.choice, "author_mineflayer_action");
-    assert.equal(parsed.output.source_language, "typescript");
-    assert.match(parsed.output.source, /inspectChest/);
-    assert.deepEqual(parsed.output.helper_allowlist, ["inspect_chest"]);
+    assert.equal(parsed.selection.selection_kind, "use_existing_action");
+    assert.equal(parsed.selection.action_card_id, "action-card-001");
+    assert.deepEqual(parsed.selection.args.parameters, { itemName: "oak_planks" });
+    assert.match(parsed.selection.args.why_this_tool, /Craft Item/);
   }
 });
 
-test("Actor Turn parser strips generated fields from existing-action output", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "use_existing_action",
-      action_card_id: "action-card-011",
-      parameters: {},
-      proposed_action_skill_id: "",
-      source_language: "typescript",
-      source: "",
-      helper_api_version: "mineflayer-action-skill-helper/v1",
-      helper_allowlist: ["inventory"],
-      timeout_ms: 1000,
-      verifier: { kind: "container_snapshot" },
-      known_failure_modes: ["blocked chest"],
-      promotion_policy: "promote_after_passed_trial",
-      why_this_action: "Inspect the nearby chest with an existing Action Card.",
-      expected_evidence: ["runtime evidence from inspect_chest"],
-      fallback_if_blocked: "Move closer or remember the blocker."
-    }
+test("Actor Turn tool parser rejects visible Action Card extra context fields", () => {
+  const parsed = parseActorTurnToolSelection({
+    functionCalls: [
+      {
+        type: "function_call",
+        name: "action_card_001_craft_item",
+        call_id: "call-extra",
+        arguments: JSON.stringify({
+          parameters: { itemName: "oak_planks" },
+          situation_assessment: "Current inventory has oak_log.",
+          why_this_tool: "Craft Item handles inventory-grid recipes.",
+          success_evidence: ["inventory_delta for oak_planks"],
+          failure_handling: "Record blocker.",
+          context_summary: "Do not let model-selected summaries enter the tool boundary."
+        })
+      }
+    ],
+    actionCardToolMappings: [
+      {
+        tool_name: "action_card_001_craft_item",
+        action_card_id: "action-card-001",
+        title: "Craft Item",
+        runtime_mapping_ref: "action-card-mappings/action-card-001.json",
+        card: {
+          schema: "action-card/v1",
+          action_card_id: "action-card-001",
+          title: "Craft Item",
+          description: "Craft an inventory-grid recipe.",
+          parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/craft_item.json",
+          parameter_hints: ["itemName is required."],
+          current_state_requirements: ["inventory has ingredients for the requested inventory-grid recipe"],
+          expected_evidence: ["inventory delta"],
+          likely_blockers: ["missing itemName"],
+          readiness: "requires_current_state_check",
+          runtime_mapping_ref: "action-card-mappings/action-card-001.json"
+        }
+      }
+    ]
   });
 
-  assert.equal(parsed.ok, true);
-  if (parsed.ok) {
-    assert.equal(parsed.output.choice, "use_existing_action");
-    assert.equal((parsed.output as Record<string, unknown>).source, undefined);
+  assert.equal(parsed.ok, false);
+  assert.ok(!parsed.ok && parsed.errors.some((error) => error.includes("context_summary")));
+});
+
+test("Actor Turn author_mineflayer_action parser rejects source and context-preserve bottlenecks", () => {
+  const parsed = parseActorTurnToolSelection({
+    functionCalls: [
+      {
+        type: "function_call",
+        name: "author_mineflayer_action",
+        call_id: "call-author-1",
+        arguments: JSON.stringify({
+          situation_assessment: "Repeated observation is no longer useful.",
+          why_codegen_is_needed: "A bounded placement-cell scan is missing from visible Action Cards.",
+          desired_minecraft_behavior: "Find a valid adjacent support cell and place a crafting table.",
+          existing_tools_considered: [
+            {
+              action_card_id: "action-card-007",
+              title: "Place Block",
+              why_not_enough: "It needs a known target cell before execution."
+            }
+          ],
+          success_evidence: ["post-observation sees crafting_table"],
+          failure_handling: "Return blocker evidence without claiming placement.",
+          source: "export async function run(ctx, params) { return {}; }",
+          context_to_preserve: ["inventory"]
+        })
+      }
+    ],
+    actionCardToolMappings: []
+  });
+
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.ok(parsed.errors.some((error) => error.includes("source is forbidden")));
+    assert.ok(parsed.errors.some((error) => error.includes("context_to_preserve is forbidden")));
   }
 });
 
-test("Actor Turn parser repairs non-authority explanation fields from nested parameters", () => {
-  const parsed = parseActorTurnProviderOutput({
-    actor_turn: {
-      choice: "use_existing_action",
-      action_card_id: "action-card-008",
-      parameters: {
-        source: "export async function run(ctx) { return { status: 'ok' }; }",
-        purpose: "Check the current inventory counts with a bounded runtime program.",
-        expectedObservation: "inventory count evidence"
-      },
-      proposed_action_skill_id: "ignoredForExistingAction",
-      input_schema: { type: "object" }
-    }
+test("Actor Turn author_mineflayer_action parser rejects nested forbidden context fields", () => {
+  const parsed = parseActorTurnToolSelection({
+    functionCalls: [
+      {
+        type: "function_call",
+        name: "author_mineflayer_action",
+        call_id: "call-author-nested",
+        arguments: JSON.stringify({
+          situation_assessment: "The visible Action Cards cannot express a bounded target search.",
+          why_codegen_is_needed: "The actor needs a generated helper-limited placement search.",
+          desired_minecraft_behavior: "Find a valid support cell and place a crafting table.",
+          existing_tools_considered: [
+            {
+              action_card_id: "action-card-007",
+              title: "Place Block",
+              why_not_enough: "It requires a known target cell.",
+              source: "export async function run(ctx, params) { return {}; }",
+              context_to_preserve: ["inventory", "nearby blocks"]
+            }
+          ],
+          success_evidence: ["nearby crafting_table block evidence"],
+          failure_handling: "Return explicit blocker evidence."
+        })
+      }
+    ],
+    actionCardToolMappings: []
   });
 
-  assert.equal(parsed.ok, true);
-  if (parsed.ok) {
-    assert.equal(parsed.output.choice, "use_existing_action");
-    assert.equal(
-      parsed.output.why_this_action,
-      "Check the current inventory counts with a bounded runtime program."
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.ok(parsed.errors.some((error) => error.includes("existing_tools_considered.0.source is forbidden")));
+    assert.ok(
+      parsed.errors.some((error) => error.includes("existing_tools_considered.0.context_to_preserve is forbidden"))
     );
-    assert.deepEqual(parsed.output.expected_evidence, ["inventory count evidence"]);
-    assert.match(parsed.output.fallback_if_blocked, /valid prerequisite/);
   }
 });
 
-test("Actor Turn parser accepts top-level actor turn output when provider omits wrapper", () => {
-  const parsed = parseActorTurnProviderOutput({
-    choice: "use_existing_action",
-    action_card_id: "action-card-011",
-    parameters: {},
-    why_this_action: "Inspect the nearby shared chest.",
-    expected_evidence: ["runtime evidence from inspect_chest"],
-    fallback_if_blocked: "Refresh observation or choose a prerequisite action."
+test("Mineflayer codegen request preserves full ActorTurnInput and raw outer function call", () => {
+  const actorTurnInput = {
+    schema: "actor-turn-input/v1",
+    turn_id: "turn-codegen-preserve",
+    active_episode: {
+      actor_id: "npc_b"
+    },
+    current_state: {
+      inventory_counts: { crafting_table: 1 }
+    },
+    mineflayer_codegen_skill: {
+      skill_markdown: "# Mineflayer Code Generation\nUse bounded helpers."
+    }
+  } as unknown as ActorTurnInput;
+  const rawOuterToolCall = {
+    type: "function_call",
+    name: "author_mineflayer_action",
+    call_id: "call-author-2",
+    arguments: JSON.stringify({
+      desired_minecraft_behavior: "Place a crafting table."
+    })
+  };
+  const parsedAuthorToolArgs = {
+    situation_assessment: "The actor has a crafting_table item and needs a placed station.",
+    why_codegen_is_needed: "Visible Place Block lacks a known valid target cell.",
+    desired_minecraft_behavior: "Scan for a valid support cell and place a crafting table.",
+    existing_tools_considered: [
+      {
+        action_card_id: "action-card-007",
+        title: "Place Block",
+        why_not_enough: "No target cell is known yet."
+      }
+    ],
+    success_evidence: ["nearby crafting_table block evidence"],
+    failure_handling: "Return explicit blocker evidence."
+  };
+
+  const request = buildMineflayerCodegenRequest({
+    requestId: "request-preserve",
+    actorTurnInput,
+    rawOuterToolCall,
+    parsedAuthorToolArgs
+  });
+
+  assert.equal(request.actor_turn_input, actorTurnInput);
+  assert.deepEqual(request.raw_outer_tool_call, rawOuterToolCall);
+  assert.deepEqual(request.parsed_author_tool_args, parsedAuthorToolArgs);
+  assert.match(request.mineflayer_codegen_skill_markdown, /Mineflayer Code Generation/);
+  assert.match(request.output_contract.forbidden_context_boundary, /legacy planner|context_to_preserve/i);
+});
+
+test("Mineflayer codegen parser rejects extra candidate context fields", () => {
+  const parsed = parseMineflayerCodegenProviderOutput({
+    mineflayer_codegen: {
+      schema: "mineflayer-codegen-output/v1",
+      runtime_parameters: { text: "Need logs in shared storage." },
+      candidate: {
+        schema: "generated-action-skill-candidate/v1",
+        proposed_skill_id: "saySharedChestNeed",
+        purpose: "Say a concrete shared-storage need with helper evidence.",
+        source_language: "typescript",
+        source: "export async function run(ctx, params) { await ctx.say(params.text); return { status: 'ok' }; }",
+        input_schema: {
+          type: "object",
+          required: ["text"],
+          additionalProperties: false,
+          properties: { text: { type: "string" } }
+        },
+        helper_api_version: "mineflayer-action-skill-helper/v1",
+        helper_allowlist: ["say"],
+        timeout_ms: 5000,
+        verifier: { kind: "helper_result_status", helper: "say", status: "delivered" },
+        known_failure_modes: ["chat helper unavailable"],
+        promotion_policy: "promote_after_passed_trial",
+        context_to_preserve: ["inventory"]
+      },
+      codegen_rationale: "Use the full actor turn context and generate a bounded say helper."
+    }
+  });
+
+  assert.equal(parsed.ok, false);
+  assert.ok(
+    !parsed.ok &&
+      parsed.errors.some((error) => error.includes("candidate.context_to_preserve"))
+  );
+});
+
+test("Gemini GenAI function declarations reuse Actor Turn tool schemas", () => {
+  const actorTurnInput = {
+    schema: "actor-turn-input/v1",
+    turn_id: "turn-gemini-tools",
+    active_episode: {
+      actor_id: "npc_b"
+    },
+    action_cards: [
+      {
+        schema: "action-card/v1",
+        action_card_id: "action-card-001",
+        title: "Craft Item",
+        description: "Craft an inventory-grid recipe.",
+        parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/craft_item.json",
+        parameter_hints: ["itemName is required."],
+        current_state_requirements: ["inventory has ingredients for the requested inventory-grid recipe"],
+        expected_evidence: ["inventory delta"],
+        likely_blockers: ["missing itemName"],
+        readiness: "requires_current_state_check",
+        runtime_mapping_ref: "action-card-mappings/action-card-001.json"
+      }
+    ],
+    mineflayer_codegen_skill: {
+      skill_markdown: "# Mineflayer Code Generation"
+    }
+  } as unknown as ActorTurnInput;
+  const payload = buildActorTurnToolSelectionPayload({
+    actorTurnInput,
+    actionCardProjection: {
+      schema: "action-card-projection/v1",
+      actor_id: "npc_b",
+      action_cards: actorTurnInput.action_cards,
+      runtime_mappings: [
+        {
+          kind: "use_primitive",
+          action_card_id: "action-card-001",
+          primitive_id: "craft_item"
+        }
+      ],
+      deferred_counts: {
+        primitives: 0,
+        action_skills: 0
+      },
+      missing_affordances: []
+    }
+  });
+
+  const declarations = buildGeminiFunctionDeclarationsFromTools(payload.tools);
+
+  assert.deepEqual(
+    declarations.map((declaration) => declaration.name),
+    ["action_card_001_craft_item", "author_mineflayer_action"]
+  );
+  assert.deepEqual(declarations[0]?.parametersJsonSchema, payload.tools[0]?.parameters);
+  assert.match(declarations[1]?.description ?? "", /full-context codegen|internal full-context/i);
+});
+
+test("Gemini GenAI function calls parse through the Actor Turn tool-selection contract", () => {
+  const calls = normalizeGeminiFunctionCalls([
+    {
+      id: "gemini-call-1",
+      name: "author_mineflayer_action",
+      args: {
+        situation_assessment: "The actor has a crafting table item and repeated observe would not help.",
+        why_codegen_is_needed: "A valid placement-cell search is missing from visible Action Cards.",
+        desired_minecraft_behavior: "Find a valid adjacent support cell and place a crafting table.",
+        existing_tools_considered: [
+          {
+            action_card_id: "action-card-007",
+            title: "Place Block",
+            why_not_enough: "It requires a known target cell."
+          }
+        ],
+        success_evidence: ["nearby crafting_table block evidence"],
+        failure_handling: "Return explicit blocker evidence."
+      }
+    }
+  ]);
+
+  const parsed = parseActorTurnToolSelection({
+    functionCalls: calls,
+    actionCardToolMappings: []
   });
 
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
-    assert.equal(parsed.output.choice, "use_existing_action");
-    assert.equal(parsed.output.action_card_id, "action-card-011");
+    assert.equal(parsed.selection.selection_kind, "author_mineflayer_action");
+    assert.equal(parsed.selection.call_id, "gemini-call-1");
+    assert.match(parsed.selection.args.why_codegen_is_needed, /placement-cell/);
   }
 });

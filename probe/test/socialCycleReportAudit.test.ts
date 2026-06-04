@@ -1,3 +1,4 @@
+/** Regression coverage for social-cycle report audit invariants. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -44,7 +45,7 @@ function baseReport(): SocialCycleRunReport {
       {
         cycle_id: "cycle-0001",
         cycle_goal_ref: "goals/cycle/cycle-0001-goal.json",
-        action_intent_ref: "goals/cycle/intents/cycle-0001-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/cycle-0001-legacy-planner-action.json",
         provider_input_refs: ["provider-inputs/cycle-0001-input.json"],
         provider_output_refs: ["provider-outputs/cycle-0001-output.json"],
         evidence_refs: ["evidence/cycle-0001-observe.json"],
@@ -54,7 +55,7 @@ function baseReport(): SocialCycleRunReport {
       {
         cycle_id: "cycle-0002",
         cycle_goal_ref: "goals/cycle/cycle-0002-goal.json",
-        action_intent_ref: "goals/cycle/intents/cycle-0002-intent.json",
+        action_ref: "goals/cycle/legacy-planner-actions/cycle-0002-legacy-planner-action.json",
         provider_input_refs: ["provider-inputs/cycle-0002-input.json"],
         provider_output_refs: ["provider-outputs/cycle-0002-output.json"],
         evidence_refs: ["evidence/cycle-0002-observe.json"],
@@ -107,8 +108,8 @@ async function writeActorWorkspaceFixture(
       cycle_id: cycle.cycle_id,
       summary: "Observe settlement state"
     });
-    await writeJson(path.join(actorDir, cycle.action_intent_ref), {
-      schema: "action-intent/v1",
+    await writeJson(path.join(actorDir, cycle.action_ref), {
+      schema: "legacy-planner-action/v1",
       actor_id: actorId,
       cycle_id: cycle.cycle_id,
       cycle_goal_id: cycle.cycle_goal_ref,
@@ -293,13 +294,13 @@ test("rejects satisfied settlement checklist items without evidence refs", async
   );
 });
 
-test("rejects move_to intents with empty or invalid structured args", async () => {
+test("rejects move_to actions with empty or invalid structured args", async () => {
   const workspaceRoot = await makeWorkspaceRoot("social-audit-move-empty-args");
   const report = baseReport();
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
-  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_intent_ref), {
-    schema: "action-intent/v1",
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_ref), {
+    schema: "legacy-planner-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
@@ -310,8 +311,8 @@ test("rejects move_to intents with empty or invalid structured args", async () =
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
   });
-  await writeJson(path.join(workspaceRoot, actorId, report.cycles[1]!.action_intent_ref), {
-    schema: "action-intent/v1",
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[1]!.action_ref), {
+    schema: "legacy-planner-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0002",
     cycle_goal_id: report.cycles[1]!.cycle_goal_ref,
@@ -328,12 +329,12 @@ test("rejects move_to intents with empty or invalid structured args", async () =
 
   assert.ok(
     errors.some((error) =>
-      error.includes("move_to intent") && error.includes("has empty args")
+      error.includes("move_to action") && error.includes("has empty args")
     )
   );
   assert.ok(
     errors.some((error) =>
-      error.includes("move_to intent") && error.includes("has invalid physical args")
+      error.includes("move_to action") && error.includes("has invalid physical args")
     )
   );
 });
@@ -684,7 +685,7 @@ test("review summary surfaces world scan counts and movement contract status", a
       attempt_id: "cycle-0001-action-01",
       action_index: 0,
       turn_id: "cycle-0001-action-01",
-      action_intent_ref: report.cycles[0]!.action_intent_ref,
+      action_ref: report.cycles[0]!.action_ref,
       provider_input_refs: [],
       provider_output_refs: [],
       evidence_refs: [report.cycles[0]!.evidence_refs[0]!],
@@ -698,8 +699,8 @@ test("review summary surfaces world scan counts and movement contract status", a
   ];
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
-  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_intent_ref), {
-    schema: "action-intent/v1",
+  await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_ref), {
+    schema: "legacy-planner-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: report.cycles[0]!.cycle_goal_ref,

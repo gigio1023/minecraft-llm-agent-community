@@ -1,3 +1,9 @@
+/**
+ * Reviewer heuristics for long-objective probe reports.
+ *
+ * @remarks These recommendations help diagnose direct-generated runs and should
+ * not be treated as social-cycle memory or actor action authority.
+ */
 import type { LongObjectivePhaseReport, LongObjectiveReport } from "./types.js";
 
 export function buildLongObjectiveReviewerTasks(report: LongObjectiveReport): string[] {

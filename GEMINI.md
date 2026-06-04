@@ -17,12 +17,13 @@ user has approved an operating-rule change.
 8. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 9. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
 10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-11. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-12. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-13. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-14. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
-15. `docs/blog-doc/Setup/Provider-Setup.md`
-16. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
+11. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+12. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+13. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+14. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+15. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
+16. `docs/blog-doc/Setup/Provider-Setup.md`
+17. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
@@ -33,6 +34,28 @@ benchmark project, or a house-building architecture.
 Providers propose goals, actions, and judgments. Runtime code owns Minecraft
 truth: schemas, structured args, permission gates, Mineflayer execution,
 verification, artifacts, actor workspace state, and provider usage records.
+
+Never parse LLM-facing prose with string `includes`, regexes, or keyword
+heuristics to decide runtime policy. `current_state_requirements`, Action Card
+descriptions, rationale, Minecraft Basic Guide text, memory, and PlanBeads are
+context, not executable authority. Tool calling plus strict schemas/enums
+enforce flow; within a selected visible tool/action, the LLM keeps decision
+freedom with full context and schema-bound logical parameters. Runtime then
+validates explicit params, schema, permission, retry/safety, source guards,
+timeouts, verifier/evidence, and artifacts.
+
+`decision_frame` is context, not a planner output. Do not add
+`parameter_candidates`, `top_eligible_action_cards`,
+`recommended_next_action_candidates`, generated chat text, coordinates, recipe
+decisions, or other pre-selected action payloads to it.
+
+Do not hide Action Cards or tools through hardcoded Minecraft heuristics such as
+item-family, station-family, construction-readiness, survival-priority, or
+shelter-first filters. Tool visibility and rejection must be represented with
+typed readiness/eligibility contracts, structured state, schemas, gates, retry
+constraints, or evidence. The runtime must not become a hidden Minecraft
+planner. No compatibility or legacy compromise is required when removing prose
+parsing or hidden domain-planner behavior.
 
 PlanBeads are structured actor-owned work state for concerns an LLM actor would
 otherwise forget or blur in free-form prose. They should make the NPC more

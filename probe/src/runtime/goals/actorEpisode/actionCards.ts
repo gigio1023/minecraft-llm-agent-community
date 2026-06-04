@@ -4,7 +4,7 @@
  *
  * @remarks Action Cards are provider-facing affordances, not direct execution.
  * Their mappings and parameter contracts must still resolve into validated
- * `ActionIntent` records before Mineflayer work starts.
+ * Actor Turn actions before Mineflayer work starts.
  */
 import type {
   ActionSurfaceActionSkill,
@@ -23,6 +23,7 @@ export type ActionCardRuntimeMapping =
       kind: "use_action_skill";
       action_card_id: string;
       action_skill_id: string;
+      input_schema?: Record<string, unknown>;
     };
 
 export type ActionCardProjection = {
@@ -73,39 +74,39 @@ function primitiveParameterHints(primitive: ActionSurfacePrimitive) {
     : ["No structured parameters required."];
 }
 
-function primitiveCurrentStateRequirements(primitive: ActionSurfacePrimitive) {
+function primitiveCurrentStateHints(primitive: ActionSurfacePrimitive) {
   switch (primitive.primitive_id) {
     case "move_to":
-      return ["movement reaches a specific actionable target or enables a fresh observe after movement"];
+      return ["choose movement only when it reaches a specific actionable target or enables a fresh observe after movement"];
     case "collect_logs":
-      return ["nearby loaded world evidence contains reachable log blocks"];
+      return ["check whether nearby loaded world evidence contains reachable log blocks"];
     case "craft_item":
-      return ["inventory has ingredients for the requested inventory-grid recipe"];
+      return ["check whether inventory has ingredients for the requested inventory-grid recipe"];
     case "craft_with_table":
       return [
-        "nearby loaded world evidence contains a reachable crafting_table block",
-        "inventory has ingredients for the requested table-bound recipe"
+        "check whether nearby loaded world evidence contains a reachable crafting_table block",
+        "check whether inventory has ingredients for the requested table-bound recipe"
       ];
     case "consume_item":
-      return ["inventory has the requested edible item"];
+      return ["check whether inventory has the requested edible item"];
     case "deposit_shared":
-      return ["shared chest nearby", "inventory has requested depositable item"];
+      return ["check whether a shared chest is nearby", "check whether inventory has the requested depositable item"];
     case "inspect_chest":
-      return ["shared chest nearby"];
+      return ["check whether a shared chest is nearby"];
     case "mine_block":
-      return ["nearby loaded world evidence contains the requested block"];
+      return ["check whether nearby loaded world evidence contains the requested block"];
     case "place_block":
       return [
-        "inventory has the requested block item",
-        "provider supplied an explicit target cell or support surface"
+        "check whether inventory has the requested block item",
+        "supply an explicit target cell or support-surface coordinate in function parameters"
       ];
     case "build_pattern":
       return [
-        "inventory has solid build material",
-        "provider supplied an explicit build anchor, target cell, or support surface"
+        "check whether inventory has solid build material",
+        "supply an explicit build anchor or target coordinate in function parameters"
       ];
     case "say":
-      return ["target actor visible"];
+      return ["check whether communication context exists"];
     default:
       return [];
   }
@@ -136,7 +137,7 @@ function primitiveActionCard(
       parameters_schema_ref:
         `runtime-parameters/${primitive.args_contract.schema}/${primitive.primitive_id}.json`,
       parameter_hints: primitiveParameterHints(primitive),
-      current_state_requirements: primitiveCurrentStateRequirements(primitive),
+      current_state_requirements: primitiveCurrentStateHints(primitive),
       expected_evidence: primitiveExpectedEvidence(primitive),
       likely_blockers: primitiveLikelyBlockers(primitive),
       readiness: primitiveReadiness(primitive),
@@ -163,8 +164,8 @@ function actionSkillActionCard(
 ): { card: ActionCard; mapping: ActionCardRuntimeMapping } {
   const actionCardId = `action-card-${String(index + 1).padStart(3, "0")}`;
   const preconditionText = skill.preconditions.length > 0
-    ? ` Preconditions that must be true in current_state or recent evidence: ${skill.preconditions.join("; ")}.`
-    : " No additional preconditions beyond the mapped primitive contracts.";
+    ? ` Advisory current-state hints to check before choosing this card: ${skill.preconditions.join("; ")}.`
+    : " No additional advisory current-state hints beyond the mapped primitive contracts.";
   return {
     card: {
       schema: "action-card/v1",
@@ -174,16 +175,16 @@ function actionSkillActionCard(
         `Run the actor-owned action skill ${skill.action_skill_id}. ${skill.reason}.${preconditionText}`,
       parameters_schema_ref: `actor-action-skills/${skill.action_skill_id}/parameters-schema.json`,
       parameter_hints: [
-        "Before choosing this actor-owned action skill, verify each listed precondition against current_state or recent runtime evidence.",
-        ...skill.preconditions.map((precondition) => `Required current_state evidence: ${precondition}.`),
-        "Empty parameters are allowed only after those preconditions are satisfied.",
+        "Before choosing this actor-owned action skill, use current_state or recent runtime evidence to justify each advisory hint.",
+        ...skill.preconditions.map((precondition) => `Advisory current_state hint: ${precondition}.`),
+        "Empty parameters are allowed only when the action skill input schema accepts them; current_state never supplies hidden parameters.",
         "Do not output primitive_id or action_skill_id; choose this Action Card by action_card_id."
       ],
       current_state_requirements: [...skill.preconditions],
       expected_evidence: [skill.success_verifier],
       likely_blockers: [
         ...(skill.preconditions.length > 0
-          ? [`do not choose until current_state satisfies: ${skill.preconditions.join("; ")}`]
+          ? [`risky if current_state lacks support for: ${skill.preconditions.join("; ")}`]
           : []),
         ...skill.preconditions,
         ...skill.missing_primitives.map((primitive) => `missing primitive ${primitive}`)
@@ -194,7 +195,8 @@ function actionSkillActionCard(
     mapping: {
       kind: "use_action_skill",
       action_card_id: actionCardId,
-      action_skill_id: skill.action_skill_id
+      action_skill_id: skill.action_skill_id,
+      ...(skill.input_schema ? { input_schema: skill.input_schema } : {})
     }
   };
 }
@@ -233,7 +235,7 @@ export function buildActionCardProjection(surface: ActionSurfacePacket): ActionC
     missing_affordances: [
       ...surface.missing_affordances,
       ...(hiddenGeneratedRunnerCount > 0
-        ? ["generic Mineflayer program runner hidden from use_existing_action; choose author_mineflayer_action for new generated source"]
+        ? ["generic Mineflayer program runner excluded from use_existing_action; choose author_mineflayer_action for new generated source"]
         : [])
     ]
   };

@@ -6,26 +6,33 @@ sidebar_position: 43
 
 Search token: `ACTION_SELECTION_GATED_ACTION_SKILL_AUTHORING`.
 
-Status: active implementation plan; initial vertical slice implemented.
+Status: superseded as the outer action-selection architecture; retained as the
+generated action-skill candidate, trial, helper allowlist, verifier, and
+promotion mechanics plan.
+
+Active outer-selection spec:
+`Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`.
 
 Recorded: 2026-06-01.
 
 Implementation checkpoint: 2026-06-01.
 
-Implemented slice:
+Historical implemented slice:
 
-- `ActionIntent` accepts `author_and_trial_action_skill` and schema-bound
-  `parameters` while keeping `args` as a migration alias.
+- The legacy planner action path accepted `author_and_trial_action_skill` and
+  schema-bound `parameters` while keeping `args` as a migration alias.
 - The action planner provider schema exposes `parameters`, generated candidate
   contracts, and `action_selection_modes`.
 - Generated TypeScript runs as `export async function run(ctx, params)`.
 - Candidate `input_schema` validates current `parameters` before trial.
 - Generated helper calls are limited by `helper_allowlist`, logged as helper
   events, and run through the bounded generated executor.
-- `executeSocialActionIntent` now has an explicit
-  `author_and_trial_action_skill` branch that writes candidate proposal,
-  direct-trial source, helper-event/tool evidence, and
-  `action_skill_candidate_trial` evidence under the actor workspace.
+- The current executor keeps this legacy path behind `executeLegacyPlannerAction`
+  while the ordinary Actor Turn path uses `author_mineflayer_action` and
+  `ActorTurnResolvedAction`.
+- The authoring branch writes candidate proposal, direct-trial source,
+  helper-event/tool evidence, and `action_skill_candidate_trial` evidence under
+  the actor workspace.
 - Passed trials become `generated_lifecycle_status: "promotable"` in the
   candidate proposal, never active promotion.
 - Async reviewer proposal creation is gated on an existing
@@ -40,18 +47,48 @@ Not yet implemented:
 - Live provider proof that the model chooses this mode in a real Minecraft
   blocker scenario.
 
-## Capability
+## Current Adaptation Rule
 
-The social-cycle action planner must be able to choose a new action-skill
-authoring path when the current actor body cannot solve the CycleGoal well with
-active action skills or direct primitives.
+Use this document only for the mechanics after action authoring has been
+selected: generated candidate shape, input schema, source guard, helper
+allowlist, trial evidence, actor-workspace persistence, and later lifecycle
+promotion.
+
+Do not use this document's legacy planner action-centered outer planner flow as the active
+Actor Turn architecture. The ordinary path is now:
+
+```text
+ActorTurnInput
+-> strict function tool selection
+-> visible Action Card parameters OR author_mineflayer_action rationale
+-> ActorTurnResolvedAction / full-context codegen
+-> runtime validation, trial, evidence, actor workspace
+```
+
+Visible Action Card tool args use logical `parameters`, not
+`runtime_parameters`. `author_mineflayer_action` is a logical selection gate and
+does not carry generated source or parameters; the internal codegen LLM receives
+the full ActorTurnInput, raw outer function call, parsed author args, and
+mineflayer codegen agent skill markdown.
+
+## Active Capability Boundary
+
+The active Actor Turn provider must be able to choose a new action-skill
+authoring path when no visible Action Card can express the useful bounded
+Minecraft behavior. That active choice is the `author_mineflayer_action`
+function tool. The outer tool call carries detailed rationale and desired
+behavior, not generated source.
 
 This is not a background code-generation loop. Action skill creation starts only
-from the action-selection stage, as an explicit ActionIntent mode. Other
-systems may review, modify, retire, promote, or persist candidates afterward,
-but the first creation of a new action skill must be selected by the actor's
-current action planner under ActorSoul, LifeGoal, observation, memory,
-PlanBeads, relationship context, retry constraints, and runtime affordances.
+from the action-selection stage. In the active Actor Turn architecture, this is
+the `author_mineflayer_action` function tool. In the legacy planner path, the
+same mechanics may still appear as an explicit `author_and_trial_action_skill`
+legacy planner action for historical compatibility. Other systems may review,
+modify, retire, promote, or persist candidates afterward, but the first creation
+of a new action skill must be selected by the actor's current
+Actor Turn/action-selection context under ActorSoul, LifeGoal, observation,
+memory, PlanBeads, relationship context, retry constraints, and runtime
+affordances.
 
 The intended effect is more Mineflayer agency, not a narrower scripted planner.
 The LLM should be encouraged to generate bounded Mineflayer helper code when the
@@ -65,8 +102,8 @@ The plan adapts workflow patterns from the local harness shelf:
 
 - `gstack` shows that a useful harness exposes explicit workflow choices rather
   than hiding major mode changes in prose. This repo should expose
-  `author_and_trial_action_skill` as a first-class ActionIntent kind instead of
-  smuggling generation through `args` or a reviewer side effect.
+  `author_mineflayer_action` as a first-class Actor Turn function tool instead
+  of smuggling generation through prose, `args`, or a reviewer side effect.
 - `gstack` review and spec flows separate decision gates from execution. This
   repo should separate authoring, schema validation, trial execution, promotion,
   and later background review.
@@ -90,7 +127,7 @@ The 2026-06-01 Gemini social-cycle run showed the current weakness.
 
 The LLM correctly reasoned that `placeCraftingTable` failed because the target
 was blocked by `oak_leaves`. It then explained that the actor should move to
-coordinates or mine the obstructing leaves. However, the executable ActionIntent
+coordinates or mine the obstructing leaves. However, the executable legacy planner action
 kept emitting empty primitive args:
 
 ```json
@@ -110,9 +147,12 @@ I need a new bounded behavior: find a replaceable nearby cell and place the
 crafting table there. Generate and trial that behavior now.
 ```
 
-## Core Decision
+## Historical Core Decision
 
-Action selection becomes a mode choice:
+This mode list documents the legacy planner implementation shape. It is not the
+active outer Actor Turn contract.
+
+Legacy action selection became a mode choice:
 
 1. `use_action_skill`: execute an existing active actor-owned action skill.
 2. `use_primitive`: execute one direct primitive with schema-valid parameters.
@@ -120,7 +160,9 @@ Action selection becomes a mode choice:
    action skill candidate and trial it in the current cycle.
 4. `wait` or `remember`: runtime control and continuity actions.
 
-Only mode 3 can create a new action skill.
+Only mode 3 could create a new action skill in that legacy shape. In the active
+Actor Turn shape, only `author_mineflayer_action` can originate a generated
+Mineflayer candidate.
 
 Background reviewers, async sidecars, PlanBead operations, legacy generated
 skill importers, and offline scripts must not create new action skill candidates
@@ -134,12 +176,15 @@ from scratch. They may:
 - propose a PlanBead that says a new action skill is needed, without creating
   the action skill itself.
 
-## Target Flow
+## Historical Target Flow
+
+The flow below documents the legacy planner implementation shape. Translate it
+through the active Actor Turn tool-calling spec before applying it to new work.
 
 ```mermaid
 flowchart TD
   Context["ActorSoul, LifeGoal, observation, memory, PlanBeads, relationships, retry constraints"] --> Planner["Action planner"]
-  Planner --> Choice{"ActionIntent kind"}
+  Planner --> Choice{"legacy planner action kind"}
   Choice --> Active["use_action_skill"]
   Choice --> Primitive["use_primitive"]
   Choice --> Author["author_and_trial_action_skill"]
@@ -152,22 +197,26 @@ flowchart TD
   Evidence --> Decision{"Trial passed?"}
   Decision -->|yes| Promotable["candidate: promotable, optional active promotion"]
   Decision -->|no| Candidate["candidate: failed/rejected with blocker evidence"]
-  Promotable --> Future["Future action planner sees active/promotable actor-owned skill"]
+  Promotable --> Future["Future Actor Turn action surface sees active/promotable actor-owned skill"]
   Candidate --> Future
 ```
 
-## Schema-First ActionIntent
+## Schema-First Legacy Planner Action
 
 Replace weak free-object `args` semantics with schema-bound `parameters`.
 
-Compatibility can keep `args` as a legacy alias during migration, but provider
-inputs, provider outputs, artifacts, tests, and docs should use `parameters`.
+This section remains useful for explicit legacy-path maintenance only. Active
+Actor Turn Action Card tools already use schema-bound `parameters`; do not
+route new provider or codegen context through this legacy planner action object.
+Compatibility can keep `args` as a legacy alias during migration, but active
+provider inputs, provider outputs, artifacts, tests, and docs should use
+`parameters`.
 
 ### Primitive Intent
 
 ```ts
 type UsePrimitiveIntent = {
-  schema: "action-intent/v2";
+  schema: "legacy-planner-action/v2";
   kind: "use_primitive";
   primitive_id: RuntimePrimitiveId;
   parameters_schema_ref: string;
@@ -186,7 +235,7 @@ gate, but empty physical parameters should fail before Mineflayer execution.
 
 ```ts
 type UseActionSkillIntent = {
-  schema: "action-intent/v2";
+  schema: "legacy-planner-action/v2";
   kind: "use_action_skill";
   action_skill_id: string;
   parameters_schema_ref?: string;
@@ -205,7 +254,7 @@ parameters against the action skill input schema.
 
 ```ts
 type AuthorAndTrialActionSkillIntent = {
-  schema: "action-intent/v2";
+  schema: "legacy-planner-action/v2";
   kind: "author_and_trial_action_skill";
   candidate: {
     proposed_skill_id: string;
@@ -218,7 +267,7 @@ type AuthorAndTrialActionSkillIntent = {
     helper_allowlist: string[];
     timeout_ms: number;
     verifier: ActionSkillVerifierSpec;
-    promotion_policy: "record_candidate_only" | "promote_after_passed_trial";
+    promotion_policy: "promote_after_passed_trial";
     known_failure_modes: string[];
   };
   parameters: JsonObject;
@@ -242,7 +291,7 @@ Schema artifacts rather than adding Python as a runtime dependency.
 Required schema surfaces:
 
 - `runtime/parameters/primitiveSchemas.ts`: one schema per primitive.
-- `skills/generated/authoringSchemas.ts`: ActionIntent v2 and candidate schemas.
+- `skills/generated/authoringSchemas.ts`: legacy planner action v2 and candidate schemas.
 - `skills/generated/helperApiManifest.ts`: helper API manifest exposed to
   generated TypeScript.
 - `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`:
@@ -315,7 +364,8 @@ Generated source guardrails:
 
 Each authoring attempt must write actor-relative artifacts:
 
-- provider input snapshot for action planner;
+- provider input snapshot for Actor Turn/codegen, or legacy action planner when
+  explicitly testing that path;
 - provider output snapshot with raw generated candidate;
 - candidate action skill record;
 - candidate input schema artifact;
@@ -362,10 +412,10 @@ Promotion can be automatic only when all are true:
 Otherwise, mark `promotable` and let background review or user approval promote
 later.
 
-## Provider Input Changes
+## Historical Provider Input Changes
 
-The action planner input must show creation as a valid mode, not an implicit
-fallback:
+The legacy action planner input needed to show creation as a valid mode, not an
+implicit fallback:
 
 - `action_selection_modes`: active action skill, primitive, author-and-trial,
   wait, remember;
@@ -378,18 +428,20 @@ fallback:
 - `mineflayer_expansion_opportunities`: situations where authoring a candidate
   is appropriate.
 
-Do not expose a giant always-on strategy checklist. The LLM should decide
-whether authoring is appropriate from the current CycleGoal and evidence.
+Do not expose a giant always-on strategy checklist. In active Actor Turn mode,
+the LLM should decide whether authoring is appropriate from the full
+`ActorTurnInput`, visible Action Cards, current state, Evidence Trace, Minecraft
+Basic Guide, memory, relationships, PlanBeads, and runtime retry constraints.
 
 ## Implementation Slices
 
-### Slice 1: ActionIntent v2 And Parameter Schemas
+### Slice 1: Legacy Planner Action V2 And Parameter Schemas
 
 Goal: make primitive parameters schema-bound before execution.
 
 Tasks:
 
-1. Add `parameters` to ActionIntent while keeping `args` as legacy read alias.
+1. Add `parameters` to legacy planner action while keeping `args` as legacy read alias.
 2. Add primitive parameter schemas for the existing direct primitives.
 3. Validate provider output immediately after parse.
 4. Fail provider output or run one repair call when physical parameters are
@@ -403,14 +455,15 @@ Acceptance:
 - `mine_block` requires `blockName` or `targetBlock`.
 - Existing deterministic-social tests still pass through compatibility aliases.
 
-### Slice 2: Author-And-Trial ActionIntent Mode
+### Slice 2: Author-And-Trial Legacy Planner Action Mode
 
-Goal: allow action planner to create one new candidate from the current action
-selection stage.
+Goal: allow the current action-selection stage to create one new candidate. In
+active Actor Turn mode this means `author_mineflayer_action`; in legacy tests it
+means `author_and_trial_action_skill`.
 
 Tasks:
 
-1. Extend ActionIntent validator and provider schema with
+1. Extend legacy planner action validator and provider schema with
    `author_and_trial_action_skill`.
 2. Add candidate authoring schema.
 3. Add provider instructions that authoring is the only creation path.
@@ -453,7 +506,8 @@ Goal: make successful candidates usable in later cycles without flooding context
 
 Tasks:
 
-1. Add candidate and promotable summaries to action planner input.
+1. Add candidate and promotable summaries to Actor Turn/action-surface context
+   or explicit legacy action planner input.
 2. Add active action skill input schemas to action surface records.
 3. Add memory writes for generated behavior patterns and failure modes.
 4. Add PlanBead operation guidance for blockers that need an authored
@@ -494,7 +548,7 @@ Acceptance:
 
 Required focused tests:
 
-- ActionIntent v2 validates primitive parameters by primitive schema.
+- legacy planner action v2 validates primitive parameters by primitive schema.
 - Legacy `args` maps to `parameters` during migration and emits a deprecation
   marker in artifacts.
 - Action planner rejects empty physical parameters before execution.

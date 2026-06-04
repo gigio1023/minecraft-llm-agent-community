@@ -1,3 +1,4 @@
+/** Regression coverage for provider usage tracking and budget context. */
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -8,6 +9,7 @@ import {
   appendProviderUsageRecord,
   guardProviderUsageRequest,
   normalizeGeminiUsage,
+  normalizeOpenAiUsage,
   ProviderUsageBudgetError,
   summarizeProviderUsage
 } from "../src/provider/providerUsageTracker.js";
@@ -288,6 +290,35 @@ test("Gemini usage normalization counts thinking tokens as output tokens", () =>
     output_tokens: 5,
     thinking_tokens: 2,
     total_tokens: 15
+  });
+});
+
+test("OpenAI usage normalization accepts Responses API token fields", () => {
+  const normalized = normalizeOpenAiUsage(
+    {
+      input_tokens: 11,
+      output_tokens: 7,
+      output_tokens_details: {
+        reasoning_tokens: 3
+      },
+      total_tokens: 18
+    },
+    {
+      requests: 1,
+      input_tokens: 1,
+      output_tokens: 1,
+      thinking_tokens: 0,
+      total_tokens: 2
+    }
+  );
+
+  assert.equal(normalized.source, "provider_reported");
+  assert.deepEqual(normalized.usage, {
+    requests: 1,
+    input_tokens: 11,
+    output_tokens: 7,
+    thinking_tokens: 3,
+    total_tokens: 18
   });
 });
 

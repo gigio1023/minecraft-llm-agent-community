@@ -1,3 +1,4 @@
+/** Regression coverage for hostile-role policy context. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

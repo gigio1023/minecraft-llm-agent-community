@@ -1,8 +1,8 @@
 import { runtimePrimitives } from "../gameplay/primitives/registry.js";
 import {
-  primitiveArgsContractSummary,
-  type PrimitiveArgsContractSummary
-} from "./goals/actionIntentContracts.js";
+  primitiveParameterContractSummary,
+  type PrimitiveParameterContractSummary
+} from "./goals/actionParameterContracts.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 
 export type ActionSurfaceExposure = "direct" | "deferred";
@@ -14,13 +14,14 @@ export type ActionSurfacePrimitive = {
   executable: boolean;
   reason: string;
   description: string;
-  args_contract: PrimitiveArgsContractSummary;
+  args_contract: PrimitiveParameterContractSummary;
 };
 
 export type ActionSurfaceActionSkill = {
   action_skill_id: string;
   exposure: ActionSurfaceExposure;
   executable: boolean;
+  input_schema?: Record<string, unknown>;
   required_primitives: string[];
   missing_primitives: string[];
   preconditions: string[];
@@ -126,15 +127,11 @@ function primitiveDescription(primitiveId: string) {
 function primitiveReason(input: {
   primitiveId: string;
   roleAllowedPrimitiveIds: Set<string>;
-  activePrimitiveIds: Set<string>;
 }) {
   if (!input.roleAllowedPrimitiveIds.has(input.primitiveId)) {
     return "not role-allowed in the current actor contract";
   }
-  if (!input.activePrimitiveIds.has(input.primitiveId)) {
-    return "not backed by an active actor-owned action skill";
-  }
-  return "role-allowed and backed by active actor-owned action skills";
+  return "role-allowed runtime primitive with strict parameter and evidence requirements";
 }
 
 function actionSkillExposure(input: {
@@ -149,6 +146,9 @@ function actionSkillExposure(input: {
     action_skill_id: input.record.skill_id,
     exposure: executable ? "direct" : "deferred",
     executable,
+    ...(input.record.generated_input_schema
+      ? { input_schema: input.record.generated_input_schema }
+      : {}),
     required_primitives: [...input.record.required_primitives],
     missing_primitives: missing,
     preconditions: [...input.record.preconditions],
@@ -190,14 +190,7 @@ export function buildActionSurfacePacket(input: {
   recentBlockers?: Array<{ key: string; count: number; example: string }>;
 }): ActionSurfacePacket {
   const roleAllowedPrimitiveIds = new Set(input.allowedPrimitiveIds);
-  const activePrimitiveIds = new Set(
-    input.activeActionSkills.flatMap((record) =>
-      record.status === "active" ? record.required_primitives : []
-    )
-  );
-  const executablePrimitiveIds = new Set(
-    [...roleAllowedPrimitiveIds].filter((primitiveId) => activePrimitiveIds.has(primitiveId))
-  );
+  const executablePrimitiveIds = new Set(roleAllowedPrimitiveIds);
 
   const primitiveRows = runtimePrimitives.map((primitive) => {
     const executable = executablePrimitiveIds.has(primitive.id);
@@ -208,11 +201,10 @@ export function buildActionSurfacePacket(input: {
       executable,
       reason: primitiveReason({
         primitiveId: primitive.id,
-        roleAllowedPrimitiveIds,
-        activePrimitiveIds
+        roleAllowedPrimitiveIds
       }),
       description: primitiveDescription(primitive.id),
-      args_contract: primitiveArgsContractSummary(primitive.id)
+      args_contract: primitiveParameterContractSummary(primitive.id)
     };
   });
 

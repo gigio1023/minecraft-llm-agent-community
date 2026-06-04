@@ -1,3 +1,4 @@
+/** Regression coverage for relationship-derived action context signals. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

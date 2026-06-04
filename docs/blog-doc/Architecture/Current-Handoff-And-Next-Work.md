@@ -27,6 +27,97 @@ is reliable.
 
 ## Latest Live Evidence
 
+Recorded 2026-06-04 (`Asia/Seoul`).
+
+Fresh-world 50-cycle OpenAI `gpt-5.4-nano` Actor Turn run:
+
+- Report:
+  `tmp/social-cycle-fresh-world-openai-gpt54nano-50-20260604T093902Z.json`
+- Review:
+  `tmp/social-cycle-fresh-world-openai-gpt54nano-50-20260604T093902Z-review.md`
+- Run id: `social-cycle-c59f5c19-73fa-457b-80a3-9789276235a5`
+- Server: fresh world seed `287340098429350`, Minecraft `1.21.11`,
+  spawn-access prepared at `(-9,64,-8)`, starter inventory seeded.
+- Provider usage: OpenAI API `gpt-5.4-nano`, 51 requests, 1,159,266 input
+  tokens, 20,338 output tokens, 3,454 thinking tokens, 1,179,604 total tokens.
+  Local daily budget guard allowed the run with 7,820,396 tokens remaining.
+- Runtime status: `passed`.
+- Outcome distribution: 4 `verified_progress`, 46 `no_progress`.
+
+Behavior verdict:
+
+- Actor Turn became more willing to act than the earlier over-constrained path,
+  but long-term work continuity collapsed.
+- The actor satisfied the shared-storage request mechanically by depositing
+  `oak_log`, then drifted into repeated observe/inspect/wait/say-style turns
+  while the Active Episode still carried the stale
+  `Deposit 1 oak_log into the nearby shared chest...` focus.
+- Actor Turn inputs did include current-state warnings that shared storage was
+  already `contributed`, no social deposit candidate remained, and shelter was
+  still unknown. That was not enough to update durable work state.
+
+PlanBeads verdict:
+
+- PlanBead ready-front snapshots were written every cycle:
+  `plan_bead_packet_ref` count = 50.
+- Actual PlanBead use was empty:
+  `selected_plan_bead_refs=0`,
+  `plan_bead_operation_result_refs=0`,
+  `plan_bead_operation_results=0`,
+  and Actor Turn `compact_plan_bead_hints=[]`.
+- The actor workspace for this run contained only
+  `plan-beads/indexes/plan-bead-ready-front-cycle-*.json`; no PlanBead record,
+  event, history, or operation-result artifact was created.
+- Conclusion: PlanBeads are wired as passive context, but the latest run did
+  not use them as durable long-term work state. Empty ready-front packets are
+  not evidence of planning continuity.
+
+Immediate next work:
+
+- Create/update guarded PlanBeads from meaningful social requests, completed
+  work, repeated no-progress evidence, blockers, and branch-time reframing
+  without making PlanBeads executable authority.
+- Close or retire stale Active Episode focus when runtime evidence satisfies the
+  request, and preserve the next open work item as durable context.
+- Add review/audit checks that distinguish "PlanBead packet present" from
+  "PlanBead graph substantively used".
+
+## Latest Implementation Update
+
+Recorded 2026-06-04 (`Asia/Seoul`).
+
+Actor Turn tool selection is now aligned with the full-context codegen spec:
+
+- OpenAI/Gemini Actor Turn function tools use visible Action Cards with logical
+  `parameters`, not provider-authored `runtime_parameters`.
+- `author_mineflayer_action` remains a logical selection gate only. Generated
+  source, runtime parameters, input schema, verifier, helper allowlist, timeout,
+  failure modes, and promotion policy are produced by the internal full-context
+  codegen stage.
+- The social-cycle runner's ordinary `actor_turn` path executes
+  `ActorTurnResolvedAction` directly. The legacy planner path is explicit and
+  named `LegacyPlannerAction`; it is not the provider/codegen boundary.
+- Actor-owned generated action skill `generated_input_schema` now reaches the
+  visible Action Card tool schema, so promoted/generated action skills with
+  non-empty params do not collapse to `{}`.
+- Actor Turn tool parsing and Mineflayer codegen parsing reject unknown/context
+  summary fields instead of silently accepting `context_to_preserve`-style
+  bottlenecks.
+- The next implementation/review pass must treat prose parsing as the strongest
+  anti-pattern: do not use string `includes`, regexes, keyword lists, or
+  hardcoded Minecraft domain heuristics over `current_state_requirements`,
+  rationale, guide text, memory, or PlanBeads to hide tools, choose Action Cards,
+  supply args, grant permission, clear retry, authorize source, or prove success.
+  Tool calling plus strict schemas/enums enforce flow; runtime validation and
+  evidence enforce execution.
+
+Verified in this update:
+
+- `cd probe && bun run typecheck`
+- `cd probe && bun test test/actorTurnProviderInput.test.ts test/actorTurnResolver.test.ts test/socialCycleExecution.test.ts test/planBeadLifecycle.test.ts test/generatedActionSkillAuthoringContracts.test.ts`
+
+Not yet verified in this update: a new 30/50/60-cycle live provider run.
+
 Recorded 2026-06-03 (`Asia/Seoul`).
 
 The current Actor Turn plus passive PlanBeads line has now been tested beyond
@@ -89,6 +180,44 @@ Longer live runs under OpenAI `gpt-5.4-nano`:
   weakness: no generated action authoring occurred in this run, no social
   follow-up event was produced after the deposit, and `craftPlanksAndSticks`
   still dominated 12 of 30 top-level actions.
+- `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v22.json`:
+  `runtime_status=passed`, 37 provider records, 356,764 total tokens, 30 cycles.
+  Provider usage guard projected 8,757,241 / 9,000,000 daily tokens, leaving
+  about 242,759 tokens for the UTC day. A 60-cycle OpenAI rerun was therefore
+  not budget-feasible without risking the guard. Outcome distribution was
+  24 `verified_progress`, 2 `partial_verified_progress`, and 4 `blocked`.
+  The run avoided provider invalid outputs and missing artifact refs, kept
+  `action_hot_path=actor_turn`, and produced real inventory progress including
+  `crafting_table`, `wooden_pickaxe`, `stick`, `oak_planks`, `dirt`, and
+  `cobblestone`. Remaining weakness: `craftPlanksAndSticks` still appeared
+  10 times, `mineCobblestone` 7 times, `placeCraftingTable` failed twice on the
+  same placement timeout, no `say` tool call occurred, no relationship event was
+  produced, and generated Mineflayer authoring was not exercised in this run.
+
+Short Gemini `gemini-2.5-flash-lite` follow-up evidence:
+
+- `tmp/gemini-25-flash-json-smoke-actor-turn-v1.json`:
+  the plain `gemini-2.5-flash` JSON smoke returned invalid JSON (`"He"`), so it
+  is not a reliable social-cycle provider path for this campaign without more
+  provider-specific repair work.
+- `tmp/gemini-25-flash-lite-json-smoke-actor-turn-v1.json`:
+  the `gemini-2.5-flash-lite` JSON smoke returned valid structured output.
+- `tmp/social-smoke-gemini-25-flash-lite-5cycle-say-followup-v1.json`:
+  `runtime_status=passed`, but the actor selected `Say` with empty parameters.
+  This exposed the missing primitive-args resolver guard.
+- `tmp/social-smoke-gemini-25-flash-lite-5cycle-say-followup-v2.json`:
+  `runtime_status=passed`, 7 provider records, 74,485 total tokens. The actor
+  selected `Say` with structured `parameters.text`, proving the args guard and
+  repair path, but the runtime still treated the target as unavailable.
+- `tmp/social-smoke-gemini-25-flash-lite-3cycle-say-world-chat-v1.json`:
+  `runtime_status=passed`, 5 provider records, 51,046 total tokens. The guarded
+  budget projected 19 / 20 same-day `gemini-2.5-flash-lite` requests, so no
+  longer flash-lite run should be started in the same quota window. The run
+  executed `deposit_shared -> craftPlanksAndSticks -> say`. The `say` evidence
+  delivered `"npc_a, I deposited the requested oak_log in shared storage."` to
+  `targetId=world_chat`; review output is
+  `tmp/social-smoke-gemini-25-flash-lite-3cycle-say-world-chat-v1-review.md`.
+  This is social follow-up proof, not a long-run behavior proof.
 
 What improved in this slice:
 
@@ -96,9 +225,9 @@ What improved in this slice:
   from current state before the ready front is exposed;
 - deliberation receives `current_state` and suppresses stale shared-storage
   reopen proposals when the contribution is already done;
-- Actor Turn demotes repeated `mineCobblestone` only when cobblestone is already
-  sufficient and no explicit shortage exists, while keeping the Action Card
-  available;
+- Actor Turn keeps `mineCobblestone` and other visible cards available; repeated
+  mining evidence is surfaced as current-state/evidence context rather than as
+  hidden card demotion;
 - crafting table state now distinguishes a known or placed table from a table
   that is nearby and usable by the actor;
 - Actor Turn repair removes rejected Action Cards from both the visible card
@@ -106,9 +235,10 @@ What improved in this slice:
 - `move_to` runtime retry identity now canonicalizes equivalent explicit
   position args and Actor Turn receives `args_normalized` in retry summaries, so
   the provider can see the exact blocked target instead of only the blocker text.
-- Actor Turn now hides building and placement cards when current inventory lacks
-  solid block items, and it demotes generic `mine_block` when no explicit mined
-  block need exists.
+- Actor Turn no longer hides building, placement, or generic mining cards through
+  hardcoded inventory heuristics. The provider sees current inventory/evidence
+  and must choose strict parameters; runtime validators and verifier outcomes
+  decide whether execution is valid progress.
 - runtime-generated Mineflayer source can use bounded
   `ctx.mineflayer(method,args)` helper calls while direct `ctx.bot` access and
   `ctx.mineflayer().method` object escapes remain blocked.
@@ -118,18 +248,52 @@ What improved in this slice:
 - Actor Turn runtime classifier writes neutral evidence-linked memory summaries
   instead of copying provider `why_this_action` prose into CycleJudgment memory
   writes.
+- Actor Turn provider input now injects the repo's
+  `.agents/skills/mineflayer-code-generation/SKILL.md` body into
+  `mineflayer_codegen_skill.skill_markdown`, so every
+  `author_mineflayer_action` turn sees the bounded Mineflayer generation rules.
+- Actor Turn decision-frame code has been split into responsibility-focused
+  modules for current-state projection, episode context, Action Cards,
+  selection hints, Minecraft basic guide injection, Mineflayer codegen skill
+  injection, validators, parser, and provider orchestration.
+- `say` is now a role-allowed self-contained social primitive when current
+  evidence shows communication context; it no longer requires a separate active
+  action skill merely to announce a completed shared-storage contribution.
+- Actor Turn now recommends a structured `Say` candidate after a completed
+  shared-storage contribution, and prioritizes table-bound tool crafting before
+  repeated generic planks/sticks crafting when a usable crafting table and
+  ingredients are already evidenced.
+- primitive Action Card parameters are validated before execution. For example,
+  `Say` without `parameters.text` is rejected during Actor Turn resolution and
+  repaired through the provider instead of reaching the Mineflayer primitive
+  with empty args.
+- targetless `say` now falls back to world chat and records
+  `targetId=world_chat`, so a social follow-up can still produce truthful chat
+  evidence when the originally referenced actor is not visible.
+- generated Mineflayer candidates now reject unused helper allowlist entries,
+  helper calls missing from the allowlist, source reads of undeclared
+  `params.*`, and dummy input-schema properties that the source never reads.
+  This closes the weak v19 pattern where a candidate used a broad helper
+  allowlist and meaningless `dummy` parameter before trial.
 
 Remaining failures from the latest review:
 
-- broader loop-constriction still exists: v20 removed the prior movement loop
-  but overused `craftPlanksAndSticks` 12 times in 30 cycles;
+- broader loop-constriction still exists: v22 improved the earlier movement and
+  generic build loops, but still overused `craftPlanksAndSticks` 10 times and
+  `mineCobblestone` 7 times in 30 cycles;
 - `buildBasicShelter` has not produced verified shelter evidence in the latest
   reviewed runs, and v20 still only produced partial shelter progress;
-- social evidence remains minimal: one `deposit_shared` mutation, no visible
-  actors, no `say` tool calls, and no relationship events;
+- social evidence remains thin in long-run evidence: v22 still has one
+  `deposit_shared` mutation, no visible actors, no `say` tool calls, and no
+  relationship events. The later flash-lite 3-cycle run proves the `Say`
+  follow-up path and world-chat fallback, but it is intentionally short and does
+  not replace a 30/60-cycle social plausibility review;
 - generated Mineflayer action authoring is wired and was exercised in v19, but
-  v20 did not need or choose it, so the next proof should include a scenario
-  where no existing Action Card expresses the needed behavior;
+  v20 and v22 did not need or choose it. The v19 live candidate stayed as
+  failed trial evidence and used weak dummy parameters. Current validation now
+  rejects that candidate shape, but the next proof should still include a
+  stronger live scenario where no existing Action Card expresses the needed
+  behavior and the candidate has meaningful schema-bound parameters;
 - CycleGoal context is still marked `runtime_rule` for compatibility, so
   branch-only deliberation should continue moving goal authority away from the
   old per-cycle planner shape.
@@ -145,9 +309,9 @@ latest behavioral proof:
 - `tmp/social-smoke-openai-nano-3cycle-rerun7.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 5 provider records,
   31,836 total tokens. The actor deposited `1 oak_log`, later Actor Turn inputs
-  showed `deposit_candidates[oak_log].socially_requested=false`, and
-  `Deposit Shared` / `Deposit Shared Items` Action Cards were hidden, preventing
-  repeated completion of the same request.
+  showed `deposit_candidates[oak_log].socially_requested=false`. This is past
+  evidence from before the direct tool-calling/no-hidden-planner cleanup; do not
+  preserve its Action Card hiding behavior as current architecture.
 - `tmp/social-smoke-openai-nano-3cycle-decision-frame-v2.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 4 provider records,
   29,916 total tokens. The actor performed
@@ -162,11 +326,14 @@ Next work:
   instead of returning to `craftPlanksAndSticks`;
 - improve `buildBasicShelter` or replace it with a narrower, more verifiable
   Mineflayer-backed shelter action skill;
-- add a social-visible follow-up action after a completed shared-storage
-  contribution, such as a bounded `say` or relationship event path;
+- live-test the social-visible `Say` follow-up after a completed shared-storage
+  contribution in a longer run and decide whether chat should also create a
+  guarded relationship event;
 - create a live scenario that forces bounded generated Mineflayer authoring and
   verifies candidate source, helper events, verifier output, and actor-workspace
   evidence;
+- rerun 60 cycles only after the provider usage guard shows enough same-day
+  OpenAI headroom or after switching to a checked lower-cost provider window;
 - keep Actor Turn as the opt-in hot path until actionfulness, PlanBead
   continuity, social consequence, and budget gates pass together.
 
@@ -284,7 +451,7 @@ Implemented surfaces:
   events, with the provider input snapshot still attached when snapshots are
   enabled.
 
-### World-State Diagnostics And ActionIntent Contracts
+### World-State Diagnostics And Runtime Action Contracts
 
 Provider context now has a stricter autonomy-substrate boundary:
 
@@ -296,10 +463,10 @@ Provider context now has a stricter autonomy-substrate boundary:
 - provider-facing world summaries must stay query-neutral and must not expose
   fixed resource, station, construction-readiness, or survival-priority
   categories;
-- direct provider `use_primitive` intents are checked against structured
+- direct provider `use_primitive` actions are checked against structured
   primitive args contracts before persistence/execution;
 - natural-language rationale fields are not executable authority;
-- direct provider primitive intents cannot spoof `args.actionSkillId` to borrow
+- direct provider primitive actions cannot spoof `args.actionSkillId` to borrow
   an action-skill-local fallback;
 - direct provider shared-storage transfers require explicit `count` or
   `targetCount`;
@@ -308,7 +475,7 @@ Provider context now has a stricter autonomy-substrate boundary:
 - report audit/review now count only explicit `world-state-summary/v1` or
   `world-state-scan/v1` artifacts as scan evidence;
 - missing physical args produce artifact-visible
-  `action_intent_contract_failure` evidence instead of hidden movement or
+  runtime action contract failure evidence instead of hidden movement or
   gameplay defaults.
 
 Important files:
@@ -318,7 +485,7 @@ Important files:
 - `probe/src/provider/providerOutputStore.ts`;
 - `probe/src/provider/openaiCodexGameplayProvider.ts`;
 - `probe/src/tools/worldStateScan.ts`;
-- `probe/src/runtime/goals/actionIntentContracts.ts`;
+- `probe/src/runtime/goals/actionParameterContracts.ts`;
 - `probe/test/runtimeArtifacts.test.ts`;
 - `probe/test/actorProviderContext.relationshipContext.test.ts`.
 
@@ -330,11 +497,11 @@ Implemented surfaces:
 
 - `runtime-retry-attempt/v1` records are derived from blocked, failed, timeout,
   cancelled, or postcondition-failed attempts;
-- `runtime-retry-constraint/v1` groups the same actor, ActionIntent target,
+- `runtime-retry-constraint/v1` groups the same actor, runtime action target,
   normalized structured args, and normalized blocker reason after repeated
   evidence;
 - social-cycle context exposes `runtime_retry_constraints` to both CycleGoal and
-  ActionIntent providers;
+  runtime action providers;
 - the executor blocks a matching retry before Mineflayer execution and writes
   `retry_constraint_blocked` evidence;
 - social-cycle reports record `runtime_retry_constraints` and per-attempt
@@ -1099,9 +1266,9 @@ Check:
 2. Preserve the corrected architecture rule: provider-facing context is
    query-neutral evidence substrate, not a fixed resource, station,
    construction, or survival strategy taxonomy.
-3. Treat physical `ActionIntent` args as the immediate runtime contract. Missing
+3. Treat physical runtime action args as the immediate runtime contract. Missing
    target, item, position, or container args should fail with artifact-visible
-   `action_intent_contract_failure` evidence instead of hidden executor defaults.
+   runtime action contract failure evidence instead of hidden executor defaults.
 4. Improve world-state diagnostics as a raw Mineflayer scan: center, radius,
    vertical range, loaded-world limits, raw observed names, nearest examples,
    truncation, and evidence refs.
@@ -1144,8 +1311,8 @@ What improved:
 - repeated `move_to` loops were reduced. v8 had no top-level `move_to` action.
 - malformed generated-action authoring no longer stopped the run. Parser
   recovery now handles split authoring fields, metadata nested under
-  `parameters`, schema echoes, sparse `input_schema`, and non-executable
-  `record_candidate_only` authoring outputs.
+  `parameters`, schema echoes, sparse `input_schema`, and invalid
+  `promotion_policy` authoring outputs.
 - action-selection-only generated authoring produced candidate artifacts without
   bypassing trial lifecycle gates.
 - the run produced verified physical progress: shared storage deposit,
@@ -1212,7 +1379,7 @@ Current decision:
 - Deliberation should propose PlanBead mutations only at meaningful branch
   points.
 - PlanBeads must not become a semantic Minecraft planner, primitive selector,
-  ActionIntent argument source, retry override, or success oracle.
+  runtime action argument source, retry override, or success oracle.
 
 Implemented in this checkpoint:
 

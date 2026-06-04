@@ -33,9 +33,11 @@ Core fields:
 Each cycle contains refs, not all inline details:
 - `cycle_id`.
 - `cycle_goal_ref`: actor workspace JSON under `goals/cycle/`.
-- `action_intent_ref`: actor workspace JSON under `goals/cycle/intents/`.
-- `provider_input_refs`: prompt/context snapshots for goal mind, action planner,
-  and judgment stages.
+- `action_attempts`: current Actor Turn execution attempts and their refs.
+- `action_intent_ref`: legacy actor workspace JSON under
+  `goals/cycle/intents/`, present only for explicit legacy planner reports.
+- `provider_input_refs`: prompt/context snapshots for Actor Turn, codegen,
+  Deliberation, or legacy goal/action/judgment stages.
 - `provider_output_refs`: provider outputs, parsed payloads, usage records, and
   possible runtime fallback metadata.
 - `evidence_refs`: runtime evidence written by executed tools.
@@ -55,7 +57,11 @@ Resolve refs against:
 
 Important subdirectories:
 - `goals/cycle/`: `CycleGoal` artifacts.
-- `goals/cycle/intents/`: `ActionIntent` artifacts.
+- `goals/cycle/actions/`: current Actor Turn runtime action artifacts.
+- `goals/cycle/intents/`: legacy `ActionIntent` artifacts.
+- `goals/episodes/`: Active Episode and Deliberation branch artifacts.
+- `plan-beads/`: PlanBead records, ready-front snapshots, operation results,
+  event logs, and history snapshots when the graph is substantively used.
 - `provider-inputs/`: provider-facing context packets. These prove what the
   model was allowed to see.
 - `provider-outputs/`: provider raw text, parsed output, proposal refs, usage,
@@ -128,9 +134,9 @@ the runtime could not accept as-is.
 
 ## Retry Constraints
 
-`runtime-retry-constraint/v1` means the runtime grouped repeated exact
-ActionIntent target + structured args + blocker reason and will block matching
-future attempts before Mineflayer execution.
+`runtime-retry-constraint/v1` means the runtime grouped repeated exact runtime
+action target + normalized structured args + blocker reason and will block
+matching future attempts before Mineflayer execution.
 
 Important fields:
 - `action_kind`;

@@ -36,7 +36,7 @@ Prefer:
 - explicit state transitions;
 - runtime evidence;
 - typed contracts;
-- explicit `ActionIntent` argument validation;
+- explicit runtime action parameter validation;
 - bounded world-state diagnostics;
 - evidence-linked context compaction;
 - bounded helpers;
@@ -112,7 +112,7 @@ Use tests this way:
 - keep them small;
 - test one owned behavior or regression;
 - reject fake success and hidden dependencies;
-- protect action-skill gates, `ActionIntent` validators, verifier rules,
+- protect action-skill gates, runtime action validators, verifier rules,
   artifact refs, world-state diagnostic summaries, compaction invariants, and
   domain models;
 - delete or rewrite tests that would pass after real logic breaks.

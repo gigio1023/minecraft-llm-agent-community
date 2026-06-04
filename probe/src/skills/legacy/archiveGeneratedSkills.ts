@@ -1,3 +1,9 @@
+/**
+ * Moves legacy generated action skill artifacts out of the active path.
+ *
+ * @remarks `build/generated-skills` is historical exploratory output; actor
+ * workspace records are the source of truth for current action skill ownership.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 

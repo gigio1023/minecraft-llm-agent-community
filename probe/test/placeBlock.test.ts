@@ -1,3 +1,4 @@
+/** Regression coverage for structured block-placement contracts. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

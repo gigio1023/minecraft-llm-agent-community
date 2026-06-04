@@ -1,3 +1,10 @@
+/**
+ * REST Gemini JSON/text provider path used for structured planner output.
+ *
+ * @remarks Provider calls are infrastructure boundaries. Authentication,
+ * response-shape, and schema failures should be reported as provider evidence,
+ * not silently converted into actor decisions.
+ */
 import { GoogleGenAI } from "@google/genai";
 
 import { classifyGeminiError, GeminiPlannerError } from "./errors.js";
@@ -33,7 +40,7 @@ const generatedSourceSchema = {
   properties: {
     source: {
       type: "string",
-      description: "Complete TypeScript source. Must include export async function run(ctx)."
+      description: "Complete TypeScript source. Must include export async function run(ctx, params)."
     },
     notes: {
       type: "string",

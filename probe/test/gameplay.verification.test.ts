@@ -1,3 +1,4 @@
+/** Regression coverage for gameplay verification rejecting fake progress. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

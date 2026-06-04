@@ -1,3 +1,4 @@
+/** Regression coverage for actor profile and role context fixtures. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

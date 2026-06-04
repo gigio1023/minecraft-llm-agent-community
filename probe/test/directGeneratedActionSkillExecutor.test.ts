@@ -21,7 +21,7 @@ test("direct generated action skill executor runs TypeScript and records helper 
       export async function run(ctx: {
         ensureItem(name: string, count: number): Promise<{ name: string; count: number }>;
         craftWithTable(name: string, count: number): Promise<{ name: string; count: number }>;
-      }) {
+      }, params: Record<string, never>) {
         await ctx.ensureItem("cobblestone", 3);
         await ctx.ensureItem("stick", 2);
         return ctx.craftWithTable("stone_axe", 1);
@@ -56,7 +56,7 @@ test("direct generated action skill source guard rejects Node escape hatches", (
     () =>
       assertDirectGeneratedActionSkillSource(`
         import fs from "node:fs";
-        export async function run(ctx) { return fs; }
+        export async function run(ctx, params) { return fs; }
       `),
     /blocked API/
   );
@@ -66,9 +66,19 @@ test("direct generated action skill source guard rejects obvious unbounded loops
   assert.throws(
     () =>
       assertDirectGeneratedActionSkillSource(`
-        export async function run(ctx) { while (true) { await ctx.wait(100); } }
+        export async function run(ctx, params) { while (true) { await ctx.wait(100); } }
       `),
     /blocked API or obvious unbounded loop/
+  );
+});
+
+test("direct generated action skill source guard requires ctx and params signature", () => {
+  assert.throws(
+    () =>
+      assertDirectGeneratedActionSkillSource(`
+        export async function run(ctx) { return ctx.observe(); }
+      `),
+    /run\(ctx, params\)/
   );
 });
 
@@ -101,7 +111,7 @@ test("direct generated action skill executor enforces helper allowlist", async (
     actorId: "npc_b",
     skillName: "blockedHelper",
     source: `
-      export async function run(ctx: { mineBlock(args: { blockName: string }): Promise<unknown> }) {
+      export async function run(ctx: { mineBlock(args: { blockName: string }): Promise<unknown> }, params: Record<string, never>) {
         return ctx.mineBlock({ blockName: "stone" });
       }
     `,
@@ -122,7 +132,7 @@ test("direct generated action skill executor enforces helper allowlist", async (
 test("direct generated action skill source guard allows bounded ctx.mineflayer helper calls", () => {
   assert.doesNotThrow(() =>
     assertDirectGeneratedActionSkillSource(`
-      export async function run(ctx) {
+      export async function run(ctx, params) {
         return ctx.mineflayer("lookAtNearestBlock", { blockName: "chest" });
       }
     `)
@@ -131,10 +141,10 @@ test("direct generated action skill source guard allows bounded ctx.mineflayer h
 
 test("direct generated action skill source guard rejects unsupported ctx shapes", () => {
   for (const source of [
-    `export async function run(ctx) { return ctx.helpers.observe({}); }`,
-    `export async function run(ctx) { return ctx.sharedStorage.chest; }`,
-    `export async function run(ctx) { return ctx.bot.entity.position; }`,
-    `export async function run(ctx) { return ctx.mineflayer().activateItem(); }`
+    `export async function run(ctx, params) { return ctx.helpers.observe({}); }`,
+    `export async function run(ctx, params) { return ctx.sharedStorage.chest; }`,
+    `export async function run(ctx, params) { return ctx.bot.entity.position; }`,
+    `export async function run(ctx, params) { return ctx.mineflayer().activateItem(); }`
   ]) {
     assert.throws(
       () => assertDirectGeneratedActionSkillSource(source),
@@ -149,7 +159,7 @@ test("direct generated action skill executor reports timeout", async () => {
     skillName: "slowSkill",
     timeoutMs: 5,
     source: `
-      export async function run(ctx: { wait(ms: number): Promise<void> }) {
+      export async function run(ctx: { wait(ms: number): Promise<void> }, params: Record<string, never>) {
         await ctx.wait(100);
         return { status: "late" };
       }

@@ -1,12 +1,15 @@
-import { actionIntentParameters, type ActionIntent } from "./types.js";
+import {
+  legacyPlannerActionParameters,
+  type LegacyPlannerAction
+} from "./types.js";
 
-export const ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION =
-  "action-intent-primitive-args/v1" as const;
+export const ACTION_PARAMETER_CONTRACT_VERSION =
+  "actor-turn-action-parameters/v1" as const;
 
-export type ActionIntentPrimitiveArgsContractVersion =
-  typeof ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION;
+export type ActionParameterContractVersion =
+  typeof ACTION_PARAMETER_CONTRACT_VERSION;
 
-export type ActionIntentPosition = {
+export type ActionParameterPosition = {
   x: number;
   y: number;
   z: number;
@@ -20,7 +23,7 @@ export type MoveToTargetMetadata =
   | {
       kind: "position";
       source: MoveToPositionTargetSource;
-      position: ActionIntentPosition;
+      position: ActionParameterPosition;
     }
   | {
       kind: "scout";
@@ -29,29 +32,29 @@ export type MoveToTargetMetadata =
       distance: number;
     };
 
-export type ActionIntentPrimitiveArgsContractResult =
+export type ActionParameterContractResult =
   | {
       ok: true;
       primitiveId: string;
-      contractVersion: ActionIntentPrimitiveArgsContractVersion;
+      contractVersion: ActionParameterContractVersion;
       target?: MoveToTargetMetadata;
     }
   | {
       ok: false;
       primitiveId: string;
-      contractVersion: ActionIntentPrimitiveArgsContractVersion;
+      contractVersion: ActionParameterContractVersion;
       error: string;
       target?: MoveToTargetMetadata;
     };
 
-export type ActionIntentPrimitiveArgsInput = {
+export type ActionParameterContractInput = {
   primitiveId: string;
   args?: Record<string, unknown>;
   actionSkillId?: string;
 };
 
-export type PrimitiveArgsContractSummary = {
-  schema: ActionIntentPrimitiveArgsContractVersion;
+export type PrimitiveParameterContractSummary = {
+  schema: ActionParameterContractVersion;
   primitive_id: string;
   required_structured_args: string[];
   accepted_forms: string[];
@@ -64,11 +67,11 @@ const scoutDirections = new Set<ScoutDirection>(["north", "south", "east", "west
 function passed(input: {
   primitiveId: string;
   target?: MoveToTargetMetadata;
-}): ActionIntentPrimitiveArgsContractResult {
+}): ActionParameterContractResult {
   return {
     ok: true,
     primitiveId: input.primitiveId,
-    contractVersion: ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION,
+    contractVersion: ACTION_PARAMETER_CONTRACT_VERSION,
     target: input.target
   };
 }
@@ -77,11 +80,11 @@ function failed(input: {
   primitiveId: string;
   error: string;
   target?: MoveToTargetMetadata;
-}): ActionIntentPrimitiveArgsContractResult {
+}): ActionParameterContractResult {
   return {
     ok: false,
     primitiveId: input.primitiveId,
-    contractVersion: ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION,
+    contractVersion: ACTION_PARAMETER_CONTRACT_VERSION,
     error: input.error,
     target: input.target
   };
@@ -162,7 +165,7 @@ function readScoutTarget(args: Record<string, unknown>): MoveToTargetMetadata | 
 function validateMoveToArgs(
   primitiveId: string,
   args: Record<string, unknown>
-): ActionIntentPrimitiveArgsContractResult {
+): ActionParameterContractResult {
   const explicitTarget = firstExplicitMoveTarget(args);
   if (explicitTarget) {
     return passed({ primitiveId, target: explicitTarget });
@@ -184,8 +187,8 @@ function hasPositionAt(args: Record<string, unknown>, keys: readonly string[]) {
   return keys.some((key) => readPosition("position", args[key]));
 }
 
-function hasActionSkillFallback(input: ActionIntentPrimitiveArgsInput, args: Record<string, unknown>) {
-  return nonEmptyString(input.actionSkillId) || nonEmptyString(args.actionSkillId);
+function hasActionSkillFallback(input: ActionParameterContractInput, _args: Record<string, unknown>) {
+  return nonEmptyString(input.actionSkillId);
 }
 
 function isInventoryGridRecipeItemName(value: unknown) {
@@ -203,7 +206,7 @@ function isInventoryGridRecipeItemName(value: unknown) {
 }
 
 function validateSharedTransferArgs(
-  input: ActionIntentPrimitiveArgsInput,
+  input: ActionParameterContractInput,
   args: Record<string, unknown>
 ) {
   // Shared storage is social evidence, so direct provider calls must name the
@@ -226,9 +229,9 @@ function validateSharedTransferArgs(
 }
 
 function validatePhysicalPrimitiveArgs(
-  input: ActionIntentPrimitiveArgsInput,
+  input: ActionParameterContractInput,
   args: Record<string, unknown>
-): ActionIntentPrimitiveArgsContractResult {
+): ActionParameterContractResult {
   switch (input.primitiveId) {
     case "move_to":
       return validateMoveToArgs(input.primitiveId, args);
@@ -307,7 +310,7 @@ function validatePhysicalPrimitiveArgs(
         ? passed({ primitiveId: input.primitiveId })
         : failed({
             primitiveId: input.primitiveId,
-            error: "run_mineflayer_program requires generated source with export async function run(ctx)"
+            error: "run_mineflayer_program requires generated source with export async function run(ctx, params)"
           });
     case "deposit_shared":
     case "withdraw_shared":
@@ -329,9 +332,9 @@ function validatePhysicalPrimitiveArgs(
  * Minecraft strategy. The summary names shapes, not preferred materials or
  * objectives, so the model receives a contract rather than a checklist.
  */
-export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgsContractSummary {
+export function primitiveParameterContractSummary(primitiveId: string): PrimitiveParameterContractSummary {
   const base = {
-    schema: ACTION_INTENT_PRIMITIVE_ARGS_CONTRACT_VERSION,
+    schema: ACTION_PARAMETER_CONTRACT_VERSION,
     primitive_id: primitiveId,
     hidden_defaults_allowed: false,
     prose_fields_are_authority: false
@@ -441,7 +444,7 @@ export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgs
         required_structured_args: ["source"],
         accepted_forms: [
           "{source:string,purpose?:string,expectedObservation?:string,timeoutMs?:number}",
-          "source must export async function run(ctx) and use runtime helper calls for evidence"
+          "source must export async function run(ctx, params) and use runtime helper calls for evidence"
         ]
       };
     default:
@@ -453,15 +456,25 @@ export function primitiveArgsContractSummary(primitiveId: string): PrimitiveArgs
   }
 }
 
+export function validateDirectPrimitiveLegacyPlannerActionParameters(
+  action: LegacyPlannerAction
+): ActionParameterContractResult {
+  return validatePrimitiveActionParameters({
+    primitiveId: action.primitive_id ?? action.kind,
+    args: legacyPlannerActionParameters(action),
+    actionSkillId: action.action_skill_id
+  });
+}
+
 /**
  * Validates the structured args contract before Mineflayer receives a physical
  * primitive. Provider rationale such as `why_this_action` is intentionally not
  * read here: prose may explain intent, but it must not become hidden movement,
  * placement, mining, or chat authority.
  */
-export function validatePrimitiveActionIntentArgs(
-  input: ActionIntentPrimitiveArgsInput
-): ActionIntentPrimitiveArgsContractResult {
+export function validatePrimitiveActionParameters(
+  input: ActionParameterContractInput
+): ActionParameterContractResult {
   const args = input.args ?? {};
   if (!isRecord(args)) {
     return failed({
@@ -471,40 +484,4 @@ export function validatePrimitiveActionIntentArgs(
   }
 
   return validatePhysicalPrimitiveArgs(input, args);
-}
-
-/**
- * Convenience wrapper for provider-direct ActionIntent validation. Owned action
- * skills should be resolved to their primitive calls first, because the
- * action-skill id can be a documented fallback only at that resolved boundary.
- */
-export function validateDirectPrimitiveActionIntentArgs(
-  intent: Pick<ActionIntent, "kind" | "primitive_id" | "action_skill_id" | "args" | "parameters">
-): ActionIntentPrimitiveArgsContractResult {
-  if (intent.kind === "wait" || intent.kind === "remember") {
-    return validatePrimitiveActionIntentArgs({
-      primitiveId: intent.kind,
-      args: actionIntentParameters(intent),
-      actionSkillId: intent.action_skill_id
-    });
-  }
-
-  if (intent.kind !== "use_primitive" || !intent.primitive_id) {
-    return failed({
-      primitiveId: intent.primitive_id ?? intent.kind,
-      error: "ActionIntent must resolve to one primitive before primitive args validation"
-    });
-  }
-
-  const parameters = actionIntentParameters(intent);
-  const argsWithoutActionSkillFallback = isRecord(parameters)
-    ? Object.fromEntries(
-        Object.entries(parameters).filter(([key]) => key !== "actionSkillId")
-      )
-    : parameters;
-
-  return validatePrimitiveActionIntentArgs({
-    primitiveId: intent.primitive_id,
-    args: argsWithoutActionSkillFallback
-  });
 }

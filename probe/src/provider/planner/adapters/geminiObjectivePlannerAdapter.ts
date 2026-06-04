@@ -1,3 +1,9 @@
+/**
+ * Adapter that routes legacy objective planning through Gemini Live.
+ *
+ * @remarks This provider path is experimental and must remain isolated from the
+ * default social-cycle action-selection contract.
+ */
 import { callGeminiLivePlanner } from "../../gemini/geminiLivePlanner.js";
 import { stripGeneratedSourceFence } from "../stripGeneratedSource.js";
 import type {

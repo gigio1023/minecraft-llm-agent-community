@@ -1,3 +1,4 @@
+/** Regression coverage for social obligation routing context. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

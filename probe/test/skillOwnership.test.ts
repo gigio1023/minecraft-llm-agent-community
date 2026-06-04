@@ -1,3 +1,4 @@
+/** Regression coverage for actor-owned action skill authority records. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

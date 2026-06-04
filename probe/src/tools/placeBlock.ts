@@ -1,3 +1,11 @@
+/**
+ * Mineflayer primitive for placing a block with bounded target and support
+ * checks.
+ *
+ * @remarks Placement is a physical mutation claim, so this tool must be strict
+ * about structured args, reachable positions, held inventory, and verifier
+ * evidence. Provider prose must never supply missing target coordinates.
+ */
 import { goals } from "mineflayer-pathfinder";
 import { Vec3 } from "vec3";
 

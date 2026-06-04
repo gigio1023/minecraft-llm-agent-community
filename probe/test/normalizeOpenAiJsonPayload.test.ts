@@ -1,8 +1,13 @@
+/** Regression coverage for normalizing provider JSON payload envelopes. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import { normalizeOpenAiJsonPayload } from "../src/provider/normalizeOpenAiJsonPayload.js";
-import { parseOpenAiJsonText } from "../src/provider/openaiApiJsonProvider.js";
+import {
+  buildOpenAiJsonSchemaResponseRequest,
+  normalizeOpenAiReasoningEffort,
+  parseOpenAiJsonText
+} from "../src/provider/openaiApiJsonProvider.js";
 import {
   buildCycleJudgmentBodyFromPayload,
   extractCycleJudgmentPayload
@@ -21,11 +26,54 @@ test("unwraps schema-shaped OpenAI payloads", () => {
 });
 
 test("parses the first JSON value when a schema response duplicates the object", () => {
-  const parsed = parseOpenAiJsonText<{ action_intent: { primitive_id: string } }>(
-    '{"action_intent":{"primitive_id":"observe"}}\n{"action_intent":{"primitive_id":"wait"}}'
+  const parsed = parseOpenAiJsonText<{ selected_action: { primitive_id: string } }>(
+    '{"selected_action":{"primitive_id":"observe"}}\n{"selected_action":{"primitive_id":"wait"}}'
   );
 
-  assert.equal(parsed.action_intent.primitive_id, "observe");
+  assert.equal(parsed.selected_action.primitive_id, "observe");
+});
+
+test("OpenAI Responses JSON schema requests pass configured reasoning effort", () => {
+  const request = buildOpenAiJsonSchemaResponseRequest({
+    model: "gpt-5.4-nano",
+    maxCompletionTokens: 32,
+    reasoning: "medium",
+    background: true,
+    schemaName: "tiny_schema",
+    schema: {
+      type: "object",
+      properties: {
+        ok: { type: "boolean" }
+      },
+      required: ["ok"],
+      additionalProperties: false
+    },
+    system: "Return JSON.",
+    user: "Say ok."
+  });
+
+  assert.equal(request.reasoning?.effort, "medium");
+  assert.equal(request.model, "gpt-5.4-nano");
+  assert.equal(request.background, true);
+  assert.equal(request.store, true);
+  assert.deepEqual(request.text?.format, {
+    type: "json_schema",
+    name: "tiny_schema",
+    strict: false,
+    schema: {
+      type: "object",
+      properties: {
+        ok: { type: "boolean" }
+      },
+      required: ["ok"],
+      additionalProperties: false
+    }
+  });
+});
+
+test("OpenAI reasoning effort normalization rejects unknown values", () => {
+  assert.equal(normalizeOpenAiReasoningEffort(" xhigh "), "xhigh");
+  assert.equal(normalizeOpenAiReasoningEffort("ultra"), undefined);
 });
 
 test("cycle judgment payload extraction accepts direct judgment objects", () => {

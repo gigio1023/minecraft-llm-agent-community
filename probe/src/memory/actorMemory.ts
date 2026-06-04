@@ -1,3 +1,10 @@
+/**
+ * Actor memory model and packet assembly for provider context.
+ *
+ * @remarks Memory helps preserve ActorSoul/LifeGoal continuity, relationships,
+ * and learned runtime context, but memory text is not evidence of Minecraft
+ * progress and does not grant primitive or action skill authority.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 

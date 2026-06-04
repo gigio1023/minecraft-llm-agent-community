@@ -1,3 +1,4 @@
+/** Regression coverage for relationship ledger state transitions. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

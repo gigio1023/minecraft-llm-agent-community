@@ -34,6 +34,12 @@ export type PlanBeadPriority = 0 | 1 | 2 | 3 | 4;
 
 export type PlanBeadMetadataValue = string | number | boolean | string[];
 
+/**
+ * Artifact references that explain why a PlanBead exists or changed.
+ *
+ * PlanBeads carry links to evidence and context, but those links do not become
+ * primitive parameters or runtime permission.
+ */
 export type PlanBeadRefs = {
   evidence_refs: string[];
   memory_refs: string[];
@@ -44,6 +50,15 @@ export type PlanBeadRefs = {
   action_skill_refs: string[];
 };
 
+/**
+ * Persistent actor-owned work-state record for concerns, blockers, obligations,
+ * and resumable follow-up.
+ *
+ * @remarks The assertion policy is part of the serialized record so any
+ * provider or reviewer packet keeps the central invariant visible: a PlanBead is
+ * context, not executable authority, and physical success requires current
+ * evidence.
+ */
 export type ActorPlanBead = {
   schema: "actor-plan-bead/v1";
   bead_id: string;
@@ -127,6 +142,13 @@ export type PlanBeadContextSummary = {
   checkpoint_ref: string;
 };
 
+/**
+ * Compact provider-facing PlanBead context.
+ *
+ * @remarks `physical_progress_claim` must remain false. The packet may guide
+ * CycleGoal or Actor Turn selection, while runtime action contracts and
+ * verifiers still control execution and success.
+ */
 export type PlanBeadPacket = {
   schema: "plan-bead-packet/v1";
   physical_progress_claim: false;
@@ -165,6 +187,13 @@ export const planBeadOperationConfidences = [
 export type PlanBeadOperationConfidence =
   (typeof planBeadOperationConfidences)[number];
 
+/**
+ * Raw PlanBead operation proposal accepted from provider or reviewer stages.
+ *
+ * @remarks Validation and application are intentionally separate so malformed
+ * operations can be rejected individually without failing an entire
+ * CycleJudgment.
+ */
 export type PlanBeadOperationBase = {
   schema: "plan-bead-operation/v1";
   actor_id: string;

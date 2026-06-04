@@ -1,3 +1,4 @@
+/** Regression coverage for consume-item primitive evidence. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

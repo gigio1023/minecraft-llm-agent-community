@@ -1,3 +1,10 @@
+/**
+ * Persistence and compaction helpers for CycleGoal records.
+ *
+ * @remarks CycleGoals are compatibility focus records in Actor Turn mode. They
+ * remain subordinate to runtime action contracts, action-surface gates, and
+ * verifier evidence.
+ */
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 

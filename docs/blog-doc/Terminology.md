@@ -22,8 +22,9 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
 4. Use **provider** for model-facing code. Do not call it the actor's brain,
    mind, consciousness, or intelligence.
 5. Use **ActorSoul**, **LifeGoal**, **WorldEvent**, **CycleGoal**,
-   **ActionIntent**, **CycleJudgment**, **Active Episode**, **Actor Turn**,
-   and **Evidence Trace** only for schema-backed runtime records.
+   **CycleJudgment**, **Active Episode**, **Actor Turn**, **Action Card**,
+   **runtime action**, and **Evidence Trace** only for schema-backed runtime
+   records. Use **ActionIntent** only for legacy or migration artifacts.
 6. If existing code, schemas, paths, or historical artifacts contain older
    vocabulary, treat that wording as a legacy identifier. Do not copy it into
    new prose unless you also name the canonical term.
@@ -155,7 +156,7 @@ primitive, seed action skill, actor-owned action skill, or promoted generated
 action skill.
 
 An Action Card is not a strategy checklist, not proof that preconditions are
-true, and not a bypass around ActionIntent validation.
+true, and not a bypass around runtime action validation.
 
 ## Minecraft Basic Guide
 
@@ -167,7 +168,7 @@ rediscover from observation, such as early item flows, station requirements,
 item-vs-world-block distinctions, useful tool prerequisites, blocker recovery,
 and repeated-observe limits.
 
-It is a guide, not an `ActionIntent` contract, verifier, runtime permission
+It is a guide, not a runtime action contract, verifier, runtime permission
 packet, strategy checklist, or proof of progress. Runtime evidence still owns
 current world state, and the action surface still owns executable affordances.
 
@@ -216,22 +217,24 @@ survive initialization unless a separate explicit cleanup operation is requested
 
 ## Provider
 
-A **provider** is the model-facing component that proposes a CycleGoal,
-ActionIntent, CycleJudgment, tool call, or short utterance.
+A **provider** is the model-facing component that proposes an Actor Turn tool
+selection, CycleGoal, CycleJudgment, branch-time Deliberation update, generated
+action candidate, or short utterance.
 
 The provider does not own reality, verification, timeouts, runtime permissions,
 or action skill promotion.
 
 Preferred terms:
 
-- **Actor Turn provider** for the target hot-path component that proposes one
-  `actor-turn-output/v1` record from an `actor-turn-input/v1` packet;
+- **Actor Turn provider** for the target hot-path component that chooses exactly
+  one visible Action Card function tool or `author_mineflayer_action` from an
+  `actor-turn-input/v1` packet;
 - **Deliberation provider** for the target branch-only component that reframes
   or updates Active Episode state and proposes guarded PlanBead operations;
-- **cycle goal provider** for the component that selects PlanBead context and
-  proposes CycleGoal records;
-- **action planner provider** for the component that proposes ActionIntent
-  records;
+- **cycle goal provider** for the legacy/migration component that selects
+  PlanBead context and proposes CycleGoal records;
+- **action planner provider** for the legacy/migration component that proposes
+  ActionIntent or `LegacyPlannerAction` records;
 - **cycle judgment provider** for the component that summarizes evidence into a
   CycleJudgment.
 
@@ -344,9 +347,9 @@ evidence, judgments, dependencies, or related records changed it.
 
 A PlanBead is not executable authority, not physical proof, and not a hidden
 domain planner. It must not grant runtime primitive permissions, supply missing
-ActionIntent args, or mark progress without runtime evidence. If a PlanBead
-claims closure, satisfaction, or blockage, that transition must cite evidence
-refs or guarded non-physical resolution evidence.
+runtime action parameters, or mark progress without runtime evidence. If a
+PlanBead claims closure, satisfaction, or blockage, that transition must cite
+evidence refs or guarded non-physical resolution evidence.
 
 ## PlanBeadGraph
 
@@ -385,10 +388,11 @@ Minecraft Basic Guide.
 In artifacts the target schemas are `actor-turn-input/v1` and
 `actor-turn-output/v1`.
 
-An Actor Turn should usually produce exactly one executable choice:
-`use_existing_action` or `author_mineflayer_action`. Runtime gates still validate
-parameters, permissions, retry constraints, generated source, timeout, and
-verifier contracts before Mineflayer execution.
+An Actor Turn should usually produce exactly one function tool choice: one
+visible Action Card with schema-bound `parameters`, or
+`author_mineflayer_action`. Runtime gates still validate parameters,
+permissions, retry constraints, generated source, timeout, and verifier
+contracts before Mineflayer execution.
 
 ## Evidence Trace
 
@@ -405,11 +409,11 @@ unbounded raw transcript back to the provider.
 
 ## Runtime Action Resolver
 
-The **Runtime Action Resolver** maps an Actor Turn's `use_existing_action`
-Action Card choice to the current runtime execution authority. It may resolve
-the card to a runtime primitive, seed action skill, actor-owned action skill, or
-promoted generated action skill, then validate structured parameters before
-execution.
+The **Runtime Action Resolver** maps direct Action Card function-tool selection,
+or the older `use_existing_action` compatibility shape, to the current runtime
+execution authority. It may resolve the card to a runtime primitive, seed action
+skill, actor-owned action skill, or promoted generated action skill, then
+validate structured parameters before execution.
 
 For `author_mineflayer_action`, the resolver maps the proposal into the
 action-selection-gated generated action skill trial path. Generated code remains
@@ -442,17 +446,23 @@ enough for action selection and verification.
 
 ## ActionIntent
 
-An **ActionIntent** is one proposed action for the current CycleGoal. It can
-target a runtime primitive or an owned action skill, subject to runtime gates.
+An **ActionIntent** is the legacy/migration term for one proposed action for the
+current CycleGoal. It can target a runtime primitive or an owned action skill,
+subject to runtime gates.
 
-Physical ActionIntent args are an executable contract. A rationale field such
-as `why_this_action` can explain the intent, but it cannot supply missing
+Active Actor Turn work should prefer **Action Card**, **Actor Turn tool
+selection**, and **runtime action** unless it is explicitly reading or writing a
+legacy artifact.
+
+Physical legacy ActionIntent args are an executable contract. A rationale field
+such as `why_this_action` can explain the intent, but it cannot supply missing
 coordinates, item names, counts, container ids, anchors, or block selectors.
 
 ## Runtime Retry Constraint
 
 A **runtime retry constraint** is a runtime-owned gate created after repeated
-matching blocker evidence for the same ActionIntent target and structured args.
+matching blocker evidence for the same runtime action target and structured
+args.
 In artifacts the schema is `runtime-retry-constraint/v1` and the provider-facing
 field is `runtime_retry_constraints`.
 

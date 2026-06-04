@@ -1,6 +1,13 @@
-import type { ActionIntent } from "../types.js";
 import type { SocialPrimitiveAttemptStatus } from "../../socialCycleProgress.js";
 import type { ActorPlanBead, PlanBeadOperation } from "./types.js";
+
+type PlanBeadEvidenceAction = {
+  kind: string;
+  primitive_id?: string;
+  action_skill_id?: string;
+  parameters?: Record<string, unknown>;
+  args?: Record<string, unknown>;
+};
 
 type EvidenceSignal =
   | {
@@ -19,7 +26,7 @@ export type PlanBeadLifecycleDerivationInput = {
   actorId: string;
   cycleId: string;
   turnId: string;
-  actionIntent: ActionIntent;
+  action: PlanBeadEvidenceAction;
   toolStatuses: readonly SocialPrimitiveAttemptStatus[];
   evidenceRefs: readonly string[];
   beads: readonly ActorPlanBead[];
@@ -63,21 +70,21 @@ function readString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-function intentItemName(intent: ActionIntent) {
-  return readString(intent.parameters?.itemName) ??
-    readString(intent.parameters?.targetItem) ??
-    readString(intent.parameters?.recipe) ??
-    readString(intent.args?.itemName) ??
-    readString(intent.args?.targetItem) ??
-    readString(intent.args?.recipe);
+function actionItemName(action: PlanBeadEvidenceAction) {
+  return readString(action.parameters?.itemName) ??
+    readString(action.parameters?.targetItem) ??
+    readString(action.parameters?.recipe) ??
+    readString(action.args?.itemName) ??
+    readString(action.args?.targetItem) ??
+    readString(action.args?.recipe);
 }
 
 function successfulSignal(input: {
-  intent: ActionIntent;
+  action: PlanBeadEvidenceAction;
   toolStatus: SocialPrimitiveAttemptStatus;
 }): EvidenceSignal | null {
   if (input.toolStatus.tool === "deposit_shared" && input.toolStatus.status === "deposited") {
-    return { kind: "deposit_shared", itemName: intentItemName(input.intent) };
+    return { kind: "deposit_shared", itemName: actionItemName(input.action) };
   }
   if (input.toolStatus.tool === "inspect_chest" && input.toolStatus.status === "inspected") {
     return { kind: "inspect_chest" };
@@ -86,7 +93,7 @@ function successfulSignal(input: {
     (input.toolStatus.tool === "craft_item" || input.toolStatus.tool === "craft_with_table") &&
     input.toolStatus.status === "crafted"
   ) {
-    return { kind: "crafted", itemName: intentItemName(input.intent) };
+    return { kind: "crafted", itemName: actionItemName(input.action) };
   }
   return null;
 }
@@ -95,6 +102,9 @@ function runtimeEvidenceRefs(refs: readonly string[]) {
   return refs.filter((ref) => ref.startsWith("evidence/") || ref.startsWith("settlement/"));
 }
 
+// Matching is deliberately conservative and text-based: this helper may close
+// or update a PlanBead from observed evidence, but it never derives new
+// primitive arguments or execution authority.
 function hasAny(text: string, terms: readonly string[]) {
   return terms.some((term) => text.includes(term));
 }
@@ -214,6 +224,13 @@ function updateOperation(input: {
   };
 }
 
+/**
+ * Derives small PlanBead lifecycle operations from verified turn evidence.
+ *
+ * @remarks This turns runtime evidence into state-continuity updates only. The
+ * returned operations still pass through the guarded PlanBead applier before
+ * the actor workspace changes.
+ */
 export function derivePlanBeadLifecycleOperationsFromTurnEvidence(
   input: PlanBeadLifecycleDerivationInput
 ): PlanBeadOperation[] {
@@ -222,7 +239,7 @@ export function derivePlanBeadLifecycleOperationsFromTurnEvidence(
     return [];
   }
   const signals = input.toolStatuses
-    .map((toolStatus) => successfulSignal({ intent: input.actionIntent, toolStatus }))
+    .map((toolStatus) => successfulSignal({ action: input.action, toolStatus }))
     .filter((signal): signal is EvidenceSignal => signal !== null);
   if (signals.length === 0) {
     return [];
@@ -261,6 +278,11 @@ export function derivePlanBeadLifecycleOperationsFromTurnEvidence(
   return operations;
 }
 
+/**
+ * Derives closure operations from consolidated current state, primarily for
+ * shared-storage contribution evidence that may be recognized after the turn
+ * artifact has been compacted.
+ */
 export function derivePlanBeadLifecycleOperationsFromCurrentState(
   input: PlanBeadCurrentStateLifecycleInput
 ): PlanBeadOperation[] {

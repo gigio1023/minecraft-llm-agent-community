@@ -42,29 +42,30 @@ The guide is different from these runtime packets:
 | `observation` | Current scoped world, inventory, entity, and position evidence | Global absence outside loaded scans, recipe knowledge |
 | `action_surface_summary` | Which actor body capabilities are currently direct/deferred | Domain strategy |
 | `runtime_affordances` | Executable primitive ids and args shapes for this turn | Minecraft recipe background |
-| `ActionIntent` | One structured provider proposal | Proof of success |
+| Actor Turn tool selection | One visible Action Card or `author_mineflayer_action` selection | Proof of success |
 | Runtime evidence | World, inventory, movement, block, container, chat, and transcript truth | Provider preference |
 
 The guide is advisory context. Runtime gates still validate action availability,
-ActionIntent args, role permissions, action-skill ownership, timeouts, and
+structured parameters, role permissions, action-skill ownership, timeouts, and
 verification. If the guide and runtime evidence appear to disagree, the runtime
 evidence wins for current state.
 
 ## Provider Stages
 
-Every social-cycle provider stage should receive `minecraft_basic_guide`:
+Every ordinary Actor Turn should receive `minecraft_basic_guide`:
 
-- cycle goal provider: uses it to avoid impossible goals such as table-sized
-  recipes before a reachable placed crafting table exists;
-- action planner provider: uses it to choose the nearest executable prerequisite
-  action instead of repeating observe;
-- cycle judgment provider: uses it to classify failures such as "missing
-  crafting_table inventory" as a prerequisite blocker, not as a reason to keep
-  scanning the same state.
+- Actor Turn provider: uses it to choose a useful visible Action Card, fill
+  schema-bound parameters, or justify `author_mineflayer_action` instead of
+  repeating observe;
+- internal Mineflayer codegen provider: uses it as mechanics background while
+  still relying on current state and runtime helper contracts;
+- branch-time Deliberation provider: may use the same vocabulary to reframe
+  blockers or durable work, but cannot use the guide to close PlanBeads or claim
+  physical progress.
 
-The guide is intentionally stage-independent. A blocker discovered during cycle
-judgment should feed the next cycle goal and action planner with the same
-mechanics vocabulary.
+The guide is intentionally stage-independent. A blocker discovered during
+runtime evidence classification should feed the next Actor Turn or branch-time
+Deliberation with the same mechanics vocabulary.
 
 ## Shape
 

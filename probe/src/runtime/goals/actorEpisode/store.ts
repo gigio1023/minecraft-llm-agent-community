@@ -1,3 +1,9 @@
+/**
+ * Persistence helpers for Active Episode and deliberation branch artifacts.
+ *
+ * @remarks Episodes frame provider decisions but do not execute actions. Stored
+ * artifacts preserve branch history for review and context continuity.
+ */
 import { writeActorGoalArtifact } from "../goalJsonStore.js";
 import {
   validateActiveEpisode,

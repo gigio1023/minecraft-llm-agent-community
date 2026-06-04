@@ -6,7 +6,9 @@ sidebar_position: 40
 
 Search token: `ACTOR_EPISODE_ACTOR_TURN`.
 
-Status: active target architecture and migration spec.
+Status: active for Active Episode, evidence trace, passive PlanBeads, and branch
+semantics; superseded for outer Actor Turn tool selection by
+`Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`.
 
 Recorded: 2026-06-03 (`Asia/Seoul`).
 
@@ -28,9 +30,11 @@ Active Episode
 
 This document replaces the per-cycle mental model where separate provider calls
 for cycle goal, action planning, and cycle judgment all run on every cycle. It
-does not remove runtime evidence, PlanBeads, action skill ownership, or
-ActionIntent validation. It narrows their authority boundaries so the hot path
-is simpler and more actionful.
+does not remove runtime evidence, PlanBeads, action skill ownership, or schema
+validation. For the ordinary hot path, read `Runtime Action Resolver` as direct
+Actor Turn function-tool selection into `ActorTurnResolvedAction`, not as a
+legacy planner action bridge. It narrows authority boundaries so the hot path is
+simpler and more actionful.
 
 Non-goals:
 
@@ -76,7 +80,7 @@ anecdotes, or a file-by-file task list.
 flowchart TD
   Obs["Observation, memory, PlanBeads, relationships, action surface"] --> Goal["Cycle goal provider, legacy goal_mind"]
   Goal --> Planner["Action planner provider"]
-  Planner --> Runtime["Runtime ActionIntent gate and Mineflayer execution"]
+  Planner --> Runtime["Runtime legacy planner action gate and Mineflayer execution"]
   Runtime --> Judgment["Cycle judgment provider"]
   Judgment --> PlanBeads["Guarded PlanBead operation applier"]
   Judgment --> Next["Next cycle context projection"]
@@ -106,11 +110,12 @@ flowchart TD
   Cards["Action Cards: existing affordances by description and schema"] --> Turn
   Trace["Evidence Trace window"] --> Turn
 
-  Turn --> Choice{"Actor Turn choice"}
-  Choice --> Existing["use_existing_action"]
-  Choice --> Author["author_mineflayer_action"]
+  Turn --> Choice{"Actor Turn function tool"}
+  Choice --> Existing["visible Action Card tool<br/>schema-bound parameters"]
+  Choice --> Author["author_mineflayer_action<br/>detailed rationale, no source"]
   Existing --> Resolver["Runtime Action Resolver"]
-  Author --> Resolver
+  Author --> Codegen["Full-context Mineflayer codegen"]
+  Codegen --> Resolver
   Resolver --> Execute["Serialized Mineflayer execution"]
   Execute --> Evidence["Verifier, helper events, post-observation"]
   Evidence --> Trace
@@ -139,16 +144,16 @@ when a typed branch condition is recorded.
 | Active Episode | Current bounded focus, selected concern refs, success signals, pivot triggers, mistake budget, social pressure | Execute actions, close PlanBeads by itself, prove physical progress |
 | Actor Turn provider | One turn proposal from episode, evidence, current observation, action cards, and guide context | Decide runtime success, bypass schemas, choose by primitive-vs-action-skill taxonomy |
 | Action Card | Provider-visible affordance description plus parameter contract for currently plausible choices | Become a strategy checklist, expose hidden authority, or invite choices that `current_state` clearly cannot satisfy |
-| Runtime Action Resolver | Map cards to primitives or actor-owned action skills, validate parameters, enforce retry constraints, trial generated candidates | Infer missing physical args from prose |
+| Runtime Action Resolver | Map cards to primitives or actor-owned action skills, validate parameters, enforce retry constraints, trial generated candidates | Infer missing physical args from prose, parse LLM-facing text as policy, or hide cards through Minecraft domain heuristics |
 | Mineflayer execution boundary | Run one serialized action boundary for one bot, with timeout and cancellation | Batch unrelated turn actions outside an action skill |
 | Evidence Trace | Append runtime facts, refs, post-observations, verifier output, and helper events | Store provider narration as proof |
 | Runtime Classifier | Decide continue, close, defer, or branch based on evidence and thresholds | Invent new PlanBeads or executable actions |
 | Deliberation provider | Reframe Active Episode and propose guarded PlanBead operations only when branch rules fire | Run every turn, choose an action, generate Mineflayer code |
-| PlanBeadGraph | Durable actor-owned work graph, dependencies, blockers, ready front | Supply ActionIntent args, grant permissions, mark physical success without evidence |
+| PlanBeadGraph | Durable actor-owned work graph, dependencies, blockers, ready front | Supply runtime action parameters, grant permissions, mark physical success without evidence |
 
 Deliberation output is intentionally narrower than Actor Turn output. It can
 write a new `active-episode/v1` and raw PlanBead operation proposals for the
-guarded applier. It must not emit `ActionIntent`, `ActionCard`, `primitive_id`,
+guarded applier. It must not emit `legacy planner action`, `ActionCard`, `primitive_id`,
 `action_skill_id`, generated source, helper configuration, `args`, or
 executable parameters.
 
@@ -231,6 +236,7 @@ type ActionCardV1 = {
   title: string;
   description: string;
   parameters_schema_ref: string;
+  eligibility_contract_ref: string;
   parameter_hints: string[];
   current_state_requirements: string[];
   expected_evidence: string[];
@@ -243,11 +249,29 @@ type ActionCardV1 = {
 The provider chooses the card by what it does and what parameters it needs. The
 provider should not have to care whether the runtime mapping is a primitive,
 seed action skill, actor-owned action skill, or promoted generated action skill.
-`current_state_requirements` are a runtime contract, not prompt decoration. If a
-cheap model chooses a `requires_current_state_check` card while the current
+`current_state_requirements` describe the card's runtime contract; they are not
+prompt decoration, and they are not the enforcement mechanism by themselves. If
+a cheap model chooses a `requires_current_state_check` card while the current
 state clearly lacks the required inventory, world, social, or parameter
 condition, the runtime must reject that choice before Mineflayer execution and
 feed the blocker back as a repair constraint.
+
+The enforceable contract must be structured. Do not implement those checks by
+searching `current_state_requirements` strings, Action Card descriptions,
+Minecraft Basic Guide text, memory, PlanBeads, or rationale with `includes`,
+regexes, keyword lists, or other prose heuristics. Use typed
+readiness/eligibility records, schemas/enums, structured current-state fields,
+permission gates, retry constraints, and evidence refs. The prose fields explain
+the card to the provider and reviewers; they do not decide visibility,
+eligibility, executable arguments, permissions, retry clearance, generated-source
+authority, or success.
+
+The runtime must also not become a hidden Minecraft planner by filtering cards
+through hardcoded item-family, station-family, construction-readiness,
+survival-priority, shelter-first, or single-domain strategy heuristics. Within a
+selected visible tool/action, the LLM keeps decision freedom with full context
+and schema-bound logical parameters. Runtime authority starts at explicit
+validation and evidence, not secret domain planning.
 
 ### `actor-turn-input/v1`
 
@@ -344,42 +368,43 @@ changed.
 
 ### `actor-turn-output/v1`
 
+The active Actor Turn output is a parsed function-tool selection. Existing
+Action Card tools carry logical `parameters`. `author_mineflayer_action` carries
+the outer model's detailed judgment and starts a separate full-context codegen
+call; it does not contain TypeScript source.
+
 ```ts
 type ActorTurnOutputV1 =
   | {
       schema: "actor-turn-output/v1";
-      choice: "use_existing_action";
+      choice: "action_card";
       action_card_id: string;
       parameters: JsonObject;
-      why_this_action: string;
-      expected_evidence: string[];
-      fallback_if_blocked: string;
+      situation_assessment: string;
+      why_this_tool: string;
+      success_evidence: string[];
+      failure_handling: string;
     }
   | {
       schema: "actor-turn-output/v1";
       choice: "author_mineflayer_action";
-      proposed_action_skill_id: string;
-      purpose: string;
-      input_schema: JsonSchemaObject;
-      parameters: JsonObject;
-      source_language: "typescript";
-      source: string;
-      helper_api_version: "mineflayer-action-skill-helper/v1";
-      helper_allowlist: string[];
-      timeout_ms: number;
-      verifier: ActionSkillVerifierSpec;
-      known_failure_modes: string[];
-      promotion_policy: "record_candidate_only" | "promote_after_passed_trial";
-      why_this_action: string;
-      expected_evidence: string[];
-      fallback_if_blocked: string;
+      situation_assessment: string;
+      why_codegen_is_needed: string;
+      desired_minecraft_behavior: string;
+      existing_tools_considered: Array<{
+        action_card_id: string;
+        title: string;
+        why_not_enough: string;
+      }>;
+      success_evidence: string[];
+      failure_handling: string;
     };
 ```
 
-This is the provider-facing simplified choice. During migration, the runtime may
-map `use_existing_action` to existing `use_primitive` or `use_action_skill`
-ActionIntent records, and map `author_mineflayer_action` to the existing
-`author_and_trial_action_skill` path.
+The internal codegen provider then returns generated source, input schema,
+runtime parameters, helper allowlist, timeout, verifier, failure modes, and
+promotion policy as a generated action skill candidate. That is a second
+provider boundary, not part of the outer Actor Turn tool call.
 
 ### `evidence-trace/v1`
 
@@ -485,15 +510,19 @@ Scenario examples:
   has only two planks, then Runtime Action Resolver rejects the Action Card
   before Mineflayer execution and feeds the exact requirement back as a repair
   constraint.
+- Given an Action Card has prose `current_state_requirements`, when the runtime
+  decides visibility or rejection, then the decision is based on structured
+  readiness/eligibility state, schemas/enums, gates, retry constraints, or
+  evidence refs, not string includes, regexes, or Minecraft keyword heuristics.
 - Given `craft_item` is selected for `stick`, `oak_planks`, or
   `crafting_table`, when current inventory lacks the exact inventory-grid
   ingredients, then Runtime Action Resolver rejects it before Mineflayer and
   Actor Turn input should either hide `Craft Item` or show the exact missing
   recipe ingredients.
-- Given direct `say` is available in the action surface but no target actor is
-  visible, when Actor Turn input is built for a single-bot run, then `Say` is
-  hidden from Action Cards rather than letting the runtime target the actor
-  itself and return `unavailable`.
+- Given direct `say` is available and the social context justifies a message,
+  when no target actor is visible in a single-bot run, then targetless `Say`
+  may fall back to world chat and must record `targetId=world_chat` as truthful
+  chat evidence.
 - Given `deposit_shared` succeeds and `inspect_chest` later verifies the chest
   contents, when settlement state is rebuilt, then `shared_storage` and
   `known_positions.shared_chest` both carry the chest id, status, and evidence
@@ -509,9 +538,9 @@ Scenario examples:
 |----------------|----------------|----------------|
 | `goal_mind` provider | Deliberation provider | Run only on branch conditions, not every turn |
 | `CycleGoal` | Field inside Active Episode and Actor Turn context | Keep compatibility records while the new episode contract lands |
-| `action_planner` provider | Actor Turn provider | Collapse action choice into `use_existing_action` or `author_mineflayer_action` |
+| `action_planner` provider | Actor Turn provider | Collapse action choice into one visible Action Card function tool or `author_mineflayer_action` |
 | `use_primitive` vs `use_action_skill` provider choice | Runtime Action Resolver mapping | Provider chooses Action Card, runtime chooses primitive or action skill mapping |
-| `author_and_trial_action_skill` | `author_mineflayer_action` provider choice plus resolver mapping | Keep existing gated trial path as implementation authority |
+| `author_and_trial_action_skill` | `author_mineflayer_action` provider choice plus full-context codegen/trial | Keep candidate validation, source guard, trial, verifier, and promotion mechanics as implementation authority |
 | `CycleJudgment` every cycle | Runtime Classifier plus optional boundary review | Runtime computes ordinary turn outcome; provider review is reserved for branch or learning-worthy events |
 | StrategicGoal live accumulation | PlanBeadGraph plus compact episode hints | Do not create another persistent middle layer |
 | Social-cycle report pass | Episode review summary | Pass/fail must cite episode-specific evidence, not generic movement |
@@ -551,6 +580,12 @@ Actor Turn path belongs to branch-time Deliberation plus the guarded PlanBead
 applier. The legacy CycleJudgment provider may still carry proposal candidates
 only on the legacy path during migration.
 
+However, an empty graph for an entire long run is still a behavior gap. If a
+report has ready-front snapshots every cycle but zero selected bead refs, zero
+operation results, and empty `compact_plan_bead_hints`, reviewers should record
+"PlanBeads wired but not substantively used" rather than treating packet
+presence as planning continuity.
+
 Deliberation may emit either valid `plan-bead-operation/v1` objects or looser
 work-state proposals. The runtime may adapt looser branch-time proposals into
 evidence-linked `create` operations, but it must not invent status closure,
@@ -562,10 +597,16 @@ Architecture acceptance requires:
 
 - Actor Turn input exposes Action Cards instead of making the provider choose
   primitive-vs-action-skill categories.
-- Actor Turn output has exactly two executable choices:
-  `use_existing_action` or `author_mineflayer_action`.
+- Actor Turn output has exactly one function-tool choice: one visible Action
+  Card tool with schema-bound `parameters`, or `author_mineflayer_action`.
+- Tool calling plus strict schemas/enums enforce Actor Turn flow. LLM-facing
+  prose is never parsed as hidden policy for tool visibility, eligibility,
+  executable args, permissions, retry, source authority, or success.
+- Action Cards are not hidden by hardcoded Minecraft domain heuristics. Hiding
+  or rejection is traceable to typed readiness/eligibility, structured state,
+  schemas, permission gates, retry constraints, or evidence.
 - Generic Mineflayer program runners such as `run_mineflayer_program` and the
-  seed `runBoundedMineflayerProgram` are not exposed as `use_existing_action`
+  seed `runBoundedMineflayerProgram` are not exposed as ordinary existing
   Action Cards for fresh source. New generated source must use
   `author_mineflayer_action`; already promoted actor-owned action skills may be
   exposed by their specific behavior description.
@@ -573,9 +614,10 @@ Architecture acceptance requires:
   fallback or repair path is explicitly recorded.
 - `requires_current_state_check` Action Cards are rejected before Mineflayer
   execution when their current-state requirements are clearly false.
-- Enforceable `current_state_requirements` include exact recipe counts when the
-  recipe requires them; "has planks" is not enough for a crafting table or
-  pickaxe recipe.
+- Enforceable eligibility/readiness contracts associated with
+  `current_state_requirements` include exact recipe counts when the recipe
+  requires them; "has planks" is not enough for a crafting table or pickaxe
+  recipe.
 - Table-bound recipes such as `wooden_pickaxe` must not pass through the
   inventory-grid `craft_item` card even when current inventory has enough
   planks and sticks; they require a table-bound action path or a contract
@@ -583,10 +625,10 @@ Architecture acceptance requires:
 - Inventory-grid recipes such as planks, sticks, and `crafting_table` must also
   enforce exact ingredients before execution. A generic "inventory has items"
   check is not enough to expose or execute `Craft Item`.
-- Direct `say` must not be exposed as ready in a single-bot state with no
-  visible target actor. Chat-delivering action skills need the same
-  current-state target evidence unless the runtime has a separate deliverable
-  broadcast contract.
+- Direct `say` may be exposed when social context justifies communication. If
+  no target actor is visible, targetless `Say` must use the explicit world-chat
+  fallback contract and record `targetId=world_chat`; it must not pretend a
+  hidden actor target was reached.
 - Deliberation does not run on every turn.
 - Evidence Trace entries cite runtime artifacts and never treat provider prose,
   memory notes, `wait`, observe-only records, or movement-only `position_delta`

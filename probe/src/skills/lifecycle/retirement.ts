@@ -18,6 +18,9 @@ export type RetireActionSkillInput = {
   retired_at?: string;
 };
 
+// Status records are stored in lifecycle-specific directories, so retiring an
+// active/candidate record needs a write to retired plus removal from the old
+// bucket.
 async function removeStatusRecord(
   rootDir: string,
   actorId: string,
@@ -33,6 +36,10 @@ function currentStatusPath(record: ActorActionSkillRecord): ActorActionSkillStat
   return record.status;
 }
 
+/**
+ * Retires an actor-owned action skill while preserving the reason and evidence
+ * in the replacement record.
+ */
 export async function retireActionSkill(input: RetireActionSkillInput) {
   const transition = transitionActionSkillStatus(input.record.status, "retired");
 

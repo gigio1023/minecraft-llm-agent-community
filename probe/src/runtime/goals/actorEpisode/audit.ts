@@ -1,3 +1,10 @@
+/**
+ * Audit checks for episode review summaries.
+ *
+ * @remarks Passing an episode requires evidence-backed mutation or social
+ * visibility. These checks reject unsupported closure and PlanBead satisfaction
+ * claims before they become misleading handoff context.
+ */
 import {
   type EpisodeReviewSummary,
   type PlanBeadClosureCheck

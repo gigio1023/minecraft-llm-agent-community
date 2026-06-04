@@ -1,3 +1,9 @@
+/**
+ * Persistence for action skill proposal records.
+ *
+ * @remarks Proposals are candidate evidence only. They do not become runtime
+ * action skill authority until trial and lifecycle promotion succeed.
+ */
 import path from "node:path";
 
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "../../runtime/actorWorkspacePaths.js";

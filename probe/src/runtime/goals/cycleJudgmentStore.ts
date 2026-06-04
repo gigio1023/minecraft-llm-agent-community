@@ -1,3 +1,10 @@
+/**
+ * Persistence for CycleJudgment artifacts.
+ *
+ * @remarks Judgments may include raw PlanBead operation proposals, including
+ * malformed ones, so later guarded validation can preserve what the provider
+ * attempted without mutating state unsafely.
+ */
 import path from "node:path";
 
 import type { CycleJudgment } from "./types.js";

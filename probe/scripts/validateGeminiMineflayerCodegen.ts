@@ -1,3 +1,4 @@
+/** Validates Gemini Mineflayer codegen output against helper and runtime constraints. */
 import path from "node:path";
 
 import { assertDirectGeneratedActionSkillSource } from "../src/generatedActionSkills/directExecutor.js";

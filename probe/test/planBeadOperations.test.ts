@@ -1,3 +1,4 @@
+/** Regression coverage for guarded PlanBead operation application. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";

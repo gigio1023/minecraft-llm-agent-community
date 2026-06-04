@@ -6,15 +6,15 @@ import {
   validateActorCycleGoal,
   validateActorLifeGoal,
   validateActorSoul,
-  validateActionIntent,
+  validateLegacyPlannerAction,
   validateCycleJudgment
 } from "../src/runtime/goals/types.js";
-import type { ActionIntent } from "../src/runtime/goals/types.js";
+import type { LegacyPlannerAction } from "../src/runtime/goals/types.js";
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
 import {
-  buildActionIntentRegenerationGuidance,
-  repairNonExecutableActionIntentMetadata,
-  shouldRegenerateActionIntent
+  buildLegacyPlannerActionRegenerationGuidance,
+  repairNonExecutableLegacyPlannerActionMetadata,
+  shouldRegenerateLegacyPlannerAction
 } from "../src/provider/socialActionPlannerProvider.js";
 
 test("ActorSoul and LifeGoal validators accept canonical records", () => {
@@ -54,10 +54,10 @@ test("validateActorCycleGoal rejects wrong schema", () => {
   assert.equal(result.ok, false);
 });
 
-test("validateActionIntent rejects shallow or mismatched action plans", () => {
+test("validateLegacyPlannerAction rejects shallow or mismatched action plans", () => {
   assert.equal(
-    validateActionIntent({
-      schema: "action-intent/v1",
+    validateLegacyPlannerAction({
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "g1",
@@ -71,8 +71,8 @@ test("validateActionIntent rejects shallow or mismatched action plans", () => {
   );
 
   assert.equal(
-    validateActionIntent({
-      schema: "action-intent/v1",
+    validateLegacyPlannerAction({
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "g1",
@@ -86,9 +86,9 @@ test("validateActionIntent rejects shallow or mismatched action plans", () => {
   );
 });
 
-test("validateActionIntent accepts action-selection generated candidate authoring shape", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+test("validateLegacyPlannerAction accepts action-selection generated candidate authoring shape", () => {
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "g1",
@@ -104,6 +104,7 @@ test("validateActionIntent accepts action-selection generated candidate authorin
       input_schema: {
         type: "object",
         required: ["text"],
+        additionalProperties: false,
         properties: { text: { type: "string" } }
       },
       helper_api_version: "mineflayer-action-skill-helper/v1",
@@ -117,14 +118,14 @@ test("validateActionIntent accepts action-selection generated candidate authorin
     expected_evidence: ["helper say delivered"],
     fallback_if_blocked: "remember blocker"
   };
-  const result = validateActionIntent(intent);
+  const result = validateLegacyPlannerAction(intent);
 
   assert.equal(result.ok, true);
 });
 
 test("generated candidate contract failures request one guided regeneration", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "g1",
@@ -136,8 +137,8 @@ test("generated candidate contract failures request one guided regeneration", ()
       proposed_skill_id: "badLoop",
       purpose: "Bad candidate",
       source_language: "typescript",
-      source: "export async function run(ctx) { while (true) {} }",
-      input_schema: { type: "object" },
+      source: "export async function run(ctx, params) { while (true) {} }",
+      input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
       helper_api_version: "mineflayer-action-skill-helper/v1",
       helper_allowlist: ["wait"],
       timeout_ms: 5_000,
@@ -152,16 +153,16 @@ test("generated candidate contract failures request one guided regeneration", ()
   const error =
     "Generated action skill candidate contract failed: Generated action skill contains a blocked API or obvious unbounded loop";
 
-  assert.equal(shouldRegenerateActionIntent(intent, error), true);
-  const guidance = buildActionIntentRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(shouldRegenerateLegacyPlannerAction(intent, error), true);
+  const guidance = buildLegacyPlannerActionRegenerationGuidance({ error, rejectedIntent: intent });
   assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
   assert.equal(guidance.rejected_error, error);
   assert.equal(guidance.rules.do_not_repeat_blocked_source_or_helper_shape, true);
 });
 
 test("direct primitive parameter contract failures request one guided regeneration", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "g1",
@@ -174,10 +175,10 @@ test("direct primitive parameter contract failures request one guided regenerati
     fallback_if_blocked: "observe current state"
   };
   const error =
-    "ActionIntent parameters contract failed: move_to requires structured args with x/y/z, position, targetPosition, target_position, or explicit scout direction and distance 2..12";
+    "LegacyPlannerAction parameters contract failed: move_to requires structured args with x/y/z, position, targetPosition, target_position, or explicit scout direction and distance 2..12";
 
-  assert.equal(shouldRegenerateActionIntent(intent, error), true);
-  const guidance = buildActionIntentRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(shouldRegenerateLegacyPlannerAction(intent, error), true);
+  const guidance = buildLegacyPlannerActionRegenerationGuidance({ error, rejectedIntent: intent });
   assert.equal(guidance.schema, "action-planner-regeneration-guidance/v1");
   assert.equal(guidance.rejected_error, error);
   assert.equal(guidance.rules.use_runtime_affordance_args_contract, true);
@@ -185,8 +186,8 @@ test("direct primitive parameter contract failures request one guided regenerati
 });
 
 test("missing required action intent narrative fields request one guided regeneration", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "g1",
@@ -200,15 +201,15 @@ test("missing required action intent narrative fields request one guided regener
   };
   const error = "why_this_action must be a non-empty string; fallback_if_blocked must be a non-empty string";
 
-  assert.equal(shouldRegenerateActionIntent(intent, error), true);
-  const guidance = buildActionIntentRegenerationGuidance({ error, rejectedIntent: intent });
+  assert.equal(shouldRegenerateLegacyPlannerAction(intent, error), true);
+  const guidance = buildLegacyPlannerActionRegenerationGuidance({ error, rejectedIntent: intent });
   assert.equal(guidance.rejected_error, error);
   assert.equal(guidance.rules.fix_the_reported_error_directly, true);
 });
 
 test("non-executable action intent metadata can be repaired after guided regeneration fails", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "g1",
@@ -221,7 +222,7 @@ test("non-executable action intent metadata can be repaired after guided regener
     fallback_if_blocked: ""
   };
 
-  const repaired = repairNonExecutableActionIntentMetadata({
+  const repaired = repairNonExecutableLegacyPlannerActionMetadata({
     intent,
     errors: [
       "why_this_action must be a non-empty string",
@@ -232,13 +233,13 @@ test("non-executable action intent metadata can be repaired after guided regener
   assert.ok(repaired);
   assert.equal(repaired.repairs.length, 2);
   assert.deepEqual(repaired.intent.parameters, intent.parameters);
-  assert.equal(validateActionIntent(repaired.intent).ok, true);
+  assert.equal(validateLegacyPlannerAction(repaired.intent).ok, true);
   assert.match(repaired.intent.why_this_action, /Provider omitted why_this_action/);
 });
 
 test("action intent metadata repair does not cover executable contract failures", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "g1",
@@ -251,7 +252,7 @@ test("action intent metadata repair does not cover executable contract failures"
   };
 
   assert.equal(
-    repairNonExecutableActionIntentMetadata({
+    repairNonExecutableLegacyPlannerActionMetadata({
       intent,
       errors: [
         "why_this_action must be a non-empty string",

@@ -1,3 +1,4 @@
+/** Regression coverage for serialized PlanBead type and policy contracts. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

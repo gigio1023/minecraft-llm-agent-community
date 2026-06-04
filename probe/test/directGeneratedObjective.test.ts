@@ -1,3 +1,4 @@
+/** Regression coverage for direct-generated objective execution reports. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 

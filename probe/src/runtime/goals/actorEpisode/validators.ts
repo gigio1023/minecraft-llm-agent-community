@@ -1,3 +1,12 @@
+/**
+ * Runtime validators for Actor Episode, Actor Turn, deliberation, and review
+ * contracts.
+ *
+ * @remarks These validators protect the boundary between provider-shaped JSON
+ * and runtime authority. They intentionally reject executable authority in
+ * context-only records and require evidence refs where success or closure would
+ * otherwise become easy to fake.
+ */
 import {
   actionCardReadinesses,
   activeEpisodeStatuses,
@@ -9,12 +18,17 @@ import {
   type ActionCard,
   type ActiveEpisode,
   type ActorTurnInput,
-  type ActorTurnOutput,
+  type ActorTurnExecutionDraft,
   type DeliberationBranch,
   type DeliberationOutput,
   type EpisodeReviewSummary,
   type EvidenceTraceEntry
 } from "./types.js";
+import {
+  boundedMineflayerMethodNames,
+  mineflayerActionSkillHelperNames,
+  mineflayerCodegenSkillRef
+} from "./mineflayerCodegenSkill.js";
 
 type ValidationFailure = { ok: false; errors: string[] };
 
@@ -103,18 +117,6 @@ function assertPlanBeadPriority(
   }
 }
 
-function assertPositiveInteger(
-  record: Record<string, unknown>,
-  key: string,
-  path: string,
-  errors: string[]
-) {
-  const value = record[key];
-  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-    errors.push(`${path}.${key} must be a positive integer`);
-  }
-}
-
 function assertRecord(
   record: Record<string, unknown>,
   key: string,
@@ -156,6 +158,8 @@ function assertAllowedKeys(
 }
 
 const executableAuthorityKeys = new Set([
+  // Rejected explicitly so branch-time Deliberation cannot revive the old
+  // provider-facing action-intent object as executable authority.
   "action_intent",
   "action_card_id",
   "primitive_id",
@@ -170,6 +174,8 @@ const executableAuthorityKeys = new Set([
   "helper_allowlist",
   "timeout_ms"
 ]);
+
+const actorTurnAuthoringHelperNames = new Set<string>(mineflayerActionSkillHelperNames);
 
 function collectExecutableAuthorityKeyErrors(value: unknown, path: string, errors: string[]) {
   if (Array.isArray(value)) {
@@ -349,42 +355,6 @@ function validateDecisionFrame(value: unknown, path: string, errors: string[]) {
     assertStringArray(item, "evidence_refs", `${path}.open_progress_front[${index}]`, errors);
   }
 
-  for (const [index, candidate] of assertArray(value, "parameter_candidates", path, errors).entries()) {
-    if (!isRecord(candidate)) {
-      errors.push(`${path}.parameter_candidates[${index}] must be an object`);
-      continue;
-    }
-    assertString(candidate, "action_card_title", `${path}.parameter_candidates[${index}]`, errors);
-    assertOptionalString(candidate, "itemName", `${path}.parameter_candidates[${index}]`, errors);
-    if (candidate.count !== undefined) {
-      assertNonNegativeInteger(candidate, "count", `${path}.parameter_candidates[${index}]`, errors);
-    }
-    assertString(candidate, "reason", `${path}.parameter_candidates[${index}]`, errors);
-    assertStringArray(candidate, "evidence_refs", `${path}.parameter_candidates[${index}]`, errors);
-  }
-
-  for (const [index, card] of assertArray(value, "top_eligible_action_cards", path, errors).entries()) {
-    if (!isRecord(card)) {
-      errors.push(`${path}.top_eligible_action_cards[${index}] must be an object`);
-      continue;
-    }
-    assertString(card, "action_card_id", `${path}.top_eligible_action_cards[${index}]`, errors);
-    assertString(card, "title", `${path}.top_eligible_action_cards[${index}]`, errors);
-    assertString(card, "why_now", `${path}.top_eligible_action_cards[${index}]`, errors);
-  }
-
-  for (
-    const [index, candidate] of assertArray(value, "recommended_next_action_candidates", path, errors).entries()
-  ) {
-    if (!isRecord(candidate)) {
-      errors.push(`${path}.recommended_next_action_candidates[${index}] must be an object`);
-      continue;
-    }
-    assertString(candidate, "action_card_id", `${path}.recommended_next_action_candidates[${index}]`, errors);
-    assertString(candidate, "title", `${path}.recommended_next_action_candidates[${index}]`, errors);
-    assertRecord(candidate, "parameters", `${path}.recommended_next_action_candidates[${index}]`, errors);
-    assertString(candidate, "why", `${path}.recommended_next_action_candidates[${index}]`, errors);
-  }
 }
 
 function validateRetryConstraint(value: unknown, path: string, errors: string[]) {
@@ -400,6 +370,145 @@ function validateRetryConstraint(value: unknown, path: string, errors: string[])
   assertString(value, "blocked_reason", path, errors);
   assertNonNegativeInteger(value, "repeat_count", path, errors);
   assertStringArray(value, "evidence_refs", path, errors);
+}
+
+function validateKnownStringArray(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+  allowed: ReadonlySet<string>,
+  errors: string[]
+) {
+  assertStringArray(record, key, path, errors);
+  const value = record[key];
+  if (!Array.isArray(value)) {
+    return;
+  }
+  for (const entry of value) {
+    if (typeof entry === "string" && !allowed.has(entry)) {
+      errors.push(`${path}.${key} contains unsupported value ${entry}`);
+    }
+  }
+}
+
+function validateArrayContainsAll(input: {
+  record: Record<string, unknown>;
+  key: string;
+  path: string;
+  expected: readonly string[];
+  errors: string[];
+}) {
+  assertNonEmptyStringArray(input.record, input.key, input.path, input.errors);
+  const value = input.record[input.key];
+  if (!Array.isArray(value)) {
+    return;
+  }
+  const actual = new Set(value.filter((entry): entry is string => typeof entry === "string"));
+  for (const expected of input.expected) {
+    if (!actual.has(expected)) {
+      input.errors.push(`${input.path}.${input.key} must include ${expected}`);
+    }
+  }
+}
+
+function validateMineflayerCodegenSkillProjection(
+  value: unknown,
+  path: string,
+  errors: string[]
+) {
+  if (!isRecord(value)) {
+    errors.push(`${path} must be an object`);
+    return;
+  }
+  if (value.schema !== "mineflayer-codegen-skill/v1") {
+    errors.push(`${path}.schema must be mineflayer-codegen-skill/v1`);
+  }
+  if (value.skill_ref !== mineflayerCodegenSkillRef) {
+    errors.push(`${path}.skill_ref must be ${mineflayerCodegenSkillRef}`);
+  }
+  assertString(value, "skill_markdown", path, errors);
+  if (
+    typeof value.skill_markdown === "string" &&
+    !/\bMineflayer Code Generation\b/.test(value.skill_markdown)
+  ) {
+    errors.push(`${path}.skill_markdown must contain the Mineflayer Code Generation agent skill body`);
+  }
+  assertString(value, "upstream_ref", path, errors);
+  if (value.applies_when !== "outer Actor Turn selected author_mineflayer_action") {
+    errors.push(`${path}.applies_when must be outer Actor Turn selected author_mineflayer_action`);
+  }
+  if (value.helper_api_version !== "mineflayer-action-skill-helper/v1") {
+    errors.push(`${path}.helper_api_version must be mineflayer-action-skill-helper/v1`);
+  }
+  validateArrayContainsAll({
+    record: value,
+    key: "allowed_ctx_helpers",
+    path,
+    expected: mineflayerActionSkillHelperNames,
+    errors
+  });
+  validateArrayContainsAll({
+    record: value,
+    key: "bounded_mineflayer_methods",
+    path,
+    expected: boundedMineflayerMethodNames,
+    errors
+  });
+  for (const key of [
+    "output_schema_rules",
+    "helper_call_contracts",
+    "mineflayer_api_notes",
+    "forbidden_source_patterns",
+    "verifier_and_evidence_rules",
+    "common_failure_modes"
+  ] as const) {
+    assertNonEmptyStringArray(value, key, path, errors);
+  }
+}
+
+function validateAuthoringInputSchemaDefinition(input: {
+  schema: Record<string, unknown>;
+  parameters: Record<string, unknown> | null;
+  path: string;
+  errors: string[];
+}) {
+  if (input.schema.type !== "object") {
+    input.errors.push(`${input.path}.type must be object`);
+  }
+  if (input.schema.additionalProperties !== false) {
+    input.errors.push(`${input.path}.additionalProperties must be false`);
+  }
+  const properties = assertRecord(input.schema, "properties", input.path, input.errors);
+  const rawRequired = input.schema.required;
+  const required = Array.isArray(rawRequired) &&
+    rawRequired.every((entry) => typeof entry === "string" && entry.length > 0)
+    ? rawRequired as string[]
+    : null;
+  if (!required) {
+    input.errors.push(`${input.path}.required must be a string array`);
+  }
+  if (!properties || !required) {
+    return;
+  }
+  const requiredSet = new Set(required);
+  for (const key of required) {
+    if (!(key in properties)) {
+      input.errors.push(`${input.path}.required includes ${key} but properties.${key} is missing`);
+    }
+  }
+  for (const [key, propertySchema] of Object.entries(properties)) {
+    if (!isRecord(propertySchema)) {
+      input.errors.push(`${input.path}.properties.${key} must be an object`);
+    }
+  }
+  for (const key of Object.keys(input.parameters ?? {})) {
+    if (!(key in properties)) {
+      input.errors.push(`ActorTurnExecutionDraft.parameters.${key} must be declared in ${input.path}.properties`);
+    }
+    if (!requiredSet.has(key)) {
+      input.errors.push(`ActorTurnExecutionDraft.parameters.${key} must be listed in ${input.path}.required`);
+    }
+  }
 }
 
 export function validateActiveEpisode(
@@ -494,6 +603,39 @@ export function validateEvidenceTraceEntry(
   assertOptionalString(value, "verifier_ref", "EvidenceTraceEntry", errors);
   assertOptionalString(value, "post_observation_ref", "EvidenceTraceEntry", errors);
   assertOptionalString(value, "provider_usage_ref", "EvidenceTraceEntry", errors);
+  const selectedAction = value.selected_action;
+  if (selectedAction !== undefined) {
+    const record = assertRecord(value, "selected_action", "EvidenceTraceEntry", errors);
+    if (record) {
+      assertString(record, "kind", "EvidenceTraceEntry.selected_action", errors);
+      assertString(record, "id", "EvidenceTraceEntry.selected_action", errors);
+      assertOptionalString(record, "action_card_id", "EvidenceTraceEntry.selected_action", errors);
+      assertOptionalString(record, "title", "EvidenceTraceEntry.selected_action", errors);
+    }
+  }
+  if (value.parameters !== undefined) {
+    assertRecord(value, "parameters", "EvidenceTraceEntry", errors);
+  }
+  const rationale = value.rationale;
+  if (rationale !== undefined) {
+    const record = assertRecord(value, "rationale", "EvidenceTraceEntry", errors);
+    if (record) {
+      assertOptionalString(record, "why_this_action", "EvidenceTraceEntry.rationale", errors);
+      assertOptionalString(record, "fallback_if_blocked", "EvidenceTraceEntry.rationale", errors);
+    }
+  }
+  assertOptionalString(value, "runtime_status", "EvidenceTraceEntry", errors);
+  if (value.tool_statuses !== undefined) {
+    for (const [index, status] of assertArray(value, "tool_statuses", "EvidenceTraceEntry", errors).entries()) {
+      if (!isRecord(status)) {
+        errors.push(`EvidenceTraceEntry.tool_statuses[${index}] must be an object`);
+        continue;
+      }
+      assertString(status, "tool", `EvidenceTraceEntry.tool_statuses[${index}]`, errors);
+      assertString(status, "status", `EvidenceTraceEntry.tool_statuses[${index}]`, errors);
+    }
+  }
+  assertOptionalString(value, "blocker_reason", "EvidenceTraceEntry", errors);
   assertString(value, "compact_summary", "EvidenceTraceEntry", errors);
   if (!includesString(evidenceTraceOutcomes, value.outcome)) {
     errors.push("EvidenceTraceEntry.outcome must be a known evidence outcome");
@@ -572,6 +714,11 @@ export function validateActorTurnInput(
     assertStringArray(guide, "blocker_recovery_guides", "ActorTurnInput.minecraft_basic_guide", errors);
     assertStringArray(guide, "observe_stop_guides", "ActorTurnInput.minecraft_basic_guide", errors);
   }
+  validateMineflayerCodegenSkillProjection(
+    value.mineflayer_codegen_skill,
+    "ActorTurnInput.mineflayer_codegen_skill",
+    errors
+  );
   const budget = assertRecord(value, "provider_budget_hint", "ActorTurnInput", errors);
   if (budget) {
     assertString(budget, "provider_id", "ActorTurnInput.provider_budget_hint", errors);
@@ -588,58 +735,76 @@ export function validateActorTurnInput(
   return { ok: true, input: value as ActorTurnInput };
 }
 
-export function validateActorTurnOutput(
+export function validateActorTurnExecutionDraft(
   value: unknown
-): ValidationResult<ActorTurnOutput, "output"> {
+): ValidationResult<ActorTurnExecutionDraft, "output"> {
   const errors: string[] = [];
   if (!isRecord(value)) {
-    return { ok: false, errors: ["ActorTurnOutput must be an object"] };
+    return { ok: false, errors: ["ActorTurnExecutionDraft must be an object"] };
   }
-  if (value.schema !== "actor-turn-output/v1") {
-    errors.push("ActorTurnOutput.schema must be actor-turn-output/v1");
+  if (value.schema !== "actor-turn-execution-draft/v1") {
+    errors.push("ActorTurnExecutionDraft.schema must be actor-turn-execution-draft/v1");
   }
   if (!includesString(actorTurnChoices, value.choice)) {
-    errors.push("ActorTurnOutput.choice must be use_existing_action or author_mineflayer_action");
+    errors.push("ActorTurnExecutionDraft.choice must be use_existing_action or author_mineflayer_action");
   }
-  assertRecord(value, "parameters", "ActorTurnOutput", errors);
-  assertString(value, "why_this_action", "ActorTurnOutput", errors);
-  assertStringArray(value, "expected_evidence", "ActorTurnOutput", errors);
-  assertString(value, "fallback_if_blocked", "ActorTurnOutput", errors);
+  const parameters = assertRecord(value, "parameters", "ActorTurnExecutionDraft", errors);
+  assertString(value, "why_this_action", "ActorTurnExecutionDraft", errors);
+  assertStringArray(value, "expected_evidence", "ActorTurnExecutionDraft", errors);
+  assertString(value, "fallback_if_blocked", "ActorTurnExecutionDraft", errors);
 
   if (value.choice === "use_existing_action") {
-    assertString(value, "action_card_id", "ActorTurnOutput", errors);
+    assertString(value, "action_card_id", "ActorTurnExecutionDraft", errors);
     assertAllowedKeys(
       value,
       ["primitive_id", "action_skill_id", "candidate", "source", "runtime_mapping_ref", "args"],
-      "ActorTurnOutput",
+      "ActorTurnExecutionDraft",
       errors
     );
   } else if (value.choice === "author_mineflayer_action") {
-    assertString(value, "proposed_action_skill_id", "ActorTurnOutput", errors);
-    assertString(value, "purpose", "ActorTurnOutput", errors);
-    assertRecord(value, "input_schema", "ActorTurnOutput", errors);
-    assertString(value, "source_language", "ActorTurnOutput", errors);
+    assertString(value, "proposed_action_skill_id", "ActorTurnExecutionDraft", errors);
+    assertString(value, "purpose", "ActorTurnExecutionDraft", errors);
+    const inputSchema = assertRecord(value, "input_schema", "ActorTurnExecutionDraft", errors);
+    if (inputSchema) {
+      validateAuthoringInputSchemaDefinition({
+        schema: inputSchema,
+        parameters,
+        path: "ActorTurnExecutionDraft.input_schema",
+        errors
+      });
+    }
+    assertString(value, "source_language", "ActorTurnExecutionDraft", errors);
     if (value.source_language !== "typescript") {
-      errors.push("ActorTurnOutput.source_language must be typescript");
+      errors.push("ActorTurnExecutionDraft.source_language must be typescript");
     }
-    assertString(value, "source", "ActorTurnOutput", errors);
+    assertString(value, "source", "ActorTurnExecutionDraft", errors);
     if (value.helper_api_version !== "mineflayer-action-skill-helper/v1") {
-      errors.push("ActorTurnOutput.helper_api_version must be mineflayer-action-skill-helper/v1");
+      errors.push("ActorTurnExecutionDraft.helper_api_version must be mineflayer-action-skill-helper/v1");
     }
-    assertStringArray(value, "helper_allowlist", "ActorTurnOutput", errors);
-    assertPositiveInteger(value, "timeout_ms", "ActorTurnOutput", errors);
-    assertRecord(value, "verifier", "ActorTurnOutput", errors);
-    assertStringArray(value, "known_failure_modes", "ActorTurnOutput", errors);
+    validateKnownStringArray(
+      value,
+      "helper_allowlist",
+      "ActorTurnExecutionDraft",
+      actorTurnAuthoringHelperNames,
+      errors
+    );
     if (
-      value.promotion_policy !== "record_candidate_only" &&
-      value.promotion_policy !== "promote_after_passed_trial"
+      typeof value.timeout_ms !== "number" ||
+      !Number.isInteger(value.timeout_ms) ||
+      value.timeout_ms < 500 ||
+      value.timeout_ms > 120_000
     ) {
-      errors.push("ActorTurnOutput.promotion_policy must be a known policy");
+      errors.push("ActorTurnExecutionDraft.timeout_ms must be an integer between 500 and 120000");
+    }
+    assertRecord(value, "verifier", "ActorTurnExecutionDraft", errors);
+    assertStringArray(value, "known_failure_modes", "ActorTurnExecutionDraft", errors);
+    if (value.promotion_policy !== "promote_after_passed_trial") {
+      errors.push("ActorTurnExecutionDraft.promotion_policy must be promote_after_passed_trial");
     }
     assertAllowedKeys(
       value,
       ["primitive_id", "action_skill_id", "action_card_id", "runtime_mapping_ref", "args"],
-      "ActorTurnOutput",
+      "ActorTurnExecutionDraft",
       errors
     );
   }
@@ -647,7 +812,7 @@ export function validateActorTurnOutput(
   if (errors.length > 0) {
     return { ok: false, errors };
   }
-  return { ok: true, output: value as ActorTurnOutput };
+  return { ok: true, output: value as ActorTurnExecutionDraft };
 }
 
 export function validateDeliberationBranch(

@@ -1,3 +1,9 @@
+/**
+ * Registry for legacy objective probe definitions.
+ *
+ * @remarks Objective probes are useful for Mineflayer capability checks, but
+ * they should not define the social runtime's CycleGoal sequence.
+ */
 import type { AllowedTool } from "../tools/index.js";
 
 export type ObjectiveId =

@@ -1,3 +1,10 @@
+/**
+ * Mineflayer primitive for consuming edible inventory items.
+ *
+ * @remarks Food use is a physical state-change claim. The runtime should prefer
+ * structured item selection and post-action vitals/inventory evidence over
+ * provider prose that says the actor ate.
+ */
 export type FoodMetadata = {
   foodPoints?: number;
   saturation?: number;

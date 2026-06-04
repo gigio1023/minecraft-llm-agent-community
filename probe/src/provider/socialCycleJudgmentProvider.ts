@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
-import type { ActionIntent, ActorCycleGoal, CycleJudgment } from "../runtime/goals/types.js";
+import type { LegacyPlannerAction, ActorCycleGoal, CycleJudgment } from "../runtime/goals/types.js";
 import type { PlanBeadOperation } from "../runtime/goals/planBeads/index.js";
 import { validateCycleJudgment } from "../runtime/goals/types.js";
 import { writeCycleJudgment } from "../runtime/goals/cycleJudgmentStore.js";
@@ -177,7 +177,7 @@ export function buildCycleJudgmentBodyFromPayload(
 }
 
 function buildRuntimeFallbackJudgmentBody(input: {
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   executedTools: string[];
   toolStatuses?: Array<{ tool: string; status: string }>;
   verifierStatus: CycleJudgment["verifier_status"];
@@ -185,7 +185,7 @@ function buildRuntimeFallbackJudgmentBody(input: {
 }): CycleJudgmentBody {
   const tools = input.executedTools.length > 0
     ? input.executedTools.join(", ")
-    : input.actionIntent.kind;
+    : input.legacyPlannerAction.kind;
   return {
     outcome: deterministicJudgmentOutcome({
       verifierStatus: input.verifierStatus,
@@ -267,7 +267,7 @@ function deterministicBeadOpProposals(input: {
   ];
 }
 
-function actionLabel(intent: ActionIntent) {
+function actionLabel(intent: LegacyPlannerAction) {
   return intent.kind === "use_action_skill"
     ? intent.action_skill_id ?? "unknown_action_skill"
     : intent.kind === "use_primitive"
@@ -283,7 +283,7 @@ function toolStatusText(statuses: readonly { tool: string; status: string }[] = 
   return statuses.map((entry) => `${entry.tool}:${entry.status}`);
 }
 
-function isContinuityOnlyAction(intent: ActionIntent, executedTools: readonly string[]) {
+function isContinuityOnlyAction(intent: LegacyPlannerAction, executedTools: readonly string[]) {
   const action = actionLabel(intent);
   const toolSet = new Set(executedTools);
   return (
@@ -315,7 +315,7 @@ function firstSelectedPlanBead(input: {
 function buildPlanBeadOperationGuidance(input: {
   actorId: string;
   cycleGoal: ActorCycleGoal;
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   context: SocialCycleContextPacket;
   runtimeResult: JsonValue;
   evidenceRefs: readonly string[];
@@ -324,7 +324,7 @@ function buildPlanBeadOperationGuidance(input: {
   verifierStatus: CycleJudgment["verifier_status"];
 }): JsonValue {
   const packet = input.context.plan_bead_packet;
-  const action = actionLabel(input.actionIntent);
+  const action = actionLabel(input.legacyPlannerAction);
   const statuses = toolStatusText(input.toolStatuses);
   const runtimeStatus = runtimeStatusText(input.runtimeResult);
   const hasEvidence = input.evidenceRefs.length > 0;
@@ -350,7 +350,7 @@ function buildPlanBeadOperationGuidance(input: {
   });
   const shouldConsider =
     hasEvidence &&
-    !isContinuityOnlyAction(input.actionIntent, input.executedTools) &&
+    !isContinuityOnlyAction(input.legacyPlannerAction, input.executedTools) &&
     (blockedLike || usefulProgress || action.includes("Shelter") || action.includes("craft"));
   const candidateOperations: PlanBeadOperation[] = [];
 
@@ -397,7 +397,7 @@ function buildPlanBeadOperationGuidance(input: {
       evidence_refs: [...input.evidenceRefs],
       confidence: blockedLike ? "observed" : "inferred",
       patch: {
-        kind: input.actionIntent.kind === "use_action_skill" ? "action_skill_followup" : "blocker_repair",
+        kind: input.legacyPlannerAction.kind === "use_action_skill" ? "action_skill_followup" : "blocker_repair",
         title: `Resolve ${action} continuity`,
         description:
           `Track the unresolved ${action} result under the LifeGoal without turning it into executable authority.`,
@@ -435,16 +435,16 @@ function buildPlanBeadOperationGuidance(input: {
 }
 
 function buildActionSkillFeedbackGuidance(input: {
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   executedTools: readonly string[];
   toolStatuses?: readonly { tool: string; status: string }[];
   verifierStatus: CycleJudgment["verifier_status"];
 }): JsonValue {
-  const action = actionLabel(input.actionIntent);
+  const action = actionLabel(input.legacyPlannerAction);
   const statuses = toolStatusText(input.toolStatuses);
   const actionSkillId =
-    input.actionIntent.kind === "use_action_skill"
-      ? input.actionIntent.action_skill_id ?? null
+    input.legacyPlannerAction.kind === "use_action_skill"
+      ? input.legacyPlannerAction.action_skill_id ?? null
       : null;
   const failed =
     input.verifierStatus === "failed" ||
@@ -456,7 +456,7 @@ function buildActionSkillFeedbackGuidance(input: {
     action_or_skill: action,
     action_skill_id: actionSkillId,
     should_consider_procedural_memory:
-      Boolean(actionSkillId) || (!isContinuityOnlyAction(input.actionIntent, input.executedTools) && failed),
+      Boolean(actionSkillId) || (!isContinuityOnlyAction(input.legacyPlannerAction, input.executedTools) && failed),
     should_consider_action_skill_followup_plan_bead: Boolean(actionSkillId && failed),
     memory_write_hint:
       actionSkillId && failed
@@ -482,7 +482,7 @@ export async function runSocialCycleJudgmentProvider(input: {
   actorId: string;
   cycleId: string;
   cycleGoal: ActorCycleGoal;
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   context: SocialCycleContextPacket;
   runtimeResult: JsonValue;
   evidenceRefs: string[];
@@ -502,7 +502,7 @@ export async function runSocialCycleJudgmentProvider(input: {
     turnId,
     actionIndex: input.actionIndex,
     cycleGoal: input.cycleGoal,
-    actionIntent: input.actionIntent,
+    legacyPlannerAction: input.legacyPlannerAction,
     runtimeResult: input.runtimeResult,
     evidenceRefs: input.evidenceRefs,
     executedTools: input.executedTools,
@@ -511,7 +511,7 @@ export async function runSocialCycleJudgmentProvider(input: {
     planBeadOperationGuidance: buildPlanBeadOperationGuidance({
       actorId: input.actorId,
       cycleGoal: input.cycleGoal,
-      actionIntent: input.actionIntent,
+      legacyPlannerAction: input.legacyPlannerAction,
       context: input.context,
       runtimeResult: input.runtimeResult,
       evidenceRefs: input.evidenceRefs,
@@ -520,7 +520,7 @@ export async function runSocialCycleJudgmentProvider(input: {
       verifierStatus: input.verifierStatus
     }) as unknown as JsonValue,
     actionSkillFeedbackGuidance: buildActionSkillFeedbackGuidance({
-      actionIntent: input.actionIntent,
+      legacyPlannerAction: input.legacyPlannerAction,
       executedTools: input.executedTools,
       toolStatuses: input.toolStatuses,
       verifierStatus: input.verifierStatus
@@ -550,14 +550,14 @@ export async function runSocialCycleJudgmentProvider(input: {
         executedTools: input.executedTools,
         toolStatuses: input.toolStatuses
       }),
-      what_happened: `Runtime ${input.verifierStatus} for ${input.actionIntent.kind}`,
+      what_happened: `Runtime ${input.verifierStatus} for ${input.legacyPlannerAction.kind}`,
       why_it_mattered_for_life_goal:
         "Baseline cycle records truthful runtime evidence against gatherer LifeGoal.",
       verifier_status: input.verifierStatus,
       memory_writes: [
         {
           layer: "episodic",
-          summary: input.actionIntent.why_this_action,
+          summary: input.legacyPlannerAction.why_this_action,
           confidence: "observed"
         }
       ],
@@ -643,7 +643,7 @@ ActorSoul, ActorLifeGoal, memory_packet, relationship_context, coarse action_sur
       ...(input.runId ? { run_id: input.runId } : {}),
       ...judgmentBody
     },
-    actionIntent: input.actionIntent,
+    action: input.legacyPlannerAction,
     executedTools: input.executedTools,
     toolStatuses: input.toolStatuses
   });
@@ -664,14 +664,14 @@ ActorSoul, ActorLifeGoal, memory_packet, relationship_context, coarse action_sur
         evidence_refs: [...input.evidenceRefs],
         ...(input.runId ? { run_id: input.runId } : {}),
         ...buildRuntimeFallbackJudgmentBody({
-          actionIntent: input.actionIntent,
+          legacyPlannerAction: input.legacyPlannerAction,
           executedTools: input.executedTools,
           toolStatuses: input.toolStatuses,
           verifierStatus: input.verifierStatus,
           validationErrors: validated.errors
         })
       },
-      actionIntent: input.actionIntent,
+      action: input.legacyPlannerAction,
       executedTools: input.executedTools,
       toolStatuses: input.toolStatuses
     });

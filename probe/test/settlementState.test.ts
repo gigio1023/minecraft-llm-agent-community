@@ -1,3 +1,4 @@
+/** Regression coverage for settlement-state evidence consolidation. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

@@ -1,383 +1,121 @@
 /**
- * Actor Turn provider boundary for selecting one existing Action Card or one
- * generated Mineflayer action skill candidate.
+ * Actor Turn provider orchestration.
  *
- * @remarks Provider prose is normalized and validated here because only the
- * resolved `ActionIntent` may become executable authority. The prompts preserve
- * project policy in-context, but runtime validation still rejects missing args,
- * hidden primitive ids, and generated-code metadata in the wrong place.
+ * @remarks Tool contracts and parsers live in sibling modules. This file owns
+ * provider calls, one guided repair, direct Actor Turn action resolution, and
+ * artifacts.
  */
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-import type { OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
-import { callOpenAiJsonSchema } from "./openaiApiJsonProvider.js";
-import type { GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
-import { callGeminiJsonSchema } from "./geminiApiJsonProvider.js";
-import type { ActorTurnInput, ActorTurnOutput, JsonObject } from "../runtime/goals/actorEpisode/index.js";
+import type {
+  ActorTurnInput,
+  ActorTurnExecutionDraft,
+  ActorTurnResolvedAction,
+  JsonObject
+} from "../runtime/goals/actorEpisode/index.js";
 import {
-  resolveActorTurnOutputToActionIntent,
-  validateActorTurnOutput,
+  resolveActorTurnExecutionDraftToAction,
   type ActionCardProjection
 } from "../runtime/goals/actorEpisode/index.js";
-import type { ActionIntent, SocialCycleProviderId } from "../runtime/goals/types.js";
+import type { SocialCycleProviderId } from "../runtime/goals/types.js";
 import { writeActorGoalArtifact } from "../runtime/goals/goalJsonStore.js";
+import type { GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
+import { callGeminiFunctionToolSelection } from "./geminiApiToolProvider.js";
 import type { JsonValue } from "./inputSnapshot.js";
-import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
+import type { OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
+import { callOpenAiFunctionToolSelection } from "./openaiApiToolProvider.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
-import type { ProviderUsageRecord } from "./providerUsageTracker.js";
+import type {
+  ProviderUsageBudgetDecision,
+  ProviderUsageRecord
+} from "./providerUsageTracker.js";
+import {
+  runMineflayerCodegenProvider,
+  type MineflayerCodegenProviderResult
+} from "./socialActorTurnCodegenProvider.js";
+import { buildActorTurnToolSelectionPayload } from "./socialActorTurnToolContract.js";
+import {
+  parseActorTurnToolSelection,
+  type ActorTurnToolSelection
+} from "./socialActorTurnToolParser.js";
 
-export const actorTurnProviderSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    actor_turn: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        choice: {
-          type: "string",
-          enum: ["use_existing_action", "author_mineflayer_action"]
-        },
-        action_card_id: { type: "string" },
-        parameters: { type: "object" },
-        proposed_action_skill_id: { type: "string" },
-        purpose: { type: "string" },
-        input_schema: { type: "object" },
-        source_language: { type: "string", enum: ["typescript"] },
-        source: { type: "string" },
-        helper_api_version: {
-          type: "string",
-          enum: ["mineflayer-action-skill-helper/v1"]
-        },
-        helper_allowlist: { type: "array", items: { type: "string" } },
-        timeout_ms: { type: "number" },
-        verifier: { type: "object" },
-        known_failure_modes: { type: "array", items: { type: "string" } },
-        promotion_policy: {
-          type: "string",
-          enum: ["promote_after_passed_trial"]
-        },
-        why_this_action: { type: "string" },
-        expected_evidence: { type: "array", items: { type: "string" } },
-        fallback_if_blocked: { type: "string" }
-      },
-      required: [
-        "choice",
-        "parameters",
-        "why_this_action",
-        "expected_evidence",
-        "fallback_if_blocked"
-      ]
-    }
-  },
-  required: ["actor_turn"]
-} as const;
-
-export const actorTurnSystemPrompt = `You are choosing one Actor Turn inside an Active Episode.
-Read decision_frame first. It is the runtime's compact priority view of current truth, completed work, open social requests, do-not-repeat constraints, parameter candidates, and top eligible Action Cards.
-Use decision_frame and current_state before older Active Episode wording, then recent Evidence Trace, compact PlanBead hints, relationship context, runtime retry constraints, Action Cards, and Minecraft Basic Guide.
-current_state is the live bounded projection of inventory, vitals, position, visible actors, nearby block hints, world scan, and settlement progress. Do not ignore it in favor of the Active Episode wording.
-decision_frame is guidance, not executable authority: you still must choose a visible Action Card with schema-valid parameters, or author_mineflayer_action when no existing card can express the needed behavior.
-If current_state inventory or settlement progress already satisfies a prerequisite or pivot trigger, choose the next useful action under the LifeGoal instead of repeating the same collection action.
-When current_state.deposit_candidates contains a socially_requested entry and a Deposit Shared or handoff Action Card is visible, use that candidate to fill parameters.itemName and parameters.count unless a stronger current blocker says not to.
-If shared_storage already has contribution evidence and no deposit_candidate is socially_requested, do not repeat a deposit for the same request. Choose the next useful physical, social, memory, or branch action instead.
-If recent Evidence Trace shows observe produced no_progress and current_state already contains a world scan, do not ask to observe again. Use current_state to choose a physical, container, chat, relationship, movement-enabled, or authored action.
-If current_state already records shared_chest=inspected, do not inspect the same chest again unless the episode requires a fresh container delta after another actor or inventory change.
-Choose use_existing_action when an Action Card can make progress with schema-valid parameters. Select the card by description and parameter contract; do not output primitive_id or action_skill_id.
-For Action Cards marked requires_current_state_check, do not choose the card unless current_state or recent runtime evidence satisfies its listed preconditions. If the precondition is missing, choose the nearest prerequisite action instead.
-If runtime_retry_constraints mention an Actor Turn contract rejection, do not repeat the rejected card/parameters. Choose a prerequisite or different card that satisfies current_state.
-Treat movement-only position_delta evidence as context, not durable progress. Use Move To only to reach a specific actionable target or to enable a fresh observation; after movement, prefer a world, inventory, container, chat, or relationship action that uses the new position.
-Choose author_mineflayer_action only when no existing Action Card can do the needed Mineflayer behavior. Do not include action_card_id with author_mineflayer_action. Generated source must be TypeScript, helper-limited, schema-bound, timed, verifier-backed, and trialed by runtime before promotion.
-Do not author generated code merely to probe shared chest/container openability, crafting-table reachability, or station availability when Inspect Chest, Craft With Table, Place Crafting Table, Craft Crafting Table, or current_state already expresses that boundary. Choose the existing Action Card or a prerequisite instead.
-For author_mineflayer_action, promotion_policy must be promote_after_passed_trial; never use record_candidate_only. parameters must contain only runtime inputs declared in input_schema and read through params; never put source_language, source, helper_api_version, helper_allowlist, timeout_ms, verifier, known_failure_modes, or promotion_policy inside parameters.
-For author_mineflayer_action, source must define export async function run(ctx, params) with no import, require, process, filesystem, network, eval, Function, while(true), or for(;;). Use only direct ctx helpers named in helper_allowlist, for example ctx.observe(...), ctx.wait({ durationMs: 200 }), ctx.mineBlock(...), ctx.craftItem(...), ctx.placeBlock(...), ctx.mineflayer("lookAtNearestBlock", { blockName: "chest" }), or ctx.say(...). Do not use ctx.helpers, ctx.sharedStorage, ctx.bot, or ctx.mineflayer() object access. Supported helper names are exactly: position, inventoryItems, observe, wait, collectLogs, mineBlock, craftItem, craftWithTable, consumeItem, placeBlock, buildPattern, say, mineflayer.
-PlanBeads preserve work continuity but never supply executable parameters or proof of progress.
-Do not treat observe, wait, memory notes, or provider prose as success. Runtime evidence decides what happened.
-Prefer action over repeated observation after evidence already identifies the blocker. JSON only.`;
-
-export type ActorTurnProviderPayload = {
-  schemaName: "actor_turn";
-  schema: typeof actorTurnProviderSchema;
-  system: string;
-  user: string;
-  usageContext: {
-    runId?: string;
-    actorId: string;
-    turnId: string;
-    stage: "actor_turn";
-  };
-};
-
-export function buildActorTurnProviderPayload(input: {
-  actorTurnInput: ActorTurnInput;
-  runId?: string;
-}): ActorTurnProviderPayload {
-  return {
-    schemaName: "actor_turn",
-    schema: actorTurnProviderSchema,
-    system: actorTurnSystemPrompt,
-    user: JSON.stringify(input.actorTurnInput satisfies JsonValue),
-    usageContext: {
-      runId: input.runId,
-      actorId: input.actorTurnInput.active_episode.actor_id,
-      turnId: input.actorTurnInput.turn_id,
-      stage: "actor_turn"
-    }
-  };
-}
-
-export function parseActorTurnProviderOutput(value: unknown):
-  | { ok: true; output: ActorTurnOutput }
-  | { ok: false; errors: string[] } {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { ok: false, errors: ["Actor Turn provider output must be an object"] };
-  }
-  const record = value as Record<string, unknown>;
-  const actorTurn = record.actor_turn;
-  const body = typeof actorTurn === "object" && actorTurn !== null && !Array.isArray(actorTurn)
-    ? { ...actorTurn as Record<string, unknown> }
-    : { ...record };
-  mergeSiblingActorTurnFields(body, record);
-  delete body.actor_turn;
-  delete body.type;
-  fillNonAuthorityExplanationDefaults(body);
-  if (body.choice === "author_mineflayer_action") {
-    hoistAuthoringFieldsFromParameters(body);
-    stripAuthoringMetadataFromParameters(body);
-    normalizeAuthoringInputSchema(body);
-    if (typeof body.proposed_action_skill_id !== "string" || body.proposed_action_skill_id.trim().length === 0) {
-      body.proposed_action_skill_id = fallbackGeneratedActionSkillId(body);
-    }
-    body.promotion_policy = "promote_after_passed_trial";
-    delete body.action_card_id;
-    delete body.primitive_id;
-    delete body.action_skill_id;
-    delete body.runtime_mapping_ref;
-    delete body.args;
-  } else if (body.choice === "use_existing_action") {
-    delete body.proposed_action_skill_id;
-    delete body.purpose;
-    delete body.input_schema;
-    delete body.source_language;
-    delete body.source;
-    delete body.helper_api_version;
-    delete body.helper_allowlist;
-    delete body.timeout_ms;
-    delete body.verifier;
-    delete body.known_failure_modes;
-    delete body.promotion_policy;
-  }
-  const candidate = {
-    schema: "actor-turn-output/v1",
-    ...body
-  };
-  const result = validateActorTurnOutput(candidate);
-  return result.ok
-    ? { ok: true, output: result.output }
-    : { ok: false, errors: result.errors };
-}
-
-const actorTurnSiblingFieldNames = [
-  "source_language",
-  "source",
-  "helper_api_version",
-  "helper_allowlist",
-  "timeout_ms",
-  "verifier",
-  "known_failure_modes",
-  "promotion_policy",
-  "why_this_action",
-  "expected_evidence",
-  "fallback_if_blocked"
-] as const;
-
-const authoringMetadataParameterFieldNames = [
-  "source_language",
-  "source",
-  "helper_api_version",
-  "helper_allowlist",
-  "timeout_ms",
-  "verifier",
-  "known_failure_modes",
-  "promotion_policy"
-] as const;
-
-function mergeSiblingActorTurnFields(
-  body: Record<string, unknown>,
-  record: Record<string, unknown>
-) {
-  if (body.choice !== "author_mineflayer_action" || !("actor_turn" in record)) {
-    return;
-  }
-  for (const fieldName of actorTurnSiblingFieldNames) {
-    if (body[fieldName] === undefined && record[fieldName] !== undefined) {
-      body[fieldName] = record[fieldName];
-    }
-  }
-}
-
-function hoistAuthoringFieldsFromParameters(body: Record<string, unknown>) {
-  const parameters = nestedParameters(body);
-  for (const fieldName of authoringMetadataParameterFieldNames) {
-    if (body[fieldName] === undefined && parameters[fieldName] !== undefined) {
-      body[fieldName] = parameters[fieldName];
-    }
-  }
-}
-
-function stripAuthoringMetadataFromParameters(body: Record<string, unknown>) {
-  const parameters = nestedParameters(body);
-  for (const fieldName of authoringMetadataParameterFieldNames) {
-    delete parameters[fieldName];
-  }
-  body.parameters = parameters;
-}
-
-function inferJsonSchemaForValue(value: unknown) {
-  if (typeof value === "string") {
-    return { type: "string" };
-  }
-  if (typeof value === "number") {
-    return { type: Number.isInteger(value) ? "integer" : "number" };
-  }
-  if (typeof value === "boolean") {
-    return { type: "boolean" };
-  }
-  if (Array.isArray(value)) {
-    return { type: "array" };
-  }
-  if (typeof value === "object" && value !== null) {
-    return { type: "object" };
-  }
-  return { type: "string" };
-}
-
-function normalizeAuthoringInputSchema(body: Record<string, unknown>) {
-  const rawSchema = typeof body.input_schema === "object" &&
-    body.input_schema !== null &&
-    !Array.isArray(body.input_schema)
-    ? { ...body.input_schema as Record<string, unknown> }
-    : {};
-  rawSchema.type = "object";
-  const parameters = nestedParameters(body);
-  const existingProperties = typeof rawSchema.properties === "object" &&
-    rawSchema.properties !== null &&
-    !Array.isArray(rawSchema.properties)
-    ? { ...rawSchema.properties as Record<string, unknown> }
-    : {};
-  for (const [key, value] of Object.entries(parameters)) {
-    if (existingProperties[key] === undefined) {
-      existingProperties[key] = inferJsonSchemaForValue(value);
-    }
-  }
-  rawSchema.properties = existingProperties;
-  if (rawSchema.additionalProperties === undefined) {
-    rawSchema.additionalProperties = false;
-  }
-  body.input_schema = rawSchema;
-}
-
-function nestedParameters(value: Record<string, unknown>) {
-  return typeof value.parameters === "object" && value.parameters !== null && !Array.isArray(value.parameters)
-    ? value.parameters as Record<string, unknown>
-    : {};
-}
-
-function readNestedString(value: Record<string, unknown>, keys: readonly string[]) {
-  const parameters = nestedParameters(value);
-  for (const key of keys) {
-    const bodyValue = value[key];
-    if (typeof bodyValue === "string" && bodyValue.trim().length > 0) {
-      return bodyValue;
-    }
-    const parameterValue = parameters[key];
-    if (typeof parameterValue === "string" && parameterValue.trim().length > 0) {
-      return parameterValue;
-    }
-  }
-  return undefined;
-}
-
-function fillNonAuthorityExplanationDefaults(value: Record<string, unknown>) {
-  if (typeof value.why_this_action !== "string" || value.why_this_action.trim().length === 0) {
-    value.why_this_action = readNestedString(value, ["purpose", "expectedObservation", "expected_observation"]) ??
-      "Use the selected Action Card with the supplied structured parameters.";
-  }
-  if (!Array.isArray(value.expected_evidence)) {
-    const expected = readNestedString(value, [
-      "expected_evidence",
-      "expectedEvidence",
-      "expectedObservation",
-      "expected_observation"
-    ]);
-    value.expected_evidence = expected
-      ? [expected]
-      : ["runtime evidence from the selected Action Card"];
-  }
-  if (typeof value.fallback_if_blocked !== "string" || value.fallback_if_blocked.trim().length === 0) {
-    value.fallback_if_blocked =
-      "If blocked, record the runtime blocker and choose a valid prerequisite or different Action Card next turn.";
-  }
-}
-
-function fallbackGeneratedActionSkillId(value: Record<string, unknown>) {
-  const base = typeof value.purpose === "string" && value.purpose.trim().length > 0
-    ? value.purpose
-    : typeof value.why_this_action === "string" && value.why_this_action.trim().length > 0
-      ? value.why_this_action
-      : "actor turn generated action";
-  const words = base
-    .replace(/[^a-zA-Z0-9]+/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 5);
-  const pascal = words
-    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-    .join("");
-  return `trial${pascal || "GeneratedAction"}`;
-}
+export {
+  AUTHOR_MINEFLAYER_ACTION_TOOL_NAME,
+  actorTurnToolNameForActionCard,
+  buildActorTurnToolSelectionPayload
+} from "./socialActorTurnToolContract.js";
+export {
+  parseActorTurnToolSelection,
+  type ActorTurnToolSelection
+} from "./socialActorTurnToolParser.js";
+export {
+  buildMineflayerCodegenRequest,
+  buildMineflayerCodegenProviderPayload,
+  type MineflayerCodegenOutput,
+  type MineflayerCodegenRequest
+} from "./socialActorTurnCodegenContract.js";
+export { parseMineflayerCodegenProviderOutput } from "./socialActorTurnCodegenProvider.js";
 
 export type ActorTurnProviderResult =
   | {
-      ok: true;
-      actorTurn: ActorTurnOutput;
-      intent: ActionIntent;
-      intentRef: string;
+	      ok: true;
+	      actorTurn: ActorTurnExecutionDraft;
+	      action: ActorTurnResolvedAction;
+	      actionRef: string;
       inputRef: string;
       outputRef: string;
+      intermediateInputRefs?: string[];
+      intermediateOutputRefs?: string[];
     }
   | {
       ok: false;
+      failureKind?: "provider_contract_rejection";
+      errorKind?: string;
       error: string;
       inputRef: string;
       outputRef: string;
+      rawRejectedOutput?: JsonValue;
+      budgetDecision?: ProviderUsageBudgetDecision;
+      intermediateInputRefs?: string[];
+      intermediateOutputRefs?: string[];
     };
 
 type ActorTurnProviderAttempt =
   | {
       ok: true;
-      actorTurn: ActorTurnOutput;
+      actorTurn: ActorTurnExecutionDraft;
       inputRef: string;
       snapshotId: string;
       model: string;
       rawText: string;
+      rawProviderOutput?: JsonValue;
       usageRecord?: ProviderUsageRecord;
+      toolSelection?: ActorTurnToolSelection;
+      toolSelectionRef?: string;
+      codegen?: Extract<MineflayerCodegenProviderResult, { ok: true }>;
+      intermediateInputRefs?: string[];
+      intermediateOutputRefs?: string[];
     }
   | {
       ok: false;
+      failureKind?: "provider_contract_rejection";
+      errorKind?: string;
       error: string;
       inputRef: string;
       outputRef: string;
+      rawRejectedOutput?: JsonValue;
+      budgetDecision?: ProviderUsageBudgetDecision;
+      intermediateInputRefs?: string[];
+      intermediateOutputRefs?: string[];
     };
 
 function deterministicActorTurn(input: {
   actorTurnInput: ActorTurnInput;
   actionCardProjection: ActionCardProjection;
   defaultPrimitive?: string;
-}): ActorTurnOutput {
+}): ActorTurnExecutionDraft {
   const preferredPrimitive = input.defaultPrimitive ?? "observe";
   const preferredMapping = input.actionCardProjection.runtime_mappings.find((mapping) =>
     mapping.kind === "use_primitive" && mapping.primitive_id === preferredPrimitive
@@ -392,10 +130,12 @@ function deterministicActorTurn(input: {
     ? { ticks: 20 }
     : preferredPrimitive === "remember"
       ? { note: "actor turn deterministic baseline" }
+      : preferredPrimitive === "move_to"
+        ? { x: 1, y: 0, z: 0 }
       : {};
 
   return {
-    schema: "actor-turn-output/v1",
+    schema: "actor-turn-execution-draft/v1",
     choice: "use_existing_action",
     action_card_id: actionCardId,
     parameters,
@@ -413,8 +153,11 @@ async function writeFailureOutput(input: {
   model: string;
   snapshotId: string;
   rawText?: string;
+  rawOutput?: JsonValue;
   error: string;
+  errorKind?: string;
   usageRecord?: ProviderUsageRecord;
+  budgetDecision?: ProviderUsageBudgetDecision;
 }) {
   return writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-output-snapshot/v1",
@@ -425,8 +168,17 @@ async function writeFailureOutput(input: {
     model: input.model,
     created_at: new Date().toISOString(),
     raw_output_text: input.rawText ?? "",
-    parsed_output: { error: input.error },
-    proposal: { error: input.error },
+    parsed_output: {
+      error: input.error,
+      error_kind: input.errorKind ?? null,
+      budget_decision: (input.budgetDecision as unknown as JsonValue | undefined) ?? null,
+      raw_provider_output: input.rawOutput ?? null
+    },
+    proposal: {
+      error: input.error,
+      error_kind: input.errorKind ?? null,
+      raw_provider_output: input.rawOutput ?? null
+    },
     usage: input.usageRecord
   });
 }
@@ -453,41 +205,31 @@ async function writeActorTurnAttemptSnapshot(input: {
 
 export function buildRepairActorTurnInput(input: {
   actorTurnInput: ActorTurnInput;
-  rejectedOutput: ActorTurnOutput;
+  rejectedOutput: ActorTurnExecutionDraft;
   errors: string[];
+  rawRejectedToolCall?: JsonValue;
 }): ActorTurnInput {
   const target = input.rejectedOutput.choice === "use_existing_action"
     ? `Action Card ${input.rejectedOutput.action_card_id}`
     : `generated action skill ${input.rejectedOutput.proposed_action_skill_id}`;
-  const rejectedActionCardId = input.rejectedOutput.choice === "use_existing_action"
-    ? input.rejectedOutput.action_card_id
-    : undefined;
-  const actionCards = rejectedActionCardId && input.actorTurnInput.action_cards.length > 1
-    ? input.actorTurnInput.action_cards.filter((card) => card.action_card_id !== rejectedActionCardId)
-    : input.actorTurnInput.action_cards;
-  const visibleCardIds = new Set(actionCards.map((card) => card.action_card_id));
-  const rejectedGuidance = rejectedActionCardId
-    ? [
-        `do not choose rejected ${target} again in this repair attempt`,
-        `choose only from the visible action_cards list; ${target} was removed after contract rejection`
-      ]
-    : [`do not repeat rejected ${target} in this repair attempt`];
+  const rejectedGuidance = [
+    `previous ${target} failed contract validation: ${input.errors.join("; ")}`,
+    "you may choose the same visible tool only if you repair the structured parameters or rationale; otherwise choose another visible tool or author_mineflayer_action"
+  ];
   return {
     ...input.actorTurnInput,
-    action_cards: actionCards,
     decision_frame: {
       ...input.actorTurnInput.decision_frame,
-      top_eligible_action_cards: input.actorTurnInput.decision_frame.top_eligible_action_cards
-        .filter((card) => visibleCardIds.has(card.action_card_id)),
-      recommended_next_action_candidates: input.actorTurnInput.decision_frame.recommended_next_action_candidates
-        .filter((candidate) => visibleCardIds.has(candidate.action_card_id)),
       do_not_repeat: [
         ...rejectedGuidance,
         ...input.actorTurnInput.decision_frame.do_not_repeat
       ],
       next_action_guidance: [
         `previous ${target} failed contract validation: ${input.errors.join("; ")}`,
-        "repair must choose a currently visible Action Card with schema-valid parameters or author a specific Mineflayer action",
+        ...(input.rawRejectedToolCall
+          ? ["previous raw function_call is preserved in runtime_retry_constraints.args_normalized.raw_rejected_function_call; use it to avoid repeating the same schema mistake"]
+          : []),
+        "repair must choose a visible Action Card with schema-valid parameters or author a specific Mineflayer action; no Action Card is removed merely because the previous arguments were invalid",
         ...input.actorTurnInput.decision_frame.next_action_guidance
       ]
     },
@@ -496,7 +238,9 @@ export function buildRepairActorTurnInput(input: {
         constraint_id:
           `actor-turn-contract-rejection-${input.actorTurnInput.turn_id}-${input.actorTurnInput.runtime_retry_constraints.length + 1}`,
         target_summary: `${target} rejected before execution`,
-        args_normalized: {},
+        args_normalized: input.rawRejectedToolCall
+          ? { raw_rejected_function_call: input.rawRejectedToolCall }
+          : {},
         blocked_reason: input.errors.join("; "),
         repeat_count: 1,
         evidence_refs: []
@@ -509,6 +253,7 @@ export function buildRepairActorTurnInput(input: {
 function buildMalformedOutputRepairActorTurnInput(input: {
   actorTurnInput: ActorTurnInput;
   error: string;
+  rawRejectedOutput?: JsonValue;
 }): ActorTurnInput {
   return {
     ...input.actorTurnInput,
@@ -516,10 +261,10 @@ function buildMalformedOutputRepairActorTurnInput(input: {
       {
         constraint_id:
           `actor-turn-malformed-output-${input.actorTurnInput.turn_id}-${input.actorTurnInput.runtime_retry_constraints.length + 1}`,
-        target_summary: "provider output rejected before ActionIntent resolution",
-        args_normalized: {},
+        target_summary: "provider output rejected before Actor Turn tool selection",
+        args_normalized: input.rawRejectedOutput ?? {},
         blocked_reason:
-          `${input.error}. Return an actor_turn object, not the JSON schema. choice must be use_existing_action or author_mineflayer_action, and parameters must be an object.`,
+          `${input.error}. Return exactly one Actor Turn tool call: one visible Action Card function or author_mineflayer_action with schema-valid arguments.`,
         repeat_count: 1,
         evidence_refs: []
       },
@@ -528,7 +273,7 @@ function buildMalformedOutputRepairActorTurnInput(input: {
     decision_frame: {
       ...input.actorTurnInput.decision_frame,
       next_action_guidance: [
-        "previous provider output was malformed; return a concrete actor_turn decision object, not the schema definition",
+        "previous provider output was malformed; return one concrete tool selection with schema-valid parameters or detailed author_mineflayer_action rationale",
         ...input.actorTurnInput.decision_frame.next_action_guidance
       ]
     }
@@ -536,7 +281,7 @@ function buildMalformedOutputRepairActorTurnInput(input: {
 }
 
 function isRepairableActorTurnProviderError(error: string) {
-  return /\bActorTurnOutput\b|Actor Turn provider output|actor_turn object|parameters must be an object/i
+  return /\bActorTurnExecutionDraft\b|Actor Turn provider output|Actor Turn provider must return exactly one function_call|Actor Turn tool selection|function_call|function call|tool call|parameters must be an object/i
     .test(error);
 }
 
@@ -551,6 +296,299 @@ function projectionForActorTurnInput(
     runtime_mappings: projection.runtime_mappings.filter((mapping) =>
       visibleIds.has(mapping.action_card_id)
     )
+  };
+}
+
+function actorTurnOutputFromExistingToolSelection(
+  selection: Extract<ActorTurnToolSelection, { selection_kind: "use_existing_action" }>
+): ActorTurnExecutionDraft {
+  return {
+    schema: "actor-turn-execution-draft/v1",
+    choice: "use_existing_action",
+    action_card_id: selection.action_card_id,
+    parameters: selection.args.parameters,
+    why_this_action: [
+      selection.args.situation_assessment,
+      selection.args.why_this_tool
+    ].join("\n\n"),
+    expected_evidence: [...selection.args.success_evidence],
+    fallback_if_blocked: selection.args.failure_handling
+  };
+}
+
+function toJsonObject(value: unknown): JsonObject {
+  return JSON.parse(JSON.stringify(value)) as JsonObject;
+}
+
+function actorTurnOutputFromCodegenSelection(input: {
+  selection: Extract<ActorTurnToolSelection, { selection_kind: "author_mineflayer_action" }>;
+  codegen: Extract<MineflayerCodegenProviderResult, { ok: true }>;
+}): ActorTurnExecutionDraft {
+  return {
+    schema: "actor-turn-execution-draft/v1",
+    choice: "author_mineflayer_action",
+    proposed_action_skill_id: input.codegen.output.candidate.proposed_skill_id,
+    purpose: input.codegen.output.candidate.purpose,
+    input_schema: toJsonObject(input.codegen.output.candidate.input_schema),
+    parameters: input.codegen.output.runtime_parameters,
+    source_language: input.codegen.output.candidate.source_language,
+    source: input.codegen.output.candidate.source,
+    helper_api_version: input.codegen.output.candidate.helper_api_version,
+    helper_allowlist: [...input.codegen.output.candidate.helper_allowlist],
+    timeout_ms: input.codegen.output.candidate.timeout_ms,
+    verifier: toJsonObject(input.codegen.output.candidate.verifier),
+    known_failure_modes: [...input.codegen.output.candidate.known_failure_modes],
+    promotion_policy: input.codegen.output.candidate.promotion_policy,
+    why_this_action: [
+      input.selection.args.situation_assessment,
+      input.selection.args.why_codegen_is_needed,
+      input.selection.args.desired_minecraft_behavior,
+      input.codegen.output.codegen_rationale
+    ].join("\n\n"),
+    expected_evidence: [...input.selection.args.success_evidence],
+    fallback_if_blocked: input.selection.args.failure_handling
+  };
+}
+
+function actorTurnArtifactOutput(output: ActorTurnExecutionDraft): JsonValue {
+  if (output.choice !== "author_mineflayer_action") {
+    return output as unknown as JsonValue;
+  }
+  const { source: _source, ...sourceFree } = output;
+  return {
+    ...sourceFree,
+    source_omitted: true,
+    source_boundary:
+      "Generated TypeScript source is stored only in mineflayer-codegen artifacts and actor-owned action-skill candidate evidence."
+  } as unknown as JsonValue;
+}
+
+function providerParsedOutputForAttempt(attempt: Extract<ActorTurnProviderAttempt, { ok: true }>): JsonValue {
+  if (!attempt.toolSelection) {
+    return attempt.actorTurn as unknown as JsonValue;
+  }
+  return {
+    schema: "actor-turn-tool-selection-result/v1",
+    actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
+    actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null,
+    raw_provider_output: attempt.rawProviderOutput ?? null,
+    actor_turn_output: actorTurnArtifactOutput(attempt.actorTurn),
+    ...(attempt.codegen
+      ? {
+          mineflayer_codegen_request_ref: attempt.codegen.requestRef,
+          mineflayer_codegen_output_ref: attempt.codegen.outputRef
+        }
+      : {})
+  } as unknown as JsonValue;
+}
+
+async function writeToolSelectionArtifact(input: {
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  turnId: string;
+  selection: ActorTurnToolSelection;
+}) {
+  const { ref } = await writeActorGoalArtifact(
+    input.actorWorkspaceRootDir,
+    input.actorId,
+    path.join("goals", "cycle", "tool-selections"),
+    `${input.turnId}-tool-selection`,
+    input.selection
+  );
+  return ref;
+}
+
+async function requestLlmActorTurnToolSelection(input: {
+  providerId: Extract<SocialCycleProviderId, "openai-api" | "gemini-api">;
+  actorWorkspaceRootDir: string;
+  actorId: string;
+  actorTurnInput: ActorTurnInput;
+  actionCardProjection: ActionCardProjection;
+  openAi?: OpenAiJsonProviderConfig;
+  gemini?: GeminiJsonProviderConfig;
+  runId?: string;
+  snapshotId: string;
+  inputRef: string;
+}): Promise<ActorTurnProviderAttempt> {
+  const payload = buildActorTurnToolSelectionPayload({
+    actorTurnInput: input.actorTurnInput,
+    actionCardProjection: input.actionCardProjection,
+    runId: input.runId
+  });
+  const result = input.providerId === "openai-api"
+    ? await callOpenAiFunctionToolSelection({
+        config: input.openAi!,
+        system: payload.system,
+        user: payload.user,
+        tools: payload.tools,
+        usageContext: payload.usageContext
+      })
+    : await callGeminiFunctionToolSelection({
+        config: input.gemini!,
+        system: payload.system,
+        user: payload.user,
+        tools: payload.tools,
+        usageContext: payload.usageContext
+      });
+  const rawText = result.rawText ?? "";
+  if (!result.ok) {
+    const outputRef = await writeFailureOutput({
+      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+      actorId: input.actorId,
+      turnId: input.actorTurnInput.turn_id,
+      providerId: input.providerId,
+      model: result.model,
+      snapshotId: input.snapshotId,
+      rawText,
+      error: result.message,
+      errorKind: result.errorKind,
+      usageRecord: result.usageRecord,
+      rawOutput: result.rawOutput,
+      budgetDecision: result.budgetDecision
+    });
+    return {
+      ok: false,
+      errorKind: result.errorKind,
+      error: result.message,
+      inputRef: input.inputRef,
+      outputRef,
+      rawRejectedOutput: result.rawOutput,
+      budgetDecision: result.budgetDecision
+    };
+  }
+
+  const parsed = parseActorTurnToolSelection({
+    functionCalls: result.functionCalls,
+    actionCardToolMappings: payload.actionCardToolMappings
+  });
+  if (!parsed.ok) {
+    const error = parsed.errors.join("; ");
+    const outputRef = await writeFailureOutput({
+      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+      actorId: input.actorId,
+      turnId: input.actorTurnInput.turn_id,
+      providerId: input.providerId,
+      model: result.model,
+      snapshotId: input.snapshotId,
+      rawText,
+      error,
+      errorKind: "tool_selection_parse_error",
+      usageRecord: result.usageRecord,
+      rawOutput: result.rawOutput,
+      budgetDecision: result.budgetDecision
+    });
+    return {
+      ok: false,
+      errorKind: "tool_selection_parse_error",
+      error,
+      inputRef: input.inputRef,
+      outputRef,
+      rawRejectedOutput: result.rawOutput,
+      budgetDecision: result.budgetDecision
+    };
+  }
+
+  const toolSelectionRef = await writeToolSelectionArtifact({
+    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    turnId: input.actorTurnInput.turn_id,
+    selection: parsed.selection
+  });
+
+  if (parsed.selection.selection_kind === "use_existing_action") {
+    return {
+      ok: true,
+      actorTurn: actorTurnOutputFromExistingToolSelection(parsed.selection),
+      inputRef: input.inputRef,
+      snapshotId: input.snapshotId,
+      model: result.model,
+      rawText,
+      rawProviderOutput: result.rawOutput,
+      usageRecord: result.usageRecord,
+      toolSelection: parsed.selection,
+      toolSelectionRef
+    };
+  }
+
+  const codegen = await runMineflayerCodegenProvider({
+    providerId: input.providerId,
+    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
+    actorId: input.actorId,
+    actorTurnInput: input.actorTurnInput,
+    rawOuterToolCall: parsed.selection.raw_tool_call,
+    parsedAuthorToolArgs: parsed.selection.args,
+    openAi: input.openAi,
+    gemini: input.gemini,
+    runId: input.runId,
+    snapshotId: `${input.snapshotId}-mineflayer-codegen`
+  });
+  if (!codegen.ok) {
+    const outerOutputRef = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
+      schema: "provider-output-snapshot/v1",
+      snapshot_id: `${input.snapshotId}-outer-tool-selection-out`,
+      actor_id: input.actorId,
+      turn_id: input.actorTurnInput.turn_id,
+      provider_id: input.providerId,
+      model: result.model,
+      created_at: new Date().toISOString(),
+      raw_output_text: rawText,
+      parsed_output: {
+        schema: "actor-turn-tool-selection-result/v1",
+        actor_turn_tool_selection: parsed.selection as unknown as JsonValue,
+        actor_turn_tool_selection_ref: toolSelectionRef,
+        raw_provider_output: result.rawOutput ?? null,
+        mineflayer_codegen_failed: true,
+        mineflayer_codegen_output_ref: codegen.outputRef
+      },
+	      proposal: {
+	        actor_turn_tool_selection: parsed.selection as unknown as JsonValue,
+	        actor_turn_tool_selection_ref: toolSelectionRef,
+	        mineflayer_codegen_failed: true,
+	        mineflayer_codegen_output_ref: codegen.outputRef
+	      },
+      usage: result.usageRecord
+    });
+    return {
+      ok: false,
+      failureKind: "provider_contract_rejection",
+      errorKind: "mineflayer_codegen_contract_rejection",
+      error: codegen.error,
+      inputRef: input.inputRef,
+      outputRef: codegen.outputRef,
+      intermediateInputRefs: [
+        ...(codegen.intermediateInputRefs ?? []),
+        codegen.inputRef
+      ],
+      intermediateOutputRefs: [
+        outerOutputRef,
+        ...(codegen.intermediateOutputRefs ?? []),
+        codegen.outputRef
+      ]
+    };
+  }
+  return {
+    ok: true,
+    actorTurn: actorTurnOutputFromCodegenSelection({
+      selection: parsed.selection,
+      codegen
+    }),
+    inputRef: input.inputRef,
+    snapshotId: input.snapshotId,
+    model: result.model,
+    rawText,
+    rawProviderOutput: result.rawOutput,
+    usageRecord: result.usageRecord,
+    toolSelection: parsed.selection,
+    toolSelectionRef,
+    codegen,
+    intermediateInputRefs: [
+      ...(codegen.intermediateInputRefs ?? []),
+      codegen.inputRef
+    ],
+    intermediateOutputRefs: [
+      ...(codegen.intermediateOutputRefs ?? []),
+      codegen.outputRef
+    ]
   };
 }
 
@@ -592,62 +630,23 @@ async function requestActorTurn(input: {
     };
   }
 
-  const payload = buildActorTurnProviderPayload({
-    actorTurnInput: input.actorTurnInput,
-    runId: input.runId
-  });
-  const result = input.providerId === "gemini-api"
-    ? await callGeminiJsonSchema<{ actor_turn: unknown }>({
-        config: input.gemini!,
-        ...payload
-      })
-    : await callOpenAiJsonSchema<{ actor_turn: unknown }>({
-        config: input.openAi!,
-        ...payload
-      });
-  const rawText = result.rawText ?? "";
-  if (!result.ok) {
-    const outputRef = await writeFailureOutput({
+  if (input.providerId === "openai-api" || input.providerId === "gemini-api") {
+    return requestLlmActorTurnToolSelection({
+      providerId: input.providerId,
       actorWorkspaceRootDir: input.actorWorkspaceRootDir,
       actorId: input.actorId,
-      turnId: input.actorTurnInput.turn_id,
-      providerId: input.providerId,
-      model: result.model,
+      actorTurnInput: input.actorTurnInput,
+      actionCardProjection: input.actionCardProjection,
+      openAi: input.openAi,
+      gemini: input.gemini,
+      runId: input.runId,
       snapshotId: input.snapshotId,
-      rawText,
-      error: result.message,
-      usageRecord: result.usageRecord
+      inputRef: inputPath
     });
-    return { ok: false, error: result.message, inputRef: inputPath, outputRef };
   }
 
-  const parsed = parseActorTurnProviderOutput(
-    normalizeOpenAiJsonPayload(result.parsed as Record<string, unknown>)
-  );
-  if (!parsed.ok) {
-    const error = parsed.errors.join("; ");
-    const outputRef = await writeFailureOutput({
-      actorWorkspaceRootDir: input.actorWorkspaceRootDir,
-      actorId: input.actorId,
-      turnId: input.actorTurnInput.turn_id,
-      providerId: input.providerId,
-      model: result.model,
-      snapshotId: input.snapshotId,
-      rawText,
-      error,
-      usageRecord: result.usageRecord
-    });
-    return { ok: false, error, inputRef: inputPath, outputRef };
-  }
-  return {
-    ok: true,
-    actorTurn: parsed.output,
-    inputRef: inputPath,
-    snapshotId: input.snapshotId,
-    model: result.model,
-    rawText,
-    usageRecord: result.usageRecord
-  };
+  const unsupportedProvider: never = input.providerId;
+  throw new Error(`Unsupported Actor Turn provider: ${unsupportedProvider}`);
 }
 
 export async function runSocialActorTurnProvider(input: {
@@ -667,6 +666,8 @@ export async function runSocialActorTurnProvider(input: {
   const model = input.openAi?.model ?? input.gemini?.model ?? "deterministic-social";
   let actorTurnInput = input.actorTurnInput;
   let actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
+  const intermediateInputRefs: string[] = [];
+  const intermediateOutputRefs: string[] = [];
   let attempt = await requestActorTurn({
     ...input,
     actorTurnInput,
@@ -678,9 +679,12 @@ export async function runSocialActorTurnProvider(input: {
     if (!isRepairableActorTurnProviderError(attempt.error)) {
       return attempt;
     }
+    intermediateInputRefs.push(attempt.inputRef, ...(attempt.intermediateInputRefs ?? []));
+    intermediateOutputRefs.push(attempt.outputRef, ...(attempt.intermediateOutputRefs ?? []));
     actorTurnInput = buildMalformedOutputRepairActorTurnInput({
       actorTurnInput,
-      error: attempt.error
+      error: attempt.error,
+      rawRejectedOutput: attempt.rawRejectedOutput
     });
     actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
     attempt = await requestActorTurn({
@@ -691,11 +695,21 @@ export async function runSocialActorTurnProvider(input: {
       model
     });
     if (!attempt.ok) {
-      return attempt;
+      return {
+        ...attempt,
+        intermediateInputRefs: [
+          ...intermediateInputRefs,
+          ...(attempt.intermediateInputRefs ?? [])
+        ],
+        intermediateOutputRefs: [
+          ...intermediateOutputRefs,
+          ...(attempt.intermediateOutputRefs ?? [])
+        ]
+      };
     }
   }
 
-  let resolution = resolveActorTurnOutputToActionIntent({
+  let resolution = resolveActorTurnExecutionDraftToAction({
     actorId: input.actorId,
     cycleId: input.cycleId,
     cycleGoalId: input.cycleGoalId,
@@ -713,19 +727,33 @@ export async function runSocialActorTurnProvider(input: {
       model: attempt.model,
       created_at: new Date().toISOString(),
       raw_output_text: attempt.rawText,
-      parsed_output: attempt.actorTurn as unknown as JsonValue,
+      parsed_output: providerParsedOutputForAttempt(attempt),
       proposal: {
-        actor_turn_output: attempt.actorTurn as unknown as JsonValue,
-        action_intent_ref: null,
+        actor_turn_output: actorTurnArtifactOutput(attempt.actorTurn),
+        ...(attempt.toolSelection
+	          ? {
+	              actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
+	              actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null
+	            }
+          : {}),
+        ...(attempt.codegen
+          ? {
+              mineflayer_codegen_request_ref: attempt.codegen.requestRef,
+              mineflayer_codegen_output_ref: attempt.codegen.outputRef
+            }
+          : {}),
+        action_ref: null,
         resolution_errors: resolution.errors,
         repair_requested: true
       },
       usage: attempt.usageRecord
     });
+    intermediateOutputRefs.push(rejectionRef);
     actorTurnInput = buildRepairActorTurnInput({
       actorTurnInput,
       rejectedOutput: attempt.actorTurn,
-      errors: resolution.errors
+      errors: resolution.errors,
+      rawRejectedToolCall: attempt.toolSelection?.raw_tool_call
     });
     actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
     attempt = await requestActorTurn({
@@ -736,9 +764,19 @@ export async function runSocialActorTurnProvider(input: {
       model
     });
     if (!attempt.ok) {
-      return attempt;
+      return {
+        ...attempt,
+        intermediateInputRefs: [
+          ...intermediateInputRefs,
+          ...(attempt.intermediateInputRefs ?? [])
+        ],
+        intermediateOutputRefs: [
+          ...intermediateOutputRefs,
+          ...(attempt.intermediateOutputRefs ?? [])
+        ]
+      };
     }
-    resolution = resolveActorTurnOutputToActionIntent({
+    resolution = resolveActorTurnExecutionDraftToAction({
       actorId: input.actorId,
       cycleId: input.cycleId,
       cycleGoalId: input.cycleGoalId,
@@ -757,19 +795,49 @@ export async function runSocialActorTurnProvider(input: {
         snapshotId: attempt.snapshotId,
         rawText: attempt.rawText,
         error: `${error}; previous_contract_rejection_ref=${rejectionRef}`,
-        usageRecord: attempt.usageRecord
+        errorKind: "actor_turn_resolution_error",
+        usageRecord: attempt.usageRecord,
+        rawOutput: attempt.rawProviderOutput
       });
-      return { ok: false, error, inputRef: attempt.inputRef, outputRef };
+      return {
+        ok: false,
+        failureKind: "provider_contract_rejection",
+        errorKind: "actor_turn_resolution_error",
+        error,
+        inputRef: attempt.inputRef,
+        outputRef,
+        rawRejectedOutput: attempt.actorTurn as unknown as JsonValue,
+        intermediateInputRefs: [
+          ...intermediateInputRefs,
+          ...(attempt.intermediateInputRefs ?? [])
+        ],
+        intermediateOutputRefs: [
+          ...intermediateOutputRefs,
+          ...(attempt.intermediateOutputRefs ?? [])
+        ]
+      };
     }
   }
 
-  const { ref: intentRef } = await writeActorGoalArtifact(
+  const actionArtifact = attempt.toolSelection
+    ? {
+        ...resolution.action,
+        actor_turn_tool_selection_ref: attempt.toolSelectionRef,
+        ...(attempt.codegen
+          ? {
+              mineflayer_codegen_request_ref: attempt.codegen.requestRef,
+              mineflayer_codegen_output_ref: attempt.codegen.outputRef
+            }
+          : {})
+      }
+    : resolution.action;
+  const { ref: actionRef } = await writeActorGoalArtifact(
     input.actorWorkspaceRootDir,
     input.actorId,
-    path.join("goals", "cycle", "intents"),
-    `${actorTurnInput.turn_id}-intent`,
-    resolution.intent
-  );
+	    path.join("goals", "cycle", "actions"),
+	    `${actorTurnInput.turn_id}-action`,
+	    actionArtifact
+	  );
 
   const outputRef = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
     schema: "provider-output-snapshot/v1",
@@ -780,10 +848,22 @@ export async function runSocialActorTurnProvider(input: {
     model: attempt.model,
     created_at: new Date().toISOString(),
     raw_output_text: attempt.rawText,
-    parsed_output: attempt.actorTurn as unknown as JsonValue,
+    parsed_output: providerParsedOutputForAttempt(attempt),
     proposal: {
-      actor_turn_output: attempt.actorTurn as unknown as JsonValue,
-      action_intent_ref: intentRef
+      actor_turn_output: actorTurnArtifactOutput(attempt.actorTurn),
+      ...(attempt.toolSelection
+	          ? {
+	            actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
+	            actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null
+	          }
+        : {}),
+      ...(attempt.codegen
+        ? {
+            mineflayer_codegen_request_ref: attempt.codegen.requestRef,
+            mineflayer_codegen_output_ref: attempt.codegen.outputRef
+          }
+        : {}),
+      action_ref: actionRef
     },
     usage: attempt.usageRecord
   });
@@ -791,9 +871,17 @@ export async function runSocialActorTurnProvider(input: {
   return {
     ok: true,
     actorTurn: attempt.actorTurn,
-    intent: resolution.intent,
-    intentRef,
+    action: resolution.action,
+    actionRef,
     inputRef: attempt.inputRef,
-    outputRef
+    outputRef,
+    intermediateInputRefs: [
+      ...intermediateInputRefs,
+      ...(attempt.intermediateInputRefs ?? [])
+    ],
+    intermediateOutputRefs: [
+      ...intermediateOutputRefs,
+      ...(attempt.intermediateOutputRefs ?? [])
+    ]
   };
 }

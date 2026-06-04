@@ -52,7 +52,7 @@ test("run_mineflayer_program stores source, helper events, and post-observation 
       export async function run(ctx: {
         observe(): Promise<unknown>;
         say(text: string): Promise<unknown>;
-      }) {
+      }, params: Record<string, never>) {
         await ctx.observe();
         return ctx.say("I can report what I just saw.");
       }
@@ -77,7 +77,7 @@ test("run_mineflayer_program wait accepts structured duration args", async () =>
     actorId: "npc_b",
     bot,
     source: `
-      export async function run(ctx) {
+      export async function run(ctx, params) {
         await ctx.wait({ durationMs: 1 });
         return { status: "waited" };
       }
@@ -96,7 +96,7 @@ test("run_mineflayer_program wait rejects non-finite durations", async () => {
     actorId: "npc_b",
     bot,
     source: `
-      export async function run(ctx) {
+      export async function run(ctx, params) {
         await ctx.wait({ durationMs: "soon" });
         return { status: "waited" };
       }

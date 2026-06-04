@@ -50,9 +50,61 @@ function sanitizeFileId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "generated_action_skill";
 }
 
+function runSignatureParameters(source: string) {
+  const match = /\bexport\s+async\s+function\s+run\s*\(/.exec(source);
+  if (!match) {
+    return null;
+  }
+  let depth = 1;
+  const start = match.index + match[0].length;
+  for (let index = start; index < source.length; index++) {
+    const char = source[index];
+    if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index);
+      }
+    }
+  }
+  return null;
+}
+
+function topLevelParameterNames(parameters: string) {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+  for (const char of parameters) {
+    if (char === "(" || char === "{" || char === "[" || char === "<") {
+      depth += 1;
+    } else if (char === ")" || char === "}" || char === "]" || char === ">") {
+      depth = Math.max(0, depth - 1);
+    }
+    if (char === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) {
+    parts.push(current);
+  }
+  return parts.map((part) => {
+    const trimmed = part.trim();
+    const name = trimmed.split(/[:=?\s]/, 1)[0];
+    return name?.trim() ?? "";
+  });
+}
+
 export function assertDirectGeneratedActionSkillSource(source: string) {
-  if (!source.includes("export async function run")) {
-    throw new Error("Generated action skill must export async function run(ctx)");
+  const parameterNames = runSignatureParameters(source);
+  const [firstParam, secondParam] = parameterNames
+    ? topLevelParameterNames(parameterNames)
+    : [];
+  if (firstParam !== "ctx" || secondParam !== "params") {
+    throw new Error("Generated action skill must export async function run(ctx, params)");
   }
 
   if (blockedGeneratedCodePattern.test(source)) {
@@ -134,7 +186,7 @@ async function importGeneratedActionSkill(sourcePath: string) {
   const moduleUrl = `${pathToFileURL(sourcePath).href}?t=${Date.now()}`;
   const imported = await import(moduleUrl) as { run?: unknown };
   if (typeof imported.run !== "function") {
-    throw new Error("Generated action skill module must export run(ctx)");
+    throw new Error("Generated action skill module must export run(ctx, params)");
   }
 
   return imported.run as (ctx: unknown, params?: Record<string, unknown>) => Promise<unknown>;

@@ -1,3 +1,4 @@
+/** Regression coverage for the bounded social-cycle runner loop. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -5,7 +6,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  episodePivotMatchesSettlementState,
   runSocialCycle,
   selectGeminiFallbackModelsForCall,
   selectGeminiModelForCall
@@ -19,8 +19,6 @@ import { assignSeedActionSkillOwnership } from "../src/skills/ownership.js";
 import { getActorProfile } from "../src/npc/profiles.js";
 import { writeStrategicGoal } from "../src/runtime/goals/strategicGoalStore.js";
 import type { StrategicGoal } from "../src/runtime/goals/types.js";
-import type { ActiveEpisode } from "../src/runtime/goals/actorEpisode/index.js";
-import type { SettlementState } from "../src/runtime/settlement/settlementState.js";
 import {
   appendPlanBeadDependency,
   readActorPlanBead,
@@ -31,77 +29,12 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "test-artifacts", `social-runner-${process.pid}-${Date.now()}`);
 
-function activeEpisodeWithPivot(trigger: string): ActiveEpisode {
-  return {
-    schema: "active-episode/v1",
-    episode_id: "episode-test",
-    actor_id: "npc_b",
-    actors_visible_or_relevant: [],
-    life_goal_ref: "goals/life/active.json",
-    purpose: "Test Active Episode pivot matching.",
-    current_focus: "Inspect shared storage.",
-    selected_plan_bead_refs: [],
-    related_plan_bead_refs: [],
-    success_signals: [{ kind: "runtime_artifact", description: trigger }],
-    pivot_triggers: [{ trigger, evidence_refs: [] }],
-    mistake_budget: {
-      allow_exploration_turns: 2,
-      observe_repeat_limit: 1,
-      exact_blocker_repeat_limit: 2
-    },
-    social_pressure: [],
-    opened_from_refs: [],
-    status: "active"
-  };
-}
-
-function settlementStateWithSharedChest(status: "unknown" | "known" = "known"): SettlementState {
-  const evidenceRefs = status === "known" ? ["evidence/inspect_chest.json"] : [];
-  return {
-    schema: "settlement-state/v1",
-    actor_id: "npc_b",
-    updated_at: "2026-06-03T00:00:00.000Z",
-    inventory_counts: {},
-    shared_storage: {
-      status,
-      items: [],
-      evidence_refs: evidenceRefs
-    },
-    known_positions: {
-      actor_position: { x: 0, y: 64, z: 0 },
-      crafting_table: { status: "unknown", evidence_refs: [] },
-      shared_chest: {
-        status: status === "known" ? "inspected" : "unknown",
-        evidence_refs: evidenceRefs
-      },
-      shelter: { status: "unknown", evidence_refs: [] }
-    },
-    blocker_histogram: [],
-    available_action_skill_ids: [],
-    missing_primitive_blockers: [],
-    progress: {
-      has_crafting_table: false,
-      has_verified_shelter: false,
-      has_shared_storage_contribution: false,
-      has_judgment_or_memory: false,
-      has_blocker_summary: false
-    },
-    checklist: {
-      schema: "settlement-checklist/v1",
-      items: [],
-      satisfied_count: 0,
-      pending_count: 0,
-      blocked_count: 0
-    }
-  };
-}
-
 type ReportActionAttempt = {
   attempt_id: string;
   action_index: number;
   turn_id: string;
   active_episode_id?: string;
-  action_intent_ref: string;
+  action_ref: string;
   provider_input_refs: string[];
   provider_output_refs: string[];
   evidence_refs: string[];
@@ -117,23 +50,6 @@ function readActionAttempts(cycle: unknown): ReportActionAttempt[] {
   const attempts = (cycle as { action_attempts?: unknown }).action_attempts;
   return Array.isArray(attempts) ? attempts as ReportActionAttempt[] : [];
 }
-
-test("episode pivot matcher treats completed chest inspection as episode success", () => {
-  assert.equal(
-    episodePivotMatchesSettlementState({
-      activeEpisode: activeEpisodeWithPivot("Chest inspection completes (snapshot recorded)."),
-      settlementState: settlementStateWithSharedChest("known")
-    }),
-    true
-  );
-  assert.equal(
-    episodePivotMatchesSettlementState({
-      activeEpisode: activeEpisodeWithPivot("Chest inspection completes (snapshot recorded)."),
-      settlementState: settlementStateWithSharedChest("unknown")
-    }),
-    false
-  );
-});
 
 function runnerPlanBead(input: {
   beadId: string;
@@ -220,7 +136,8 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
     maxActionsPerCycle: 2,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: path.join(rootDir, "actors")
+    actorWorkspaceRootDir: path.join(rootDir, "actors"),
+    actionHotPath: "legacy"
   });
 
   assert.equal(result.report.cycles.length, 2);
@@ -300,7 +217,8 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
     maxActionsPerCycle: 1,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot
+    actorWorkspaceRootDir: isolatedRoot,
+    actionHotPath: "legacy"
   });
 
   const actorDir = path.join(isolatedRoot, actorId);
@@ -442,6 +360,7 @@ test("deterministic-social maxActionsPerCycle=2 report keeps observe and wait at
 
   const cycle = result.report.cycles[0];
   assert.ok(cycle);
+  assert.equal(result.report.action_hot_path, "actor_turn");
   const attempts = readActionAttempts(cycle);
   assert.equal(attempts.length, 2);
   assert.deepEqual(attempts.map((attempt) => attempt.action_index), [0, 1]);
@@ -450,10 +369,10 @@ test("deterministic-social maxActionsPerCycle=2 report keeps observe and wait at
     "cycle-0001-action-02"
   ]);
   assert.deepEqual(attempts.map((attempt) => attempt.executed_tools), [["observe"], ["wait"]]);
-  assert.deepEqual(attempts.map((attempt) => attempt.runtime_status), ["blocked", "blocked"]);
-  assert.notEqual(attempts[0]?.action_intent_ref, attempts[1]?.action_intent_ref);
-  assert.ok(attempts[0]?.action_intent_ref.includes("cycle-0001-action-01"));
-  assert.ok(attempts[1]?.action_intent_ref.includes("cycle-0001-action-02"));
+  assert.deepEqual(attempts.map((attempt) => attempt.runtime_status), ["blocked", "completed"]);
+  assert.notEqual(attempts[0]?.action_ref, attempts[1]?.action_ref);
+  assert.ok(attempts[0]?.action_ref.includes("cycle-0001-action-01"));
+  assert.ok(attempts[1]?.action_ref.includes("cycle-0001-action-02"));
   assert.notEqual(attempts[0]?.judgment_ref, attempts[1]?.judgment_ref);
 });
 
@@ -509,10 +428,10 @@ test("deterministic-social actor_turn action path writes Actor Turn snapshots an
   );
 
   const firstIntent = await readJsonIfExists<{ kind?: string; primitive_id?: string }>(
-    path.join(actorDir, attempts[0]!.action_intent_ref)
+    path.join(actorDir, attempts[0]!.action_ref)
   );
   const secondIntent = await readJsonIfExists<{ kind?: string; primitive_id?: string }>(
-    path.join(actorDir, attempts[1]!.action_intent_ref)
+    path.join(actorDir, attempts[1]!.action_ref)
   );
   assert.equal(firstIntent?.kind, "use_primitive");
   assert.equal(firstIntent?.primitive_id, "observe");
@@ -725,7 +644,8 @@ test("stale alphabetically later judgment is not used as previous context", asyn
     maxActionsPerCycle: 1,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot
+    actorWorkspaceRootDir: isolatedRoot,
+    actionHotPath: "legacy"
   });
 
   const actorDir = path.join(isolatedRoot, actorId);
@@ -809,7 +729,8 @@ test("deterministic-social run carries PlanBead ready front and guarded operatio
     maxActionsPerCycle: 1,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot
+    actorWorkspaceRootDir: isolatedRoot,
+    actionHotPath: "legacy"
   });
 
   assert.equal(result.report.cycles.length, 2);

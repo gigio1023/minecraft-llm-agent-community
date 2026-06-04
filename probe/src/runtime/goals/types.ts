@@ -150,21 +150,6 @@ export type WorldEvent = {
   run_id?: string;
 };
 
-export type ActionIntentKind =
-  | "use_action_skill"
-  | "use_primitive"
-  | "author_and_trial_action_skill"
-  | "wait"
-  | "remember";
-
-const actionIntentKinds: readonly ActionIntentKind[] = [
-  "use_action_skill",
-  "use_primitive",
-  "author_and_trial_action_skill",
-  "wait",
-  "remember"
-];
-
 export type GeneratedActionSkillCandidate = {
   schema: "generated-action-skill-candidate/v1";
   proposed_skill_id: string;
@@ -176,26 +161,95 @@ export type GeneratedActionSkillCandidate = {
   helper_allowlist: string[];
   timeout_ms: number;
   verifier: Record<string, unknown>;
-  promotion_policy: "record_candidate_only" | "promote_after_passed_trial";
+  promotion_policy: "promote_after_passed_trial";
   known_failure_modes: string[];
 };
 
-export type ActionIntent = {
-  schema: "action-intent/v1";
+export type LegacyPlannerActionKind =
+  | "use_primitive"
+  | "use_action_skill"
+  | "author_and_trial_action_skill"
+  | "wait"
+  | "remember";
+
+/**
+ * Legacy planner-only action record.
+ *
+ * @remarks Actor Turn must not use this as a provider-facing or codegen-facing
+ * boundary. It remains only so the explicit `action_hot_path=legacy` path and
+ * old artifacts can compile while the ordinary runtime moves through
+ * `ActorTurnResolvedAction`.
+ */
+export type LegacyPlannerAction = {
+  schema: "legacy-planner-action/v1" | "action-intent/v1";
   actor_id: string;
   cycle_id: string;
   cycle_goal_id: string;
-  kind: ActionIntentKind;
-  action_skill_id?: string;
+  kind: LegacyPlannerActionKind;
   primitive_id?: string;
+  action_skill_id?: string;
+  args?: Record<string, unknown>;
   parameters?: Record<string, unknown>;
   parameters_schema?: Record<string, unknown>;
-  args: Record<string, unknown>;
   candidate?: GeneratedActionSkillCandidate;
   why_this_action: string;
   expected_evidence: string[];
   fallback_if_blocked: string;
 };
+
+export function legacyPlannerActionParameters(
+  action: LegacyPlannerAction
+): Record<string, unknown> {
+  return action.parameters ?? action.args ?? {};
+}
+
+export function validateLegacyPlannerAction(
+  value: unknown
+): { ok: true; action: LegacyPlannerAction } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  if (!isRecord(value)) {
+    return { ok: false, errors: ["LegacyPlannerAction must be an object"] };
+  }
+  if (value.schema !== "legacy-planner-action/v1" && value.schema !== "action-intent/v1") {
+    errors.push("schema must be legacy-planner-action/v1");
+  }
+  assertString(value, "actor_id", errors);
+  assertString(value, "cycle_id", errors);
+  assertString(value, "cycle_goal_id", errors);
+  if (!includesString([
+    "use_primitive",
+    "use_action_skill",
+    "author_and_trial_action_skill",
+    "wait",
+    "remember"
+  ] as const, value.kind)) {
+    errors.push("kind must be a known legacy planner action kind");
+  }
+  if (value.kind === "use_primitive" && typeof value.primitive_id !== "string") {
+    errors.push("primitive_id must be present for use_primitive");
+  }
+  if (value.kind === "use_action_skill" && typeof value.action_skill_id !== "string") {
+    errors.push("action_skill_id must be present for use_action_skill");
+  }
+  if (value.kind === "author_and_trial_action_skill" && !isRecord(value.candidate)) {
+    errors.push("candidate must be present for author_and_trial_action_skill");
+  }
+  if (value.kind === "wait" || value.kind === "remember") {
+    if (value.primitive_id !== undefined || value.action_skill_id !== undefined) {
+      errors.push("wait/remember legacy planner actions must not carry primitive_id or action_skill_id");
+    }
+  }
+  if (!isRecord(value.parameters) && !isRecord(value.args)) {
+    errors.push("parameters must be an object");
+  }
+  assertString(value, "why_this_action", errors);
+  assertStringArray(value, "expected_evidence", errors);
+  assertString(value, "fallback_if_blocked", errors);
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+  return { ok: true, action: value as LegacyPlannerAction };
+}
 
 /** Cycle outcomes distinguish final success from useful current-run mutation that still failed a verifier. */
 export type CycleJudgmentOutcome =
@@ -326,7 +380,7 @@ export type SocialCycleRunReport = {
     active_episode_ref?: string;
     deliberation_branch_ref?: string;
     deliberation_trigger_reason?: string;
-    action_intent_ref: string;
+    action_ref: string;
     provider_input_refs: string[];
     provider_output_refs: string[];
     evidence_refs: string[];
@@ -340,7 +394,7 @@ export type SocialCycleRunReport = {
       action_index: number;
       turn_id: string;
       active_episode_id?: string;
-      action_intent_ref: string;
+      action_ref: string;
       provider_input_refs: string[];
       provider_output_refs: string[];
       evidence_refs: string[];
@@ -358,6 +412,13 @@ export type SocialCycleRunReport = {
     }>;
   }>;
   provider_error?: string;
+  provider_error_refs?: Array<{
+    stage: string;
+    turn_id?: string;
+    error: string;
+    provider_input_refs: string[];
+    provider_output_refs: string[];
+  }>;
   action_skill_execution_unit?: boolean;
   settlement_state?: SettlementState;
   settlement_checklist?: SettlementChecklist;
@@ -434,15 +495,6 @@ function includesString<T extends string>(values: readonly T[], value: unknown):
   return typeof value === "string" && values.includes(value as T);
 }
 
-export function actionIntentParameters(
-  intent: Pick<ActionIntent, "args" | "parameters">
-): Record<string, unknown> {
-  if (isRecord(intent.parameters)) {
-    return intent.parameters;
-  }
-  return isRecord(intent.args) ? intent.args : {};
-}
-
 export function validateActorSoul(value: unknown): { ok: true; soul: ActorSoul } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(value)) {
@@ -511,44 +563,6 @@ export function validateActorCycleGoal(
     return { ok: false, errors };
   }
   return { ok: true, cycleGoal: value as ActorCycleGoal };
-}
-
-export function validateActionIntent(
-  value: unknown
-): { ok: true; intent: ActionIntent } | { ok: false; errors: string[] } {
-  const errors: string[] = [];
-  if (!isRecord(value)) {
-    return { ok: false, errors: ["ActionIntent must be an object"] };
-  }
-  if (value.schema !== "action-intent/v1") {
-    errors.push("schema must be action-intent/v1");
-  }
-  assertString(value, "actor_id", errors);
-  assertString(value, "cycle_id", errors);
-  assertString(value, "cycle_goal_id", errors);
-  assertString(value, "why_this_action", errors);
-  assertString(value, "fallback_if_blocked", errors);
-  assertStringArray(value, "expected_evidence", errors);
-  assertRecord(value, "args", errors);
-  if (value.parameters !== undefined) {
-    assertRecord(value, "parameters", errors);
-  }
-  if (value.parameters_schema !== undefined) {
-    assertRecord(value, "parameters_schema", errors);
-  }
-  if (!includesString(actionIntentKinds, value.kind)) {
-    errors.push("kind must be one of use_action_skill, use_primitive, author_and_trial_action_skill, wait, remember");
-  } else if (value.kind === "use_primitive") {
-    assertString(value, "primitive_id", errors);
-  } else if (value.kind === "use_action_skill") {
-    assertString(value, "action_skill_id", errors);
-  } else if (value.kind === "author_and_trial_action_skill") {
-    assertRecord(value, "candidate", errors);
-  }
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-  return { ok: true, intent: value as ActionIntent };
 }
 
 export function validateCycleJudgment(

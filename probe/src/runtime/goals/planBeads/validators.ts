@@ -64,6 +64,8 @@ const authorityKeys = new Set([
   "physical_progress_claim"
 ]);
 
+// PlanBead state must not smuggle execution authority such as primitive args,
+// action skill ids, retry overrides, or physical-progress claims.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -248,6 +250,10 @@ function validateContextSummary(
   return true;
 }
 
+/**
+ * Validates serialized PlanBead state before it enters the actor workspace or
+ * provider context.
+ */
 export function validateActorPlanBead(
   value: unknown
 ): ValidationResult<ActorPlanBead, "bead"> {
@@ -384,6 +390,12 @@ export function validatePlanBeadDependency(
   return { ok: true, dependency: value as PlanBeadDependency };
 }
 
+/**
+ * Validates the compact packet sent to provider stages.
+ *
+ * The packet is rejected if it claims physical progress or weakens the rules
+ * that keep PlanBeads subordinate to the action surface and runtime verifier.
+ */
 export function validatePlanBeadPacket(
   value: unknown
 ): ValidationResult<PlanBeadPacket, "packet"> {
@@ -501,6 +513,12 @@ function validateDependencyPatch(
   }
 }
 
+/**
+ * Validates one proposed PlanBead operation.
+ *
+ * Malformed operations should be reported by the guarded applier instead of
+ * causing the whole provider judgment to disappear.
+ */
 export function validatePlanBeadOperation(
   value: unknown
 ): ValidationResult<PlanBeadOperation, "operation"> {

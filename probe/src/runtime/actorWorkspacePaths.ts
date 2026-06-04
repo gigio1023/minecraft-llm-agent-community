@@ -1,3 +1,10 @@
+/**
+ * Canonical path builder for actor workspace artifacts.
+ *
+ * @remarks The actor workspace is the source of truth for actor-owned action
+ * skills, evidence, memory, PlanBeads, and review records. Path sanitization
+ * keeps provider text from shaping filesystem layout directly.
+ */
 import { createHash } from "node:crypto";
 import path from "node:path";
 

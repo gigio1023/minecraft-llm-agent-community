@@ -1,3 +1,9 @@
+/**
+ * Shared JSON artifact writer for actor goal-state records.
+ *
+ * @remarks Goal artifacts are part of the audit trail; writing them under actor
+ * workspace paths keeps context changes inspectable across compaction.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 

@@ -12,6 +12,7 @@ import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "./actorWorkspac
 import { ensureActorSoul } from "./goals/actorSoulStore.js";
 import { bumpLifeGoalCounters, ensureActiveLifeGoal } from "./goals/lifeGoalStore.js";
 import { writeCycleGoal } from "./goals/cycleGoalStore.js";
+import { writeActorGoalArtifact } from "./goals/goalJsonStore.js";
 import { listStrategicGoals } from "./goals/strategicGoalStore.js";
 import {
   assembleSocialCycleContext,
@@ -19,14 +20,14 @@ import {
 } from "./goals/cycleContextAssembler.js";
 import { createEmptySocialCycleReport, finalizeRuntimeStatus } from "./goals/cycleReport.js";
 import type {
-  ActionIntent,
   ActorCycleGoal,
   CycleJudgment,
+  LegacyPlannerAction,
   SocialCycleProviderId,
   SocialCycleRunReport,
   WorldEventKind
 } from "./goals/types.js";
-import { actionIntentParameters } from "./goals/types.js";
+import { legacyPlannerActionParameters } from "./goals/types.js";
 import { createWorldEvent, listWorldEvents, writeWorldEvent } from "./goals/worldEventStore.js";
 import { runSocialCycleGoalProvider } from "../provider/socialGoalMindProvider.js";
 import {
@@ -48,7 +49,8 @@ import { summarizeProviderUsage } from "../provider/providerUsageTracker.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import {
   compileSocialAllowedPrimitives,
-  executeSocialActionIntent,
+  executeActorTurnAction,
+  executeLegacyPlannerAction,
   filterExecutableSocialActionSkills,
   observeActorWorld
 } from "./socialCycleExecution.js";
@@ -77,7 +79,6 @@ import { startDockerServer } from "../server/dockerServer.js";
 import {
   buildSettlementState,
   type ActionSkillPostconditionResult,
-  type SettlementState,
   type ToolResultRecord
 } from "./settlement/settlementState.js";
 import { applyCycleJudgmentRelationshipEventProposals } from "../reviewer/relationshipProposalApplier.js";
@@ -96,12 +97,14 @@ import {
   buildActorTurnInput,
   anchorActiveEpisodeToPlanBeadContext,
   classifyActorTurnRuntime,
+  classifyActorTurnProviderContractRejection,
   writeActiveEpisode,
   writeDeliberationBranch,
   type ActiveEpisode,
   type DeliberationBranch,
   type DeliberationBranchReason,
   type ActorTurnRuntimeClassifierResult,
+  type ActorTurnResolvedAction,
   type EvidenceTraceEntry
 } from "./goals/actorEpisode/index.js";
 
@@ -118,7 +121,7 @@ type SocialCycleActionAttemptReport = {
   action_index: number;
   turn_id: string;
   active_episode_id?: string;
-  action_intent_ref: string;
+  action_ref: string;
   provider_input_refs: string[];
   provider_output_refs: string[];
   evidence_refs: string[];
@@ -142,7 +145,7 @@ type SocialCycleReportCycleWithAttempts = SocialCycleRunReport["cycles"][number]
 type EvidenceTraceAttempt = Pick<
   SocialCycleActionAttemptReport,
   | "turn_id"
-  | "action_intent_ref"
+  | "action_ref"
   | "evidence_refs"
   | "judgment_ref"
   | "verifier_status"
@@ -155,6 +158,193 @@ type EvidenceTraceAttempt = Pick<
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function actorRelativeRef(actorDir: string, ref: string | undefined) {
+  if (!ref) {
+    return undefined;
+  }
+  return path.isAbsolute(ref) ? path.relative(actorDir, ref) : ref;
+}
+
+function optionalStringProperty(value: unknown, key: string) {
+  return value &&
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>)[key] === "string"
+    ? (value as Record<string, string>)[key]
+    : undefined;
+}
+
+function optionalStringArrayProperty(value: unknown, key: string) {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const candidate = (value as Record<string, unknown>)[key];
+  return Array.isArray(candidate) && candidate.every((entry) => typeof entry === "string")
+    ? candidate
+    : undefined;
+}
+
+function providerRefs(input: {
+  actorDir: string;
+  inputRef?: string;
+  outputRef?: string;
+  intermediateInputRefs?: string[];
+  intermediateOutputRefs?: string[];
+}) {
+  return {
+    provider_input_refs: [
+      ...(input.intermediateInputRefs ?? []),
+      input.inputRef
+    ]
+      .map((ref) => actorRelativeRef(input.actorDir, ref))
+      .filter((ref): ref is string => Boolean(ref)),
+    provider_output_refs: [
+      ...(input.intermediateOutputRefs ?? []),
+      input.outputRef
+    ]
+      .map((ref) => actorRelativeRef(input.actorDir, ref))
+      .filter((ref): ref is string => Boolean(ref))
+  };
+}
+
+function appendProviderErrorRefs(input: {
+  report: SocialCycleRunReport;
+  actorDir: string;
+  stage: string;
+  turnId?: string;
+  error: string;
+  inputRef?: string;
+  outputRef?: string;
+  intermediateInputRefs?: string[];
+  intermediateOutputRefs?: string[];
+}) {
+  const refs = providerRefs({
+    actorDir: input.actorDir,
+    inputRef: input.inputRef,
+    outputRef: input.outputRef,
+    intermediateInputRefs: input.intermediateInputRefs,
+    intermediateOutputRefs: input.intermediateOutputRefs
+  });
+  input.report.provider_error_refs ??= [];
+  input.report.provider_error_refs.push({
+    stage: input.stage,
+    ...(input.turnId ? { turn_id: input.turnId } : {}),
+    error: input.error,
+    ...refs
+  });
+}
+
+function actorTurnProviderFailureKind(
+  result: ActorTurnProviderResult | ActionPlannerProviderResult
+) {
+  return !result.ok && "failureKind" in result ? result.failureKind : undefined;
+}
+
+async function buildActorTurnProviderContractRejectionAttempt(input: {
+  rootDir: string;
+  actorDir: string;
+  actorId: string;
+  runId: string;
+  cycleId: string;
+  turnId: string;
+  actionIndex: number;
+  cycleGoal: ActorCycleGoal;
+  activeEpisodeId?: string;
+  planner: Extract<ActorTurnProviderResult, { ok: false }>;
+}): Promise<{
+  attempt: SocialCycleActionAttemptReport;
+  judgment: CycleJudgment;
+  judgmentRef: string;
+}> {
+  const refs = providerRefs({
+    actorDir: input.actorDir,
+    inputRef: input.planner.inputRef,
+    outputRef: input.planner.outputRef,
+    intermediateInputRefs: input.planner.intermediateInputRefs,
+    intermediateOutputRefs: input.planner.intermediateOutputRefs
+  });
+  const { ref: markerRef } = await writeActorGoalArtifact(
+    input.rootDir,
+    input.actorId,
+    path.join("goals", "cycle", "intents"),
+    `${input.turnId}-provider-contract-rejection`,
+    {
+      schema: "actor-turn-provider-contract-rejection/v1",
+      actor_id: input.actorId,
+      cycle_id: input.cycleId,
+      turn_id: input.turnId,
+      non_executable: true,
+      error: input.planner.error,
+      provider_input_refs: refs.provider_input_refs,
+      provider_output_refs: refs.provider_output_refs
+    }
+  );
+  const { ref: evidenceRef } = await writeActorGoalArtifact(
+    input.rootDir,
+    input.actorId,
+    "evidence",
+    `${input.turnId}-provider-contract-rejection`,
+    {
+      schema: "actor-turn-provider-contract-rejection-evidence/v1",
+      actor_id: input.actorId,
+      cycle_id: input.cycleId,
+      turn_id: input.turnId,
+      status: "blocked",
+      verifier_status: "failed",
+      no_minecraft_action_executed: true,
+      error: input.planner.error,
+      provider_input_refs: refs.provider_input_refs,
+      provider_output_refs: refs.provider_output_refs
+    }
+  );
+  const judgmentResult = await classifyActorTurnProviderContractRejection({
+    actorWorkspaceRootDir: input.rootDir,
+    actorId: input.actorId,
+    cycleId: input.cycleId,
+    turnId: input.turnId,
+    runId: input.runId,
+    cycleGoal: input.cycleGoal,
+    error: input.planner.error,
+    evidenceRefs: [evidenceRef]
+  });
+  if (!judgmentResult.ok) {
+    throw new Error(`failed to write provider contract rejection judgment: ${judgmentResult.error}`);
+  }
+  const runtimeResult: JsonValue = {
+    schema: "actor-turn-provider-contract-rejection-runtime-result/v1",
+    status: "blocked",
+    verifier_status: "failed",
+    no_minecraft_action_executed: true,
+    error: input.planner.error,
+    provider_input_refs: refs.provider_input_refs,
+    provider_output_refs: refs.provider_output_refs
+  };
+  return {
+    judgment: judgmentResult.judgment,
+    judgmentRef: judgmentResult.judgmentRef,
+    attempt: {
+      attempt_id: input.turnId,
+      action_index: input.actionIndex,
+      turn_id: input.turnId,
+      active_episode_id: input.activeEpisodeId,
+      action_ref: markerRef,
+      provider_input_refs: refs.provider_input_refs,
+      provider_output_refs: refs.provider_output_refs,
+      evidence_refs: [evidenceRef],
+      judgment_ref: judgmentResult.judgmentRef,
+      verifier_status: "failed",
+      executed_tools: ["actor_turn_provider_contract"],
+      tool_statuses: [{ tool: "actor_turn_provider_contract", status: "rejected" }],
+      runtime_result: runtimeResult,
+      runtime_status: "blocked",
+      retry_constraint_blocked: false,
+      branch_recommended: judgmentResult.branchRecommended,
+      branch_reason: judgmentResult.branchReason,
+      postcondition_results: [],
+      plan_bead_operation_result_refs: []
+    }
+  };
 }
 
 function countRelationshipContextRefs(context: {
@@ -222,7 +412,7 @@ function evidenceTraceFromActionAttempts(input: {
       schema: "evidence-trace/v1",
       turn_id: attempt.turn_id,
       episode_id: input.episodeId,
-      action_ref: attempt.action_intent_ref,
+      action_ref: attempt.action_ref,
       runtime_gate_ref: `runtime-gates/${attempt.turn_id}.json`,
       ...(attempt.evidence_refs[0] ? { execution_ref: attempt.evidence_refs[0] } : {}),
       ...(attempt.judgment_ref ? { verifier_ref: attempt.judgment_ref } : {}),
@@ -236,14 +426,11 @@ function evidenceTraceFromActionAttempts(input: {
 function branchReasonFromActionAttempts(
   attempts: readonly SocialCycleActionAttemptReport[]
 ): DeliberationBranchReason | null {
-  if (attempts.some((attempt) => attempt.branch_recommended && /retry constraint/i.test(attempt.branch_reason ?? ""))) {
+  if (attempts.some((attempt) => attempt.retry_constraint_blocked)) {
     return "repeated_exact_blocker";
   }
   if (attempts.some((attempt) => attempt.branch_recommended)) {
     return "episode_blocked";
-  }
-  if (attempts.some((attempt) => attempt.retry_constraint_blocked)) {
-    return "repeated_exact_blocker";
   }
   if (attempts.some((attempt) => attempt.verifier_status === "failed" || attempt.runtime_status === "failed")) {
     return "episode_blocked";
@@ -251,65 +438,40 @@ function branchReasonFromActionAttempts(
   return null;
 }
 
-function inventoryHasItemFamily(inventory: Record<string, number>, family: string) {
-  const normalized = family.toLowerCase();
-  return Object.entries(inventory).some(([name, count]) => {
-    if (count <= 0) {
-      return false;
-    }
-    if (normalized === "logs" || normalized === "log") {
-      return name.endsWith("_log") || name === "log";
-    }
-    if (normalized === "planks" || normalized === "plank") {
-      return name.endsWith("_planks") || name === "planks";
-    }
-    if (normalized === "sticks" || normalized === "stick") {
-      return name === "stick";
-    }
-    if (normalized === "crafting_table") {
-      return name === "crafting_table";
-    }
-    return name === normalized;
-  });
+function worldEventRef(eventId: string) {
+  return `world-events/${eventId}.json`;
 }
 
-export function episodePivotMatchesSettlementState(input: {
+function newWorldEventRefs(input: {
   activeEpisode: ActiveEpisode;
-  settlementState: SettlementState;
+  context: SocialCycleContextPacket;
 }) {
-  const triggers = input.activeEpisode.pivot_triggers.map((trigger) =>
-    trigger.trigger.toLowerCase()
-  );
-  const inventory = input.settlementState.inventory_counts;
-  return triggers.some((trigger) => {
-    if (/inventory has .*planks?/.test(trigger)) {
-      return inventoryHasItemFamily(inventory, "planks");
-    }
-    if (/inventory has .*sticks?/.test(trigger)) {
-      return inventoryHasItemFamily(inventory, "stick");
-    }
-    if (/inventory has .*crafting_table|inventory has .*crafting table/.test(trigger)) {
-      return inventoryHasItemFamily(inventory, "crafting_table");
-    }
-    if (/crafting_table.*nearby|crafting table.*nearby|crafting_table.*placed|crafting table.*placed/.test(trigger)) {
-      const status = input.settlementState.known_positions.crafting_table?.status;
-      return status === "nearby" || status === "placed";
-    }
-    if (
-      /chest.*inspect|inspect.*chest|container snapshot|chest.*open|open.*chest/.test(trigger)
-    ) {
-      const status = input.settlementState.known_positions.shared_chest?.status;
-      return status === "inspected" || input.settlementState.shared_storage.status === "known";
-    }
-    return false;
-  });
+  const opened = new Set(input.activeEpisode.opened_from_refs);
+  return input.context.world_events
+    .map((event) => worldEventRef(event.event_id))
+    .filter((ref) => !opened.has(ref));
 }
 
-function branchReasonFromActiveEpisodeProgress(input: {
+function branchReasonFromContextSignals(input: {
   activeEpisode: ActiveEpisode;
-  settlementState: SettlementState;
+  context: SocialCycleContextPacket;
 }): DeliberationBranchReason | null {
-  return episodePivotMatchesSettlementState(input) ? "episode_success" : null;
+  const currentVisibleActors = buildActorTurnCurrentStateProjection(input.context).visible_actors
+    .map((actor) => actor.id);
+  const knownActors = new Set(input.activeEpisode.actors_visible_or_relevant);
+  if (currentVisibleActors.some((actorId) => !knownActors.has(actorId))) {
+    return "new_social_pressure";
+  }
+
+  const opened = new Set(input.activeEpisode.opened_from_refs);
+  const hasNewActorLinkedWorldEvent = input.context.world_events.some((event) =>
+    event.actor_refs.length > 0 && !opened.has(worldEventRef(event.event_id))
+  );
+  if (hasNewActorLinkedWorldEvent) {
+    return "new_social_pressure";
+  }
+
+  return newWorldEventRefs(input).length > 0 ? "context_change" : null;
 }
 
 function pushUniqueRef(target: string[] | undefined, ref: string) {
@@ -383,7 +545,7 @@ export type SocialCycleRunOptions = {
   prepareSpawnAccess?: boolean;
   /** Seed a small social proof scenario: npc_a asks the active actor to contribute inventory to shared storage. */
   sharedStorageSocialSmoke?: boolean;
-  /** Experimental action-selection path using Actor Turn provider output and Action Card resolution. */
+  /** Action-selection path. Actor Turn is the ordinary hot path; legacy remains explicit fallback coverage. */
   actionHotPath?: "legacy" | "actor_turn";
   /** Deterministic-social debug hook for exercising Actor Turn branches without a live provider. */
   deterministicActorTurnPrimitives?: string[];
@@ -423,10 +585,25 @@ export function selectGeminiFallbackModelsForCall(input: {
   return rotation.filter((model, index) => index !== selected && model !== input.fallbackModel);
 }
 
+type ReportedRuntimeAction = LegacyPlannerAction | ActorTurnResolvedAction;
+
+function runtimeActionParameters(action: ReportedRuntimeAction): Record<string, unknown> {
+  return action.schema === "actor-turn-resolved-action/v1"
+    ? action.parameters as Record<string, unknown>
+    : legacyPlannerActionParameters(action);
+}
+
+function runtimeActionSkillIds(action: ReportedRuntimeAction) {
+  return [
+    ...(action.kind === "use_action_skill" ? [action.action_skill_id] : []),
+    ...(action.kind === "use_primitive" ? [action.primitive_id] : [])
+  ].filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
 function memoryKindForJudgmentWrite(input: {
   layer: CycleJudgment["memory_writes"][number]["layer"];
   judgment: CycleJudgment;
-  actionIntent: ActionIntent;
+  action: ReportedRuntimeAction;
 }): ActorMemoryKind {
   if (input.layer === "procedural") {
     return "action_skill_note";
@@ -437,7 +614,7 @@ function memoryKindForJudgmentWrite(input: {
   if (input.layer === "guardrail" || input.judgment.outcome === "blocked") {
     return "blocker";
   }
-  if (input.actionIntent.kind === "use_primitive" && input.actionIntent.primitive_id === "observe") {
+  if (input.action.kind === "use_primitive" && input.action.primitive_id === "observe") {
     return "world_observation";
   }
   return "cycle_judgment";
@@ -447,7 +624,7 @@ async function persistJudgmentMemoryWrites(
   rootDir: string,
   actorId: string,
   judgment: CycleJudgment,
-  actionIntent: ActionIntent,
+  action: ReportedRuntimeAction,
   executedTools: readonly string[],
   runtimeResult: JsonValue,
   toolStatuses: readonly SocialPrimitiveAttemptStatus[],
@@ -458,7 +635,7 @@ async function persistJudgmentMemoryWrites(
   }
 
   const now = new Date().toISOString();
-  const parameters = actionIntentParameters(actionIntent);
+  const parameters = runtimeActionParameters(action);
   await writeActorMemoryRecords(
     rootDir,
     judgment.memory_writes.map((write, index) => ({
@@ -469,7 +646,7 @@ async function persistJudgmentMemoryWrites(
       kind: memoryKindForJudgmentWrite({
         layer: write.layer,
         judgment,
-        actionIntent
+        action
       }),
       status: "active",
       confidence:
@@ -488,10 +665,7 @@ async function persistJudgmentMemoryWrites(
         item_names: typeof parameters.itemName === "string" ? [parameters.itemName] : [],
         block_names: typeof parameters.blockName === "string" ? [parameters.blockName] : [],
         tool_names: [...executedTools],
-        action_skill_ids: [
-          ...(actionIntent.action_skill_id ? [actionIntent.action_skill_id] : []),
-          ...(actionIntent.primitive_id ? [actionIntent.primitive_id] : [])
-        ],
+        action_skill_ids: runtimeActionSkillIds(action),
         diagnoses: [judgment.outcome],
         verifier_statuses: [judgment.verifier_status],
         causal_refs: [judgment.cycle_id, judgmentRef]
@@ -501,7 +675,7 @@ async function persistJudgmentMemoryWrites(
         judgment_ref: judgmentRef,
         outcome: judgment.outcome,
         verifier_status: judgment.verifier_status,
-        action_intent: actionIntent as unknown as JsonValue,
+        action: action as unknown as JsonValue,
         executed_tools: [...executedTools],
         tool_statuses: toolStatuses as unknown as JsonValue,
         runtime_result: runtimeResult
@@ -604,7 +778,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       : workspaceBaseDir;
   const profile = getActorProfile(input.actorId);
   const reasoning = input.reasoning ?? process.env.SOCIAL_CYCLE_REASONING ?? "low";
-  const actionHotPath = input.actionHotPath ?? "legacy";
+  const actionHotPath = input.actionHotPath ?? "actor_turn";
 
   const report = createEmptySocialCycleReport({
     runId,
@@ -984,6 +1158,15 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         if (!deliberation.ok) {
           providerFailed = true;
           report.provider_error = deliberation.error;
+          appendProviderErrorRefs({
+            report,
+            actorDir: paths.actorDir,
+            stage: "deliberation",
+            turnId: `${cycleId}-deliberation`,
+            error: deliberation.error,
+            inputRef: deliberation.inputRef,
+            outputRef: deliberation.outputRef
+          });
           break;
         }
 
@@ -1047,6 +1230,15 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         if (!cycleGoalProvider.ok) {
           providerFailed = true;
           report.provider_error = cycleGoalProvider.error;
+          appendProviderErrorRefs({
+            report,
+            actorDir: paths.actorDir,
+            stage: "goal_mind",
+            turnId: cycleId,
+            error: cycleGoalProvider.error,
+            inputRef: cycleGoalProvider.inputRef,
+            outputRef: cycleGoalProvider.outputRef
+          });
           break;
         }
 
@@ -1085,7 +1277,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.agency_status.builtin_goal_authority = cycleGoal.source === "runtime_rule";
       }
 
-      let lastIntentRef = "";
+      let lastActionRef = "";
       let lastVerifier: "passed" | "failed" | "not_applicable" = "not_applicable";
       let actionSkillExecutionUnit = false;
       let lastJudgmentRef = "";
@@ -1207,30 +1399,85 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             });
 
         if (!planner.ok) {
+          if (
+            actionHotPath === "actor_turn" &&
+            actorTurnProviderFailureKind(planner) === "provider_contract_rejection"
+          ) {
+            const contractRejection = await buildActorTurnProviderContractRejectionAttempt({
+              rootDir,
+              actorDir: paths.actorDir,
+              actorId: input.actorId,
+              runId,
+              cycleId,
+              turnId: actionTurnId,
+              actionIndex,
+              cycleGoal,
+              activeEpisodeId: activeEpisodeForCycle.episode_id,
+              planner
+            });
+            lastActionRef = contractRejection.attempt.action_ref;
+            lastVerifier = "failed";
+            lastJudgmentRef = contractRejection.judgmentRef;
+            lastJudgment = {
+              ref: contractRejection.judgmentRef,
+              judgment: contractRejection.judgment
+            };
+            actionAttempts.push(contractRejection.attempt);
+            break;
+          }
           providerFailed = true;
           report.provider_error = planner.error;
+          appendProviderErrorRefs({
+            report,
+            actorDir: paths.actorDir,
+            stage: actionHotPath === "actor_turn" ? "actor_turn" : "action_planner",
+            turnId: actionTurnId,
+            error: planner.error,
+            inputRef: planner.inputRef,
+            outputRef: planner.outputRef,
+            intermediateInputRefs: optionalStringArrayProperty(planner, "intermediateInputRefs"),
+            intermediateOutputRefs: optionalStringArrayProperty(planner, "intermediateOutputRefs")
+          });
           break;
         }
 
-        lastIntentRef = planner.intentRef;
+        const plannedActionRef = "action" in planner
+          ? planner.actionRef
+          : planner.legacyPlannerActionRef;
+        const plannedRuntimeAction: ReportedRuntimeAction = "action" in planner
+          ? planner.action
+          : planner.legacyPlannerAction;
+        lastActionRef = plannedActionRef;
 
-        const execution = await executeSocialActionIntent({
-          actorWorkspaceRootDir: rootDir,
-          actorId: input.actorId,
-          cycleId,
-          turnId: actionTurnId,
-          cycleGoal,
-          intent: planner.intent,
-          activeActionSkills: executableActiveSkills,
-          runtimeRetryConstraints: actionRetryConstraints,
-          bot
-        });
+        const execution = "action" in planner
+          ? await executeActorTurnAction({
+              actorWorkspaceRootDir: rootDir,
+              actorId: input.actorId,
+              cycleId,
+              turnId: actionTurnId,
+              cycleGoal,
+              action: planner.action,
+              activeActionSkills: executableActiveSkills,
+              runtimeRetryConstraints: actionRetryConstraints,
+              bot
+            })
+          : await executeLegacyPlannerAction({
+              actorWorkspaceRootDir: rootDir,
+              actorId: input.actorId,
+              cycleId,
+              turnId: actionTurnId,
+              cycleGoal,
+              action: planner.legacyPlannerAction,
+              activeActionSkills: executableActiveSkills,
+              runtimeRetryConstraints: actionRetryConstraints,
+              bot
+            });
         const retryAttempt = buildRuntimeRetryAttempt({
           actorId: input.actorId,
           cycleId,
           turnId: actionTurnId,
           actionIndex,
-          intent: planner.intent,
+          intent: plannedRuntimeAction,
           execution
         });
         if (retryAttempt) {
@@ -1269,7 +1516,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
               turnId: actionTurnId,
               runId,
               cycleGoal,
-              actionIntent: planner.intent,
+              action: plannedRuntimeAction as ActorTurnResolvedAction,
               evidenceRefs: execution.evidenceRefs,
               executedTools: execution.executedTools,
               toolStatuses: execution.toolStatuses,
@@ -1284,7 +1531,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
               turnId: actionTurnId,
               actionIndex,
               cycleGoal,
-              actionIntent: planner.intent,
+              legacyPlannerAction: plannedRuntimeAction as LegacyPlannerAction,
               context: actionContext,
               runtimeResult: execution.runtimeResult,
               evidenceRefs: execution.evidenceRefs,
@@ -1299,6 +1546,15 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         if (!judgmentResult.ok) {
           providerFailed = true;
           report.provider_error = judgmentResult.error;
+          appendProviderErrorRefs({
+            report,
+            actorDir: paths.actorDir,
+            stage: actionHotPath === "actor_turn" ? "actor_turn_classifier" : "cycle_judgment",
+            turnId: actionTurnId,
+            error: judgmentResult.error,
+            inputRef: optionalStringProperty(judgmentResult, "inputRef"),
+            outputRef: optionalStringProperty(judgmentResult, "outputRef")
+          });
           break;
         }
 
@@ -1312,7 +1568,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
               actorId: input.actorId,
               cycleId,
               turnId: actionTurnId,
-              actionIntent: planner.intent,
+              action: plannedRuntimeAction,
               toolStatuses: execution.toolStatuses,
               evidenceRefs: execution.evidenceRefs,
               beads: (await loadPlanBeadGraphSnapshot(rootDir, input.actorId)).beads
@@ -1341,8 +1597,15 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             reason: result.reason
           }))
         );
-        const judgmentInputRef = "inputRef" in judgmentResult ? judgmentResult.inputRef : undefined;
-        const judgmentOutputRef = "outputRef" in judgmentResult ? judgmentResult.outputRef : undefined;
+        const judgmentInputRef = optionalStringProperty(judgmentResult, "inputRef");
+        const judgmentOutputRef = optionalStringProperty(judgmentResult, "outputRef");
+        const plannerProviderRefs = providerRefs({
+          actorDir: paths.actorDir,
+          inputRef: planner.inputRef,
+          outputRef: planner.outputRef,
+          intermediateInputRefs: optionalStringArrayProperty(planner, "intermediateInputRefs"),
+          intermediateOutputRefs: optionalStringArrayProperty(planner, "intermediateOutputRefs")
+        });
         const branchRecommended = "branchRecommended" in judgmentResult
           ? judgmentResult.branchRecommended
           : undefined;
@@ -1354,13 +1617,13 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           action_index: actionIndex,
           turn_id: actionTurnId,
           active_episode_id: actionHotPath === "actor_turn" ? activeEpisodeForCycle.episode_id : undefined,
-          action_intent_ref: planner.intentRef,
+          action_ref: plannedActionRef,
           provider_input_refs: [
-            path.relative(paths.actorDir, planner.inputRef),
+            ...plannerProviderRefs.provider_input_refs,
             judgmentInputRef ? path.relative(paths.actorDir, judgmentInputRef) : ""
           ].filter(Boolean),
           provider_output_refs: [
-            path.relative(paths.actorDir, planner.outputRef),
+            ...plannerProviderRefs.provider_output_refs,
             judgmentOutputRef ? path.relative(paths.actorDir, judgmentOutputRef) : ""
           ].filter(Boolean),
           evidence_refs: execution.evidenceRefs,
@@ -1385,7 +1648,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           rootDir,
           input.actorId,
           judgmentResult.judgment,
-          planner.intent,
+          plannedRuntimeAction,
           execution.executedTools,
           execution.runtimeResult,
           execution.toolStatuses,
@@ -1433,9 +1696,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       const branchReason =
         actionHotPath === "actor_turn"
           ? branchReasonFromActionAttempts(actionAttempts) ??
-            branchReasonFromActiveEpisodeProgress({
+            branchReasonFromContextSignals({
               activeEpisode: activeEpisodeForCycle,
-              settlementState: postCycleSettlementState
+              context
             })
           : null;
       if (branchReason && activeEpisodeState) {
@@ -1468,7 +1731,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       report.cycles.push({
         cycle_id: cycleId,
         cycle_goal_ref: cycleGoalRef,
-        action_intent_ref: lastIntentRef,
+        action_ref: lastActionRef,
         provider_input_refs: [
           cycleGoalInputRef ? path.relative(paths.actorDir, cycleGoalInputRef) : "",
           ...actionAttempts.flatMap((attempt) => attempt.provider_input_refs)

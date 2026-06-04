@@ -1,3 +1,9 @@
+/**
+ * CLI for running actor reviewer passes.
+ *
+ * @remarks Review output should diagnose evidence, proposals, and lifecycle
+ * state; it must not create new runtime action skill candidates on its own.
+ */
 import { loadProbeConfig } from "../config.js";
 import { buildActorProviderContext } from "../provider/actorProviderContext.js";
 import { loadOpenAICodexAuth } from "../mutual/openaiCodexAuth.js";

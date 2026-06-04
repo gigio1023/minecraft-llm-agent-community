@@ -1,11 +1,19 @@
-/** Regression coverage for Actor Turn output resolution into ActionIntent. */
+/** Regression coverage for Actor Turn output resolution into ActorTurnResolvedAction. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  resolveActorTurnOutputToActionIntent,
-  type ActionCardProjection
+  resolveActorTurnExecutionDraftToAction,
+  type ActionCardProjection,
+  type ActorTurnExecutionDraft
 } from "../src/runtime/goals/actorEpisode/index.js";
+
+function requireResolvedAction(result: ReturnType<typeof resolveActorTurnExecutionDraftToAction>) {
+  if (!result.ok) {
+    assert.fail(result.errors.join("; "));
+  }
+  return result.action;
+}
 
 const projection: ActionCardProjection = {
   schema: "action-card-projection/v1",
@@ -16,7 +24,7 @@ const projection: ActionCardProjection = {
       action_card_id: "card-place-block",
       title: "Place Block",
       description: "Place an inventory block at an explicit position.",
-      parameters_schema_ref: "runtime-parameters/action-intent-primitive-args/v1/place_block.json",
+      parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/place_block.json",
       parameter_hints: ["{itemName:string,targetPosition:{x:number,y:number,z:number}}"],
       current_state_requirements: [
         "inventory has the requested block item",
@@ -32,7 +40,7 @@ const projection: ActionCardProjection = {
       action_card_id: "card-craft-item",
       title: "Craft Item",
       description: "Craft an inventory-grid recipe.",
-      parameters_schema_ref: "runtime-parameters/action-intent-primitive-args/v1/craft_item.json",
+      parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/craft_item.json",
       parameter_hints: ["{itemName:string} for inventory-grid recipes only."],
       current_state_requirements: ["inventory has ingredients for the requested inventory-grid recipe"],
       expected_evidence: ["crafted inventory item"],
@@ -58,7 +66,7 @@ const projection: ActionCardProjection = {
       action_card_id: "card-craft-with-table",
       title: "Craft With Table",
       description: "Craft a table-bound recipe against a reachable crafting table.",
-      parameters_schema_ref: "runtime-parameters/action-intent-primitive-args/v1/craft_with_table.json",
+      parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/craft_with_table.json",
       parameter_hints: ["{itemName:string} for table-bound recipes."],
       current_state_requirements: [
         "nearby loaded world evidence contains a reachable crafting_table block",
@@ -91,13 +99,26 @@ const projection: ActionCardProjection = {
       action_card_id: "card-inspect-chest",
       title: "Inspect Chest",
       description: "Inspect a nearby shared chest and record container snapshot/openability evidence.",
-      parameters_schema_ref: "runtime-parameters/action-intent-primitive-args/v1/inspect_chest.json",
+      parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/inspect_chest.json",
       parameter_hints: ["{} to inspect the nearest known shared chest."],
       current_state_requirements: ["shared chest nearby"],
       expected_evidence: ["container snapshot or blocked openability evidence"],
       likely_blockers: ["shared chest unavailable"],
       readiness: "requires_current_state_check",
       runtime_mapping_ref: "action-card-mappings/card-inspect-chest.json"
+    },
+    {
+      schema: "action-card/v1",
+      action_card_id: "card-say",
+      title: "Say",
+      description: "Speak when communication matters for current relationship or role context.",
+      parameters_schema_ref: "runtime-parameters/actor-turn-action-parameters/v1/say.json",
+      parameter_hints: ["{text:string}"],
+      current_state_requirements: ["communication context exists"],
+      expected_evidence: ["runtime evidence from say"],
+      likely_blockers: ["missing text"],
+      readiness: "requires_current_state_check",
+      runtime_mapping_ref: "action-card-mappings/card-say.json"
     },
     {
       schema: "action-card/v1",
@@ -176,6 +197,11 @@ const projection: ActionCardProjection = {
       primitive_id: "inspect_chest"
     },
     {
+      kind: "use_primitive",
+      action_card_id: "card-say",
+      primitive_id: "say"
+    },
+    {
       kind: "use_action_skill",
       action_card_id: "card-craft-crafting-table",
       action_skill_id: "craftCraftingTable"
@@ -228,11 +254,11 @@ function resolutionBase() {
   };
 }
 
-test("Runtime Action Resolver maps use_existing_action cards to primitive ActionIntent", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver maps use_existing_action cards to primitive ActorTurnResolvedAction", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-place-block",
       parameters: { itemName: "crafting_table", targetPosition: { x: 0, y: 64, z: 1 } },
@@ -242,44 +268,68 @@ test("Runtime Action Resolver maps use_existing_action cards to primitive Action
     }
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.ok && result.intent.kind, "use_primitive");
-  assert.equal(result.ok && result.intent.primitive_id, "place_block");
-  assert.deepEqual(result.ok && result.intent.parameters, {
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_primitive");
+  assert.equal(action.primitive_id, "place_block");
+  assert.deepEqual(action.parameters, {
     itemName: "crafting_table",
     targetPosition: { x: 0, y: 64, z: 1 }
   });
 });
 
-test("Runtime Action Resolver rejects non-block items for place_block", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver rejects primitive Action Cards with missing required args", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       ...resolutionBase().currentState,
-      inventory_counts: { stick: 4 }
+      shared_storage: {
+        status: "contributed",
+        items: [{ name: "oak_log", count: 1 }],
+        evidence_refs: ["evidence/deposit.json"]
+      }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-say",
+      parameters: {},
+      why_this_action: "Tell npc_a the deposit is done.",
+      expected_evidence: ["runtime evidence from say"],
+      fallback_if_blocked: "use the recommended text candidate"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(!result.ok && result.errors.some((error) => error.includes("say requires text")));
+});
+
+test("Runtime Action Resolver rejects place_block without an explicit structured target", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
+    ...resolutionBase(),
+    currentState: {
+      ...resolutionBase().currentState,
+      inventory_counts: { crafting_table: 1 }
+    },
+    output: {
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-place-block",
-      parameters: { itemName: "stick", targetPosition: { x: 0, y: 64, z: 1 } },
-      why_this_action: "Try to place a stick as if it were a block.",
+      parameters: { itemName: "crafting_table" },
+      why_this_action: "Try to place a crafting table without a target cell.",
       expected_evidence: ["block delta"],
-      fallback_if_blocked: "choose another action"
+      fallback_if_blocked: "choose another explicit target"
     }
   });
 
   assert.equal(result.ok, false);
   assert.ok(
     !result.ok &&
-      result.errors.some((error) =>
-        error.includes("inventory has the requested block item")
-      )
+      result.errors.some((error) => error.includes("explicit target position"))
   );
 });
 
-test("Runtime Action Resolver rejects stale crafting-table placement when a usable table is already known", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver treats crafting-table placement current-state requirements as advisory", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -305,7 +355,7 @@ test("Runtime Action Resolver rejects stale crafting-table placement when a usab
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-place-crafting-table",
       parameters: {},
@@ -315,17 +365,14 @@ test("Runtime Action Resolver rejects stale crafting-table placement when a usab
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) =>
-        error.includes("no usable crafting_table already known")
-      )
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "placeCraftingTable");
+  assert.deepEqual(action.parameters, {});
 });
 
-test("Runtime Action Resolver does not treat a far placed crafting table as nearby", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver does not turn crafting-table proximity requirement text into rejection", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -354,7 +401,7 @@ test("Runtime Action Resolver does not treat a far placed crafting table as near
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-wooden-pickaxe",
       parameters: { itemName: "wooden_pickaxe" },
@@ -364,15 +411,13 @@ test("Runtime Action Resolver does not treat a far placed crafting table as near
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) => error.includes("crafting_table nearby"))
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftWoodenPickaxe");
 });
 
 test("Runtime Action Resolver allows crafting a new table when the known table is far", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -401,7 +446,7 @@ test("Runtime Action Resolver allows crafting a new table when the known table i
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
@@ -411,16 +456,16 @@ test("Runtime Action Resolver allows crafting a new table when the known table i
     }
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.ok && result.intent.kind, "use_action_skill");
-  assert.equal(result.ok && result.intent.action_skill_id, "craftCraftingTable");
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftCraftingTable");
 });
 
-test("Runtime Action Resolver maps use_existing_action cards to action skill ActionIntent", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver maps use_existing_action cards to action skill ActorTurnResolvedAction", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-collect-logs",
       parameters: { targetCount: 2 },
@@ -430,53 +475,54 @@ test("Runtime Action Resolver maps use_existing_action cards to action skill Act
     }
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.ok && result.intent.kind, "use_action_skill");
-  assert.equal(result.ok && result.intent.action_skill_id, "collectLogs");
-  assert.deepEqual(result.ok && result.intent.parameters, { targetCount: 2 });
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "collectLogs");
+  assert.deepEqual(action.parameters, { targetCount: 2 });
 });
 
-test("Runtime Action Resolver rejects action-skill parameters that contradict the selected card", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver rejects action-skill parameters that fail mapped input_schema", () => {
+  const actionCardProjection: ActionCardProjection = {
+    ...projection,
+    runtime_mappings: projection.runtime_mappings.map((mapping) =>
+      mapping.action_card_id === "card-collect-logs" && mapping.kind === "use_action_skill"
+        ? {
+            ...mapping,
+            input_schema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["targetCount"],
+              properties: {
+                targetCount: { type: "integer", minimum: 1 }
+              }
+            }
+          }
+        : mapping
+    )
+  };
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
-    currentState: {
-      schema: "actor-turn-current-state/v1",
-      observer_id: "npc_b",
-      inventory_counts: { oak_log: 4 },
-      visible_actors: [],
-      nearby_block_hints: [],
-      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
-      settlement_progress: {
-        inventory_counts: { oak_log: 4 },
-        shared_storage_status: "unknown",
-        known_position_summaries: [],
-        checklist: [],
-        recent_blockers: []
-      }
-    },
+    actionCardProjection,
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
-      action_card_id: "card-craft-planks-and-sticks",
-      parameters: { itemName: "oak_log" },
-      why_this_action: "Use the crafting bundle.",
-      expected_evidence: ["crafted inventory item"],
-      fallback_if_blocked: "choose a valid crafted output"
+      action_card_id: "card-collect-logs",
+      parameters: { targetCount: "two" },
+      why_this_action: "Use the actor-owned collection bundle with invalid typed parameters.",
+      expected_evidence: ["inventory logs increased"],
+      fallback_if_blocked: "provide schema-valid parameters"
     }
   });
 
   assert.equal(result.ok, false);
   assert.ok(
     !result.ok &&
-      result.errors.some((error) =>
-        error.includes("Craft Planks And Sticks cannot use itemName=oak_log")
-      )
+      result.errors.some((error) => error.includes("parameters.targetCount must be an integer"))
   );
 });
 
-test("Runtime Action Resolver rejects broad planks-and-sticks crafting when basic materials are already sufficient", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver treats broad planks-and-sticks current-state requirements as advisory", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -499,7 +545,7 @@ test("Runtime Action Resolver rejects broad planks-and-sticks crafting when basi
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-planks-and-sticks",
       parameters: {},
@@ -509,17 +555,13 @@ test("Runtime Action Resolver rejects broad planks-and-sticks crafting when basi
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) =>
-        error.includes("basic planks/sticks need not already satisfied")
-      )
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftPlanksAndSticks");
 });
 
 test("Runtime Action Resolver keeps planks-and-sticks crafting valid when sticks are still missing", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -541,7 +583,7 @@ test("Runtime Action Resolver keeps planks-and-sticks crafting valid when sticks
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-planks-and-sticks",
       parameters: {},
@@ -551,16 +593,16 @@ test("Runtime Action Resolver keeps planks-and-sticks crafting valid when sticks
     }
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.ok && result.intent.kind, "use_action_skill");
-  assert.equal(result.ok && result.intent.action_skill_id, "craftPlanksAndSticks");
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftPlanksAndSticks");
 });
 
 test("Runtime Action Resolver rejects unmapped Action Cards", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-missing",
       parameters: {},
@@ -574,8 +616,8 @@ test("Runtime Action Resolver rejects unmapped Action Cards", () => {
   assert.ok(!result.ok && result.errors.some((error) => error.includes("No runtime mapping")));
 });
 
-test("Runtime Action Resolver rejects Action Cards when current_state requirements are not satisfied", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver does not reject only because current_state requirement text is unsatisfied", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -594,7 +636,7 @@ test("Runtime Action Resolver rejects Action Cards when current_state requiremen
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-place-block",
       parameters: { itemName: "crafting_table", targetPosition: { x: 0, y: 64, z: 1 } },
@@ -604,15 +646,17 @@ test("Runtime Action Resolver rejects Action Cards when current_state requiremen
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) => error.includes("inventory has the requested block item"))
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_primitive");
+  assert.equal(action.primitive_id, "place_block");
+  assert.deepEqual(action.parameters, {
+    itemName: "crafting_table",
+    targetPosition: { x: 0, y: 64, z: 1 }
+  });
 });
 
-test("Runtime Action Resolver enforces recipe count requirements", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver leaves recipe count requirements advisory", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -631,7 +675,7 @@ test("Runtime Action Resolver enforces recipe count requirements", () => {
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
@@ -641,15 +685,13 @@ test("Runtime Action Resolver enforces recipe count requirements", () => {
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) => error.includes("inventory has planks >= 4"))
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftCraftingTable");
 });
 
-test("Runtime Action Resolver rejects redundant crafting-table crafting when a usable table is already known", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver leaves usable-table redundancy requirements advisory", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -668,7 +710,7 @@ test("Runtime Action Resolver rejects redundant crafting-table crafting when a u
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
@@ -678,15 +720,13 @@ test("Runtime Action Resolver rejects redundant crafting-table crafting when a u
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) => error.includes("no usable crafting_table already known"))
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftCraftingTable");
 });
 
-test("Runtime Action Resolver rejects redundant crafting-table crafting when the actor already carries one", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver leaves carried crafting-table requirements advisory", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -705,7 +745,7 @@ test("Runtime Action Resolver rejects redundant crafting-table crafting when the
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
@@ -715,15 +755,13 @@ test("Runtime Action Resolver rejects redundant crafting-table crafting when the
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) => error.includes("no crafting_table item already carried"))
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftCraftingTable");
 });
 
-test("Runtime Action Resolver rejects table-bound recipes through inventory-grid craft_item", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver rejects inventory-grid recipes through table-bound craft_with_table", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -742,13 +780,13 @@ test("Runtime Action Resolver rejects table-bound recipes through inventory-grid
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
-      action_card_id: "card-craft-item",
-      parameters: { itemName: "wooden_pickaxe" },
-      why_this_action: "Try to craft a wooden pickaxe with enough planks and sticks.",
-      expected_evidence: ["crafted wooden_pickaxe"],
-      fallback_if_blocked: "use a table-bound crafting action"
+      action_card_id: "card-craft-with-table",
+      parameters: { itemName: "stick" },
+      why_this_action: "Try to craft an inventory-grid recipe through the table-bound primitive.",
+      expected_evidence: ["crafted stick"],
+      fallback_if_blocked: "use craft_item for inventory-grid recipes"
     }
   });
 
@@ -756,13 +794,13 @@ test("Runtime Action Resolver rejects table-bound recipes through inventory-grid
   assert.ok(
     !result.ok &&
       result.errors.some((error) =>
-        error.includes("inventory has ingredients for the requested inventory-grid recipe")
+        error.includes("craft_with_table is for table-bound recipes")
       )
   );
 });
 
-test("Runtime Action Resolver rejects redundant wooden-pickaxe action skill when already carried", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver leaves wooden-pickaxe redundancy requirements advisory", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -781,7 +819,7 @@ test("Runtime Action Resolver rejects redundant wooden-pickaxe action skill when
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-wooden-pickaxe",
       parameters: {},
@@ -791,15 +829,13 @@ test("Runtime Action Resolver rejects redundant wooden-pickaxe action skill when
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) => error.includes("no wooden_pickaxe already carried"))
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "use_action_skill");
+  assert.equal(action.action_skill_id, "craftWoodenPickaxe");
 });
 
-test("Runtime Action Resolver enforces exact table-bound recipe ingredients", () => {
-  const missingSticks = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver does not enforce table-bound inventory counts from current_state text", () => {
+  const missingSticks = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -818,7 +854,7 @@ test("Runtime Action Resolver enforces exact table-bound recipe ingredients", ()
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-with-table",
       parameters: { itemName: "wooden_pickaxe" },
@@ -828,15 +864,11 @@ test("Runtime Action Resolver enforces exact table-bound recipe ingredients", ()
     }
   });
 
-  assert.equal(missingSticks.ok, false);
-  assert.ok(
-    !missingSticks.ok &&
-      missingSticks.errors.some((error) =>
-        error.includes("inventory has ingredients for the requested table-bound recipe")
-      )
-  );
+  const missingSticksAction = requireResolvedAction(missingSticks);
+  assert.equal(missingSticksAction.kind, "use_primitive");
+  assert.equal(missingSticksAction.primitive_id, "craft_with_table");
 
-  const furnace = resolveActorTurnOutputToActionIntent({
+  const furnace = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -855,7 +887,7 @@ test("Runtime Action Resolver enforces exact table-bound recipe ingredients", ()
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-with-table",
       parameters: { itemName: "furnace" },
@@ -865,11 +897,12 @@ test("Runtime Action Resolver enforces exact table-bound recipe ingredients", ()
     }
   });
 
-  assert.equal(furnace.ok, true);
-  assert.equal(furnace.ok && furnace.intent.primitive_id, "craft_with_table");
+  const furnaceAction = requireResolvedAction(furnace);
+  assert.equal(furnaceAction.kind, "use_primitive");
+  assert.equal(furnaceAction.primitive_id, "craft_with_table");
 });
 
-test("Runtime Action Resolver enforces exact inventory-grid recipe ingredients", () => {
+test("Runtime Action Resolver requires craft_item itemName but leaves recipe ingredients advisory", () => {
   const state = {
     schema: "actor-turn-current-state/v1" as const,
     observer_id: "npc_b",
@@ -886,12 +919,31 @@ test("Runtime Action Resolver enforces exact inventory-grid recipe ingredients",
       recent_blockers: []
     }
   };
+  const missingItemName = resolveActorTurnExecutionDraftToAction({
+    ...resolutionBase(),
+    currentState: state,
+    output: {
+      schema: "actor-turn-execution-draft/v1",
+      choice: "use_existing_action",
+      action_card_id: "card-craft-item",
+      parameters: {},
+      why_this_action: "Try to craft without naming an item.",
+      expected_evidence: ["crafted inventory item"],
+      fallback_if_blocked: "provide itemName"
+    }
+  });
+  assert.equal(missingItemName.ok, false);
+  assert.ok(
+    !missingItemName.ok &&
+      missingItemName.errors.some((error) => error.includes("craft_item requires itemName"))
+  );
+
   for (const itemName of ["stick", "oak_planks", "crafting_table"]) {
-    const result = resolveActorTurnOutputToActionIntent({
+    const result = resolveActorTurnExecutionDraftToAction({
       ...resolutionBase(),
       currentState: state,
       output: {
-        schema: "actor-turn-output/v1",
+        schema: "actor-turn-execution-draft/v1",
         choice: "use_existing_action",
         action_card_id: "card-craft-item",
         parameters: { itemName },
@@ -900,23 +952,19 @@ test("Runtime Action Resolver enforces exact inventory-grid recipe ingredients",
         fallback_if_blocked: "choose a non-crafting action"
       }
     });
-    assert.equal(result.ok, false);
-    assert.ok(
-      !result.ok &&
-        result.errors.some((error) =>
-          error.includes("inventory has ingredients for the requested inventory-grid recipe")
-        )
-    );
+    const action = requireResolvedAction(result);
+    assert.equal(action.kind, "use_primitive");
+    assert.equal(action.primitive_id, "craft_item");
   }
 
-  const stick = resolveActorTurnOutputToActionIntent({
+  const stick = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       ...state,
       inventory_counts: { oak_planks: 2 }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "use_existing_action",
       action_card_id: "card-craft-item",
       parameters: { itemName: "stick" },
@@ -925,15 +973,16 @@ test("Runtime Action Resolver enforces exact inventory-grid recipe ingredients",
       fallback_if_blocked: "use another action"
     }
   });
-  assert.equal(stick.ok, true);
-  assert.equal(stick.ok && stick.intent.primitive_id, "craft_item");
+  const stickAction = requireResolvedAction(stick);
+  assert.equal(stickAction.kind, "use_primitive");
+  assert.equal(stickAction.primitive_id, "craft_item");
 });
 
-test("Runtime Action Resolver maps author_mineflayer_action to generated ActionIntent", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver maps author_mineflayer_action to generated ActorTurnResolvedAction", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "author_mineflayer_action",
       proposed_action_skill_id: "saySettlementNeed",
       purpose: "Say a concrete settlement need with helper evidence.",
@@ -958,16 +1007,16 @@ test("Runtime Action Resolver maps author_mineflayer_action to generated ActionI
     }
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.ok && result.intent.kind, "author_and_trial_action_skill");
-  assert.equal(result.ok && result.intent.candidate?.proposed_skill_id, "saySettlementNeed");
-  assert.deepEqual(result.ok && result.intent.parameters, {
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "author_mineflayer_action");
+  assert.equal(action.candidate.proposed_skill_id, "saySettlementNeed");
+  assert.deepEqual(action.parameters, {
     text: "I am blocked placing the crafting table; trying a new cell."
   });
 });
 
-test("Runtime Action Resolver rejects generated shared chest probe when Inspect Chest covers it", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver allows generated shared chest probe when strict authoring guards pass", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -990,11 +1039,11 @@ test("Runtime Action Resolver rejects generated shared chest probe when Inspect 
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "author_mineflayer_action",
       proposed_action_skill_id: "probeSharedChestOpenability",
       purpose: "Check whether the shared chest can be opened and snapshot the container.",
-      input_schema: { type: "object", properties: {}, additionalProperties: false },
+      input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
       parameters: {},
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.observe({}); return { status: 'checked' }; }",
@@ -1010,17 +1059,14 @@ test("Runtime Action Resolver rejects generated shared chest probe when Inspect 
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) =>
-        error.includes("shared chest/container probing is already covered")
-      )
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "author_mineflayer_action");
+  assert.equal(action.candidate.proposed_skill_id, "probeSharedChestOpenability");
+  assert.deepEqual(action.parameters, {});
 });
 
-test("Runtime Action Resolver rejects generated crafting-table reachability probe when station cards cover it", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver allows generated crafting-table reachability probe when strict authoring guards pass", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     currentState: {
       schema: "actor-turn-current-state/v1",
@@ -1039,11 +1085,11 @@ test("Runtime Action Resolver rejects generated crafting-table reachability prob
       }
     },
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "author_mineflayer_action",
       proposed_action_skill_id: "checkCraftingTableReachability",
       purpose: "Verify crafting table station reachability before table-bound crafting.",
-      input_schema: { type: "object", properties: {}, additionalProperties: false },
+      input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
       parameters: {},
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.observe({}); return { status: 'checked' }; }",
@@ -1059,40 +1105,39 @@ test("Runtime Action Resolver rejects generated crafting-table reachability prob
     }
   });
 
-  assert.equal(result.ok, false);
-  assert.ok(
-    !result.ok &&
-      result.errors.some((error) =>
-        error.includes("crafting-table/station probing is already covered")
-      )
-  );
+  const action = requireResolvedAction(result);
+  assert.equal(action.kind, "author_mineflayer_action");
+  assert.equal(action.candidate.proposed_skill_id, "checkCraftingTableReachability");
+  assert.deepEqual(action.parameters, {});
 });
 
-test("Runtime Action Resolver rejects non-executable generated promotion policy", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+test("Runtime Action Resolver rejects invalid generated promotion policy", () => {
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "author_mineflayer_action",
       proposed_action_skill_id: "recordOnlyCandidate",
       purpose: "Record only should not become executable intent.",
       input_schema: {
         type: "object",
+        required: [],
+        additionalProperties: false,
         properties: {}
       },
       parameters: {},
       source_language: "typescript",
-      source: "export async function run(ctx) { await ctx.wait(1); }",
+      source: "export async function run(ctx, params) { await ctx.wait(1); }",
       helper_api_version: "mineflayer-action-skill-helper/v1",
       helper_allowlist: ["wait"],
       timeout_ms: 5000,
       verifier: { kind: "helper_event_progress" },
       known_failure_modes: [],
-      promotion_policy: "record_candidate_only",
+      promotion_policy: "draft_only",
       why_this_action: "Try record-only.",
       expected_evidence: ["candidate record"],
       fallback_if_blocked: "choose executable policy"
-    }
+    } as unknown as ActorTurnExecutionDraft
   });
 
   assert.equal(result.ok, false);
@@ -1103,10 +1148,10 @@ test("Runtime Action Resolver rejects non-executable generated promotion policy"
 });
 
 test("Runtime Action Resolver rejects generated parameters that fail input_schema", () => {
-  const result = resolveActorTurnOutputToActionIntent({
+  const result = resolveActorTurnExecutionDraftToAction({
     ...resolutionBase(),
     output: {
-      schema: "actor-turn-output/v1",
+      schema: "actor-turn-execution-draft/v1",
       choice: "author_mineflayer_action",
       proposed_action_skill_id: "saySettlementNeed",
       purpose: "Say a concrete settlement need with helper evidence.",

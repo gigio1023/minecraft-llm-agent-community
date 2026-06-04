@@ -1,5 +1,12 @@
+/**
+ * Provider input projections for the social-cycle stages.
+ *
+ * @remarks These projections keep provider context compact and policy-aware
+ * after transcript growth. They should carry evidence refs and limitations
+ * instead of laundering old prose into current-state claims.
+ */
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
-import type { ActionIntent, ActorCycleGoal, StrategicGoal } from "../runtime/goals/types.js";
+import type { LegacyPlannerAction, ActorCycleGoal, StrategicGoal } from "../runtime/goals/types.js";
 import { buildActionCardProjection } from "../runtime/goals/actorEpisode/index.js";
 import type { JsonValue } from "./inputSnapshot.js";
 
@@ -323,7 +330,7 @@ function buildActionSelectionModes(context: SocialCycleContextPacket) {
 function buildActorTurnContract() {
   return {
     schema: "actor-turn-contract/v1",
-    target_output_schema: "actor-turn-output/v1",
+    target_output_schema: "actor-turn-execution-draft/v1",
     choices: [
       {
         choice: "use_existing_action",
@@ -334,8 +341,9 @@ function buildActorTurnContract() {
       {
         choice: "author_mineflayer_action",
         provider_selects:
-          "schema-bound generated TypeScript candidate with parameters, helper allowlist, timeout, and verifier",
-        runtime_resolves_to: "action-selection-gated generated action skill trial"
+          "a direct function tool with detailed rationale, existing-tool comparison, desired Minecraft behavior, success evidence, and failure handling; no source or context summary",
+        runtime_resolves_to:
+          "internal full-context Mineflayer codegen receives ActorTurnInput, raw outer tool call, parsed args, and injected SKILL markdown"
       }
     ],
     rules: {
@@ -429,7 +437,7 @@ export function buildCycleJudgmentProviderInput(input: {
   turnId: string;
   actionIndex?: number;
   cycleGoal: ActorCycleGoal;
-  actionIntent: ActionIntent;
+  legacyPlannerAction: LegacyPlannerAction;
   runtimeResult: JsonValue;
   evidenceRefs: string[];
   executedTools: string[];
@@ -446,7 +454,7 @@ export function buildCycleJudgmentProviderInput(input: {
     ActorSoul: input.context.ActorSoul,
     ActorLifeGoal: input.context.ActorLifeGoal,
     cycle_goal: input.cycleGoal,
-    action_intent: input.actionIntent,
+    legacy_planner_action: input.legacyPlannerAction,
     runtime_result: input.runtimeResult,
     evidence_refs: input.evidenceRefs,
     executed_tools: input.executedTools,

@@ -1,3 +1,4 @@
+/** Regression coverage for compaction without laundering weak progress claims. */
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -11,7 +12,7 @@ import {
   type SocialCycleContextPacketLike
 } from "../src/runtime/goals/socialCycleContextCompaction.js";
 import type {
-  ActionIntent,
+  LegacyPlannerAction,
   ActorCycleGoal,
   ActorLifeGoal,
   CycleJudgment
@@ -68,9 +69,9 @@ function cycleGoal(): ActorCycleGoal {
   };
 }
 
-function actionIntent(): ActionIntent {
+function legacyPlannerAction(): LegacyPlannerAction {
   return {
-    schema: "action-intent/v1",
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0003",
     cycle_goal_id: "cycle-goal-1",
@@ -323,15 +324,15 @@ test("social-cycle context checkpoint preserves authority names and compact refs
     createdAt,
     context: contextPacket(),
     currentCycleGoal: cycleGoal(),
-    currentActionIntent: actionIntent(),
+    currentLegacyPlannerAction: legacyPlannerAction(),
     trigger: "token_limit",
     reason: "Provider input exceeded local token budget after repeated observe/wait context.",
     refs: {
       inputContextRef: "provider-inputs/goal-mind-cycle-0003.json",
       latestObservationRef: "evidence/cycle-0003-observe.json",
       cycleGoalRef: "goals/cycle/cycle-goal-1.json",
-      actionIntentRef: "goals/cycle/intents/cycle-0003-action-01-intent.json",
-      recentActionRefs: ["goals/cycle/intents/cycle-0002-action-01-intent.json"],
+      legacyPlannerActionRef: "goals/cycle/legacy-planner-actions/cycle-0003-action-01-legacy-planner-action.json",
+      recentActionRefs: ["goals/cycle/legacy-planner-actions/cycle-0002-action-01-legacy-planner-action.json"],
       evidenceRefs: [
         "evidence/cycle-0002-collect_logs.json",
         "evidence/cycle-0003-observe.json"
@@ -388,14 +389,14 @@ test("compact summary facts are ref-backed and cannot claim physical progress", 
   const checkpoint = buildSocialCycleContextCheckpoint({
     context: contextPacket(),
     currentCycleGoal: cycleGoal(),
-    currentActionIntent: actionIntent(),
+    currentLegacyPlannerAction: legacyPlannerAction(),
     trigger: "cycle_boundary",
     reason: "Snapshot before the next cycle provider input.",
     refs: {
       inputContextRef: "provider-inputs/action-planner-cycle-0003.json",
       latestObservationRef: "evidence/cycle-0003-observe.json",
       cycleGoalRef: "goals/cycle/cycle-goal-1.json",
-      actionIntentRef: "goals/cycle/intents/cycle-0003-action-01-intent.json",
+      legacyPlannerActionRef: "goals/cycle/legacy-planner-actions/cycle-0003-action-01-legacy-planner-action.json",
       evidenceRefs: ["evidence/cycle-0003-observe.json"],
       verifierRefs: ["verifier/cycle-0002-collect_logs.json"],
       judgmentRefs: ["judgments/cycle-0002-action-01-judgment.json"]
@@ -442,14 +443,14 @@ test("builder rejects compact summaries without required evidence refs", () => {
       buildSocialCycleContextCheckpoint({
         context: contextPacket(),
         currentCycleGoal: cycleGoal(),
-        currentActionIntent: actionIntent(),
+        currentLegacyPlannerAction: legacyPlannerAction(),
         trigger: "report_snapshot",
         reason: "bad checkpoint",
         refs: {
           inputContextRef: "provider-inputs/action-planner-cycle-0003.json",
           latestObservationRef: "",
           cycleGoalRef: "goals/cycle/cycle-goal-1.json",
-          actionIntentRef: "goals/cycle/intents/cycle-0003-action-01-intent.json"
+          legacyPlannerActionRef: "goals/cycle/legacy-planner-actions/cycle-0003-action-01-legacy-planner-action.json"
         }
       }),
     /latestObservationRef/

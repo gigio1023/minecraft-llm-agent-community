@@ -1,3 +1,10 @@
+/**
+ * Per-actor async reviewer queue and artifact coordination.
+ *
+ * @remarks Reviewers may analyze, patch, reject, or retire existing evidence and
+ * candidates, but they must not originate runtime action skill authority outside
+ * the action-selection path.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 

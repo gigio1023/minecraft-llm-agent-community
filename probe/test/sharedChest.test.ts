@@ -1,3 +1,4 @@
+/** Regression coverage for shared-chest primitive contracts. */
 import assert from "node:assert/strict";
 import test from "node:test";
 

@@ -1,3 +1,9 @@
+/**
+ * Persistence for Actor LifeGoal records.
+ *
+ * @remarks LifeGoal is the long-lived frame for actor decisions, not a provider
+ * shortcut for claiming progress without evidence.
+ */
 import { randomUUID } from "node:crypto";
 
 import type { ActorLifeGoal, ActorSoul } from "./types.js";

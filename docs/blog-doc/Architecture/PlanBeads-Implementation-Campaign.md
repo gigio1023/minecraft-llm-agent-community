@@ -19,7 +19,8 @@ Implementation result, 2026-05-31:
   `probe/src/runtime/goals/planBeads/`.
 - Social-cycle context receives a bounded read-only `plan_bead_packet` with
   `physical_progress_claim: false` when an actor has PlanBead graph records;
-  action execution still comes only from the action surface and `ActionIntent`.
+  action execution still comes only from Actor Turn tool selection, runtime
+  action validation, and runtime evidence.
 - Deterministic ready fronts are computed from stored graph state and written as
   actor-workspace index artifacts.
 - `CycleJudgment` can propose typed PlanBead operations, but runtime-owned
@@ -66,10 +67,10 @@ The runtime loop being implemented remains:
 ActorSoul + LifeGoal
 -> actor-owned PlanBeadGraph
 -> ready PlanBeads
--> CycleGoal
--> ActionIntent
+-> Active Episode / Actor Turn context
+-> Action Card or author_mineflayer_action tool selection
 -> runtime execution and evidence
--> CycleJudgment
+-> runtime classifier / branch-time Deliberation
 -> guarded PlanBead updates
 ```
 
@@ -236,7 +237,7 @@ Runtime invariants:
 - Actor workspace is the source of truth for actor-owned PlanBeadGraph state.
 - PlanBeads are work graph state, not ordinary memory and not executable
   authority.
-- PlanBeads must not provide missing ActionIntent args, action-skill
+- PlanBeads must not provide missing runtime action parameters, action-skill
   permissions, physical success, retry-constraint mutation, ActorSoul mutation,
   or LifeGoal mutation.
 - Provider packets expose bounded read-only PlanBead context with

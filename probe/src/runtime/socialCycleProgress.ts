@@ -1,4 +1,9 @@
-import type { ActionIntent, CycleJudgment, CycleJudgmentOutcome } from "./goals/types.js";
+import type { CycleJudgment, CycleJudgmentOutcome } from "./goals/types.js";
+
+type JudgmentAction = {
+  kind: string;
+  action_skill_id?: string;
+};
 
 /** Primitives that refresh state but do not by themselves satisfy gather/craft cycle goals. */
 export const SOCIAL_OBSERVATION_ONLY_PRIMITIVES = new Set([
@@ -107,7 +112,7 @@ export function isDurableProgressVerifier(
 /** Rejects provider-written outcomes that are stronger than runtime evidence supports. */
 export function clampCycleJudgmentOutcome(input: {
   judgment: CycleJudgment;
-  actionIntent: ActionIntent;
+  action?: JudgmentAction;
   executedTools: string[];
   toolStatuses?: readonly SocialPrimitiveAttemptStatus[];
 }): CycleJudgment {
@@ -147,8 +152,8 @@ export function clampCycleJudgmentOutcome(input: {
   }
 
   if (
-    input.actionIntent.kind === "use_action_skill" &&
-    input.actionIntent.action_skill_id === "runtimeObserveAndRemember" &&
+    input.action?.kind === "use_action_skill" &&
+    input.action.action_skill_id === "runtimeObserveAndRemember" &&
     input.executedTools.every((tool) => SOCIAL_OBSERVATION_ONLY_PRIMITIVES.has(tool))
   ) {
     return { ...input.judgment, outcome: "no_progress" };

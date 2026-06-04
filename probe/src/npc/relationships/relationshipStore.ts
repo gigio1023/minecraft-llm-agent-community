@@ -1,3 +1,10 @@
+/**
+ * Persistence for actor relationship records.
+ *
+ * @remarks Relationship state shapes social context and obligations, but it is
+ * not a substitute for chat, shared-storage, or runtime evidence when claiming
+ * that a social consequence happened.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 

@@ -1,9 +1,18 @@
+/**
+ * Schema and contract checks for provider-authored Mineflayer action skill
+ * candidates.
+ *
+ * @remarks Authoring is allowed only through the action-selection path. These
+ * checks keep generated source helper-limited, parameter-schema-bound, timed,
+ * and verifier-backed before trial or promotion can happen.
+ */
 import { assertDirectGeneratedActionSkillSource } from "../../generatedActionSkills/directExecutor.js";
-import {
-  actionIntentParameters,
-  type ActionIntent,
-  type GeneratedActionSkillCandidate
+import type {
+  GeneratedActionSkillCandidate,
+  LegacyPlannerAction
 } from "../../runtime/goals/types.js";
+import { mineflayerActionSkillHelperNames } from "../../runtime/goals/actorEpisode/mineflayerCodegenSkill.js";
+import { validateGeneratedSourceContracts } from "./sourceContracts.js";
 
 export const GENERATED_ACTION_SKILL_CANDIDATE_SCHEMA =
   "generated-action-skill-candidate/v1" as const;
@@ -12,21 +21,7 @@ export const ACTION_SKILL_AUTHORING_HELPER_API_VERSION =
 
 export type GeneratedActionSkillLifecycleStatus = "draft" | "trial_failed" | "promotable";
 
-const allowedHelperNames = new Set([
-  "position",
-  "inventoryItems",
-  "observe",
-  "wait",
-  "collectLogs",
-  "mineBlock",
-  "craftItem",
-  "craftWithTable",
-  "consumeItem",
-  "placeBlock",
-  "buildPattern",
-  "say",
-  "mineflayer"
-]);
+const allowedHelperNames = new Set<string>(mineflayerActionSkillHelperNames);
 
 const helperPrimitiveMap: Record<string, string> = {
   observe: "observe",
@@ -110,6 +105,10 @@ function validateProperty(input: {
   path: string;
   errors: string[];
 }) {
+  if ("const" in input.schema && input.value !== input.schema.const) {
+    input.errors.push(`${input.path} must equal ${String(input.schema.const)}`);
+  }
+
   const type = readJsonSchemaType(input.schema);
   if (!type) {
     return;
@@ -140,6 +139,40 @@ function validateProperty(input: {
     input.value > input.schema.maximum
   ) {
     input.errors.push(`${input.path} must be <= ${input.schema.maximum}`);
+  }
+}
+
+function validateInputSchemaDefinition(
+  schema: Record<string, unknown>,
+  path: string,
+  errors: string[]
+) {
+  if (readJsonSchemaType(schema) !== "object") {
+    errors.push(`${path}.type must be object`);
+  }
+  if (schema.additionalProperties !== false) {
+    errors.push(`${path}.additionalProperties must be false`);
+  }
+  const properties = isRecord(schema.properties) ? schema.properties : null;
+  if (!properties) {
+    errors.push(`${path}.properties must be an object`);
+  }
+  const required = stringArray(schema.required);
+  if (!required) {
+    errors.push(`${path}.required must be a string array`);
+  }
+  if (!properties || !required) {
+    return;
+  }
+  for (const key of required) {
+    if (properties[key] === undefined) {
+      errors.push(`${path}.required includes ${key} but properties.${key} is missing`);
+    }
+  }
+  for (const [key, propertySchema] of Object.entries(properties)) {
+    if (!isRecord(propertySchema)) {
+      errors.push(`${path}.properties.${key} must be an object`);
+    }
   }
 }
 
@@ -205,8 +238,8 @@ export function validateGeneratedActionSkillCandidate(
   }
   if (!isRecord(value.input_schema)) {
     errors.push("candidate.input_schema must be an object JSON schema");
-  } else if (readJsonSchemaType(value.input_schema) !== "object") {
-    errors.push("candidate.input_schema.type must be object");
+  } else {
+    validateInputSchemaDefinition(value.input_schema, "candidate.input_schema", errors);
   }
   if (value.helper_api_version !== ACTION_SKILL_AUTHORING_HELPER_API_VERSION) {
     errors.push(`candidate.helper_api_version must be ${ACTION_SKILL_AUTHORING_HELPER_API_VERSION}`);
@@ -232,11 +265,8 @@ export function validateGeneratedActionSkillCandidate(
   if (!isRecord(value.verifier)) {
     errors.push("candidate.verifier must be an object");
   }
-  if (
-    value.promotion_policy !== "record_candidate_only" &&
-    value.promotion_policy !== "promote_after_passed_trial"
-  ) {
-    errors.push("candidate.promotion_policy must be record_candidate_only or promote_after_passed_trial");
+  if (value.promotion_policy !== "promote_after_passed_trial") {
+    errors.push("candidate.promotion_policy must be promote_after_passed_trial");
   }
   if (!stringArray(value.known_failure_modes)) {
     errors.push("candidate.known_failure_modes must be a string array");
@@ -247,6 +277,14 @@ export function validateGeneratedActionSkillCandidate(
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }
+    if (isRecord(value.input_schema) && helperAllowlist) {
+      errors.push(
+        ...validateGeneratedSourceContracts({
+          candidate: value as GeneratedActionSkillCandidate,
+          allowedHelperNames
+        })
+      );
+    }
   }
 
   return errors.length === 0
@@ -254,18 +292,15 @@ export function validateGeneratedActionSkillCandidate(
     : { ok: false, errors };
 }
 
-export function validateAuthorAndTrialActionSkillIntent(
-  intent: ActionIntent
-): {
+export function validateGeneratedActionSkillTrialRequest(input: {
+  candidate: unknown;
+  parameters: Record<string, unknown>;
+}): {
   ok: true;
   candidate: GeneratedActionSkillCandidate;
   parameters: Record<string, unknown>;
 } | { ok: false; errors: string[] } {
-  if (intent.kind !== "author_and_trial_action_skill") {
-    return { ok: false, errors: ["ActionIntent kind must be author_and_trial_action_skill"] };
-  }
-
-  const candidateResult = validateGeneratedActionSkillCandidate(intent.candidate);
+  const candidateResult = validateGeneratedActionSkillCandidate(input.candidate);
   if (!candidateResult.ok) {
     return candidateResult;
   }
@@ -278,10 +313,9 @@ export function validateAuthorAndTrialActionSkillIntent(
     };
   }
 
-  const parameters = actionIntentParameters(intent);
   const schemaResult = validateJsonObjectAgainstSimpleSchema({
     schema: candidateResult.candidate.input_schema,
-    parameters
+    parameters: input.parameters
   });
   if (!schemaResult.ok) {
     return schemaResult;
@@ -290,8 +324,17 @@ export function validateAuthorAndTrialActionSkillIntent(
   return {
     ok: true,
     candidate: candidateResult.candidate,
-    parameters
+    parameters: input.parameters
   };
+}
+
+export function validateAuthorAndTrialActionSkillRequest(
+  action: LegacyPlannerAction
+) {
+  return validateGeneratedActionSkillTrialRequest({
+    candidate: action.candidate,
+    parameters: action.parameters ?? action.args ?? {}
+  });
 }
 
 export function generatedCandidateRequiredPrimitives(

@@ -161,7 +161,7 @@ function resolveActorRefPath(actorDir: string, ref: string): ActorRefResolution 
 function collectReportRefs(report: SocialCycleRunReport) {
   const refs: string[] = [];
   for (const cycle of report.cycles) {
-    refs.push(cycle.cycle_goal_ref, cycle.action_intent_ref, cycle.judgment_ref);
+    refs.push(cycle.cycle_goal_ref, cycle.action_ref, cycle.judgment_ref);
     if (cycle.plan_bead_packet_ref) {
       refs.push(cycle.plan_bead_packet_ref);
     }
@@ -449,51 +449,51 @@ function moveToPhysicalArgsStatus(args: unknown) {
   return "invalid_args" as const;
 }
 
-function isMoveToIntent(intent: unknown): intent is Record<string, unknown> & { args: unknown } {
-  return isRecord(intent) &&
-    intent.kind === "use_primitive" &&
-    intent.primitive_id === "move_to";
+function isMoveToRuntimeAction(action: unknown): action is Record<string, unknown> & { args: unknown } {
+  return isRecord(action) &&
+    action.kind === "use_primitive" &&
+    action.primitive_id === "move_to";
 }
 
-function actionIntentParametersForAudit(intent: Record<string, unknown>) {
-  return isRecord(intent.parameters) ? intent.parameters : intent.args;
+function runtimeActionParametersForAudit(action: Record<string, unknown>) {
+  return isRecord(action.parameters) ? action.parameters : action.args;
 }
 
-function collectActionIntentRefs(
+function collectRuntimeActionRefs(
   cycle: SocialCycleRunReport["cycles"][number]
 ) {
   const refs = new Set<string>();
-  if (cycle.action_intent_ref) {
-    refs.add(cycle.action_intent_ref);
+  if (cycle.action_ref) {
+    refs.add(cycle.action_ref);
   }
   for (const attempt of cycle.action_attempts ?? []) {
-    if (attempt.action_intent_ref) {
-      refs.add(attempt.action_intent_ref);
+    if (attempt.action_ref) {
+      refs.add(attempt.action_ref);
     }
   }
   return [...refs];
 }
 
-async function auditMoveToIntentContracts(input: {
+async function auditMoveToRuntimeActionContracts(input: {
   actorDir: string;
   cycle: SocialCycleRunReport["cycles"][number];
   cycleNumber: number;
   errors: string[];
 }) {
-  for (const ref of collectActionIntentRefs(input.cycle)) {
-    const intent = await readActorRefJson<Record<string, unknown>>(input.actorDir, ref);
-    if (!isMoveToIntent(intent)) {
+  for (const ref of collectRuntimeActionRefs(input.cycle)) {
+    const action = await readActorRefJson<Record<string, unknown>>(input.actorDir, ref);
+    if (!isMoveToRuntimeAction(action)) {
       continue;
     }
 
-    const status = moveToPhysicalArgsStatus(actionIntentParametersForAudit(intent));
+    const status = moveToPhysicalArgsStatus(runtimeActionParametersForAudit(action));
     if (status === "empty_args") {
       input.errors.push(
-        `Cycle ${input.cycleNumber} move_to intent ${ref} has empty args; structured movement target args are required`
+        `Cycle ${input.cycleNumber} move_to action ${ref} has empty args; structured movement target args are required`
       );
     } else if (status === "invalid_args") {
       input.errors.push(
-        `Cycle ${input.cycleNumber} move_to intent ${ref} has invalid physical args; expected position/targetPosition/x,y,z or direction+distance within the movement policy`
+        `Cycle ${input.cycleNumber} move_to action ${ref} has invalid physical args; expected position/targetPosition/x,y,z or direction+distance within the movement policy`
       );
     }
   }
@@ -1081,7 +1081,7 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
 
   for (const [index, cycle] of report.cycles.entries()) {
     const cycleNumber = index + 1;
-    if (!cycle.cycle_goal_ref || !cycle.action_intent_ref || !cycle.judgment_ref) {
+    if (!cycle.cycle_goal_ref || !cycle.action_ref || !cycle.judgment_ref) {
       errors.push(`Cycle ${cycleNumber} missing goal, intent, or judgment artifact ref`);
     }
     if (report.runtime_status === "passed" && cycle.evidence_refs.length === 0) {
@@ -1100,7 +1100,7 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
         errors,
         cycleNumber,
         label: "action intent artifact",
-        ref: cycle.action_intent_ref
+        ref: cycle.action_ref
       });
       await auditRequiredActorRef({
         actorDir,
@@ -1133,7 +1133,7 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
 
       const inputErrors = await auditProviderInputs(actorDir, cycle.provider_input_refs);
       errors.push(...inputErrors);
-      await auditMoveToIntentContracts({
+      await auditMoveToRuntimeActionContracts({
         actorDir,
         cycle,
         cycleNumber,

@@ -7,9 +7,9 @@ import type { Bot } from "mineflayer";
 
 import {
   compileSocialAllowedPrimitives,
-  executeSocialActionIntent,
+  executeLegacyPlannerAction,
   filterExecutableSocialActionSkills,
-  resolvePrimitivesForSocialIntent
+  resolvePrimitivesForLegacyPlannerAction
 } from "../src/runtime/socialCycleExecution.js";
 import { listActiveActorActionSkillRecords } from "../src/runtime/actorWorkspace.js";
 import type { ActorActionSkillRecord } from "../src/runtime/actorWorkspaceStore.js";
@@ -22,7 +22,7 @@ import {
   isMovementOnlyVerifier,
   isMeaningfulGameplayPrimitive
 } from "../src/runtime/socialCycleProgress.js";
-import type { ActionIntent, CycleJudgment } from "../src/runtime/goals/types.js";
+import type { LegacyPlannerAction, CycleJudgment } from "../src/runtime/goals/types.js";
 import { testActionSkillRecord } from "./helpers/actionSkillRecords.js";
 import {
   buildSettlementState,
@@ -228,8 +228,8 @@ test("clampCycleJudgmentOutcome rejects verified_progress without meaningful too
     relationship_event_proposals: [],
     next_goal_context: []
   };
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-1",
@@ -242,7 +242,7 @@ test("clampCycleJudgmentOutcome rejects verified_progress without meaningful too
   };
   const clamped = clampCycleJudgmentOutcome({
     judgment,
-    actionIntent: intent,
+    action: intent,
     executedTools: ["observe"]
   });
   assert.equal(clamped.outcome, "no_progress");
@@ -264,8 +264,8 @@ test("clampCycleJudgmentOutcome downgrades unpassed verified progress to partial
     relationship_event_proposals: [],
     next_goal_context: []
   };
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-1",
@@ -279,7 +279,7 @@ test("clampCycleJudgmentOutcome downgrades unpassed verified progress to partial
 
   const clamped = clampCycleJudgmentOutcome({
     judgment,
-    actionIntent: intent,
+    action: intent,
     executedTools: ["build_pattern"],
     toolStatuses: [{ tool: "build_pattern", status: "progressing" }]
   });
@@ -319,14 +319,15 @@ test("Actor Turn runtime classifier does not copy provider absence claims into j
       allowed_primitive_ids: ["observe"],
       stop_conditions: []
     },
-    actionIntent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "actor-turn-resolved-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-absence-summary",
       cycle_goal_id: "cycle-goal-absence-summary",
       kind: "use_primitive",
+      action_card_id: "test-observe-card",
       primitive_id: "observe",
-      args: {},
+      parameters: {},
       why_this_action: "No nearby container target is available, so observe current loaded state.",
       expected_evidence: ["observation"],
       fallback_if_blocked: "record blocker"
@@ -357,9 +358,9 @@ test("use_action_skill resolves full owned primitive bundle", () => {
   const activeSkills: ActorActionSkillRecord[] = [
     testActionSkillRecord("collectLogs", ["observe", "collect_logs", "wait"], actorId)
   ];
-  const resolved = resolvePrimitivesForSocialIntent(
+  const resolved = resolvePrimitivesForLegacyPlannerAction(
     {
-      schema: "action-intent/v1",
+      schema: "legacy-planner-action/v1",
       actor_id: actorId,
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -379,9 +380,9 @@ test("use_action_skill resolves full owned primitive bundle", () => {
 });
 
 test("direct primitive intent cannot smuggle action-skill fallback authority", () => {
-  const resolved = resolvePrimitivesForSocialIntent(
+  const resolved = resolvePrimitivesForLegacyPlannerAction(
     {
-      schema: "action-intent/v1",
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -403,7 +404,7 @@ test("direct primitive intent cannot smuggle action-skill fallback authority", (
 
 test("executor records missing direct primitive args as contract evidence", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-contract-block-"));
-  const result = await executeSocialActionIntent({
+  const result = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0001",
@@ -433,8 +434,8 @@ test("executor records missing direct primitive args as contract evidence", asyn
       allowed_primitive_ids: ["craft_item"],
       stop_conditions: ["gate_blocked"]
     },
-    intent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -442,7 +443,7 @@ test("executor records missing direct primitive args as contract evidence", asyn
       primitive_id: "craft_item",
       args: {},
       why_this_action: "Gemini forgot itemName",
-      expected_evidence: ["action_intent_contract_failure"],
+      expected_evidence: ["action_parameter_contract_failure"],
       fallback_if_blocked: "observe"
     },
     bot: fakeObserveBot(),
@@ -460,7 +461,7 @@ test("executor records missing direct primitive args as contract evidence", asyn
 
 test("executor rejects direct primitive args actionSkillId fallback", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-direct-fallback-"));
-  const result = await executeSocialActionIntent({
+  const result = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0001",
@@ -490,8 +491,8 @@ test("executor rejects direct primitive args actionSkillId fallback", async () =
       allowed_primitive_ids: ["craft_item"],
       stop_conditions: ["gate_blocked"]
     },
-    intent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -499,7 +500,7 @@ test("executor rejects direct primitive args actionSkillId fallback", async () =
       primitive_id: "craft_item",
       args: { actionSkillId: "craftPlanksAndSticks" },
       why_this_action: "try to borrow action skill fallback from direct primitive args",
-      expected_evidence: ["action_intent_contract_failure"],
+      expected_evidence: ["action_parameter_contract_failure"],
       fallback_if_blocked: "observe"
     },
     bot: fakeObserveBot(),
@@ -515,7 +516,7 @@ test("executor rejects direct primitive args actionSkillId fallback", async () =
 
 test("executor authors and trials a generated action skill candidate only through action selection", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-author-trial-"));
-  const result = await executeSocialActionIntent({
+  const result = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0001",
@@ -545,8 +546,8 @@ test("executor authors and trials a generated action skill candidate only throug
       allowed_primitive_ids: ["run_mineflayer_program"],
       stop_conditions: ["trial_complete"]
     },
-    intent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -621,7 +622,7 @@ test("executor authors and trials a generated action skill candidate only throug
   assert.match(activeGenerated.generated_source ?? "", /ctx\.say/);
   assert.deepEqual(activeGenerated.generated_helper_allowlist, ["say"]);
 
-  const reused = await executeSocialActionIntent({
+  const reused = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0002",
@@ -651,8 +652,8 @@ test("executor authors and trials a generated action skill candidate only throug
       allowed_primitive_ids: ["run_mineflayer_program"],
       stop_conditions: ["verifier_passed"]
     },
-    intent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0002",
       cycle_goal_id: "cycle-goal-2",
@@ -676,7 +677,7 @@ test("executor authors and trials a generated action skill candidate only throug
 
 test("wait and remember still pass through CycleGoal and active action-skill gates", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-control-gate-"));
-  const result = await executeSocialActionIntent({
+  const result = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0001",
@@ -706,8 +707,8 @@ test("wait and remember still pass through CycleGoal and active action-skill gat
       allowed_primitive_ids: ["wait"],
       stop_conditions: ["gate_blocked"]
     },
-    intent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -730,7 +731,7 @@ test("wait and remember still pass through CycleGoal and active action-skill gat
 
 test("executor treats CycleGoal primitive lists as advisory and keeps active action-skill gate authority", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-open-body-"));
-  const result = await executeSocialActionIntent({
+  const result = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0001",
@@ -760,8 +761,8 @@ test("executor treats CycleGoal primitive lists as advisory and keeps active act
       allowed_primitive_ids: ["observe"],
       stop_conditions: ["gate_blocked"]
     },
-    intent: {
-      schema: "action-intent/v1",
+    action: {
+      schema: "legacy-planner-action/v1",
       actor_id: "npc_b",
       cycle_id: "cycle-0001",
       cycle_goal_id: "cycle-goal-1",
@@ -781,8 +782,8 @@ test("executor treats CycleGoal primitive lists as advisory and keeps active act
 });
 
 test("runtime retry constraints group exact repeated blocker target and args", () => {
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-1",
@@ -811,7 +812,7 @@ test("runtime retry constraints group exact repeated blocker target and args", (
     cycleId: "cycle-0002",
     turnId: "cycle-0002-action-01",
     actionIndex: 0,
-    intent: { ...intent, cycle_id: "cycle-0002" },
+    intent: { ...intent },
     execution: {
       runtimeResult: { status: "blocked", reason: "pathfinder failed near target" },
       evidenceRefs: ["evidence/cycle-0002-move_to.json"],
@@ -841,8 +842,8 @@ test("runtime retry constraints group exact repeated blocker target and args", (
 });
 
 test("runtime retry constraints canonicalize equivalent move_to position args", () => {
-  const baseIntent: ActionIntent = {
-    schema: "action-intent/v1",
+  const baseIntent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-1",
@@ -853,7 +854,7 @@ test("runtime retry constraints canonicalize equivalent move_to position args", 
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "choose a different target"
   };
-  const equivalentIntents: ActionIntent[] = [
+  const equivalentIntents: LegacyPlannerAction[] = [
     baseIntent,
     {
       ...baseIntent,
@@ -914,8 +915,8 @@ test("runtime retry constraints canonicalize equivalent move_to position args", 
 
 test("social executor blocks an exact retry constraint before Mineflayer execution", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-retry-constraint-"));
-  const intent: ActionIntent = {
-    schema: "action-intent/v1",
+  const intent: LegacyPlannerAction = {
+    schema: "legacy-planner-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0003",
     cycle_goal_id: "cycle-goal-1",
@@ -945,7 +946,7 @@ test("social executor blocks an exact retry constraint before Mineflayer executi
     attempts: attempts.filter((attempt): attempt is NonNullable<typeof attempt> => attempt !== null)
   });
 
-  const result = await executeSocialActionIntent({
+  const result = await executeLegacyPlannerAction({
     actorWorkspaceRootDir: workspaceRoot,
     actorId: "npc_b",
     cycleId: "cycle-0003",
@@ -976,7 +977,7 @@ test("social executor blocks an exact retry constraint before Mineflayer executi
       allowed_primitive_ids: ["move_to", "observe"],
       stop_conditions: ["retry_constraint_blocked"]
     },
-    intent,
+    action: intent,
     activeActionSkills: [],
     runtimeRetryConstraints: constraints
   });

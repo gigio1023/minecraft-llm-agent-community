@@ -1,3 +1,4 @@
+/** Regression coverage for evidence-derived PlanBead lifecycle updates. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -15,7 +16,7 @@ import {
   type ActorPlanBead,
   type PlanBeadOperation
 } from "../src/runtime/goals/planBeads/index.js";
-import type { ActionIntent } from "../src/runtime/goals/types.js";
+import type { LegacyPlannerAction } from "../src/runtime/goals/types.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const actorId = "npc_b";
@@ -86,9 +87,9 @@ function bead(input: {
 function intent(input: {
   primitiveId: string;
   parameters?: Record<string, unknown>;
-}): ActionIntent {
+}): LegacyPlannerAction {
   return {
-    schema: "action-intent/v1",
+    schema: "legacy-planner-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-0001",
@@ -138,7 +139,7 @@ test("deposit_shared runtime evidence closes a matching shared-storage PlanBead 
       actorId,
       cycleId: "cycle-0001",
       turnId: "turn-0001",
-      actionIntent: intent({ primitiveId: "deposit_shared", parameters: { itemName: "oak_log" } }),
+      action: intent({ primitiveId: "deposit_shared", parameters: { itemName: "oak_log" } }),
       toolStatuses: [{ tool: "deposit_shared", status: "deposited" }],
       evidenceRefs: ["evidence/cycle-0001-deposit-shared.json"],
       beads: [bead({
@@ -181,7 +182,7 @@ test("inspect_chest updates a deposit bead as incomplete instead of closing it",
     actorId,
     cycleId: "cycle-0001",
     turnId: "turn-0001",
-    actionIntent: intent({ primitiveId: "inspect_chest" }),
+    action: intent({ primitiveId: "inspect_chest" }),
     toolStatuses: [{ tool: "inspect_chest", status: "inspected" }],
     evidenceRefs: ["evidence/cycle-0001-inspect-chest.json"],
     beads: [depositBead]
@@ -301,7 +302,7 @@ test("crafted item evidence closes only a matching crafting PlanBead", () => {
     actorId,
     cycleId: "cycle-0001",
     turnId: "turn-0001",
-    actionIntent: intent({ primitiveId: "craft_item", parameters: { itemName: "crafting_table" } }),
+    action: intent({ primitiveId: "craft_item", parameters: { itemName: "crafting_table" } }),
     toolStatuses: [{ tool: "craft_item", status: "crafted" }],
     evidenceRefs: ["evidence/cycle-0001-craft-item.json"],
     beads: [matching, unrelated]
@@ -325,7 +326,7 @@ test("movement and observation evidence never derive PlanBead lifecycle close op
       actorId,
       cycleId: "cycle-0001",
       turnId: "turn-0001",
-      actionIntent: intent({ primitiveId: tool }),
+      action: intent({ primitiveId: tool }),
       toolStatuses: [{ tool, status }],
       evidenceRefs: ["evidence/cycle-0001-context.json"],
       beads: [travelBead]
@@ -339,7 +340,7 @@ test("lifecycle operations do not carry executable authority fields", () => {
     actorId,
     cycleId: "cycle-0001",
     turnId: "turn-0001",
-    actionIntent: intent({ primitiveId: "deposit_shared", parameters: { itemName: "oak_log" } }),
+    action: intent({ primitiveId: "deposit_shared", parameters: { itemName: "oak_log" } }),
     toolStatuses: [{ tool: "deposit_shared", status: "deposited" }],
     evidenceRefs: ["evidence/cycle-0001-deposit-shared.json"],
     beads: [

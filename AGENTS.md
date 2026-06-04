@@ -66,7 +66,7 @@ simulation, not a new activity that displaces them.
 
 PlanBeads must never become executable authority. They do not supply missing
 primitive args, grant action-skill permissions, decide physical success, clear
-runtime retry constraints, or replace ActionIntent validation. If an
+runtime retry constraints, or replace runtime action validation. If an
 implementation pushes PlanBeads toward deterministic domain planning, reject or
 reframe it.
 
@@ -92,10 +92,10 @@ what lands.
 
 New Minecraft action skill creation during social-cycle runtime must originate
 only from the action-selection stage. In Actor Turn mode, the provider may
-choose `author_mineflayer_action`, which the runtime resolves into the existing
-`author_and_trial_action_skill` ActionIntent path. Legacy planner paths may
-still produce `author_and_trial_action_skill` while they remain in migration
-scope. In either mode, current observation, CycleGoal or Active Episode, memory,
+choose `author_mineflayer_action`, which the runtime resolves into full-context
+generated action authoring and trial. Legacy planner paths may still produce
+`author_and_trial_action_skill` while they remain in explicit migration scope.
+In either mode, current observation, CycleGoal or Active Episode, memory,
 PlanBeads, relationship context, retry constraints, and the action surface must
 justify creating a new actor-owned behavior candidate.
 
@@ -124,6 +124,36 @@ author-and-trial path. It must be schema-bound and helper-limited:
 Use `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
 as the active implementation plan for this rule.
 
+## Tool Calling And Prose-Parsing Anti-Pattern
+
+The strongest current anti-pattern is treating LLM-facing prose as executable
+runtime policy. Do not parse `current_state_requirements`, `why_this_action`,
+Action Card descriptions, Minecraft Basic Guide text, memory notes, PlanBeads,
+or provider rationale with string `includes`, regexes, keyword lists, or similar
+text heuristics to decide tool visibility, action eligibility, primitive
+arguments, permissions, retry clearance, or generated-code authority.
+
+Tool calling and strict schemas/enums must enforce the Actor Turn flow. The
+provider may choose only a visible function tool or `author_mineflayer_action`.
+Within that selected tool/action, the LLM keeps decision freedom with full
+context, rich rationale, and schema-bound logical parameters. The runtime then
+validates explicit structured params, schema conformance, permission gates,
+retry/safety constraints, generated-source guardrails, timeouts, verifier output,
+and evidence artifacts.
+
+The runtime must not become a hidden Minecraft planner. Do not hide Action Cards
+or tools through hardcoded Minecraft domain heuristics such as item-family,
+station-family, construction-readiness, survival-priority, shelter-first, or
+single-activity strategy filters. If an action should be unavailable or rejected,
+represent that with typed readiness/eligibility contracts, structured state,
+explicit schemas, permission gates, retry constraints, or verifier evidence.
+`decision_frame` is context, not a planner output. Do not add
+`parameter_candidates`, `top_eligible_action_cards`,
+`recommended_next_action_candidates`, generated chat text, coordinates, recipe
+decisions, or other pre-selected action payloads to it.
+No compatibility or legacy compromise is required for this side project when
+removing prose parsing or hidden domain-planner behavior.
+
 ## Project Identity vs External References
 
 External Minecraft-agent and LLM-agent papers are references, not product specs.
@@ -148,8 +178,8 @@ Use external references by translating their mechanisms into this project:
   not raw eval loops or global skill reuse detached from the actor;
 - curriculum papers imply bounded capability scaffolding under ActorSoul/LifeGoal, not a
   universal benchmark objective;
-- reasoning/action papers imply CycleGoal -> ActionIntent -> evidence ->
-  CycleJudgment loops, not unconstrained chain-of-thought as authority;
+- reasoning/action papers imply Actor Turn tool selection -> runtime action ->
+  evidence -> CycleJudgment loops, not unconstrained chain-of-thought as authority;
 - memory/reflection papers imply artifact-grounded memory and review, not
   reflection text that can claim world progress;
 - affordance/interface papers imply better runtime primitives, gates, and context
@@ -389,7 +419,7 @@ Important search tokens:
 - `WORLD_STATE_DIAGNOSTICS`
 - `MINECRAFT_BASIC_GUIDE`
 - `ACTOR_PERSISTENT_STATE_PLAN_BEADS`
-- `ACTION_INTENT_CONTRACT`
+- `RUNTIME_ACTION_CONTRACT`
 - `RUNTIME_RETRY_CONSTRAINT`
 - `CONTEXT_COMPACTION`
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW`
@@ -460,31 +490,31 @@ Important search tokens:
   as stable background mechanics. It should help the provider apply basic item
   flows, station requirements, tool usefulness, item-vs-world-block distinctions,
   blocker recovery, and repeated-observe limits. It is a guide, not a strategy
-  checklist, runtime permission, current-state claim, ActionIntent contract, or
+  checklist, runtime permission, current-state claim, runtime action contract, or
   proof of progress.
 - It is acceptable for a specific action skill implementation to query a
   specific Minecraft block or item family as part of its own primitive contract.
   It is not acceptable to turn those families into always-present planner
   context, summary headings, or goal interpretation.
-- Treat physical `ActionIntent` arguments as a contract. For actions such as
+- Treat physical runtime action arguments as a contract. For actions such as
   `move_to`, `mine_block`, `place_block`, `craft_item`, `inspect_chest`,
   `deposit_shared`, or structure/building primitives, required target/item/count
   arguments must be present in structured args before execution.
-- Direct `use_primitive` intents must not carry `action_skill_id` or
+- Direct `use_primitive` actions must not carry `action_skill_id` or
   `args.actionSkillId`. Actor-owned action skill fallback authority exists only
-  after a `use_action_skill` intent is resolved by the runtime.
+  after a `use_action_skill` action is resolved by the runtime.
 - Safe-looking control actions such as `wait` and `remember` are still runtime
   primitives. They must pass CycleGoal and active action-skill gates.
 - Do not silently convert missing physical arguments into movement or gameplay
   defaults. A hidden default that makes the bot move can still be a product
-  failure. Reject, repair, or ask the provider for a valid intent, then record
+  failure. Reject, repair, or ask the provider for a valid action, then record
   the contract failure in artifacts.
 - Natural-language fields such as `why_this_action` explain intent but are not
   executable authority. If prose mentions a coordinate and structured args are
   empty or contradictory, the runtime must treat the structured intent as
   invalid rather than guessing from prose.
 - Repeated identical blocker evidence should become a `runtime-retry-constraint/v1`
-  gate over the exact ActionIntent target and structured args. This is a
+  gate over the exact runtime action target and structured args. This is a
   runtime safety rule, not a domain strategy or memory suggestion. It must block
   before Mineflayer execution and write evidence when the provider repeats the
   prohibited target/args.
@@ -533,15 +563,34 @@ practice.
 
 - Prefer readable names, narrow functions, and explicit types before adding a
   comment. A comment should not restate what TypeScript already proves.
+- This repo should use more explanatory comments than a typical CRUD or library
+  project because product policy, runtime authority, evidence semantics, and
+  actor-continuity intent are part of the implementation contract. Preserve the
+  "why this boundary exists" and "what this code must not imply" background in
+  code when it prevents future agents from accidentally changing product
+  direction.
 - Use `/** ... */` documentation comments for exported APIs, cross-module
   contracts, and code a caller needs to understand. Use `//` comments for local
   implementation notes.
 - Comments should explain intent, background, why a runtime boundary exists,
   what invariant is being protected, what failure mode is being rejected, or
   what Minecraft/Mineflayer behavior is non-obvious.
+- It is acceptable and often desirable for comments to include project intent,
+  design background, and policy constraints when the code implements rules from
+  `SPEC.md`, ActorSoul/LifeGoal continuity, PlanBeads, runtime action contracts,
+  actor workspace evidence, provider usage/auth boundaries, retry constraints,
+  or generated action skill lifecycle. Do not force readers to reconstruct these
+  constraints from distant docs when a short local note can prevent misuse.
 - For gameplay code, prioritize comments around verification, timeout,
   cancellation, reconnect/session freshness, fake-progress rejection, actor
   workspace initialization, action skill ownership, and transcript semantics.
+- For provider-facing code, document which fields are prompt context only and
+  which fields may become executable authority after validation. Prose fields,
+  memory, PlanBeads, and decision-frame hints should be explicitly described as
+  non-authoritative wherever that distinction is easy to blur.
+- For persistence and artifact code, document what record is the source of truth,
+  what evidence survives compaction, and which claims are only diagnostic context
+  rather than proof of Minecraft progress.
 - Do not add decorative section banners, obvious parameter descriptions, or
   comments that merely narrate the next line of code.
 - Keep comments short enough to review. If a comment needs a long explanation,
@@ -554,6 +603,11 @@ practice.
 - During comment passes, explicitly inspect every TypeScript file with zero
   comments. Either add a high-signal contract/invariant comment or leave it
   uncommented only when the file is a trivial CLI/re-export/declarative constant.
+- A file with zero comments is acceptable only after inspection when it is a
+  re-export, a tiny CLI shim, a declarative constant table with self-explanatory
+  names, or a small pure helper whose behavior and policy implications are
+  obvious from types and tests. Large provider, runtime, validation, Mineflayer
+  tool, memory, artifact, or lifecycle files should not remain comment-free.
 - When the user explicitly requests a comment pass, report whether existing
   guidance was sufficient, then update only comments that clarify contracts,
   invariants, runtime evidence, or non-obvious Mineflayer behavior. Tests may

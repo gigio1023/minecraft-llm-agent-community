@@ -58,10 +58,12 @@ Specific action skills may query specific block/item families inside their own
 bounded contract, but that local query must not become the general planning
 context.
 
-## ActionIntent Contract
+## Runtime Action Contract
 
-An `ActionIntent` is the provider's structured proposal for one bounded actor
-turn. Physical action args are a contract.
+An active Actor Turn tool selection is the provider's structured proposal for
+one bounded actor turn. Physical runtime action parameters are a contract.
+Legacy `ActionIntent` artifacts follow the same rule when the explicit legacy
+planner path is under review.
 
 Runtime rules:
 
@@ -69,24 +71,26 @@ Runtime rules:
   skills. Examples include target coordinates for `move_to`, block or material
   selectors for `mine_block`, item/count for `craft_item`, container/item/count
   for `deposit_shared`, and anchor/pattern args for any building primitive.
-- Natural-language fields such as `why_this_action` can explain an intent but
-  cannot supply missing executable args.
+- Natural-language fields such as rationale, `why_this_action`, Action Card
+  descriptions, Minecraft Basic Guide text, memory, or PlanBeads can explain
+  context but cannot supply missing executable args.
 - Hidden physical defaults are not valid success paths. A fallback such as
   "move east 8 blocks" may be useful only when it is an explicit action in the
   structured args or a documented repair path that records the repair.
-- Direct `use_primitive` intents must not carry `action_skill_id` or
+- Direct `use_primitive` legacy actions must not carry `action_skill_id` or
   `args.actionSkillId`. Actor-owned action skill fallback authority exists only
-  after the runtime resolves a `use_action_skill` intent into its primitive
-  bundle.
+  after the runtime resolves a `use_action_skill` action or an Action Card
+  mapped to an action skill into its primitive bundle.
 - Shared-storage transfer primitives require an explicit `count` or
-  `targetCount` for direct provider intents.
+  `targetCount` for direct provider selections.
 - Control/memory actions such as `wait` and `remember` are still runtime
   primitives. They must pass CycleGoal and active action-skill gates instead of
   bypassing authority because they look safe.
-- If prose and structured args disagree, the runtime should reject or repair the
-  intent through a typed path and record the mismatch.
-- Rejected intent contracts are useful evidence. They should be visible in the
-  transcript, provider snapshot, actor workspace evidence, and review summaries.
+- If prose and structured parameters disagree, the runtime should reject or
+  repair the selection through a typed path and record the mismatch.
+- Rejected runtime action contracts are useful evidence. They should be visible
+  in the transcript, provider snapshot, actor workspace evidence, and review
+  summaries.
 
 Mineflayer-backed contracts should be shaped by Mineflayer behavior: loaded
 chunk visibility, target lookup, pathfinder semantics, movement tolerances,
@@ -258,7 +262,7 @@ Compaction should drop or summarize:
 - repeated observe/wait records that add no new evidence;
 - provider explanations that were not backed by runtime evidence;
 - old raw transcript lines once their facts are represented in typed state;
-- stale proposed plans that never became validated ActionIntents.
+- stale proposed plans that never became validated runtime actions.
 
 Compaction must not launder weak evidence into progress. Memory notes,
 provider prose, and `wait` records remain context unless verifier-backed world,

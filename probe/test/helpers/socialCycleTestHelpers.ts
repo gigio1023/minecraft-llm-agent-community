@@ -1,3 +1,4 @@
+/** Shared test fixtures for social-cycle context and actor workspace setup. */
 import type { ActorActionSkillRecord } from "../../src/runtime/actorWorkspaceStore.js";
 
 export function buildNpcBActionSkillRecord(): ActorActionSkillRecord {
