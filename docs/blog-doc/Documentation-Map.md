@@ -105,6 +105,7 @@ Current state and operations:
 
 - `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
 - `docs/blog-doc/Architecture/Current-Architecture-And-Implementation-Audit.md`
+- `docs/blog-doc/Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`
 - `docs/blog-doc/Architecture/Future-Works.md`
 - `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `docs/blog-doc/Setup/Headless-Server.md`

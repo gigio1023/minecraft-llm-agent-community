@@ -29,6 +29,32 @@ is reliable.
 
 Recorded 2026-06-04 (`Asia/Seoul`).
 
+Fresh-world 60-cycle OpenAI `gpt-5.4-mini` Actor Turn run after removing
+provider-side output caps:
+
+- Experiment record:
+  `docs/blog-doc/Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`
+- Report:
+  `tmp/social-cycle-fresh-world-openai-gpt54mini-60-no-output-cap-20260604T133256Z.json`
+- Review:
+  `tmp/social-cycle-fresh-world-openai-gpt54mini-60-no-output-cap-20260604T133256Z-review.md`
+- Runtime status: `passed`, 60 cycles, 114 OpenAI usage records,
+  2,853,134 total tokens.
+- Output cap env present: `false`; no `incomplete: max_output_tokens` failure
+  occurred.
+- Behavior verdict: `PASSED_RUNTIME_BUT_BEHAVIOR_LOOP_WEAK`. The output cap
+  issue is fixed, but Active Episode stayed fixed on shared-storage verification
+  for all 60 cycles, PlanBeads were empty, and `author_mineflayer_action` was
+  never selected.
+
+Immediate next work from this run:
+
+- Retire or pivot Active Episode after success signals are met.
+- Regenerate CycleGoal from current evidence instead of repeating a satisfied
+  social-storage focus.
+- Create passive PlanBeads from satisfied work, blockers, and followups without
+  making them executable authority.
+
 Fresh-world 50-cycle OpenAI `gpt-5.4-nano` Actor Turn run:
 
 - Report:

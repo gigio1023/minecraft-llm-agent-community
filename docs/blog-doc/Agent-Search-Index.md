@@ -62,6 +62,7 @@ guidance.
 | `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW` | Whole-project current implementation map for runtime flow, boundaries, evidence, and risks | `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`, `README.md` |
 | `CURRENT_HANDOFF_NEXT_WORK` | Landed work, verified commands, live evidence, and next improvement order | `Architecture/Current-Handoff-And-Next-Work.md`, `Architecture/Future-Works.md` |
 | `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT` | Architecture/implementation cross-check snapshot | `Architecture/Current-Architecture-And-Implementation-Audit.md` |
+| `OPENAI_GPT54MINI_NO_OUTPUT_CAP_RUN_2026_06_04` | Dated 60-cycle OpenAI `gpt-5.4-mini` run verifying provider output-cap removal and exposing stale Active Episode / empty PlanBeads behavior weakness | `Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `REAL_SERVER_SIMULATION_TEST_PLAN` | Live-server simulation protocol and readiness gates | `Architecture/Real-Server-Simulation-Test-Plan.md`, `Setup/Headless-Server.md`, `Setup/Provider-Setup.md` |
 | `FUTURE_WORKS` | Substrate follow-ups from live runs and external references, not spec changes | `Architecture/Future-Works.md` |
 
