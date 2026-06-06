@@ -722,6 +722,10 @@ export function parseDeliberationProviderOutput(
     social_pressure: normalizeSocialPressure(rawNextEpisode.social_pressure, currentEpisode.social_pressure),
     status: activeEpisodeStatusOrActive(rawNextEpisode.status)
   };
+  // The ActiveEpisode validator rejects a present-but-empty started_at_turn_ref.
+  if (!nonEmptyString(nextEpisode.started_at_turn_ref)) {
+    delete (nextEpisode as { started_at_turn_ref?: string }).started_at_turn_ref;
+  }
   const candidate = {
     schema: "deliberation-output/v1",
     ...body,

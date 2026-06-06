@@ -136,6 +136,36 @@ test("deterministic Deliberation provider reframes Active Episode without action
   assert.equal((output?.parsed_output as Record<string, unknown>)?.parameters, undefined);
 });
 
+test("Deliberation parser omits an empty started_at_turn_ref instead of failing validation", () => {
+  const currentEpisode = activeEpisode();
+  const result = parseDeliberationProviderOutput(
+    {
+      deliberation: {
+        rationale: "Provider emitted an empty optional episode ref.",
+        next_episode: {
+          episode_id: "episode-cycle-0002",
+          actor_id: "npc_b",
+          purpose: "Continue the prior concern with a fresh evidence-backed step.",
+          current_focus: "Use current state and visible Action Cards for the next step.",
+          opened_from_refs: ["provider-outputs/deliberation.json"],
+          started_at_turn_ref: "",
+          status: "active"
+        },
+        plan_bead_op_proposals: []
+      }
+    },
+    {
+      branchId: "branch-cycle-0001-empty-ref",
+      currentEpisodeRef: "goals/episodes/episode-cycle-0001.json",
+      currentEpisode,
+      branchEvidenceRefs: []
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.output.next_episode.started_at_turn_ref, undefined);
+});
+
 test("Deliberation parser carries current Active Episode fields and normalizes concrete PlanBead creates", () => {
   const currentEpisode = activeEpisode();
   const result = parseDeliberationProviderOutput(
