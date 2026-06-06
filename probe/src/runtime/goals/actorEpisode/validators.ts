@@ -193,6 +193,28 @@ function collectExecutableAuthorityKeyErrors(value: unknown, path: string, error
   }
 }
 
+/**
+ * Deep-removes executable-authority keys (args, parameters, primitive_id, …) so a
+ * single stray field on a provider PlanBead proposal is repaired rather than
+ * failing the whole Deliberation output.
+ */
+export function stripExecutableAuthorityKeys<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripExecutableAuthorityKeys(entry)) as unknown as T;
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (executableAuthorityKeys.has(key)) {
+      continue;
+    }
+    cleaned[key] = stripExecutableAuthorityKeys(entry);
+  }
+  return cleaned as T;
+}
+
 function validateEvidenceExpectation(value: unknown, path: string, errors: string[]) {
   if (!isRecord(value)) {
     errors.push(`${path} must be an object`);

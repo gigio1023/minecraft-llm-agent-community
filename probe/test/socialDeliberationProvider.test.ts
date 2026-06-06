@@ -166,6 +166,80 @@ test("Deliberation parser omits an empty started_at_turn_ref instead of failing 
   assert.equal(result.ok && result.output.next_episode.started_at_turn_ref, undefined);
 });
 
+test("Deliberation parser falls back to current episode for blank required purpose/current_focus", () => {
+  const currentEpisode = activeEpisode();
+  const result = parseDeliberationProviderOutput(
+    {
+      deliberation: {
+        rationale: "Provider left required prose fields blank.",
+        next_episode: {
+          episode_id: "episode-cycle-0002",
+          actor_id: "npc_b",
+          purpose: "",
+          current_focus: "",
+          opened_from_refs: ["provider-outputs/deliberation.json"],
+          status: "active"
+        },
+        plan_bead_op_proposals: []
+      }
+    },
+    {
+      branchId: "branch-cycle-0001-blank-prose",
+      currentEpisodeRef: "goals/episodes/episode-cycle-0001.json",
+      currentEpisode,
+      branchEvidenceRefs: []
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.output.next_episode.purpose, currentEpisode.purpose);
+  assert.equal(result.ok && result.output.next_episode.current_focus, currentEpisode.current_focus);
+});
+
+test("Deliberation parser strips forbidden executable-authority keys from PlanBead proposals", () => {
+  const currentEpisode = activeEpisode();
+  const result = parseDeliberationProviderOutput(
+    {
+      deliberation: {
+        rationale: "Provider attached executable args to a PlanBead proposal.",
+        next_episode: {
+          episode_id: "episode-cycle-0002",
+          actor_id: "npc_b",
+          purpose: "Continue the prior crafting concern.",
+          current_focus: "Confirm a reachable crafting table before tool work.",
+          opened_from_refs: ["provider-outputs/deliberation.json"],
+          status: "active"
+        },
+        plan_bead_op_proposals: [
+          {
+            schema: "plan-bead-operation/v1",
+            op: "create",
+            bead_id: "pb-station-access",
+            rationale: "Keep crafting-table access visible.",
+            args: { primitive_id: "place_block", x: 1, y: 64, z: 2 },
+            patch: {
+              title: "Confirm crafting table access",
+              description: "Verify the observed crafting table is reachable before crafting tools.",
+              acceptance_evidence_required: ["runtime evidence the table is usable"],
+              notes_next: ["walk to the observed crafting table"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      branchId: "branch-cycle-0001-args",
+      currentEpisodeRef: "goals/episodes/episode-cycle-0001.json",
+      currentEpisode,
+      branchEvidenceRefs: []
+    }
+  );
+
+  assert.equal(result.ok, true);
+  const proposal = result.ok ? (result.output.plan_bead_op_proposals[0] as Record<string, unknown>) : {};
+  assert.equal("args" in proposal, false);
+});
+
 test("Deliberation parser carries current Active Episode fields and normalizes concrete PlanBead creates", () => {
   const currentEpisode = activeEpisode();
   const result = parseDeliberationProviderOutput(

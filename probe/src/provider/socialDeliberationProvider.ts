@@ -24,6 +24,7 @@ import {
   buildMinecraftBasicGuideProjection,
   buildActorTurnCurrentStateProjection,
   validateDeliberationOutput,
+  stripExecutableAuthorityKeys,
   writeActiveEpisode,
   type ActiveEpisode,
   type ActorTurnCurrentStateProjection,
@@ -505,7 +506,7 @@ function normalizePlanBeadProposal(input: {
     ) {
       return undefined;
     }
-    return {
+    return stripExecutableAuthorityKeys({
       ...proposal,
       schema: "plan-bead-operation/v1",
       actor_id: nonEmptyString(proposal.actor_id) ? proposal.actor_id : input.actorId,
@@ -513,7 +514,7 @@ function normalizePlanBeadProposal(input: {
       evidence_refs: evidenceRefs,
       confidence,
       ...(patch !== undefined ? { patch } : {})
-    };
+    });
   }
 
   const title =
@@ -696,6 +697,12 @@ export function parseDeliberationProviderOutput(
     life_goal_ref: nonEmptyString(rawNextEpisode.life_goal_ref)
       ? rawNextEpisode.life_goal_ref
       : currentEpisode.life_goal_ref,
+    purpose: nonEmptyString(rawNextEpisode.purpose)
+      ? rawNextEpisode.purpose
+      : currentEpisode.purpose,
+    current_focus: nonEmptyString(rawNextEpisode.current_focus)
+      ? rawNextEpisode.current_focus
+      : currentEpisode.current_focus,
     actors_visible_or_relevant: stringArrayOr(
       rawNextEpisode.actors_visible_or_relevant,
       currentEpisode.actors_visible_or_relevant
