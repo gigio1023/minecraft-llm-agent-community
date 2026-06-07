@@ -8,7 +8,7 @@ import { soulRef } from "../actorSoulStore.js";
 import { lifeGoalRef } from "../lifeGoalStore.js";
 import type { SocialCycleContextPacket } from "../cycleContextAssembler.js";
 import { buildActionCardProjection, type ActionCardProjection } from "./actionCards.js";
-import { annotateActionCardsWithCurrentStateHints } from "./actionCardSelection.js";
+import { annotateActionCardsWithStaticParameterHints } from "./actionCardSelection.js";
 import { buildActorTurnCurrentStateProjection } from "./currentStateProjection.js";
 import { buildActorTurnDecisionFrame } from "./decisionFrame.js";
 import {
@@ -37,45 +37,48 @@ export function buildActorTurnInput(input: {
 }): { actorTurnInput: ActorTurnInput; actionCardProjection: ActionCardProjection } {
   const currentState = buildActorTurnCurrentStateProjection(input.context);
   const recentEvidenceTrace = [...(input.recentEvidenceTrace ?? [])];
-  const actionCardProjection = annotateActionCardsWithCurrentStateHints(
-    buildActionCardProjection(input.context.action_surface),
-    currentState
+  const actionCardProjection = annotateActionCardsWithStaticParameterHints(
+    buildActionCardProjection(input.context.action_surface)
   );
   const activeEpisode = anchorActiveEpisodeToPlanBeadContext({
     activeEpisode: input.activeEpisode,
     context: input.context
   });
+  // Key order is the serialized prompt order, which sets the prompt prefix-cache
+  // boundary (inference backends reuse the prefix up to the first byte that
+  // changes between turns). Keep cache-stable blocks first and turn-volatile
+  // fields last.
   const actorTurnInput: ActorTurnInput = {
     schema: "actor-turn-input/v1",
-    turn_id: input.turnId,
-    decision_frame: buildActorTurnDecisionFrame({
-      activeEpisode,
-      currentState,
-      actionCardProjection,
-      recentEvidenceTrace
-    }),
-    active_episode: activeEpisode,
+    minecraft_basic_guide: buildMinecraftBasicGuideProjection(),
+    mineflayer_codegen_skill: buildMineflayerCodegenSkillProjection(),
+    action_cards: actionCardProjection.action_cards,
     actor_context: {
       actor_id: input.context.ActorSoul.actor_id,
       actor_soul_ref: soulRef(input.context.ActorSoul.actor_id),
       life_goal_ref: lifeGoalRef(),
       life_goal_summary: input.context.ActorLifeGoal.objective
     },
-    current_observation_refs: [...input.currentObservationRefs],
-    current_state: currentState,
-    recent_evidence_trace: recentEvidenceTrace,
-    compact_plan_bead_hints: planBeadHintsFromContext(input.context),
-    memory_refs: memoryRefsFromContext(input.context),
     relationship_context: buildRelationshipContextProjection(input.context),
-    runtime_retry_constraints: retryConstraintSummaries(input.context),
-    action_cards: actionCardProjection.action_cards,
-    minecraft_basic_guide: buildMinecraftBasicGuideProjection(),
-    mineflayer_codegen_skill: buildMineflayerCodegenSkillProjection(),
+    compact_plan_bead_hints: planBeadHintsFromContext(input.context),
+    current_observation_refs: [...input.currentObservationRefs],
     provider_budget_hint: input.providerBudgetHint ?? {
       provider_id: "unknown",
       model: "unknown",
       status: "unknown"
-    }
+    },
+    turn_id: input.turnId,
+    active_episode: activeEpisode,
+    decision_frame: buildActorTurnDecisionFrame({
+      activeEpisode,
+      currentState,
+      actionCardProjection,
+      recentEvidenceTrace
+    }),
+    current_state: currentState,
+    recent_evidence_trace: recentEvidenceTrace,
+    memory_refs: memoryRefsFromContext(input.context),
+    runtime_retry_constraints: retryConstraintSummaries(input.context)
   };
   return { actorTurnInput, actionCardProjection };
 }

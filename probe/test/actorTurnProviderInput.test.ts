@@ -1217,7 +1217,7 @@ test("Actor Turn input exposes shared-storage deposit candidates from inventory 
   assert.ok(handoffCard);
   assert.ok(
     depositCard.parameter_hints.some((hint) =>
-      hint.includes("oak_log inventory=4 suggestedCount=1 socially_requested")
+      hint.includes("Read current_state.deposit_candidates")
     )
   );
   assert.ok(
@@ -1301,7 +1301,7 @@ test("Actor Turn input marks Inspect Chest as the bounded container openability 
   );
   assert.ok(
     inspectCard.parameter_hints.some((hint) =>
-      hint.includes("Current shared_storage status")
+      hint.includes("current_state.shared_storage")
     )
   );
 });
@@ -1399,7 +1399,7 @@ test("Actor Turn input does not keep a completed one-item shared-storage request
   assert.ok(actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest"));
   assert.ok(
     depositCard.parameter_hints.some((hint) =>
-      hint.includes("Current deposit candidates") && !hint.includes("socially_requested")
+      hint.includes("Read current_state.deposit_candidates")
     )
   );
   assert.ok(
