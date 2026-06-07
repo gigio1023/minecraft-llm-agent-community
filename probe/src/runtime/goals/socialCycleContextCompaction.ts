@@ -341,8 +341,8 @@ function worldObservationSummary(observation: unknown) {
     )
     .filter((entry): entry is string => entry !== null);
 
-  // Legacy nearbyBlocks are a hint list, not enough evidence for absence.
-  return `legacy nearby block hints=${describeList(nearby, "not retained", 10)}`;
+  // Observation nearbyBlocks are current observation evidence, not enough evidence for absence.
+  return `observation nearby blocks=${describeList(nearby, "not retained", 10)}`;
 }
 
 function visibleActorsSummary(observation: unknown) {

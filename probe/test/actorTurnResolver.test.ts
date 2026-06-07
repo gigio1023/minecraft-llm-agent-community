@@ -699,7 +699,7 @@ test("Runtime Action Resolver leaves usable-table redundancy requirements adviso
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 4 },
       visible_actors: [],
-      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
       settlement_progress: {
         inventory_counts: {},
@@ -808,7 +808,7 @@ test("Runtime Action Resolver leaves wooden-pickaxe redundancy requirements advi
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 3, stick: 2, wooden_pickaxe: 1 },
       visible_actors: [],
-      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
       settlement_progress: {
         inventory_counts: {},
@@ -843,7 +843,7 @@ test("Runtime Action Resolver does not enforce table-bound inventory counts from
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 3, cobblestone: 33, wooden_pickaxe: 1 },
       visible_actors: [],
-      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
       settlement_progress: {
         inventory_counts: {},
@@ -876,7 +876,7 @@ test("Runtime Action Resolver does not enforce table-bound inventory counts from
       observer_id: "npc_b",
       inventory_counts: { cobblestone: 8 },
       visible_actors: [],
-      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
       settlement_progress: {
         inventory_counts: {},
@@ -1027,7 +1027,7 @@ test("Runtime Action Resolver allows generated shared chest probe when strict au
       observer_id: "npc_b",
       inventory_counts: {},
       visible_actors: [],
-      nearby_block_observations: [{ name: "chest", distance: 2, source: "legacy_nearby_block_hint", evidence_refs: [] }],
+      nearby_block_observations: [{ name: "chest", distance: 2, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: {
         status: "known",
         items: [],
@@ -1077,7 +1077,7 @@ test("Runtime Action Resolver allows generated crafting-table reachability probe
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 3, stick: 2 },
       visible_actors: [],
-      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
       settlement_progress: {
         inventory_counts: {},

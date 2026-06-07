@@ -1133,7 +1133,7 @@ test("tool modules expose observation, movement, dialogue, waiting, and memory b
   assert.deepEqual(memory.list(), ["saw npc_b near spawn", "npc_b answered"]);
 });
 
-test("observe keeps legacy nearby block hints nearest-first without station priority", async () => {
+test("observe keeps observation nearby blocks nearest-first without station priority", async () => {
   const actor = createFakeBot("npc_a", 0) as ReturnType<typeof createFakeBot> & {
     findBlocks(input: {
       matching: (block: { name: string }) => boolean;

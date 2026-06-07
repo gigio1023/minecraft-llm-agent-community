@@ -68,6 +68,10 @@ typed readiness/eligibility contracts, structured state, schemas, gates, retry
 constraints, or evidence. The runtime must not become a hidden Minecraft
 planner. No compatibility or legacy compromise is required when removing prose
 parsing or hidden domain-planner behavior.
+When changing an active runtime/provider contract, update the producer, schema,
+tests, prompts, and docs together. Do not keep legacy aliases, source names, or
+shim fields inside the new contract. Normalize old-shaped input at the boundary
+into current concept names, or remove the old path outright.
 
 ## PlanBeads Intent
 

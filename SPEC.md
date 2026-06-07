@@ -133,6 +133,11 @@ strict schemas/enums enforce the flow; within a selected tool/action, the LLM
 keeps decision freedom with full context and schema-bound logical parameters.
 This side project does not need compatibility compromises that keep prose
 parsing or hidden Minecraft-planner behavior in the hot path.
+When replacing an active contract, update the producer, provider schema,
+validators, tests, docs, and report readers coherently. Do not carry old concept
+names into new active schemas as legacy aliases or source labels. Historical
+records can remain readable through explicit audit/import paths, but active
+runtime/provider surfaces should expose only current contract names.
 
 `decision_frame` is not a planner result. It must not carry
 `parameter_candidates`, `top_eligible_action_cards`,

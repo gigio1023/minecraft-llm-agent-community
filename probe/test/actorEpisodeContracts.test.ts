@@ -118,7 +118,7 @@ function actorTurnInput(): ActorTurnInput {
       inventory_counts: { crafting_table: 1 },
       visible_actors: [{ id: "npc_a", distance: 4, busy: false }],
       nearby_block_observations: [
-        { name: "grass_block", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }
+        { name: "grass_block", distance: 1, source: "observation_nearby_block", evidence_refs: [] }
       ],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
       settlement_progress: {
@@ -149,7 +149,7 @@ function actorTurnInput(): ActorTurnInput {
           {
             name: "grass_block",
             distance: 1,
-            source: "legacy_nearby_block_hint",
+            source: "observation_nearby_block",
             evidence_refs: ["observations/turn-002-pre.json"]
           }
         ]

@@ -49,26 +49,26 @@ function visibleActorsFromObservation(observation: unknown): ActorTurnCurrentSta
 
 type NearbyBlockObservation = ActorTurnCurrentStateProjection["nearby_block_observations"][number];
 
-function legacyNearbyBlocksFromObservation(observation: unknown): NearbyBlockObservation[] {
+function nearbyBlocksFromObservation(observation: unknown): NearbyBlockObservation[] {
   const nearbyBlocks = asRecord(observation)?.nearbyBlocks;
   if (!Array.isArray(nearbyBlocks)) {
     return [];
   }
   const observations: NearbyBlockObservation[] = [];
   for (const block of nearbyBlocks) {
-      const record = asRecord(block);
-      const name = readString(record?.name);
-      if (!name) {
-        continue;
-      }
-      observations.push({
-        name,
-        ...(positionFromRecord(record?.position) ? { position: positionFromRecord(record?.position) } : {}),
-        ...(readNumber(record?.distance) !== undefined ? { distance: readNumber(record?.distance) } : {}),
-        source: "legacy_nearby_block_hint",
-        evidence_refs: []
-      });
+    const record = asRecord(block);
+    const name = readString(record?.name);
+    if (!name) {
+      continue;
     }
+    observations.push({
+      name,
+      ...(positionFromRecord(record?.position) ? { position: positionFromRecord(record?.position) } : {}),
+      ...(readNumber(record?.distance) !== undefined ? { distance: readNumber(record?.distance) } : {}),
+      source: "observation_nearby_block",
+      evidence_refs: []
+    });
+  }
   return observations.slice(0, 16);
 }
 
@@ -397,7 +397,7 @@ export function buildActorTurnCurrentStateProjection(
   const worldScan = worldScanFromObservation(observation);
   const nearbyBlockObservations = uniqueNearbyBlockObservations([
     ...blockObservationsFromWorldScan(worldScan),
-    ...legacyNearbyBlocksFromObservation(observation)
+    ...nearbyBlocksFromObservation(observation)
   ]);
   return {
     schema: "actor-turn-current-state/v1",

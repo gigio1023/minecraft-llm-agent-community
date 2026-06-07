@@ -168,6 +168,14 @@ world-state context into hidden preselection. Use bounded typed facts in
 can reason from the original evidence.
 No compatibility or legacy compromise is required for this side project when
 removing prose parsing or hidden domain-planner behavior.
+When replacing an active runtime/provider contract, do the conversion in one
+coherent pass instead of preserving legacy aliases, source names, or shim fields
+inside the new contract. Historical artifacts may remain readable through
+explicit audit/import code, but active TypeScript types, provider inputs,
+schemas, prompts, tests, and docs should use the current concept names only. If
+old producer output still exists, normalize it at the boundary into the current
+schema and name that field for what it means now, not for the old implementation
+that happened to produce it.
 
 ## Project Identity vs External References
 

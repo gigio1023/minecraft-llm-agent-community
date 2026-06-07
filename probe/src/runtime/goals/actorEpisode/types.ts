@@ -194,7 +194,7 @@ export type ActorTurnSourceEvidenceBundle = {
       name: string;
       position?: { x: number; y: number; z: number };
       distance?: number;
-      source: "world_scan_nearest" | "legacy_nearby_block_hint";
+      source: "world_scan_nearest" | "observation_nearby_block";
       evidence_refs: string[];
     }>;
     world_scan?: {
@@ -295,7 +295,7 @@ export type ActorTurnCurrentStateProjection = {
     name: string;
     position?: { x: number; y: number; z: number };
     distance?: number;
-    source: "world_scan_nearest" | "legacy_nearby_block_hint";
+    source: "world_scan_nearest" | "observation_nearby_block";
     evidence_refs: string[];
   }>;
   shared_storage: {

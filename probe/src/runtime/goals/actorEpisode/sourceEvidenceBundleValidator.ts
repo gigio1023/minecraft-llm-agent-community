@@ -114,9 +114,9 @@ function validateNearbyBlock(value: unknown, path: string, errors: string[]) {
   assertString(value, "name", path, errors);
   if (
     value.source !== "world_scan_nearest" &&
-    value.source !== "legacy_nearby_block_hint"
+    value.source !== "observation_nearby_block"
   ) {
-    errors.push(`${path}.source must be world_scan_nearest or legacy_nearby_block_hint`);
+    errors.push(`${path}.source must be world_scan_nearest or observation_nearby_block`);
   }
   assertOptionalPosition(value, "position", path, errors);
   assertOptionalNumber(value, "distance", path, errors);
