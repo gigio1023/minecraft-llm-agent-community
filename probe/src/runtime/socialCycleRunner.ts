@@ -246,10 +246,30 @@ function appendProviderErrorRefs(input: {
   });
 }
 
-function actorTurnProviderFailureKind(
+/**
+ * Actor Turn provider failures the runtime records as a rejected action attempt
+ * and recovers from, instead of aborting the whole multi-cycle run.
+ *
+ * @remarks These are turns where the model returned a completion the runtime
+ * could not use — a rejected proposal, an unparseable tool selection, or an
+ * empty tool-call array — so the next turn shares the same context and may
+ * succeed. Standing conditions (missing key, exhausted budget/quota, billing,
+ * unknown model, infra outage) are deliberately excluded and stay fatal: every
+ * retry would hit the same wall.
+ */
+export function isRecoverableActorTurnProviderFailure(
   result: ActorTurnProviderResult | ActionPlannerProviderResult
 ) {
-  return !result.ok && "failureKind" in result ? result.failureKind : undefined;
+  if (result.ok) {
+    return false;
+  }
+  const failureKind = "failureKind" in result ? result.failureKind : undefined;
+  const errorKind = "errorKind" in result ? result.errorKind : undefined;
+  return (
+    failureKind === "provider_contract_rejection" ||
+    errorKind === "tool_selection_parse_error" ||
+    errorKind === "tool_call_error"
+  );
 }
 
 async function buildActorTurnProviderContractRejectionAttempt(input: {
@@ -1475,7 +1495,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         if (!planner.ok) {
           if (
             actionHotPath === "actor_turn" &&
-            actorTurnProviderFailureKind(planner) === "provider_contract_rejection"
+            isRecoverableActorTurnProviderFailure(planner)
           ) {
             const contractRejection = await buildActorTurnProviderContractRejectionAttempt({
               rootDir,

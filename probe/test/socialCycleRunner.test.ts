@@ -6,10 +6,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  isRecoverableActorTurnProviderFailure,
   runSocialCycle,
   selectGeminiFallbackModelsForCall,
   selectGeminiModelForCall
 } from "../src/runtime/socialCycleRunner.js";
+import type { ActorTurnProviderResult } from "../src/provider/socialActorTurnProvider.js";
 import { cycleGoalProviderInputIncludesSoulAndLifeGoal } from "../src/runtime/goals/types.js";
 import { readJsonIfExists } from "../src/runtime/goals/goalJsonStore.js";
 import { initializeActorWorkspaces } from "../src/runtime/actorWorkspace.js";
@@ -198,6 +200,50 @@ test("Gemini social-cycle model rotation selects one model per provider call", (
       fallbackModel: "gemini-3-flash-preview"
     }),
     ["gemini-2.5-flash", "gemini-3.1-flash-lite"]
+  );
+});
+
+test("actor-turn recoverable failures cover rejected/unparseable/empty-tool-call turns", () => {
+  const baseFailure = {
+    ok: false as const,
+    error: "boom",
+    inputRef: "provider-inputs/in.json",
+    outputRef: "provider-outputs/out.json"
+  };
+  const recoverable: ActorTurnProviderResult[] = [
+    { ...baseFailure, failureKind: "provider_contract_rejection" },
+    { ...baseFailure, errorKind: "tool_selection_parse_error" },
+    { ...baseFailure, errorKind: "tool_call_error" }
+  ];
+  for (const result of recoverable) {
+    assert.equal(isRecoverableActorTurnProviderFailure(result), true);
+  }
+
+  // Standing conditions stay fatal: every retry hits the same wall, so the run
+  // must abort rather than churn cycles recording identical rejections.
+  const fatalErrorKinds = [
+    "missing_api_key",
+    "usage_budget_exceeded",
+    "model_not_found",
+    "quota",
+    "billing",
+    "rate_limit",
+    "timeout",
+    "server_error",
+    "api_error"
+  ];
+  for (const errorKind of fatalErrorKinds) {
+    assert.equal(
+      isRecoverableActorTurnProviderFailure({ ...baseFailure, errorKind }),
+      false,
+      `${errorKind} must not be recoverable`
+    );
+  }
+
+  // A successful provider result is never a failure to recover from.
+  assert.equal(
+    isRecoverableActorTurnProviderFailure({ ok: true } as unknown as ActorTurnProviderResult),
+    false
   );
 });
 
