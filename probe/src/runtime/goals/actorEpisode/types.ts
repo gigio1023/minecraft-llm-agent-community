@@ -367,6 +367,11 @@ export type ActiveEpisode = {
   };
   social_pressure: SocialPressureSummary[];
   opened_from_refs: string[];
+  /**
+   * Count of `opened_from_refs` omitted by hot-packet lineage windowing. Absent
+   * on persisted records (nothing omitted); set only on the Actor Turn projection.
+   */
+  opened_from_refs_omitted_count?: number;
   started_at_turn_ref?: string;
   status: ActiveEpisodeStatus;
 };
