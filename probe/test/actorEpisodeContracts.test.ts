@@ -82,27 +82,26 @@ function actorTurnInput(): ActorTurnInput {
         "use decision_frame current_truths before older episode wording",
         "consume completed_work and do_not_repeat before choosing an action",
         "choose one visible action_cards entry with schema-valid parameters"
-	      ],
-	      episode_focus: "Place or regain access to a crafting table, then continue toolmaking.",
-	      episode_focus_status: {
-	        status: "open",
-	        focus: "Place or regain access to a crafting table, then continue toolmaking.",
-	        evidence_refs: ["goals/cycle-001.json"],
-	        next: "advance_the_focus_with_runtime_evidence_or_pivot_when_current_truths_contradict_it"
-	      },
-	      current_truths: [
-	        "inventory=crafting_table:1",
-	        "crafting_table=unknown",
-	        "visible_actor=npc_a"
-	      ],
-	      open_social_requests: [],
-	      completed_work: [],
-	      recent_action_verdicts: [],
-	      do_not_repeat: ["do not reuse the blocked placement target from turn-001"],
-	      open_progress_front: [],
-	      next_action_guidance: [
-	        "choose a new explicit placement cell or record the blocker if no valid cell exists"
-	      ]
+      ],
+      episode_focus: "Place or regain access to a crafting table, then continue toolmaking.",
+      episode_focus_status: {
+        status: "open",
+        focus: "Place or regain access to a crafting table, then continue toolmaking.",
+        evidence_refs: ["goals/cycle-001.json"],
+        next: "advance_the_focus_with_runtime_evidence_or_pivot_when_current_truths_contradict_it"
+      },
+      current_truths: [
+        "inventory=crafting_table:1",
+        "crafting_table=unknown",
+        "visible_actor=npc_a"
+      ],
+      completed_work: [],
+      recent_action_verdicts: [],
+      do_not_repeat: ["do not reuse the blocked placement target from turn-001"],
+      open_progress_front: [],
+      next_action_guidance: [
+        "choose a new explicit placement cell or record the blocker if no valid cell exists"
+      ]
     },
     active_episode: episode,
     actor_context: {
@@ -116,15 +115,18 @@ function actorTurnInput(): ActorTurnInput {
       schema: "actor-turn-current-state/v1",
       observer_id: "npc_b",
       position: { x: 0, y: 64, z: 0 },
-	      inventory_counts: { crafting_table: 1 },
-	      visible_actors: [{ id: "npc_a", distance: 4, busy: false }],
-	      nearby_block_hints: [{ name: "grass_block", distance: 1 }],
-	      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-	      deposit_candidates: [],
-	      settlement_progress: {
+      inventory_counts: { crafting_table: 1 },
+      visible_actors: [{ id: "npc_a", distance: 4, busy: false }],
+      nearby_block_observations: [
+        { name: "grass_block", distance: 1, source: "legacy_nearby_block_hint", evidence_refs: [] }
+      ],
+      shared_storage: { status: "unknown", items: [], evidence_refs: [] },
+      settlement_progress: {
         inventory_counts: { crafting_table: 1 },
         shared_storage_status: "unknown",
-        known_position_summaries: ["actor_position=(0, 64, 0)", "crafting_table=unknown"],
+        known_positions: {
+          actor: { position: { x: 0, y: 64, z: 0 }, evidence_refs: ["observations/turn-002-pre.json"] }
+        },
         checklist: [
           {
             id: "crafting_table_known_or_placed",
@@ -135,6 +137,48 @@ function actorTurnInput(): ActorTurnInput {
         ],
         recent_blockers: []
       }
+    },
+    source_evidence_bundle: {
+      schema: "actor-turn-source-evidence-bundle/v1",
+      observation: {
+        observation_refs: ["observations/turn-002-pre.json"],
+        position: { x: 0, y: 64, z: 0 },
+        inventory_items: [{ name: "crafting_table", count: 1 }],
+        visible_actors: [{ id: "npc_a", distance: 4, busy: false }],
+        nearby_blocks: [
+          {
+            name: "grass_block",
+            distance: 1,
+            source: "legacy_nearby_block_hint",
+            evidence_refs: ["observations/turn-002-pre.json"]
+          }
+        ]
+      },
+      world_event_cards: [],
+      memory_cards: [],
+      recent_action_details: [
+        {
+          turn_id: evidenceTrace.turn_id,
+          outcome: evidenceTrace.outcome,
+          compact_summary: evidenceTrace.compact_summary,
+          evidence_refs: []
+        }
+      ],
+      plan_bead_cards: [
+        {
+          bead_id: "bead-crafting-table-access",
+          title: "Crafting table access is blocked",
+          status: "in_progress",
+          priority: 1,
+          why_it_matters: "Toolmaking cannot continue until the table issue is physically resolved.",
+          next_hints: ["Repair table placement before trying table-sized recipes."],
+          blockers: ["last placement target was occupied"],
+          acceptance_evidence_required: ["block or inventory evidence for table access"],
+          evidence_refs: ["evidence/turn-001-place.json"],
+          dependency_refs: ["plan-bead-dependency:npc_b:bead-crafting-table-access:blocks:bead-toolmaking"],
+          checkpoint_ref: "plan-beads/beads/bead-crafting-table-access.json"
+        }
+      ]
     },
     recent_evidence_trace: [evidenceTrace],
     compact_plan_bead_hints: [
@@ -156,7 +200,13 @@ function actorTurnInput(): ActorTurnInput {
     relationship_context: {
       relationship_refs: ["relationships/npc_a-npc_b.json"],
       visible_actor_ids: ["npc_a"],
-      obligations: ["Make shared progress visible if toolmaking remains blocked."]
+      relationship_cards: [
+        {
+          source: "incoming_signal",
+          ref: "relationships/npc_a-npc_b.json",
+          summary: "Make shared progress visible if toolmaking remains blocked."
+        }
+      ]
     },
     runtime_retry_constraints: [
       {
@@ -264,6 +314,27 @@ test("Actor Episode contract validators accept the deterministic vertical-slice 
       ]
     }),
     []
+  );
+});
+
+test("Actor Turn input rejects malformed source evidence cards", () => {
+  const input = actorTurnInput();
+  const malformed = structuredClone(input) as Record<string, any>;
+  malformed.source_evidence_bundle.recent_action_details = [
+    {
+      turn_id: evidenceTrace.turn_id,
+      outcome: "unknown",
+      compact_summary: "missing structured source evidence shape",
+      evidence_refs: []
+    }
+  ];
+
+  const result = validateActorTurnInput(malformed);
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.errors.some((error) =>
+      error.includes("source_evidence_bundle.recent_action_details[0].outcome")
+    )
   );
 });
 

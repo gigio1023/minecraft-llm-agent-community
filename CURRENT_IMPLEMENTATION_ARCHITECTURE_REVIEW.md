@@ -40,7 +40,7 @@ flowchart LR
   Soul["ActorSoul + LifeGoal<br/>identity and long-lived direction"]
   Workspace["Actor workspace<br/>evidence, memory, PlanBeads, skills"]
   Observe["Observation<br/>world, inventory, actors, transcript"]
-  Input["ActorTurnInput<br/>current_state, Evidence Trace,<br/>Action Cards, guide, hints"]
+  Input["ActorTurnInput<br/>current_state + source_evidence_bundle,<br/>Evidence Trace, Action Cards, guide"]
   LLM["Actor Turn LLM<br/>function tool selection"]
   Choice{"Exactly one tool call"}
   Card["Visible Action Card<br/>schema-bound parameters"]
@@ -118,6 +118,12 @@ safe coordinate and move there. If `LifeGoal` values the community, the runtime
 must not turn every turn into a storage or shelter planner. The LLM reads the
 current evidence and Action Cards and decides directly. The runtime executes
 only when that decision passes explicit structured parameters and gates.
+
+`current_state` is the bounded typed fact layer. `source_evidence_bundle` is the
+bounded source layer that keeps observation, world-event, memory, recent-action,
+and PlanBead cards beside those facts. This pairing is intentional: compact
+summaries may help low-cost models, but summary-only observation/social/action
+context loses too much information and recreates a hidden planner bottleneck.
 
 ## Core Terms
 

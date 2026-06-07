@@ -199,11 +199,12 @@ const authorMineflayerActionToolParameters = {
 export const actorTurnToolSelectionSystemPrompt = `You are choosing one Actor Turn inside an Active Episode through function calling.
 Call exactly one function tool.
 
-Use the full ActorTurnInput: decision_frame, current_state, recent_evidence_trace, action_cards, Minecraft Basic Guide, memory refs, relationship context, compact PlanBead hints, and runtime retry constraints.
+Use the full ActorTurnInput: decision_frame, current_state, source_evidence_bundle, recent_evidence_trace, action_cards, Minecraft Basic Guide, memory refs/cards, relationship context, compact PlanBead hints, and runtime retry constraints.
 Do not produce a legacy planner action object or ordinary text.
 
 For a visible Action Card tool:
 - choose by title, description, strict function parameter schema, advisory current_state hints, and current evidence;
+- use source_evidence_bundle raw cards/details beside summaries when interpreting world events, relationships, observations, recent action failures, or PlanBeads;
 - put only the provider-supplied structured arguments in parameters;
 - do not add actor ids, primitive ids, action skill ids, timeouts, evidence paths, verifier ids, generated source, or other hidden runtime fields;
 - do not expect current_state, Action Card hints, or runtime code to synthesize safe target cells, item names, counts, or other defaults;
@@ -215,7 +216,7 @@ For author_mineflayer_action:
 - choose it only when no visible Action Card can express the needed bounded Mineflayer behavior;
 - do not include TypeScript source, input_schema, candidate, helper_allowlist, timeout_ms, verifier, promotion_policy, or parameters;
 - set expected_outcome to the concrete delta the generated program should create; use diagnostic_unlock only for a short bounded probe that must unlock a later physical action, and not as a substitute for acting;
-- write detailed rationale so the internal codegen stage can continue the same decision without losing context;
+- write detailed rationale so the internal codegen stage can continue the same decision without losing context; the runtime will pass the full ActorTurnInput and raw outer tool call into codegen;
 - never add context_to_preserve, selected_context, relevant_context_refs, or similar summary fields.
 
 PlanBeads are passive work-state context only. They do not supply executable arguments, physical success, retry permission, generated source, or Minecraft strategy.

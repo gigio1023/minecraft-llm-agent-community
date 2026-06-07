@@ -42,28 +42,12 @@ export type PlanBeadCurrentStateLifecycleInput = {
       items?: readonly { name: string; count: number }[];
       evidence_refs?: readonly string[];
     };
-    deposit_candidates?: readonly { socially_requested?: boolean }[];
   };
   beads: readonly ActorPlanBead[];
 };
 
 function uniqueStrings(values: readonly string[]) {
   return [...new Set(values.filter((value) => value.length > 0))];
-}
-
-function textForBead(bead: ActorPlanBead) {
-  return [
-    bead.title,
-    bead.description,
-    ...bead.acceptance_criteria.evidence_required,
-    ...bead.notes.next,
-    ...bead.notes.blockers,
-    ...bead.labels
-  ]
-    .join(" ")
-    .toLowerCase()
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
 }
 
 function readString(value: unknown) {
@@ -102,59 +86,62 @@ function runtimeEvidenceRefs(refs: readonly string[]) {
   return refs.filter((ref) => ref.startsWith("evidence/") || ref.startsWith("settlement/"));
 }
 
-// Matching is deliberately conservative and text-based: this helper may close
-// or update a PlanBead from observed evidence, but it never derives new
-// primitive arguments or execution authority.
-function hasAny(text: string, terms: readonly string[]) {
-  return terms.some((term) => text.includes(term));
+function normalizeSignalKey(value: string) {
+  return value.trim().toLowerCase().replace(/[_\s]+/g, "-");
 }
 
-function itemTerms(itemName: string | undefined) {
-  if (!itemName) {
-    return [];
+function metadataStringList(bead: ActorPlanBead, key: string) {
+  const value = bead.metadata[key];
+  if (typeof value === "string" && value.trim().length > 0) {
+    return [value.trim()];
   }
-  const normalized = itemName.toLowerCase().replace(/[_-]+/g, " ");
-  return uniqueStrings([itemName.toLowerCase(), normalized]);
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+  }
+  return [];
+}
+
+function signalKeys(signal: EvidenceSignal) {
+  switch (signal.kind) {
+    case "deposit_shared":
+      return uniqueStrings([
+        "deposit_shared",
+        ...(signal.itemName ? [`deposit_shared:${signal.itemName}`] : [])
+      ]).map(normalizeSignalKey);
+    case "inspect_chest":
+      return ["inspect_chest"].map(normalizeSignalKey);
+    case "crafted":
+      return uniqueStrings([
+        "crafted",
+        ...(signal.itemName ? [`crafted:${signal.itemName}`] : [])
+      ]).map(normalizeSignalKey);
+  }
+}
+
+function beadHasLifecycleSignal(bead: ActorPlanBead, metadataKey: string, signal: EvidenceSignal) {
+  const configured = metadataStringList(bead, metadataKey).map(normalizeSignalKey);
+  if (configured.length === 0) {
+    return false;
+  }
+  const actual = signalKeys(signal);
+  return actual.some((key) => configured.includes(key));
 }
 
 export function matchPlanBeadAcceptanceEvidence(input: {
   bead: ActorPlanBead;
   signal: EvidenceSignal;
 }): "close_satisfied" | "update_incomplete" | "no_match" {
-  const text = textForBead(input.bead);
-  switch (input.signal.kind) {
-    case "deposit_shared": {
-      const storageTerms = [
-        "shared storage",
-        "shared chest",
-        "chest deposit",
-        "storage deposit",
-        "deposit",
-        "contribution",
-        "contribute"
-      ];
-      return hasAny(text, storageTerms) ? "close_satisfied" : "no_match";
-    }
-    case "inspect_chest": {
-      const isChestConcern = hasAny(text, [
-        "shared chest",
-        "chest access",
-        "inspect chest",
-        "inspect shared",
-        "open chest"
-      ]);
-      if (!isChestConcern) {
-        return "no_match";
-      }
-      return hasAny(text, ["deposit", "contribution", "contribute"])
-        ? "update_incomplete"
-        : "close_satisfied";
-    }
-    case "crafted": {
-      const terms = itemTerms(input.signal.itemName);
-      return terms.length > 0 && hasAny(text, terms) ? "close_satisfied" : "no_match";
-    }
+  // Lifecycle mutation must be opt-in structured metadata, not PlanBead prose
+  // parsing. Use lifecycle_close_signals / lifecycle_incomplete_signals values
+  // like "deposit_shared", "deposit_shared:oak_log", "inspect_chest", or
+  // "crafted:crafting_table".
+  if (beadHasLifecycleSignal(input.bead, "lifecycle_incomplete_signals", input.signal)) {
+    return "update_incomplete";
   }
+  if (beadHasLifecycleSignal(input.bead, "lifecycle_close_signals", input.signal)) {
+    return "close_satisfied";
+  }
+  return "no_match";
 }
 
 function completedNote(signal: EvidenceSignal) {
@@ -288,13 +275,9 @@ export function derivePlanBeadLifecycleOperationsFromCurrentState(
 ): PlanBeadOperation[] {
   const sharedStorage = input.currentState.shared_storage;
   const evidenceRefs = runtimeEvidenceRefs(sharedStorage?.evidence_refs ?? []);
-  const hasOpenSocialDeposit = (input.currentState.deposit_candidates ?? []).some((candidate) =>
-    candidate.socially_requested === true
-  );
   if (
     sharedStorage?.status !== "contributed" ||
-    evidenceRefs.length === 0 ||
-    hasOpenSocialDeposit
+    evidenceRefs.length === 0
   ) {
     return [];
   }

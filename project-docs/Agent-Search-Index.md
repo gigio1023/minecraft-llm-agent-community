@@ -44,6 +44,7 @@ guidance.
 | `LOW_COST_SOCIAL_SIMULATION_CAMPAIGN` | Campaign-level spec, gates, social proof scenarios, and implementation sequence for proving cheap-model Actor Turn behavior | `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md` |
 | `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL` | Compact `/goal` companion for the current pivot: Actor Turn as hot path, PlanBeads as passive issue-like state, branch-only Deliberation | `Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`, `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | New Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing legacy planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `CONTEXT_PROJECTION_SOURCE_EVIDENCE` | Actor Turn context rule: bounded facts may be compacted, but observation/action/social/work history must carry source evidence cards and refs beside summaries | `Architecture/Context-Projection-And-Source-Evidence.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `AGENTS.md` |
 | `ACTOR_MEMORY_OBSERVATION_ACTION_SPACE` | Memory IO, raw observation, and Mineflayer action-space expansion plan | `Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`, `project-docs/research-archive/hermes-memory-system/`, `probe/src/memory/actorMemory.ts`, `probe/src/runtime/actionSurface.ts` |
 | `ACTOR_PERSISTENT_STATE_PLAN_BEADS` | Restart-safe actor work graph: PlanBeads, dependency edges, and ready fronts under LifeGoal | `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Terminology.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
 | `PLANBEADS_IMPLEMENTATION_CAMPAIGN` | Long-running parallel implementation campaign contract for PlanBeads work | `Architecture/PlanBeads-Implementation-Campaign.md`, `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Architecture/Implementation-Workstreams.md` |
@@ -101,21 +102,22 @@ For any onboarding developer or agent, read in this order:
 13. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
 14. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
 15. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-16. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-17. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-18. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-19. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-20. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-21. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-22. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-23. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-24. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-25. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
-26. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-27. `project-docs/Setup/Headless-Server.md`
-28. `project-docs/Setup/Provider-Setup.md`
-29. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
-30. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+16. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+17. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+19. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+20. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+21. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+22. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+23. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+24. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+25. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+26. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+27. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+28. `project-docs/Setup/Headless-Server.md`
+29. `project-docs/Setup/Provider-Setup.md`
+30. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+31. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
 
 ## Active vs Archived
 

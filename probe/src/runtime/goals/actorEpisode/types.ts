@@ -176,7 +176,82 @@ export type ActorSoulAndLifeGoalProjection = {
 export type RelationshipContextProjection = {
   relationship_refs: string[];
   visible_actor_ids: string[];
-  obligations: string[];
+  relationship_cards: Array<{
+    source: "outgoing" | "incoming" | "signal" | "incoming_signal";
+    ref: string;
+    summary: string;
+  }>;
+};
+
+export type ActorTurnSourceEvidenceBundle = {
+  schema: "actor-turn-source-evidence-bundle/v1";
+  observation: {
+    observation_refs: string[];
+    position?: { x: number; y: number; z: number };
+    inventory_items: Array<{ name: string; count: number }>;
+    visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
+    nearby_blocks: Array<{
+      name: string;
+      position?: { x: number; y: number; z: number };
+      distance?: number;
+      source: "world_scan_nearest" | "legacy_nearby_block_hint";
+      evidence_refs: string[];
+    }>;
+    world_scan?: {
+      scan_id: string;
+      scan_ref?: string;
+      center?: { x: number; y: number; z: number };
+      radius?: number;
+      vertical_range?: { min_y: number; max_y: number; center_y: number };
+      coverage_scope: string;
+      absence_claims_exhaustive: boolean;
+      total_verified_blocks: number;
+      truncated: boolean;
+      nearest_blocks: Array<{
+        name: string;
+        position: { x: number; y: number; z: number };
+        distance: number;
+      }>;
+      named_block_examples: Array<{
+        name: string;
+        count: number;
+        nearest: Array<{
+          position: { x: number; y: number; z: number };
+          distance: number;
+        }>;
+      }>;
+      limitations: string[];
+    };
+  };
+  world_event_cards: Array<{
+    event_id: string;
+    kind: string;
+    authority: string;
+    summary: string;
+    actor_refs: string[];
+    evidence_refs: string[];
+    created_at: string;
+  }>;
+  memory_cards: Array<{
+    memory_id: string;
+    kind: string;
+    layer: string;
+    confidence: string;
+    summary: string;
+    evidence_refs: string[];
+    reason: string;
+  }>;
+  recent_action_details: Array<{
+    turn_id: string;
+    outcome: EvidenceTraceOutcome;
+    compact_summary: string;
+    selected_action?: EvidenceTraceEntry["selected_action"];
+    parameters?: JsonObject;
+    tool_statuses?: Array<{ tool: string; status: string }>;
+    blocker_reason?: string;
+    evidence_refs: string[];
+  }>;
+  plan_bead_cards: PlanBeadHint[];
 };
 
 /**
@@ -216,32 +291,43 @@ export type ActorTurnCurrentStateProjection = {
     notes: string[];
   };
   visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
-  obligation_summaries?: string[];
-  nearby_block_hints: Array<{ name: string; distance?: number }>;
+  nearby_block_observations: Array<{
+    name: string;
+    position?: { x: number; y: number; z: number };
+    distance?: number;
+    source: "world_scan_nearest" | "legacy_nearby_block_hint";
+    evidence_refs: string[];
+  }>;
   shared_storage: {
     status: string;
     chest_id?: string;
     items: Array<{ name: string; count: number }>;
     evidence_refs: string[];
   };
-  deposit_candidates: Array<{
-    itemName: string;
-    inventoryCount: number;
-    suggestedCount: number;
-    maxDepositableCount: number;
-    socially_requested: boolean;
-    requested_by_actor_ids: string[];
-    request_summaries: string[];
-    evidence_refs: string[];
-  }>;
   world_scan?: {
     scan_id: string;
+    scan_ref?: string;
+    center?: { x: number; y: number; z: number };
     radius?: number;
+    vertical_range?: { min_y: number; max_y: number; center_y: number };
     coverage_scope: string;
     absence_claims_exhaustive: boolean;
     total_verified_blocks: number;
     truncated: boolean;
     retained_block_counts: Array<{ name: string; count: number }>;
+    nearest_blocks: Array<{
+      name: string;
+      position: { x: number; y: number; z: number };
+      distance: number;
+    }>;
+    named_block_examples: Array<{
+      name: string;
+      count: number;
+      nearest: Array<{
+        position: { x: number; y: number; z: number };
+        distance: number;
+      }>;
+    }>;
     limitations: string[];
   };
   structure_progress?: {
@@ -265,7 +351,28 @@ export type ActorTurnCurrentStateProjection = {
   settlement_progress: {
     inventory_counts: Record<string, number>;
     shared_storage_status: string;
-    known_position_summaries: string[];
+    known_positions: {
+      actor?: {
+        position: { x: number; y: number; z: number };
+        evidence_refs: string[];
+      };
+      crafting_table?: {
+        status: string;
+        position?: { x: number; y: number; z: number };
+        distance_from_actor?: number;
+        usable_now?: boolean;
+        evidence_refs: string[];
+      };
+      shared_chest?: {
+        status: string;
+        evidence_refs: string[];
+      };
+      shelter?: {
+        status: string;
+        anchor?: { x: number; y: number; z: number };
+        evidence_refs: string[];
+      };
+    };
     checklist: Array<{
       id: string;
       status: string;
@@ -299,12 +406,6 @@ export type ActorTurnDecisionFrame = {
     next: string;
   };
   current_truths: string[];
-  open_social_requests: Array<{
-    itemName?: string;
-    suggestedCount?: number;
-    summary: string;
-    evidence_refs: string[];
-  }>;
   completed_work: string[];
   recent_action_verdicts: Array<{
     turn_id: string;
@@ -394,6 +495,7 @@ export type ActorTurnInput = {
   actor_context: ActorSoulAndLifeGoalProjection;
   current_observation_refs: string[];
   current_state: ActorTurnCurrentStateProjection;
+  source_evidence_bundle: ActorTurnSourceEvidenceBundle;
   recent_evidence_trace: EvidenceTraceEntry[];
   compact_plan_bead_hints: PlanBeadHint[];
   memory_refs: string[];

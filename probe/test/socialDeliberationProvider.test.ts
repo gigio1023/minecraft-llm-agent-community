@@ -261,29 +261,19 @@ test("Deliberation parser suppresses stale shared-storage work after contributio
         observer_id: "npc_b",
         inventory_counts: { dark_oak_log: 2 },
         visible_actors: [],
-        nearby_block_hints: [],
+        nearby_block_observations: [],
         shared_storage: {
           status: "contributed",
           chest_id: "shared-chest-1",
           items: [{ name: "oak_log", count: 1 }],
           evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
         },
-        deposit_candidates: [
-          {
-            itemName: "dark_oak_log",
-            inventoryCount: 2,
-            suggestedCount: 1,
-            maxDepositableCount: 2,
-            socially_requested: false,
-            requested_by_actor_ids: [],
-            request_summaries: [],
-            evidence_refs: []
-          }
-        ],
         settlement_progress: {
           inventory_counts: { dark_oak_log: 2 },
           shared_storage_status: "contributed",
-          known_position_summaries: ["shared_chest=contributed"],
+          known_positions: {
+            shared_chest: { status: "contributed", evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"] }
+          },
           checklist: [],
           recent_blockers: []
         }

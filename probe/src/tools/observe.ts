@@ -61,7 +61,7 @@ export type ObserveResult = {
       saturation?: number;
     }>;
   };
-  nearbyBlocks?: Array<{ name: string; distance: number }>;
+  nearbyBlocks?: Array<{ name: string; position: { x: number; y: number; z: number }; distance: number }>;
   sharedChest?: {
     chestId: string;
     items: Array<{ name: string; count: number }>;
@@ -195,6 +195,11 @@ function scanNearbyBlocks(actor: PositionedActor) {
     })
     .map((position) => ({
       name: actor.blockAt?.(position)?.name ?? "unknown",
+      position: {
+        x: Math.floor(position.x),
+        y: Math.floor(position.y),
+        z: Math.floor(position.z)
+      },
       distance: roundDistance(actor.entity.position.distanceTo(position))
     }))
     .sort((left, right) => left.distance - right.distance)

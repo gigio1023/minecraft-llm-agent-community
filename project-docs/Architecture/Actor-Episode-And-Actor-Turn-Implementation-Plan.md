@@ -252,29 +252,30 @@ Implementation checkpoint, 2026-06-03:
 - The first shared-storage social-smoke setup slice is implemented. The runner
   accepts `--shared-storage-social-smoke`, writes a run-scoped context-only
   request from `npc_a`, and live runs reuse spawn-access setup while seeding a
-  small `oak_log` stack. Actor Turn input now carries `shared_storage` and
-  `deposit_candidates` so cheap models can fill `deposit_shared`
-  `itemName`/`count` from current evidence instead of free-form prose.
-- Shared-storage request matching now distinguishes specific item requests from
-  generic material requests. A request for `one oak_log` no longer marks
-  unrelated inventory such as `leaf_litter` as socially requested.
-- Completed shared-storage requests now hide deposit-oriented Action Cards when
-  shared storage already has contribution evidence and no deposit candidate is
-  still socially requested. The runtime still allows inspection, memory,
-  movement, crafting, collection, and other non-deposit actions.
+  small `oak_log` stack. Actor Turn input now carries `shared_storage`, inventory
+  counts, and `source_evidence_bundle` world-event cards so cheap models can fill
+  `deposit_shared` `itemName`/`count` from current evidence instead of
+  free-form prose or hidden social-request candidates.
+- Shared-storage request matching was deliberately removed from the provider
+  input hot path. The runtime no longer constructs `deposit_candidates`,
+  `open_social_requests`, or similar preselected social intent fields. The LLM
+  receives the source world event and current inventory and chooses directly.
+- Completed shared-storage evidence is preserved in current truth and source
+  evidence. It does not hide deposit-oriented Action Cards or force a
+  request-satisfied episode status; the Actor Turn LLM or branch-time
+  Deliberation must interpret the evidence under the current goal.
 - Actor Turn input now carries `decision_frame` ahead of Active Episode. This is
   a compact cheap-model priority projection, not executable authority. It
-  exposes `episode_focus_status`, current truths, open social requests,
-  completed work, recent action verdicts, do-not-repeat items, open progress
-  fronts, parameter candidates, top eligible Action Cards, and recommended next
+  exposes `episode_focus_status`, current truths, completed work, recent action
+  verdicts, do-not-repeat items, and open progress fronts. It must not expose
+  parameter candidates, top eligible Action Cards, recommended next candidates,
+  generated chat text, coordinates, recipe decisions, or hidden social-request
   candidates. PlanBeads remain durable work graph context through
   `compact_plan_bead_hints`; `decision_frame` is the per-turn lens that tells
   the model how to consume current evidence before older episode wording.
-- Completed shared-storage requests now also hide `Inspect Chest` and
-  `Inspect Shared Chest` Action Cards when shared storage already has
-  contribution evidence and no fresh social/container question is open. This
-  keeps cheap models from treating container re-verification as the best next
-  action after the handoff is already satisfied.
+- `source_evidence_bundle` is now the companion layer for observations, world
+  events, recent action details, memory cards, and PlanBead cards. It prevents
+  compact current-state facts from becoming summary-only bottlenecks.
 - Actor Turn repair now keeps the provider-facing Action Card list and Runtime
   Action Resolver projection aligned. A card removed for a repair attempt is no
   longer accepted through the original projection.
@@ -296,14 +297,13 @@ Implementation checkpoint, 2026-06-03:
   proves the first shared-storage social consequence, but it does not yet prove
   a strong follow-up after completion; the third cycle still preferred
   remember/inspect rather than a richer next action.
-- Latest post-`decision_frame` evidence:
+- Earlier post-`decision_frame` evidence:
   `tmp/social-smoke-openai-nano-3cycle-decision-frame-v2.json` passed with
   `deposit_shared -> craftPlanksAndSticks -> craftCraftingTable`, 4 provider
-  records, and 29,916 total tokens. Cycle 3 input showed
-  `episode_focus_status.status=satisfied`, `open_social_requests=[]`, no
-  deposit/chest-inspection cards, and recommended next candidates of crafting,
-  collection, or shelter work. This is a small but concrete `PASS` for the
-  post-completion follow-up slice under a low-cost model.
+  records, and 29,916 total tokens. It proved the social-smoke consequence under
+  an older hidden request-satisfaction projection. That input shape is now
+  historical because the current architecture keeps Action Cards visible and
+  carries source evidence instead of hidden request-satisfaction projections.
 
 This is the implementation plan for
 `Actor-Episode-And-Actor-Turn-Architecture.md`. It is a detailed plan, not a

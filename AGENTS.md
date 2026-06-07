@@ -160,6 +160,12 @@ explicit schemas, permission gates, retry constraints, or verifier evidence.
 `parameter_candidates`, `top_eligible_action_cards`,
 `recommended_next_action_candidates`, generated chat text, coordinates, recipe
 decisions, or other pre-selected action payloads to it.
+Do not add provider-facing candidate fields such as `deposit_candidates`,
+`open_social_requests`, `obligation_summaries`, `nearby_block_hints`, or
+`known_position_summaries`. These fields over-compress social, observation, and
+world-state context into hidden preselection. Use bounded typed facts in
+`current_state` plus `source_evidence_bundle` cards/refs so the Actor Turn LLM
+can reason from the original evidence.
 No compatibility or legacy compromise is required for this side project when
 removing prose parsing or hidden domain-planner behavior.
 

@@ -14,6 +14,11 @@ The LLM can choose from visible action options, but the runtime decides whether
 the action is valid, whether Mineflayer can execute it, and whether the result
 counts as progress.
 
+Ordinary turns use Actor Turn: the provider receives bounded `current_state`
+facts plus a `source_evidence_bundle` of observation, world-event, memory,
+recent-action, and PlanBead cards. This keeps compact context useful without
+turning summaries into hidden action choices.
+
 ## Actor Workspace
 
 Each actor has a workspace under `data/actors/<actor_id>/`. It stores the
@@ -52,9 +57,9 @@ physical success, or clear retry constraints.
 flowchart TD
   Soul["ActorSoul + LifeGoal"]
   Workspace["actor workspace"]
-  Context["bounded provider context"]
+  Context["ActorTurnInput<br/>current_state + source evidence"]
   Surface["action surface"]
-  Proposal["actor turn proposal"]
+  Proposal["Actor Turn function tool call"]
   Gate["runtime gates"]
   Minecraft["Mineflayer execution"]
   Verify["verifier"]

@@ -8,6 +8,7 @@ import type {
   SocialPressureSummary
 } from "./types.js";
 import { asRecord, sameStrings, unique } from "./projectionUtils.js";
+import { relationshipProjectionCards } from "./sourceEvidenceBundle.js";
 
 export function visibleActorIdsFromObservation(observation: unknown) {
   const record = asRecord(observation);
@@ -48,15 +49,6 @@ function relationshipRefsFromContext(context: SocialCycleContextPacket) {
   ]);
 }
 
-export function obligationsFromContext(context: SocialCycleContextPacket) {
-  const summaries = context.world_events
-    .filter((event) =>
-      /\b(request|obligation|need|help|shared|deposit|deliver)\b/i.test(event.summary)
-    )
-    .map((event) => event.summary);
-  return unique(summaries);
-}
-
 function socialPressureFromContext(context: SocialCycleContextPacket): SocialPressureSummary[] {
   const sharedStorage = context.settlement_state.shared_storage;
   const pressures: SocialPressureSummary[] = [];
@@ -67,14 +59,12 @@ function socialPressureFromContext(context: SocialCycleContextPacket): SocialPre
       evidence_refs: [...sharedStorage.evidence_refs]
     });
   }
-  for (const event of context.world_events) {
-    if (event.evidence_refs.length > 0 || /\b(request|obligation|need|help|shared)\b/i.test(event.summary)) {
-      pressures.push({
-        kind: "world_event",
-        summary: event.summary,
-        evidence_refs: [...event.evidence_refs]
-      });
-    }
+  for (const event of context.world_events.slice(-8)) {
+    pressures.push({
+      kind: "world_event",
+      summary: event.summary,
+      evidence_refs: [...event.evidence_refs]
+    });
   }
   return pressures;
 }
@@ -200,6 +190,6 @@ export function buildRelationshipContextProjection(
   return {
     relationship_refs: relationshipRefsFromContext(context),
     visible_actor_ids: visibleActorIdsFromObservation(context.observation),
-    obligations: obligationsFromContext(context)
+    relationship_cards: relationshipProjectionCards(context)
   };
 }

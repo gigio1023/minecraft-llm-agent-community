@@ -478,22 +478,22 @@ test("shared-storage social smoke writes run-scoped request into Actor Turn cont
   assert.ok(smokeGoalEvent);
   assert.deepEqual(smokeGoalEvent.actor_refs, ["npc_a", "npc_b"]);
 
-  const actorTurn = await readJsonIfExists<{
-    input?: {
-      active_episode?: { social_pressure?: Array<{ summary?: string }> };
-      current_state?: { obligation_summaries?: string[] };
-    };
-  }>(path.join(actorDir, actorTurnRef));
+	  const actorTurn = await readJsonIfExists<{
+	    input?: {
+	      active_episode?: { social_pressure?: Array<{ summary?: string }> };
+	      source_evidence_bundle?: { world_event_cards?: Array<{ summary?: string }> };
+	    };
+	  }>(path.join(actorDir, actorTurnRef));
   assert.ok(
     actorTurn?.input?.active_episode?.social_pressure?.some((pressure) =>
       pressure.summary?.includes("deposit one oak_log into shared storage")
     )
   );
-  assert.ok(
-    actorTurn?.input?.current_state?.obligation_summaries?.some((summary) =>
-      summary.includes("deposit one oak_log into shared storage")
-    )
-  );
+	  assert.ok(
+	    actorTurn?.input?.source_evidence_bundle?.world_event_cards?.some((card) =>
+	      card.summary?.includes("deposit one oak_log into shared storage")
+	    )
+	  );
 });
 
 test("deterministic-social actor_turn reuses Active Episode without repeated goal mind", async () => {

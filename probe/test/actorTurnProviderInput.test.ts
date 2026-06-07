@@ -474,7 +474,11 @@ test("Action Card projection exposes primitive/action-skill choice through cards
   assert.deepEqual(actorTurnInput.current_state.inventory_counts, { crafting_table: 1 });
   assert.equal(actorTurnInput.current_state.position?.x, 0);
   assert.equal(actorTurnInput.current_state.visible_actors[0]?.id, "npc_a");
-  assert.equal(actorTurnInput.current_state.nearby_block_hints[0]?.name, "grass_block");
+  assert.equal(actorTurnInput.current_state.nearby_block_observations[0]?.name, "grass_block");
+  assert.equal(actorTurnInput.source_evidence_bundle.observation.nearby_blocks[0]?.name, "grass_block");
+  assert.deepEqual(actorTurnInput.source_evidence_bundle.observation.nearby_blocks[0]?.evidence_refs, [
+    "observations/cycle-0001.json"
+  ]);
   assert.equal(
     actorTurnInput.current_state.settlement_progress.checklist.some((item) =>
       item.id === "crafting_table_known_or_placed"
@@ -861,7 +865,7 @@ test("Actor Turn input does not recommend empty parameters for target-required p
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Block"));
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Mine Cobblestone"));
   assert.ok(
-    actorTurnInput.current_state.nearby_block_hints.some((block) => block.name === "stone")
+    actorTurnInput.current_state.nearby_block_observations.some((block) => block.name === "stone")
   );
 });
 
@@ -1125,7 +1129,7 @@ test("Actor Turn repair input keeps a rejected Action Card visible with contract
   );
 });
 
-test("Actor Turn input exposes shared-storage deposit candidates from inventory and social request", async () => {
+test("Actor Turn input exposes shared-storage source evidence without preselecting deposit candidates", async () => {
   const soul = compileActorSoulFromProfile("npc_b");
   const context = await assembleSocialCycleContext({
     actorWorkspaceRootDir: rootDir,
@@ -1195,29 +1199,25 @@ test("Actor Turn input exposes shared-storage deposit candidates from inventory 
     items: [{ name: "stick", count: 2 }],
     evidence_refs: []
   });
-  assert.equal(actorTurnInput.current_state.obligation_summaries?.length, 1);
-  const oakLogCandidate = actorTurnInput.current_state.deposit_candidates.find((candidate) =>
-    candidate.itemName === "oak_log"
+  assert.equal(actorTurnInput.current_state.inventory_counts.oak_log, 4);
+  assert.equal(actorTurnInput.current_state.inventory_counts.leaf_litter, 9);
+  assert.ok(
+    actorTurnInput.source_evidence_bundle.world_event_cards.some((card) =>
+      card.summary.includes("deposit one oak_log")
+    )
   );
-  assert.ok(oakLogCandidate);
-  assert.equal(oakLogCandidate.inventoryCount, 4);
-  assert.equal(oakLogCandidate.suggestedCount, 1);
-  assert.equal(oakLogCandidate.socially_requested, true);
-  assert.deepEqual(oakLogCandidate.requested_by_actor_ids, ["npc_a"]);
-  assert.match(oakLogCandidate.request_summaries[0] ?? "", /deposit one oak_log/);
-  const leafLitterCandidate = actorTurnInput.current_state.deposit_candidates.find((candidate) =>
-    candidate.itemName === "leaf_litter"
+  assert.ok(
+    actorTurnInput.source_evidence_bundle.observation.inventory_items.some((item) =>
+      item.name === "oak_log" && item.count === 4
+    )
   );
-  assert.ok(leafLitterCandidate);
-  assert.equal(leafLitterCandidate.socially_requested, false);
-  assert.deepEqual(leafLitterCandidate.request_summaries, []);
   const depositCard = actorTurnInput.action_cards.find((card) => card.title === "Deposit Shared");
   const handoffCard = actorTurnInput.action_cards.find((card) => card.title === "Handoff Item At Chest");
   assert.ok(depositCard);
   assert.ok(handoffCard);
   assert.ok(
     depositCard.parameter_hints.some((hint) =>
-      hint.includes("oak_log inventory=4 suggestedCount=1 socially_requested")
+      hint.includes("source_evidence_bundle.world_event_cards")
     )
   );
   assert.ok(
@@ -1226,23 +1226,11 @@ test("Actor Turn input exposes shared-storage deposit candidates from inventory 
     )
   );
   assert.equal(actorTurnInput.decision_frame.episode_focus_status.status, "open");
-  assert.deepEqual(actorTurnInput.decision_frame.open_social_requests.map((request) => request.itemName), [
-    "oak_log"
-  ]);
-  assert.deepEqual(actorTurnInput.current_state.deposit_candidates
-    .filter((candidate) => candidate.socially_requested)
-    .map((candidate) => ({
-      itemName: candidate.itemName,
-      suggestedCount: candidate.suggestedCount,
-      evidence_refs: candidate.evidence_refs
-    })),
-  [
-    {
-      itemName: "oak_log",
-      suggestedCount: 1,
-      evidence_refs: ["world-events/evt-shared-storage-handoff.json"]
-    }
-  ]);
+  assert.ok(
+    actorTurnInput.decision_frame.priority_order.some((entry) =>
+      entry.includes("source_evidence_bundle")
+    )
+  );
 });
 
 test("Actor Turn input marks Inspect Chest as the bounded container openability check", async () => {
@@ -1382,24 +1370,19 @@ test("Actor Turn input does not keep a completed one-item shared-storage request
   assert.deepEqual(actorTurnInput.current_state.shared_storage.items, [
     { name: "oak_log", count: 1 }
   ]);
-  const oakLogCandidate = actorTurnInput.current_state.deposit_candidates.find((candidate) =>
-    candidate.itemName === "oak_log"
+  assert.equal(actorTurnInput.current_state.inventory_counts.oak_log, 3);
+  assert.equal(actorTurnInput.current_state.inventory_counts.leaf_litter, 9);
+  assert.ok(
+    actorTurnInput.source_evidence_bundle.world_event_cards.some((card) =>
+      card.summary.includes("deposit one oak_log")
+    )
   );
-  assert.ok(oakLogCandidate);
-  assert.equal(oakLogCandidate.socially_requested, false);
-  assert.deepEqual(oakLogCandidate.request_summaries, []);
-  const leafLitterCandidate = actorTurnInput.current_state.deposit_candidates.find((candidate) =>
-    candidate.itemName === "leaf_litter"
-  );
-  assert.ok(leafLitterCandidate);
-  assert.equal(leafLitterCandidate.socially_requested, false);
-  assert.deepEqual(leafLitterCandidate.request_summaries, []);
   const depositCard = actorTurnInput.action_cards.find((card) => card.title === "Deposit Shared");
   assert.ok(depositCard);
   assert.ok(actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest"));
   assert.ok(
     depositCard.parameter_hints.some((hint) =>
-      hint.includes("Current deposit candidates") && !hint.includes("socially_requested")
+      hint.includes("source_evidence_bundle.world_event_cards")
     )
   );
   assert.ok(
@@ -1419,16 +1402,10 @@ test("Actor Turn input does not keep a completed one-item shared-storage request
     ),
     false
   );
-  assert.equal(actorTurnInput.decision_frame.episode_focus_status.status, "satisfied");
-  assert.deepEqual(actorTurnInput.decision_frame.open_social_requests, []);
+  assert.equal(actorTurnInput.decision_frame.episode_focus_status.status, "open");
   assert.ok(
-    actorTurnInput.decision_frame.completed_work.some((entry) =>
-      entry.includes("evidence/cycle-0001-action-01-deposit_shared.json")
-    )
-  );
-  assert.ok(
-    actorTurnInput.decision_frame.do_not_repeat.some((entry) =>
-      entry.includes("shared-storage contribution already has evidence")
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("shared_storage=contributed")
     )
   );
 });
@@ -1570,22 +1547,16 @@ test("Actor Turn input does not retarget a specific missing item request onto un
   });
 
   assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
-  assert.deepEqual(
-    actorTurnInput.current_state.deposit_candidates.map((candidate) => ({
-      itemName: candidate.itemName,
-      socially_requested: candidate.socially_requested,
-      request_summaries: candidate.request_summaries
-    })),
-    [
-      { itemName: "dirt", socially_requested: false, request_summaries: [] },
-      { itemName: "oak_planks", socially_requested: false, request_summaries: [] },
-      { itemName: "stick", socially_requested: false, request_summaries: [] }
-    ]
-  );
-  assert.deepEqual(actorTurnInput.decision_frame.open_social_requests, []);
-  assert.equal(
-    actorTurnInput.current_state.deposit_candidates.some((candidate) => candidate.socially_requested),
-    false
+  assert.deepEqual(actorTurnInput.current_state.inventory_counts, {
+    dirt: 1,
+    oak_planks: 4,
+    stick: 2
+  });
+  assert.equal((actorTurnInput.current_state.inventory_counts as Record<string, number>).oak_log, undefined);
+  assert.ok(
+    actorTurnInput.source_evidence_bundle.world_event_cards.some((card) =>
+      card.summary.includes("deposit one oak_log")
+    )
   );
 });
 
@@ -2472,9 +2443,11 @@ test("Actor Turn input keeps social action cards visible with advisory precondit
   assert.ok(readyTitles.includes("Announce Resource Discovery"));
   assert.ok(readyTitles.includes("Handoff Item At Chest"));
   assert.ok(readyTitles.includes("Say"));
-  assert.deepEqual(readyInput.actorTurnInput.current_state.obligation_summaries, [
-    "npc_a requested help: deliver one spare crafting table to shared storage."
-  ]);
+  assert.ok(
+    readyInput.actorTurnInput.source_evidence_bundle.world_event_cards.some((card) =>
+      card.summary.includes("deliver one spare crafting table")
+    )
+  );
   assert.equal(validateActorTurnInput(readyInput.actorTurnInput).ok, true);
 });
 
@@ -2547,9 +2520,10 @@ test("Actor Turn input keeps Say visible with social follow-up context after sha
   });
 
   assert.ok(actorTurnInput.action_cards.some((card) => card.title === "Say"));
+  assert.equal(actorTurnInput.current_state.shared_storage.status, "contributed");
   assert.ok(
-    actorTurnInput.decision_frame.next_action_guidance.some((entry) =>
-      entry.includes("if choosing Say, write your own schema-valid text")
+    actorTurnInput.decision_frame.current_truths.some((entry) =>
+      entry.includes("shared_storage=contributed")
     )
   );
   assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
@@ -2703,7 +2677,7 @@ test("Actor Turn input keeps table-bound tool crafting visible when table is usa
   assert.ok(actionTitles.includes("Craft Wooden Pickaxe"));
   assert.ok(actionTitles.includes("Craft Planks And Sticks"));
   assert.ok(
-    actorTurnInput.current_state.nearby_block_hints.some((block) => block.name === "crafting_table")
+    actorTurnInput.current_state.nearby_block_observations.some((block) => block.name === "crafting_table")
   );
   assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
 });

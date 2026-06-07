@@ -247,6 +247,21 @@ The field names intentionally echo issue trackers:
 - `metadata` is for bounded implementation or review annotations that do not
   deserve first-class schema yet.
 
+Automatic lifecycle updates are opt-in structured metadata, not title,
+description, or acceptance-prose parsing. If runtime evidence may close or update
+a PlanBead, use metadata signals such as:
+
+```json
+{
+  "lifecycle_close_signals": ["deposit_shared:oak_log", "crafted:crafting_table"],
+  "lifecycle_incomplete_signals": ["inspect_chest"]
+}
+```
+
+Without those signals, matching runtime evidence can still be shown to the Actor
+Turn LLM or branch-time Deliberation as context, but the lifecycle helper must
+not infer a close/update operation from PlanBead prose.
+
 ## Dependency Edges
 
 The PlanBead graph uses explicit dependency records:

@@ -382,8 +382,8 @@ Given:
   relationship event exists in current state;
 - the Active Episode includes that social pressure.
 - for the first shared-storage handoff smoke, Actor Turn current state includes
-  `shared_storage` and at least one `deposit_candidates[]` entry with
-  `socially_requested=true`, `itemName`, `inventoryCount`, and `suggestedCount`.
+  `shared_storage` and inventory counts, while `source_evidence_bundle` carries
+  the original world-event card and observation inventory items.
 
 When:
 
@@ -550,8 +550,9 @@ Initial implementation status, 2026-06-03:
   storage. In live runs it also reuses spawn-access setup and seeds a small
   `oak_log` inventory stack for the active bot.
 - Actor Turn input now projects `shared_storage` details and
-  `deposit_candidates`, and Action Card hints tell the provider how to fill
-  `deposit_shared` `itemName`/`count` from a socially requested candidate.
+  source evidence beside inventory counts. Action Card hints tell the provider to
+  fill `deposit_shared` `itemName`/`count` itself from the visible evidence, not
+  from a precomputed social-request candidate.
 - the remaining live-smoke work is provider-driven selection and real Mineflayer
   deposit execution, not proof that deposit evidence can be evaluated or that
   the request reaches provider input.

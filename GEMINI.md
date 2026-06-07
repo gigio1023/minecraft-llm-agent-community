@@ -18,12 +18,13 @@ user has approved an operating-rule change.
 9. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
 10. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
 11. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-12. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-13. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-14. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-15. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-16. `project-docs/Setup/Provider-Setup.md`
-17. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+12. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+13. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+14. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+15. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+16. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+17. `project-docs/Setup/Provider-Setup.md`
+18. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
@@ -48,6 +49,11 @@ timeouts, verifier/evidence, and artifacts.
 `parameter_candidates`, `top_eligible_action_cards`,
 `recommended_next_action_candidates`, generated chat text, coordinates, recipe
 decisions, or other pre-selected action payloads to it.
+Do not add provider-facing `deposit_candidates`, `open_social_requests`,
+`obligation_summaries`, `nearby_block_hints`, or `known_position_summaries`.
+Use bounded typed facts in `current_state` plus source cards/refs in
+`source_evidence_bundle` so the LLM sees evidence rather than hidden
+preselection.
 
 Do not hide Action Cards or tools through hardcoded Minecraft heuristics such as
 item-family, station-family, construction-readiness, survival-priority, or

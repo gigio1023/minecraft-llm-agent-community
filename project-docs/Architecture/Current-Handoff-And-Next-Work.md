@@ -27,6 +27,24 @@ is reliable.
 
 ## Latest Live Evidence
 
+Recorded 2026-06-07 (`Asia/Seoul`).
+
+Current code baseline after the context-projection cleanup:
+
+- Actor Turn input now pairs bounded `current_state` facts with
+  `source_evidence_bundle` cards/refs.
+- Hidden provider-facing preselection fields for social requests, deposit
+  candidates, obligation summaries, and position summaries have been removed from
+  active code.
+- Action Cards remain visible unless structured readiness, permission, retry, or
+  validation gates prove otherwise.
+- Shared-storage smoke evidence is preserved as current truth and source
+  evidence, but the runtime no longer marks the request satisfied or hides
+  deposit/chest actions through a social-request parser.
+- Use `Context-Projection-And-Source-Evidence.md` for the compression rule:
+  bounded facts may be compacted; observation, action, social, and work-state
+  summaries must travel with source evidence.
+
 Recorded 2026-06-04 (`Asia/Seoul`).
 
 Fresh-world 60-cycle OpenAI `gpt-5.4-mini` Actor Turn run after removing
@@ -334,17 +352,17 @@ latest behavioral proof:
   `npc_a` request.
 - `tmp/social-smoke-openai-nano-3cycle-rerun7.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 5 provider records,
-  31,836 total tokens. The actor deposited `1 oak_log`, later Actor Turn inputs
-  showed `deposit_candidates[oak_log].socially_requested=false`. This is past
-  evidence from before the direct tool-calling/no-hidden-planner cleanup; do not
-  preserve its Action Card hiding behavior as current architecture.
+  31,836 total tokens. The actor deposited `1 oak_log`, and later inputs used an
+  older hidden request-satisfaction projection. This is past evidence from before
+  the direct tool-calling/source-evidence cleanup; do not preserve its Action
+  Card hiding behavior as current architecture.
 - `tmp/social-smoke-openai-nano-3cycle-decision-frame-v2.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 4 provider records,
   29,916 total tokens. The actor performed
   `deposit_shared(1 oak_log) -> craftPlanksAndSticks -> craftCraftingTable`.
-  Cycle 3 input showed `decision_frame.episode_focus_status.status=satisfied`,
-  `open_social_requests=[]`, and no `Inspect Chest` / `Inspect Shared Chest`
-  Action Cards, so the cheap model did not re-verify the completed handoff.
+  Cycle 3 used an older hidden request-satisfaction projection that prevented
+  repeated chest verification. The current architecture preserves the same
+  evidence but does not hide tools through that projection.
 
 Next work:
 

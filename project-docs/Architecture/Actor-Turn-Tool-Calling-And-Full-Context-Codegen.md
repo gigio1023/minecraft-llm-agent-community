@@ -125,7 +125,7 @@ reject the selected call with a typed validation artifact.
 ## Decision Frame Boundary
 
 `decision_frame` is context, not a hidden planner. It may carry compact current
-truths, recent action verdicts, open social requests, completed work,
+truths, recent action verdicts, completed work,
 do-not-repeat notes, open progress fronts, and next-action guidance. It must not
 carry `parameter_candidates`, `top_eligible_action_cards`,
 `recommended_next_action_candidates`, generated `Say` text, placement
@@ -134,10 +134,11 @@ the action while pretending the Actor Turn LLM decided.
 
 The Actor Turn LLM should choose from the visible `action_cards` array and fill
 the selected function tool's strict `parameters` from `current_state`,
-`open_social_requests`, `recent_evidence_trace`, `active_episode`,
+`source_evidence_bundle`, `recent_evidence_trace`, `active_episode`,
 relationships, memory refs, PlanBead hints, and Minecraft Basic Guide. If the
 parameters are missing or invalid, the runtime rejects or repairs the structured
-tool call. It must not synthesize those parameters from `decision_frame` prose.
+tool call. It must not synthesize those parameters from `decision_frame` prose or
+from summary-only social-request projections.
 
 ## Branch Gate Boundary
 

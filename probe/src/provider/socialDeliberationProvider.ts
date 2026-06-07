@@ -394,8 +394,7 @@ function sharedStorageSatisfiedByCurrentState(
 ) {
   return Boolean(
     currentState?.shared_storage.status === "contributed" &&
-      currentState.shared_storage.evidence_refs.length > 0 &&
-      !currentState.deposit_candidates.some((candidate) => candidate.socially_requested)
+      currentState.shared_storage.evidence_refs.length > 0
   );
 }
 

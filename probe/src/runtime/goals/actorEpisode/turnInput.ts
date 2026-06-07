@@ -20,6 +20,7 @@ import {
 } from "./episodeContextProjection.js";
 import { buildMinecraftBasicGuideProjection } from "./minecraftBasicGuide.js";
 import { buildMineflayerCodegenSkillProjection } from "./mineflayerCodegenSkill.js";
+import { buildActorTurnSourceEvidenceBundle } from "./sourceEvidenceBundle.js";
 import type {
   ActiveEpisode,
   ActorTurnInput,
@@ -41,6 +42,7 @@ export function buildActorTurnInput(input: {
     buildActionCardProjection(input.context.action_surface),
     currentState
   );
+  const planBeadHints = planBeadHintsFromContext(input.context);
   const activeEpisode = anchorActiveEpisodeToPlanBeadContext({
     activeEpisode: input.activeEpisode,
     context: input.context
@@ -63,8 +65,15 @@ export function buildActorTurnInput(input: {
     },
     current_observation_refs: [...input.currentObservationRefs],
     current_state: currentState,
+    source_evidence_bundle: buildActorTurnSourceEvidenceBundle({
+      context: input.context,
+      currentState,
+      currentObservationRefs: input.currentObservationRefs,
+      recentEvidenceTrace,
+      planBeadHints
+    }),
     recent_evidence_trace: recentEvidenceTrace,
-    compact_plan_bead_hints: planBeadHintsFromContext(input.context),
+    compact_plan_bead_hints: planBeadHints,
     memory_refs: memoryRefsFromContext(input.context),
     relationship_context: buildRelationshipContextProjection(input.context),
     runtime_retry_constraints: retryConstraintSummaries(input.context),

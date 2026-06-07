@@ -30,6 +30,7 @@ import {
   mineflayerActionSkillHelperNames,
   mineflayerCodegenSkillRef
 } from "./mineflayerCodegenSkill.js";
+import { validateSourceEvidenceBundle } from "./sourceEvidenceBundleValidator.js";
 
 type ValidationFailure = { ok: false; errors: string[] };
 
@@ -251,9 +252,6 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
   assertString(value, "observer_id", path, errors);
   assertRecord(value, "inventory_counts", path, errors);
   assertArray(value, "visible_actors", path, errors);
-  if (value.obligation_summaries !== undefined) {
-    assertStringArray(value, "obligation_summaries", path, errors);
-  }
   if (value.session_lifecycle !== undefined) {
     const lifecycle = isRecord(value.session_lifecycle) ? value.session_lifecycle : null;
     if (!lifecycle) {
@@ -274,30 +272,21 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
       assertStringArray(lifecycle, "notes", `${path}.session_lifecycle`, errors);
     }
   }
-  assertArray(value, "nearby_block_hints", path, errors);
+  for (const [index, block] of assertArray(value, "nearby_block_observations", path, errors).entries()) {
+    if (!isRecord(block)) {
+      errors.push(`${path}.nearby_block_observations[${index}] must be an object`);
+      continue;
+    }
+    assertString(block, "name", `${path}.nearby_block_observations[${index}]`, errors);
+    assertString(block, "source", `${path}.nearby_block_observations[${index}]`, errors);
+    assertStringArray(block, "evidence_refs", `${path}.nearby_block_observations[${index}]`, errors);
+  }
   const sharedStorage = assertRecord(value, "shared_storage", path, errors);
   if (sharedStorage) {
     assertString(sharedStorage, "status", `${path}.shared_storage`, errors);
     assertOptionalString(sharedStorage, "chest_id", `${path}.shared_storage`, errors);
     assertArray(sharedStorage, "items", `${path}.shared_storage`, errors);
     assertStringArray(sharedStorage, "evidence_refs", `${path}.shared_storage`, errors);
-  }
-  for (const [index, candidate] of assertArray(value, "deposit_candidates", path, errors).entries()) {
-    const candidateRecord = isRecord(candidate) ? candidate : null;
-    if (!candidateRecord) {
-      errors.push(`${path}.deposit_candidates[${index}] must be an object`);
-      continue;
-    }
-    assertString(candidateRecord, "itemName", `${path}.deposit_candidates[${index}]`, errors);
-    assertNonNegativeInteger(candidateRecord, "inventoryCount", `${path}.deposit_candidates[${index}]`, errors);
-    assertNonNegativeInteger(candidateRecord, "suggestedCount", `${path}.deposit_candidates[${index}]`, errors);
-    assertNonNegativeInteger(candidateRecord, "maxDepositableCount", `${path}.deposit_candidates[${index}]`, errors);
-    if (typeof candidateRecord.socially_requested !== "boolean") {
-      errors.push(`${path}.deposit_candidates[${index}].socially_requested must be boolean`);
-    }
-    assertStringArray(candidateRecord, "requested_by_actor_ids", `${path}.deposit_candidates[${index}]`, errors);
-    assertStringArray(candidateRecord, "request_summaries", `${path}.deposit_candidates[${index}]`, errors);
-    assertStringArray(candidateRecord, "evidence_refs", `${path}.deposit_candidates[${index}]`, errors);
   }
   if (value.structure_progress !== undefined) {
     const structureProgress = isRecord(value.structure_progress) ? value.structure_progress : null;
@@ -317,7 +306,7 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
   if (settlement) {
     assertRecord(settlement, "inventory_counts", `${path}.settlement_progress`, errors);
     assertString(settlement, "shared_storage_status", `${path}.settlement_progress`, errors);
-    assertStringArray(settlement, "known_position_summaries", `${path}.settlement_progress`, errors);
+    assertRecord(settlement, "known_positions", `${path}.settlement_progress`, errors);
     assertArray(settlement, "checklist", `${path}.settlement_progress`, errors);
     assertArray(settlement, "recent_blockers", `${path}.settlement_progress`, errors);
   }
@@ -351,19 +340,6 @@ function validateDecisionFrame(value: unknown, path: string, errors: string[]) {
     assertString(focusStatus, "focus", `${path}.episode_focus_status`, errors);
     assertStringArray(focusStatus, "evidence_refs", `${path}.episode_focus_status`, errors);
     assertString(focusStatus, "next", `${path}.episode_focus_status`, errors);
-  }
-
-  for (const [index, request] of assertArray(value, "open_social_requests", path, errors).entries()) {
-    if (!isRecord(request)) {
-      errors.push(`${path}.open_social_requests[${index}] must be an object`);
-      continue;
-    }
-    assertOptionalString(request, "itemName", `${path}.open_social_requests[${index}]`, errors);
-    if (request.suggestedCount !== undefined) {
-      assertNonNegativeInteger(request, "suggestedCount", `${path}.open_social_requests[${index}]`, errors);
-    }
-    assertString(request, "summary", `${path}.open_social_requests[${index}]`, errors);
-    assertStringArray(request, "evidence_refs", `${path}.open_social_requests[${index}]`, errors);
   }
 
   for (const [index, verdict] of assertArray(value, "recent_action_verdicts", path, errors).entries()) {
@@ -711,6 +687,7 @@ export function validateActorTurnInput(
   }
   assertStringArray(value, "current_observation_refs", "ActorTurnInput", errors);
   validateCurrentStateProjection(value.current_state, "ActorTurnInput.current_state", errors);
+  validateSourceEvidenceBundle(value.source_evidence_bundle, "ActorTurnInput.source_evidence_bundle", errors);
   assertStringArray(value, "memory_refs", "ActorTurnInput", errors);
 
   for (const [index, entry] of assertArray(value, "recent_evidence_trace", "ActorTurnInput", errors).entries()) {
@@ -736,7 +713,7 @@ export function validateActorTurnInput(
   if (relationships) {
     assertStringArray(relationships, "relationship_refs", "ActorTurnInput.relationship_context", errors);
     assertStringArray(relationships, "visible_actor_ids", "ActorTurnInput.relationship_context", errors);
-    assertStringArray(relationships, "obligations", "ActorTurnInput.relationship_context", errors);
+    assertArray(relationships, "relationship_cards", "ActorTurnInput.relationship_context", errors);
   }
   const guide = assertRecord(value, "minecraft_basic_guide", "ActorTurnInput", errors);
   if (guide) {

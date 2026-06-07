@@ -114,6 +114,15 @@ substrate should expose raw Minecraft observations, query limits, positions,
 distances, and evidence refs; the provider chooses relevance under ActorSoul,
 LifeGoal, CycleGoal, action surface, and current evidence.
 
+Context compaction must distinguish bounded facts from evidence-rich state.
+Compact inventory counts, vitals, food candidates, retry constraints, and budget
+hints are acceptable because they are low-dimensional and easy to audit.
+Observation geometry, action/failure history, social pressure, PlanBead work
+state, and generated action trials must carry source evidence cards or refs
+beside any summary. Summary-only context for those surfaces is information loss.
+Use `project-docs/Architecture/Context-Projection-And-Source-Evidence.md` as the
+active rule for Actor Turn provider input.
+
 LLM-facing prose must never become hidden runtime policy. Do not parse
 `current_state_requirements`, `why_this_action`, Action Card descriptions,
 Minecraft Basic Guide text, memory notes, PlanBeads, or provider rationale with

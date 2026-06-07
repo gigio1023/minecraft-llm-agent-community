@@ -336,20 +336,57 @@ type ActorTurnCurrentStateV1 = {
     food_candidates: Array<{ name: string; count: number }>;
   };
   visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
-  nearby_block_hints: Array<{ name: string; distance?: number }>;
+  nearby_block_observations: Array<{
+    name: string;
+    position?: { x: number; y: number; z: number };
+    distance?: number;
+    source: "world_scan_nearest" | "legacy_nearby_block_hint";
+    evidence_refs: string[];
+  }>;
   world_scan?: {
     scan_id: string;
+    scan_ref?: string;
+    center?: { x: number; y: number; z: number };
+    radius?: number;
+    vertical_range?: { min_y: number; max_y: number; center_y: number };
     coverage_scope: string;
     absence_claims_exhaustive: boolean;
     total_verified_blocks: number;
     truncated: boolean;
     retained_block_counts: Array<{ name: string; count: number }>;
+    nearest_blocks: Array<{
+      name: string;
+      position: { x: number; y: number; z: number };
+      distance: number;
+    }>;
+    named_block_examples: Array<{
+      name: string;
+      count: number;
+      nearest: Array<{ position: { x: number; y: number; z: number }; distance: number }>;
+    }>;
     limitations: string[];
+  };
+  shared_storage: {
+    status: string;
+    chest_id?: string;
+    items: Array<{ name: string; count: number }>;
+    evidence_refs: string[];
   };
   settlement_progress: {
     inventory_counts: Record<string, number>;
     shared_storage_status: string;
-    known_position_summaries: string[];
+    known_positions: {
+      actor?: { position: { x: number; y: number; z: number }; evidence_refs: string[] };
+      crafting_table?: {
+        status: string;
+        position?: { x: number; y: number; z: number };
+        distance_from_actor?: number;
+        usable_now?: boolean;
+        evidence_refs: string[];
+      };
+      shared_chest?: { status: string; evidence_refs: string[] };
+      shelter?: { status: string; anchor?: { x: number; y: number; z: number }; evidence_refs: string[] };
+    };
     checklist: Array<{
       id: string;
       status: string;
@@ -365,6 +402,59 @@ This projection is the cheap-model state surface. It prevents the Actor Turn
 provider from reasoning only from old episode wording or opaque evidence refs.
 It is still context, not proof; verifier and runtime artifacts decide what
 changed.
+
+### `actor-turn-source-evidence-bundle/v1`
+
+`current_state` is not the only context surface. Actor Turn also receives a
+bounded source-evidence bundle so compact facts do not erase the raw evidence
+needed for interpretation.
+
+```ts
+type ActorTurnSourceEvidenceBundleV1 = {
+  schema: "actor-turn-source-evidence-bundle/v1";
+  observation: {
+    observation_refs: string[];
+    position?: { x: number; y: number; z: number };
+    inventory_items: Array<{ name: string; count: number }>;
+    visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
+    nearby_blocks: ActorTurnCurrentStateV1["nearby_block_observations"];
+    world_scan?: ActorTurnCurrentStateV1["world_scan"];
+  };
+  world_event_cards: Array<{
+    event_id: string;
+    kind: string;
+    authority: string;
+    summary: string;
+    actor_refs: string[];
+    evidence_refs: string[];
+    created_at: string;
+  }>;
+  memory_cards: Array<{
+    memory_id: string;
+    kind: string;
+    layer: string;
+    confidence: string;
+    summary: string;
+    evidence_refs: string[];
+    reason: string;
+  }>;
+  recent_action_details: Array<{
+    turn_id: string;
+    outcome: EvidenceTraceOutcome;
+    compact_summary: string;
+    selected_action?: { kind: string; id: string; title: string };
+    parameters?: Record<string, unknown>;
+    tool_statuses?: Array<{ tool: string; status: string }>;
+    blocker_reason?: string;
+    evidence_refs: string[];
+  }>;
+  plan_bead_cards: PlanBeadHintV1[];
+};
+```
+
+Use `Context-Projection-And-Source-Evidence.md` for the compression rule:
+bounded facts may be compacted, but observation, action, social, and work-state
+summaries must travel with source evidence cards or refs.
 
 ### `actor-turn-output/v1`
 

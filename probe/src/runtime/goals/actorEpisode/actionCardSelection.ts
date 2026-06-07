@@ -39,23 +39,12 @@ export function annotateActionCardsWithCurrentStateHints(
     if (card.title === "Deposit Shared" ||
       card.title === "Deposit Shared Items" ||
       card.title === "Handoff Item At Chest") {
-      const candidates = currentState.deposit_candidates.slice(0, 6);
       return {
         ...card,
         parameter_hints: unique([
           ...card.parameter_hints,
-          ...(candidates.length > 0
-            ? [
-                `Current deposit candidates: ${candidates
-                  .map((candidate) =>
-                    `${candidate.itemName} inventory=${candidate.inventoryCount} suggestedCount=${candidate.suggestedCount}${
-                      candidate.socially_requested ? " socially_requested" : ""
-                    }`
-                  )
-                  .join("; ")}.`
-              ]
-            : ["No deposit candidates are currently projected from inventory/social context."]),
-          "If choosing this Action Card, provide explicit itemName and count in parameters; runtime will not infer them from prose."
+          "Use current_state.inventory_counts plus source_evidence_bundle.world_event_cards or relationship cards to decide itemName/count yourself.",
+          "If choosing this Action Card, provide explicit itemName and count in parameters; runtime will not infer them from world-event prose."
         ])
       };
     }

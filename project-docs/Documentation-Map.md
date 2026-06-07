@@ -115,6 +115,7 @@ Architecture:
 - `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
 - `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
 - `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+- `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
 - `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
 - `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 - `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
