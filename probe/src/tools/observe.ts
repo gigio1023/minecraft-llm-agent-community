@@ -67,6 +67,33 @@ export type ObserveResult = {
     items: Array<{ name: string; count: number }>;
   };
   worldStateSummary?: WorldStateSummary;
+  session_lifecycle?: {
+    schema: "runtime-session-lifecycle/v1";
+    actor_id: string;
+    status: "active" | "dead_or_respawning" | "respawned_after_death" | "disconnected_or_error";
+    death_count: number;
+    spawn_count: number;
+    last_event?: {
+      kind: "death" | "spawn" | "end" | "kicked" | "error";
+      observed_at: string;
+      position?: { x: number; y: number; z: number };
+      health?: number;
+      food?: number;
+      reason?: string;
+    };
+    recent_events: Array<{
+      kind: "death" | "spawn" | "end" | "kicked" | "error";
+      observed_at: string;
+      position?: { x: number; y: number; z: number };
+      health?: number;
+      food?: number;
+      reason?: string;
+    }>;
+    inventory_may_have_reset: boolean;
+    branch_recommended: boolean;
+    branch_reason?: "danger_or_survival_pressure" | "environment_blocked";
+    notes: string[];
+  };
 };
 
 type ObserveArgs = {

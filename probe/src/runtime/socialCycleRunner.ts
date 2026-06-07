@@ -107,6 +107,17 @@ import {
   type ActorTurnResolvedAction,
   type EvidenceTraceEntry
 } from "./goals/actorEpisode/index.js";
+import {
+  createUnavailableVisualEvidence,
+  startVisualEvidenceRecorder,
+  type VisualEvidenceOptions,
+  type VisualEvidenceRecorder
+} from "./visualEvidence.js";
+import {
+  attachRuntimeSessionLifecycleTracker,
+  withRuntimeSessionLifecycle,
+  type RuntimeSessionLifecycleTracker
+} from "./sessionLifecycle.js";
 
 type ServerEndpoint = {
   host: string;
@@ -423,13 +434,23 @@ function evidenceTraceFromActionAttempts(input: {
   });
 }
 
+const diagnosticBranchOnlyTools = new Set(["observe", "inspect_chest", "remember", "wait"]);
+
+function hasBranchableRuntimeTool(attempt: SocialCycleActionAttemptReport) {
+  return attempt.executed_tools.some((tool) => !diagnosticBranchOnlyTools.has(tool));
+}
+
 function branchReasonFromActionAttempts(
   attempts: readonly SocialCycleActionAttemptReport[]
 ): DeliberationBranchReason | null {
   if (attempts.some((attempt) => attempt.retry_constraint_blocked)) {
     return "repeated_exact_blocker";
   }
-  if (attempts.some((attempt) => attempt.branch_recommended)) {
+  // Diagnostic/control turns feed the next Actor Turn; by themselves they are
+  // not a meaningful branch point. This keeps Deliberation off the ordinary hot
+  // path while still branching for failed movement, crafting, placement,
+  // generated-code, inventory, equipment, and social actions.
+  if (attempts.some((attempt) => attempt.branch_recommended && hasBranchableRuntimeTool(attempt))) {
     return "episode_blocked";
   }
   if (attempts.some((attempt) => attempt.verifier_status === "failed" || attempt.runtime_status === "failed")) {
@@ -456,8 +477,11 @@ function branchReasonFromContextSignals(input: {
   activeEpisode: ActiveEpisode;
   context: SocialCycleContextPacket;
 }): DeliberationBranchReason | null {
-  const currentVisibleActors = buildActorTurnCurrentStateProjection(input.context).visible_actors
-    .map((actor) => actor.id);
+  const currentState = buildActorTurnCurrentStateProjection(input.context);
+  if (currentState.session_lifecycle?.branch_recommended) {
+    return "danger_or_survival_pressure";
+  }
+  const currentVisibleActors = currentState.visible_actors.map((actor) => actor.id);
   const knownActors = new Set(input.activeEpisode.actors_visible_or_relevant);
   if (currentVisibleActors.some((actorId) => !knownActors.has(actorId))) {
     return "new_social_pressure";
@@ -549,6 +573,8 @@ export type SocialCycleRunOptions = {
   actionHotPath?: "legacy" | "actor_turn";
   /** Deterministic-social debug hook for exercising Actor Turn branches without a live provider. */
   deterministicActorTurnPrimitives?: string[];
+  /** Optional bot-view screenshots for human review; visual evidence never grants progress authority. */
+  visualEvidence?: VisualEvidenceOptions;
 };
 
 export type SocialCycleRunResult = {
@@ -880,6 +906,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   let bot: Bot | undefined;
   let stopServer: (() => Promise<void>) | undefined;
   let serverRunRcon: ((args: string[]) => Promise<string>) | undefined;
+  let visualEvidenceRecorder: VisualEvidenceRecorder | undefined;
+  let sessionLifecycleTracker: RuntimeSessionLifecycleTracker | undefined;
   let environmentBlocked = false;
 
   if (input.connectToWorld !== false) {
@@ -897,6 +925,12 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       };
       const bots = await createBots({ ...config, bots: [input.actorId] }, server);
       bot = bots[input.actorId];
+      if (bot) {
+        sessionLifecycleTracker = attachRuntimeSessionLifecycleTracker({
+          actorId: input.actorId,
+          bot
+        });
+      }
       if ((input.prepareSpawnAccess || input.sharedStorageSocialSmoke) && bot && serverRunRcon) {
         const spawnAccessPosition = await prepareSpawnAccessPoint({
           bot,
@@ -927,6 +961,48 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   } else {
     report.agency_status.fixture_dependency = true;
   }
+
+  if (input.visualEvidence?.enabled) {
+    const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
+    if (bot) {
+      try {
+        visualEvidenceRecorder = await startVisualEvidenceRecorder({
+          actorDir,
+          actorId: input.actorId,
+          runId,
+          bot,
+          options: input.visualEvidence
+        });
+        report.visual_evidence = visualEvidenceRecorder.manifest;
+        await visualEvidenceRecorder.capture({ cycleId: "initial", phase: "initial" });
+        report.visual_evidence = visualEvidenceRecorder.manifest;
+      } catch (error) {
+        report.visual_evidence = createUnavailableVisualEvidence({
+          actorId: input.actorId,
+          runId,
+          reason: `Visual evidence startup failed: ${errorMessage(error)}`,
+          intervalCycles: input.visualEvidence.intervalCycles,
+          width: input.visualEvidence.width,
+          height: input.visualEvidence.height
+        });
+      }
+    } else {
+      report.visual_evidence = createUnavailableVisualEvidence({
+        actorId: input.actorId,
+        runId,
+        reason: "Visual evidence requested but the Minecraft bot was not connected",
+        intervalCycles: input.visualEvidence.intervalCycles,
+        width: input.visualEvidence.width,
+        height: input.visualEvidence.height
+      });
+    }
+  }
+
+  const observeCurrentActorWorld = async () =>
+    withRuntimeSessionLifecycle(
+      await observeActorWorld({ actorId: input.actorId, bot }),
+      sessionLifecycleTracker
+    );
 
   let providerFailed = false;
   let anyMeaningfulProgress = false;
@@ -978,7 +1054,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.agency_status.used_previous_judgment = true;
       }
 
-      const observation = await observeActorWorld({ actorId: input.actorId, bot });
+      const observation = await observeCurrentActorWorld();
       let context = await assembleSocialCycleContext({
         actorWorkspaceRootDir: rootDir,
         actorId: input.actorId,
@@ -1303,7 +1379,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
                 worldEvents,
                 previousJudgments,
                 activeActionSkills: executableActiveSkills,
-                observation: await observeActorWorld({ actorId: input.actorId, bot }),
+                observation: await observeCurrentActorWorld(),
                 allowedPrimitiveIds: allowedPrimitives,
                 maxActionsPerCycle: input.maxActionsPerCycle,
                 cycleIndex,
@@ -1676,7 +1752,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       let deliberationTriggerReason: DeliberationBranchReason | undefined;
       const postCycleSettlementState = buildSettlementState({
         actorId: input.actorId,
-        observation: await observeActorWorld({ actorId: input.actorId, bot }),
+        observation: await observeCurrentActorWorld(),
         activeActionSkills: executableActiveSkills,
         previousJudgments: lastJudgment ? [lastJudgment] : [],
         recentToolResults: settlementToolResults,
@@ -1761,12 +1837,34 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       report.postcondition_results = allPostconditionResults;
       report.settlement_state = postCycleSettlementState;
       report.settlement_checklist = report.settlement_state.checklist;
+      if (
+        visualEvidenceRecorder &&
+        (cycleIndex + 1) % visualEvidenceRecorder.manifest.interval_cycles === 0
+      ) {
+        await visualEvidenceRecorder.capture({ cycleId, phase: "cycle_end" });
+        report.visual_evidence = visualEvidenceRecorder.manifest;
+      }
 
       // Long runs flush after each cycle so partial progress stays reviewable on failure.
       await writeJson(input.reportPath, report);
     }
   } finally {
     const cleanupErrors: string[] = [];
+    if (visualEvidenceRecorder) {
+      try {
+        const finalCycleId = report.cycles.at(-1)?.cycle_id ?? "final";
+        await visualEvidenceRecorder.capture({ cycleId: finalCycleId, phase: "final" });
+        report.visual_evidence = visualEvidenceRecorder.manifest;
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error.message : String(error));
+      }
+      try {
+        await visualEvidenceRecorder.close();
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    sessionLifecycleTracker?.close();
     if (bot) {
       try {
         await closeBots({ [input.actorId]: bot });

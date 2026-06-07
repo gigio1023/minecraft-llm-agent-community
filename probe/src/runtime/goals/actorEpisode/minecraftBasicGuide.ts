@@ -3,7 +3,7 @@ import type { MinecraftBasicGuideProjection } from "./types.js";
 export function buildMinecraftBasicGuideProjection(): MinecraftBasicGuideProjection {
   return {
     schema: "minecraft-basic-guide/v1",
-    guide_ref: "docs/blog-doc/Architecture/Minecraft-Basic-Guide.md",
+    guide_ref: "project-docs/Architecture/Minecraft-Basic-Guide.md",
     item_flows: [
       "log -> matching planks -> sticks",
       "four planks -> crafting_table item",

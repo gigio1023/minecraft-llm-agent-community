@@ -371,12 +371,12 @@ If documents disagree, start from:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-4. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-5. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-6. `docs/blog-doc/Documentation-Map.md`
-7. `docs/blog-doc/Terminology.md`
+3. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+4. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+5. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+6. `project-docs/Documentation-Map.md`
+7. `project-docs/Terminology.md`
 
-Historical docs and `docs/research-archive/**` are references only. They are not
+Historical docs and `project-docs/research-archive/**` are references only. They are not
 active implementation specs unless a current architecture document explicitly
 routes to them.

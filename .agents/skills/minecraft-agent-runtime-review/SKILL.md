@@ -7,8 +7,10 @@ description: >
   implementation flaws and next fixes. Use for prompts like "agent 행동
   리뷰해줘", "실행 결과에서 인사이트 뽑아줘", "NPC 행동 패턴 분석",
   "100 cycle 결과 봐줘", "관찰-행동-목표 루프 분석", "why did the NPC stall?",
-  "matrix 12/12 깨졌어", "collectLogs 3/4에서 멈춰", or "Langfuse trace까지 보고
-  구현 개선해줘" after Minecraft runtime, action-skill, or social-cycle runs.
+  "matrix 12/12 깨졌어", "collectLogs 3/4에서 멈춰", "스크린샷이 이상해",
+  "visual evidence 봐줘", or "Langfuse trace까지 보고 구현 개선해줘" after
+  Minecraft runtime, action-skill, Actor Turn, generated Mineflayer, or
+  social-cycle runs.
 ---
 
 # Minecraft Agent Runtime Review
@@ -36,20 +38,26 @@ the repo term **action skill**.
 5. Build an evidence table: actor, task, observation before/after, tool call,
    tool result, verification, timeout/stall/reconnect evidence, final label, and
    behavior mismatch.
-6. Decide the behavior verdict:
+6. When the run uses current Actor Turn, generated Mineflayer actions, or visual
+   evidence, read `references/actor-turn-visual-review.md` before deciding the
+   verdict. It covers current `action_ref` artifacts, `author_mineflayer_action`
+   failure modes, screenshot renderer artifacts, and product-objective gaps.
+7. Decide the behavior verdict:
    - `VALID_PROGRESS`: world or inventory state proves progress.
    - `DIAGNOSABLE_FAILURE`: no success, but artifacts explain the next fix.
    - `MISLEADING_SUCCESS`: final status says success while evidence says stall.
    - `LIVE_BEHAVIOR_FAILURE`: human-visible behavior proves the primitive is not
      doing the task, even if artifacts are incomplete.
+   - `PASSED_RUNTIME_BUT_PRODUCT_WEAK`: the process completed and low-level
+     mutations exist, but the human-facing objective was not plausibly achieved.
    - `PASSED_RUNTIME_BUT_BEHAVIOR_LOOP_WEAK`: the run completed and made
      verified low-level progress, but observation/action choices collapsed into
      narrow loops or failed to update durable settlement/social state.
    - `UNDIAGNOSABLE`: artifacts are missing the facts needed to improve code.
-7. Map each finding to a small implementation target: verifier, tool primitive,
+8. Map each finding to a small implementation target: verifier, tool primitive,
    action runner, session/reconnect, transcript/artifact, provider proposal, or
    setup/auth.
-8. Report findings first, then propose or apply narrow fixes if the user asked
+9. Report findings first, then propose or apply narrow fixes if the user asked
    for implementation.
 
 ## Evidence Sources
@@ -80,6 +88,11 @@ judgments, retry constraints, settlement state, or memory reuse.
 Read `references/social-cycle-analysis-rubric.md` before claiming that the
 observation -> action -> long-term goal loop is strong or weak. It defines the
 loop-diagnostic metrics and interpretation traps.
+
+Read `references/actor-turn-visual-review.md` when reviewing current Actor Turn
+runs, generated Mineflayer action authoring, tool-call contract rejections,
+PlanBeads boundaries, screenshots, prismarine-viewer captures, or user comments
+about weird visible blocks/camera output.
 
 ## Review Workflow
 
@@ -129,11 +142,15 @@ For `social-cycle-run-report/v1`, also answer:
   produce verified progress?
 - How much of the exposed action surface was used as top-level Actor Turn
   selection or legacy action and as executed tools?
+- For current Actor Turn reports, did the reviewer resolve `action_ref` /
+  `action_attempts[].action_ref` instead of relying on legacy `action_intent_ref`?
 - Did action choices concentrate into a narrow gather/craft/place loop?
 - Did verified primitive evidence update settlement checklist/state?
 - Were there social signals: visible actors, `say`, shared storage, relationship
   events, or obligations?
 - Did retry constraints stop repeated exact target/args failures?
+- If screenshots exist, do suspicious pixels match runtime `observe` /
+  `worldStateSummary` block names, or are they renderer/camera artifacts?
 
 Do not count these as success by themselves:
 - `remember` notes;
@@ -153,6 +170,16 @@ Prefer concrete classifications:
 - `runtime-label-bug`: final status misrepresents a stall or failed task.
 - `setup-path-bug`: server, RCON, auth, spawn, or port setup blocked the run.
 - `artifact-gap`: transcript cannot explain what changed or why.
+- `visual-evidence-gap`: screenshots exist but are obstructed, renderer-skewed,
+  or not cross-checked against world-state artifacts.
+- `product-objective-gap`: runtime status passed and some mutations happened,
+  but the human-facing objective was not achieved in a plausible form.
+- `tool-contract-conversion-gap`: Actor Turn selected a useful logical path, but
+  tool-call parsing, candidate schema, repair, verifier, or runtime contract
+  prevented it from becoming executable behavior.
+- `camera-obstruction-gap`: the bot-view screenshot is dominated by leaves,
+  blocks, water, UI artifacts, or self-occlusion, so it cannot answer the user's
+  visual question without a second camera or block evidence.
 - `skill-ownership-gap`: per-agent action skill metadata exists but is not used
   to shape proposals or responsibilities.
 - `skill-creation-gap`: a proposed learned/derived action skill lacks evidence,
@@ -248,3 +275,10 @@ If there are no blocking issues, say so and list remaining evidence gaps.
 - Be skeptical of narrow deterministic harness success. The project wants raw
   observation plus broad Mineflayer-backed agency, not a bot that merely learns
   the smallest scripted path through a test.
+- Do not trust a screenshot alone when reviewing Minecraft block identity.
+  `prismarine-viewer` can render unsupported or version-skewed blocks such as
+  `leaf_litter` as strange colored boxes. Cross-check with `observe` block names
+  and report the renderer uncertainty explicitly.
+- Current Actor Turn reports do not use legacy `ActionIntent` as the source of
+  truth. If a summary says every action is `missing`, fix or bypass the summary
+  and read `goals/cycle/actions/*.json` directly.

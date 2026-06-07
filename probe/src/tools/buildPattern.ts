@@ -36,6 +36,13 @@ export type BuildPatternResult = {
   status: "built" | "progressing" | "blocked";
   patternId: BuildPatternId;
   anchor: Positioned;
+  anchorResolution?: {
+    requestedAnchor: Positioned;
+    selectedAnchor: Positioned;
+    adjusted: boolean;
+    selectedReason: string;
+    rejectedCandidates: Array<{ anchor: Positioned; issues: string[] }>;
+  };
   materialPolicy: "best_available";
   materialUsed?: string;
   plannedPlacements: number;
@@ -130,6 +137,14 @@ function isClearBlock(block: MineflayerBlockLike | null | undefined) {
   return !block || NON_SOLID_BLOCKS.has(block.name);
 }
 
+function isLiquidBlock(block: MineflayerBlockLike | null | undefined) {
+  return block?.name === "water" || block?.name === "lava";
+}
+
+function isDryClearBlock(block: MineflayerBlockLike | null | undefined) {
+  return isClearBlock(block) && !isLiquidBlock(block);
+}
+
 function inventoryCount(bot: BuildPatternBot, itemName: string) {
   return bot.inventory?.items()
     .filter((item) => item.name === itemName)
@@ -181,8 +196,8 @@ function shelterBounds(anchor: Positioned) {
 }
 
 function isStandableWorkCell(bot: BuildPatternBot, position: Positioned) {
-  return isClearBlock(bot.blockAt?.(toVec3(position))) &&
-    isClearBlock(bot.blockAt?.(toVec3({ ...position, y: position.y + 1 }))) &&
+  return isDryClearBlock(bot.blockAt?.(toVec3(position))) &&
+    isDryClearBlock(bot.blockAt?.(toVec3({ ...position, y: position.y + 1 }))) &&
     isSolidBlock(bot.blockAt?.(toVec3({ ...position, y: position.y - 1 })));
 }
 
@@ -235,6 +250,115 @@ function buildApproachCandidates({
 function shouldTryAnotherApproach(result: PlaceBlockResult) {
   return result.status === "blocked" &&
     !/no adjacent support|requires .* in inventory|non-replaceable|requires Mineflayer/i.test(result.reason);
+}
+
+function surfaceYForColumn(bot: BuildPatternBot, x: number, z: number, aroundY: number) {
+  const startY = Math.floor(aroundY) + 8;
+  const minY = Math.floor(aroundY) - 18;
+  for (let y = startY; y >= minY; y -= 1) {
+    const support = bot.blockAt?.(toVec3({ x, y: y - 1, z }));
+    const feet = bot.blockAt?.(toVec3({ x, y, z }));
+    const head = bot.blockAt?.(toVec3({ x, y: y + 1, z }));
+    if (isSolidBlock(support) && isDryClearBlock(feet) && isDryClearBlock(head)) {
+      return y;
+    }
+  }
+  return undefined;
+}
+
+function anchorSafetyIssues(bot: BuildPatternBot, anchor: Positioned) {
+  const blueprint = starterShelterShellPositions(anchor);
+  const issues: string[] = [];
+  const checkedCells = uniquePositions([
+    ...blueprint.shellPositions,
+    ...blueprint.interiorPositions,
+    ...blueprint.floorSupportPositions
+  ]);
+  const liquidCells = checkedCells.filter((position) => isLiquidBlock(bot.blockAt?.(toVec3(position))));
+  if (liquidCells.length > 0) {
+    issues.push(`liquid_cells=${liquidCells.length}`);
+  }
+  if (
+    !blueprint.floorSupportPositions.every((position) =>
+      isSolidBlock(bot.blockAt?.(toVec3(position)))
+    )
+  ) {
+    issues.push("floor_support_missing");
+  }
+  if (
+    !blueprint.interiorPositions.every((position) =>
+      isDryClearBlock(bot.blockAt?.(toVec3(position)))
+    )
+  ) {
+    issues.push("interior_not_dry_clear");
+  }
+  const hasWorkCell = blueprint.shellPositions.some((position) =>
+    buildApproachCandidates({ bot, anchor, targetPosition: position }).length > 0
+  );
+  if (!hasWorkCell) {
+    issues.push("no_dry_standable_work_cell");
+  }
+  return issues;
+}
+
+function anchorCandidateOffsets() {
+  const offsets: Array<{ dx: number; dz: number }> = [{ dx: 0, dz: 0 }];
+  for (let radius = 1; radius <= 8; radius += 1) {
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      offsets.push({ dx, dz: -radius }, { dx, dz: radius });
+    }
+    for (let dz = -radius + 1; dz <= radius - 1; dz += 1) {
+      offsets.push({ dx: -radius, dz }, { dx: radius, dz });
+    }
+  }
+  return offsets;
+}
+
+function resolveShelterAnchor(input: {
+  bot: BuildPatternBot;
+  requestedAnchor: Positioned;
+}) {
+  const requestedAnchor = normalizePosition(input.requestedAnchor);
+  const origin = normalizePosition(input.bot.entity.position);
+  const candidates: Positioned[] = [];
+  const addCandidate = (base: Positioned, dx = 0, dz = 0) => {
+    const x = base.x + dx;
+    const z = base.z + dz;
+    const surfaceY = surfaceYForColumn(input.bot, x, z, base.y);
+    candidates.push(surfaceY === undefined ? { x, y: base.y, z } : { x, y: surfaceY, z });
+  };
+
+  for (const offset of anchorCandidateOffsets()) {
+    addCandidate(requestedAnchor, offset.dx, offset.dz);
+    addCandidate({ x: origin.x + 2, y: origin.y, z: origin.z + 2 }, offset.dx, offset.dz);
+  }
+
+  const rejectedCandidates: Array<{ anchor: Positioned; issues: string[] }> = [];
+  for (const candidate of uniquePositions(candidates)) {
+    const issues = anchorSafetyIssues(input.bot, candidate);
+    if (issues.length === 0) {
+      return {
+        requestedAnchor,
+        selectedAnchor: candidate,
+        adjusted: key(candidate) !== key(requestedAnchor),
+        selectedReason: key(candidate) === key(requestedAnchor)
+          ? "requested anchor is dry, supported, and locally workable"
+          : "selected nearest dry supported local anchor",
+        rejectedCandidates: rejectedCandidates.slice(0, 8)
+      };
+    }
+    if (rejectedCandidates.length < 12) {
+      rejectedCandidates.push({ anchor: candidate, issues });
+    }
+  }
+
+  return {
+    requestedAnchor,
+    selectedAnchor: requestedAnchor,
+    adjusted: false,
+    selectedReason: "no dry supported local anchor found",
+    rejectedCandidates: rejectedCandidates.slice(0, 8)
+  };
 }
 
 export function starterShelterShellPositions(anchor: Positioned) {
@@ -393,13 +517,38 @@ export async function buildPattern({
   maxDurationMs?: number;
   signal?: AbortSignal;
 }): Promise<BuildPatternResult> {
-  const normalizedAnchor = normalizePosition(anchor);
+  const anchorResolution = resolveShelterAnchor({
+    bot,
+    requestedAnchor: anchor
+  });
+  const normalizedAnchor = anchorResolution.selectedAnchor;
   const blueprint = starterShelterShellPositions(normalizedAnchor);
   const placementLedger: PlaceBlockResult[] = [];
   let materialUsed: string | undefined;
   const plannedTargets = blueprint.shellPositions.slice(0, Math.max(0, maxPlacements));
   const deadline = Date.now() + Math.max(1_000, maxDurationMs);
   let stoppedByBudget = false;
+
+  if (anchorResolution.selectedReason === "no dry supported local anchor found") {
+    const verification = verifyShelterStructure({
+      bot,
+      anchor: normalizedAnchor,
+      patternId,
+      placementLedger,
+      minNewShellBlocks
+    });
+    return {
+      status: "blocked",
+      patternId,
+      anchor: normalizedAnchor,
+      anchorResolution,
+      materialPolicy: "best_available",
+      plannedPlacements: blueprint.shellPositions.length,
+      placementLedger,
+      verification,
+      reason: "build_pattern found no dry supported nearby anchor for this pattern."
+    };
+  }
 
   const budgetRemaining = () => deadline - Date.now();
 
@@ -491,6 +640,7 @@ export async function buildPattern({
       status: "built",
       patternId,
       anchor: normalizedAnchor,
+      anchorResolution,
       materialPolicy: "best_available",
       materialUsed,
       plannedPlacements: blueprint.shellPositions.length,
@@ -505,6 +655,7 @@ export async function buildPattern({
       status: "progressing",
       patternId,
       anchor: normalizedAnchor,
+      anchorResolution,
       materialPolicy: "best_available",
       materialUsed,
       plannedPlacements: blueprint.shellPositions.length,
@@ -520,6 +671,7 @@ export async function buildPattern({
     status: "blocked",
     patternId,
     anchor: normalizedAnchor,
+    anchorResolution,
     materialPolicy: "best_available",
     materialUsed,
     plannedPlacements: blueprint.shellPositions.length,

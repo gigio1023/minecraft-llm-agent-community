@@ -73,13 +73,11 @@ to invent new capabilities.
 
 ## What To Read Now
 
-Start with the [architecture spec](/docs/Architecture/SPEC), then read:
+Start with the public [architecture overview](/docs/architecture), then read:
 
-- [Runtime Loop And Verification](/docs/Architecture/Runtime-Loop-And-Verification)
-- [Actor Workspace And Action Skill Memory](/docs/Architecture/Actor-Workspace-And-Action-Skill-Memory)
-- [Async Reviewer Sidecars](/docs/Architecture/Async-Reviewer-Sidecars)
-- [Social Actor Profiles And Relationships](/docs/Architecture/Social-Actor-Profiles-And-Relationships)
-- [Headless Server Setup](/docs/Setup/Headless-Server)
+- [Evidence And Artifacts](/docs/evidence-and-artifacts)
+- [Getting Started](/docs/getting-started)
+- [Roadmap](/docs/roadmap)
 
 The short-term proof remains deliberately boring: a bot should complete concrete
 gameplay tasks and leave artifacts that make failures easy to inspect. That is

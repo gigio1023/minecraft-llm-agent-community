@@ -10,20 +10,20 @@ user has approved an operating-rule change.
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `docs/blog-doc/Documentation-Map.md`
-5. `docs/blog-doc/Agent-Search-Index.md`
-6. `docs/blog-doc/Terminology.md`
-7. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-8. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-9. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-10. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-11. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-12. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-13. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-14. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-15. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
-16. `docs/blog-doc/Setup/Provider-Setup.md`
-17. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
+4. `project-docs/Documentation-Map.md`
+5. `project-docs/Agent-Search-Index.md`
+6. `project-docs/Terminology.md`
+7. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+8. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+9. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+10. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+11. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+12. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+13. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+14. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+15. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+16. `project-docs/Setup/Provider-Setup.md`
+17. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
@@ -100,9 +100,17 @@ Follow `KARPATHY_GUIDELINES` from `AGENTS.md`:
 
 ## Documentation Boundary
 
-Docusaurus-exposed docs live under `docs/blog-doc/`. Repo-internal review and
-agent-operation docs live at the project root. Historical research, old public
-plans, and raw paper dumps live under `docs/research-archive/`.
+Internal project docs live under `project-docs/`: specs, architecture notes,
+setup notes, provider/API access notes, handoffs, implementation campaigns,
+terminology, and routing indexes.
+
+Docusaurus-exposed public docs live under `docs/public-docs/`. They should
+explain the project externally, not carry private provider access, operator
+budget state, dated handoffs, implementation plans, or agent operating rules.
+
+Repo-root review and agent-operation docs live at the project root. Historical
+research, old public plans, and raw paper dumps live under
+`project-docs/research-archive/`.
 
 Do not add new public docs under `docs/docs/`. Do not treat archived research as
 an active build instruction unless an active spec or handoff promotes it.

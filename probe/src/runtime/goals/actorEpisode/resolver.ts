@@ -153,6 +153,7 @@ export function resolveActorTurnExecutionDraftToAction(
           action_card_id: output.action_card_id,
           primitive_id: mapping.primitive_id,
           parameters: output.parameters,
+          expected_outcome: output.expected_outcome,
           why_this_action: output.why_this_action,
           expected_evidence: [...output.expected_evidence],
           fallback_if_blocked: output.fallback_if_blocked
@@ -166,6 +167,7 @@ export function resolveActorTurnExecutionDraftToAction(
           action_card_id: output.action_card_id,
           action_skill_id: mapping.action_skill_id,
           parameters: output.parameters,
+          expected_outcome: output.expected_outcome,
           why_this_action: output.why_this_action,
           expected_evidence: [...output.expected_evidence],
           fallback_if_blocked: output.fallback_if_blocked
@@ -190,6 +192,7 @@ export function resolveActorTurnExecutionDraftToAction(
     kind: "author_mineflayer_action",
     parameters: output.parameters,
     candidate: generatedCandidateFromOutput(output),
+    expected_outcome: output.expected_outcome,
     why_this_action: output.why_this_action,
     expected_evidence: [...output.expected_evidence],
     fallback_if_blocked: output.fallback_if_blocked

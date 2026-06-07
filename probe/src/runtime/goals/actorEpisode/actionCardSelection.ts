@@ -75,7 +75,8 @@ export function annotateActionCardsWithCurrentStateHints(
         ...card,
         parameter_hints: unique([
           ...card.parameter_hints,
-          "Provide an explicit targetPosition/anchor in structured parameters; runtime will not synthesize placement coordinates."
+          "Provide an explicit targetPosition/anchor in structured parameters; runtime will not synthesize placement coordinates.",
+          "Placement and pattern verifiers are local physical-evidence checks, not universal goal-completion rules; compare current_state.structure_progress with active_episode/world event wording before continuing, adapting, or pivoting."
         ])
       };
     }

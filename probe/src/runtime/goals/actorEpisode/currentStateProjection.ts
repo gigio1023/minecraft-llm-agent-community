@@ -102,6 +102,55 @@ function vitalsFromObservation(observation: unknown): ActorTurnCurrentStateProje
   };
 }
 
+function sessionLifecycleFromObservation(
+  observation: unknown
+): ActorTurnCurrentStateProjection["session_lifecycle"] | undefined {
+  const lifecycle = asRecord(asRecord(observation)?.session_lifecycle);
+  if (!lifecycle || lifecycle.schema !== "runtime-session-lifecycle/v1") {
+    return undefined;
+  }
+  const status = readString(lifecycle.status);
+  if (
+    status !== "active" &&
+    status !== "dead_or_respawning" &&
+    status !== "respawned_after_death" &&
+    status !== "disconnected_or_error"
+  ) {
+    return undefined;
+  }
+  const lastEvent = asRecord(lifecycle.last_event);
+  return {
+    schema: "runtime-session-lifecycle/v1",
+    status,
+    death_count: readNumber(lifecycle.death_count) ?? 0,
+    spawn_count: readNumber(lifecycle.spawn_count) ?? 0,
+    ...(lastEvent && readString(lastEvent.kind) && readString(lastEvent.observed_at)
+      ? {
+          last_event: {
+            kind: readString(lastEvent.kind) as "death" | "spawn" | "end" | "kicked" | "error",
+            observed_at: readString(lastEvent.observed_at) as string,
+            ...(positionFromRecord(lastEvent.position) ? { position: positionFromRecord(lastEvent.position) } : {}),
+            ...(readNumber(lastEvent.health) !== undefined ? { health: readNumber(lastEvent.health) } : {}),
+            ...(readNumber(lastEvent.food) !== undefined ? { food: readNumber(lastEvent.food) } : {}),
+            ...(readString(lastEvent.reason) ? { reason: readString(lastEvent.reason) } : {})
+          }
+        }
+      : {}),
+    inventory_may_have_reset: readBoolean(lifecycle.inventory_may_have_reset) ?? false,
+    branch_recommended: readBoolean(lifecycle.branch_recommended) ?? false,
+    ...(readString(lifecycle.branch_reason)
+      ? {
+          branch_reason: readString(lifecycle.branch_reason) as
+            | "danger_or_survival_pressure"
+            | "environment_blocked"
+        }
+      : {}),
+    notes: Array.isArray(lifecycle.notes)
+      ? lifecycle.notes.filter((entry): entry is string => typeof entry === "string").slice(0, 4)
+      : []
+  };
+}
+
 function worldScanFromObservation(observation: unknown): ActorTurnCurrentStateProjection["world_scan"] | undefined {
   const summary = asRecord(asRecord(observation)?.worldStateSummary);
   if (!summary) {
@@ -182,6 +231,7 @@ function knownPositionSummaries(
   actorPosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>
 ) {
   const positions = context.settlement_state.known_positions;
+  const structureProgress = context.settlement_state.structure_progress;
   const craftingTablePosition = positions.crafting_table?.position
     ? positionFromRecord(positions.crafting_table.position)
     : undefined;
@@ -193,7 +243,10 @@ function knownPositionSummaries(
         }${tableUsabilitySuffix({ actorPosition, tablePosition: craftingTablePosition })}`
       : undefined,
     positions.shared_chest ? `shared_chest=${positions.shared_chest.status}` : undefined,
-    positions.shelter ? `shelter=${positions.shelter.status}` : undefined
+    positions.shelter ? `shelter=${positions.shelter.status}` : undefined,
+    structureProgress.status !== "none"
+      ? `structure_progress=${structureProgress.status} placed_blocks=${structureProgress.total_placed_blocks}`
+      : undefined
   ].filter((entry): entry is string => Boolean(entry));
 }
 
@@ -204,6 +257,26 @@ function sharedStorageProjection(context: SocialCycleContextPacket): ActorTurnCu
     ...(storage.chest_id ? { chest_id: storage.chest_id } : {}),
     items: storage.items.slice(0, 16).map((item) => ({ ...item })),
     evidence_refs: [...storage.evidence_refs]
+  };
+}
+
+function structureProgressProjection(
+  context: SocialCycleContextPacket
+): ActorTurnCurrentStateProjection["structure_progress"] | undefined {
+  const progress = context.settlement_state.structure_progress;
+  if (progress.status === "none") {
+    return undefined;
+  }
+  return {
+    status: progress.status,
+    total_placed_blocks: progress.total_placed_blocks,
+    ...(progress.latest_pattern_id ? { latest_pattern_id: progress.latest_pattern_id } : {}),
+    ...(progress.latest_anchor ? { latest_anchor: { ...progress.latest_anchor } } : {}),
+    ...(progress.latest_material ? { latest_material: progress.latest_material } : {}),
+    ...(progress.latest_verifier ? { latest_verifier: { ...progress.latest_verifier } } : {}),
+    evidence_refs: [...progress.evidence_refs],
+    summaries: [...progress.summaries],
+    interpretation_notes: [...progress.interpretation_notes]
   };
 }
 
@@ -339,18 +412,22 @@ export function buildActorTurnCurrentStateProjection(
   const observerId = readString(asRecord(observation)?.observerId) ?? context.ActorSoul.actor_id;
   const inventoryCounts = inventoryCountsFromObservation(observation);
   const actorPosition = positionFromRecord(asRecord(observation)?.position);
+  const structureProgress = structureProgressProjection(context);
+  const sessionLifecycle = sessionLifecycleFromObservation(observation);
   return {
     schema: "actor-turn-current-state/v1",
     observer_id: observerId,
     ...(actorPosition ? { position: actorPosition } : {}),
     inventory_counts: inventoryCounts,
     ...(vitalsFromObservation(observation) ? { vitals: vitalsFromObservation(observation) } : {}),
+    ...(sessionLifecycle ? { session_lifecycle: sessionLifecycle } : {}),
     visible_actors: visibleActorsFromObservation(observation),
     obligation_summaries: obligationsFromContext(context),
     nearby_block_hints: nearbyBlockHintsFromObservation(observation),
     shared_storage: sharedStorageProjection(context),
     deposit_candidates: depositCandidatesFromContext(context, inventoryCounts),
     ...(worldScanFromObservation(observation) ? { world_scan: worldScanFromObservation(observation) } : {}),
+    ...(structureProgress ? { structure_progress: structureProgress } : {}),
     settlement_progress: {
       inventory_counts: { ...context.settlement_state.inventory_counts },
       shared_storage_status: context.settlement_state.shared_storage.status,

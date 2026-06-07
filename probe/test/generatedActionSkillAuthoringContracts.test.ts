@@ -158,3 +158,49 @@ test("generated verifier fails when helper result status does not match declarat
   assert.equal(result.status, "failed");
   assert.match(result.reason, /No completed helper say produced result.status=stored/);
 });
+
+test("generated verifier normalizes runtime-evidence alias only when helper progress exists", () => {
+  const result = evaluateGeneratedActionSkillTrialVerifier({
+    candidate: candidate({
+      verifier: { kind: "runtime-evidence" }
+    }),
+    runtimeResult: {
+      status: "completed_with_evidence",
+      helperEvents: [
+        {
+          name: "placeBlock",
+          status: "completed",
+          result: { status: "placed", itemName: "oak_planks" }
+        }
+      ],
+      postObservation: { status: "ok", inventory: [] }
+    }
+  });
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.verifier_kind, "helper_event_progress");
+  assert.match(result.reason, /runtime-evidence/);
+});
+
+test("generated verifier does not let unknown kind pass without helper progress", () => {
+  const result = evaluateGeneratedActionSkillTrialVerifier({
+    candidate: candidate({
+      verifier: { kind: "unknown" }
+    }),
+    runtimeResult: {
+      status: "completed_with_evidence",
+      helperEvents: [
+        {
+          name: "observe",
+          status: "completed",
+          result: { status: "ok" }
+        }
+      ],
+      postObservation: { status: "ok", inventory: [] }
+    }
+  });
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.verifier_kind, "unknown");
+  assert.match(result.reason, /Unsupported generated action skill verifier kind unknown/);
+});

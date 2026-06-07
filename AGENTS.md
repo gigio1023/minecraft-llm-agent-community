@@ -121,7 +121,7 @@ author-and-trial path. It must be schema-bound and helper-limited:
 - a passed trial is not active action skill authority until lifecycle promotion
   succeeds.
 
-Use `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+Use `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
 as the active implementation plan for this rule.
 
 ## Tool Calling And Prose-Parsing Anti-Pattern
@@ -216,37 +216,37 @@ Read these first:
 3. `CLAUDE.md`
 4. `GEMINI.md`
 5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
-7. `docs/blog-doc/Specification/Runtime-Evidence-And-Action-Skills.md`
-8. `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
-9. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
-10. `docs/blog-doc/Documentation-Map.md`
-11. `docs/blog-doc/Agent-Search-Index.md`
-12. `docs/blog-doc/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-13. `docs/blog-doc/Terminology.md`
-14. `docs/blog-doc/Architecture/Runtime-Loop-And-Verification.md`
-15. `docs/blog-doc/Architecture/Transcript-And-Runtime-Artifacts.md`
-16. `docs/blog-doc/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-17. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-18. `docs/blog-doc/Architecture/PlanBeads-Implementation-Campaign.md`
-19. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-20. `docs/blog-doc/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-21. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-22. `docs/blog-doc/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-23. `docs/blog-doc/Architecture/Minecraft-Basic-Guide.md`
-24. `docs/blog-doc/Architecture/Async-Reviewer-Sidecars.md`
-25. `docs/blog-doc/Architecture/Implementation-Workstreams.md`
-26. `docs/blog-doc/Architecture/Action-Skill-Verification.md`
-27. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-28. `docs/blog-doc/Architecture/Minimal-Probe.md`
-29. `docs/blog-doc/Architecture/Social-Actor-Profiles-And-Relationships.md`
-30. `docs/blog-doc/Setup/Headless-Server.md`
-31. `docs/blog-doc/Setup/Provider-Setup.md`
-32. `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md`
+6. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+7. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+8. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+9. `project-docs/Specification/Reference-Adaptation-Guide.md`
+10. `project-docs/Documentation-Map.md`
+11. `project-docs/Agent-Search-Index.md`
+12. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+13. `project-docs/Terminology.md`
+14. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+15. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+16. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+17. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+18. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+21. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+22. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+23. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+24. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
+25. `project-docs/Architecture/Implementation-Workstreams.md`
+26. `project-docs/Architecture/Action-Skill-Verification.md`
+27. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+28. `project-docs/Architecture/Minimal-Probe.md`
+29. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+30. `project-docs/Setup/Headless-Server.md`
+31. `project-docs/Setup/Provider-Setup.md`
+32. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
-`SPEC.md` and `docs/blog-doc/Specification/*` are long-term spec files.
+`SPEC.md` and `project-docs/Specification/*` are long-term spec files.
 `AGENTS.md` is binding repo-agent guidance for interpreting and applying that
 spec. `CLAUDE.md` and `GEMINI.md` mirror these rules for their agent surfaces
 and must point back to `AGENTS.md` as the authority when rules conflict. Editing
@@ -263,7 +263,7 @@ command output, and volatile evidence in handoff or audit docs instead.
   validate, execute, verify, and record. Conversation-like actions are action
   skills when they run through the game runtime.
 - Do not use bare `skill` in active guidance when the meaning could be confused.
-- `docs/blog-doc/Terminology.md` is normative. New docs, code comments, prompts,
+- `project-docs/Terminology.md` is normative. New docs, code comments, prompts,
   report labels, and agent guides must follow it.
 - If existing code or docs conflict with `Terminology.md`, either update them or
   add an explicit legacy-identifier mapping in `Terminology.md`. Do not spread
@@ -392,7 +392,7 @@ observations on common LLM coding mistakes:
 
 ## Search Index
 
-Read `docs/blog-doc/Agent-Search-Index.md` first for routing.
+Read `project-docs/Agent-Search-Index.md` first for routing.
 
 Important search tokens:
 
@@ -652,19 +652,26 @@ Reference anchors:
 
 ## Documentation Rules
 
-- Keep `SPEC.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/blog-doc/intro.md`,
-  `docs/blog-doc/Documentation-Map.md`, `docs/blog-doc/Terminology.md`, and
-  `docs/blog-doc/Agent-Search-Index.md` aligned.
-- Docusaurus-exposed documentation pages live under `docs/blog-doc/`. Despite
-  the directory name, this is the public docs source, not a blog-post folder.
+- Keep `SPEC.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `project-docs/intro.md`,
+  `project-docs/Documentation-Map.md`, `project-docs/Terminology.md`, and
+  `project-docs/Agent-Search-Index.md` aligned.
+- Internal project docs live under `project-docs/`. This includes specs,
+  architecture notes, setup notes, provider/API access notes, handoffs,
+  implementation campaigns, terminology, and routing indexes.
+- Docusaurus-exposed public docs live under `docs/public-docs/`. These pages
+  should explain the project externally: purpose, high-level architecture, basic
+  local run instructions, evidence semantics, and roadmap.
 - Do not add new public docs under `docs/docs/`.
 - Do not put ordinary documentation, specs, architecture notes, setup guides,
   handoffs, reviews, or research notes under `docs/blog/`. `docs/blog/` is only
   for explicitly requested chronological blog posts.
+- Do not put internal setup notes, private provider access instructions,
+  provider-budget state, dated run handoffs, implementation workstreams, or
+  agent operating rules under `docs/public-docs/` or `docs/blog/`.
 - Repo-internal review and operation docs belong in the project root when they
   guide branch review or agents directly. Historical research, stale public
-  plans, and raw paper dumps belong under `docs/research-archive/`.
-- When adding or changing project vocabulary, update `docs/blog-doc/Terminology.md`
+  plans, and raw paper dumps belong under `project-docs/research-archive/`.
+- When adding or changing project vocabulary, update `project-docs/Terminology.md`
   first, then update affected docs/code comments/prompts to match it.
 - If a plan becomes historical rather than active, mark it clearly as archived or
   deprecated instead of leaving it ambiguous.
@@ -675,7 +682,7 @@ Reference anchors:
 
 For **Mineflayer TypeScript codegen** (long-objective / direct-generated planner),
 do **not** use Gemini Native Audio Dialog as a planner path. Recorded verdict:
-`docs/blog-doc/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
+`project-docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
 
 Use:
 
@@ -745,7 +752,7 @@ Live provider calls must be explicit and auditable.
   `build/provider-usage/free-tier-budgets.json` as `already_used` before running
   long or repeated live provider tests.
 - Before long OpenAI or Gemini API free-tier runs, read
-  `docs/blog-doc/Setup/Provider-Free-Tier-Reset-Windows.md` and use its reset
+  `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md` and use its reset
   windows when deciding whether the budget has refreshed:
   - OpenAI API data-sharing complimentary tokens reset at `00:00 UTC`, which is
     `09:00 KST`.
@@ -794,7 +801,7 @@ cost-sensitive tests until budget state is known.
 `deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
 Do not use `probe:long-objective` as the social-life runtime.
 
-Canonical plan: `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
+Canonical plan: `project-docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
 
 ## Auth Rule
 

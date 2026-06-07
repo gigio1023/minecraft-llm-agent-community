@@ -101,7 +101,8 @@ export function buildMineflayerCodegenSkillProjection(): MineflayerCodegenSkillP
       "ctx.mineflayer().method"
     ],
     verifier_and_evidence_rules: [
-      "verifier must name runtime evidence such as helper events, inventory delta, block delta, container snapshot, chat event, or post-observation",
+      "verifier.kind should use a supported vocabulary: helper_event_progress, helper_result_status, helper_event, inventory_delta, inventory_contains, inventory_count, world_scan, container_snapshot, or block_or_inventory_delta",
+      "use helper_event_progress for general physical progress proven by completed helper events instead of inventing runtime-evidence or unknown verifier kinds",
       "provider prose and memory notes are not proof of physical success",
       "known_failure_modes should be concrete enough to guide one regeneration attempt"
     ],

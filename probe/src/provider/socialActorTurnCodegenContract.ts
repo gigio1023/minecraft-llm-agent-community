@@ -135,6 +135,7 @@ Return JSON only with mineflayer_codegen:
 - candidate: generated-action-skill-candidate/v1 with TypeScript source, JSON Schema input_schema, helper_api_version, helper_allowlist, timeout_ms, verifier, known_failure_modes, promotion_policy
 - codegen_rationale: detailed explanation of how you used the full ActorTurnInput, outer tool-call rationale, current_state, Minecraft Basic Guide, and evidence trace.
 
+Respect parsed_author_tool_args.expected_outcome. If it asks for a world_block_delta, inventory_delta, position_delta, or social_delta, generate a bounded program that attempts that concrete delta through helpers; do not satisfy a physical expected outcome with observe-only or diagnostic-only code.
 Generated source must define export async function run(ctx, params), read runtime inputs from params, use only allowed ctx helpers from the injected skill body, await async work, and stop within timeout_ms.
 Never use imports, require, process, filesystem, network, eval, Function, raw ctx.bot, unbounded loops, or hidden Mineflayer object access.`;
 

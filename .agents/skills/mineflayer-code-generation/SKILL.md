@@ -31,7 +31,11 @@ The provider output must include:
 - `helper_api_version`: exactly `mineflayer-action-skill-helper/v1`.
 - `helper_allowlist`: only helpers the source actually calls.
 - `timeout_ms`: bounded trial timeout.
-- `verifier`: the evidence the runtime should check after trial.
+- `verifier`: the evidence the runtime should check after trial. Prefer
+  supported `verifier.kind` values: `helper_event_progress`,
+  `helper_result_status`, `helper_event`, `inventory_delta`,
+  `inventory_contains`, `inventory_count`, `world_scan`, `container_snapshot`,
+  or `block_or_inventory_delta`.
 - `known_failure_modes`: specific blocker strings the runtime can feed back on
   failure.
 - `promotion_policy`: `promote_after_passed_trial`.
@@ -151,5 +155,7 @@ Before returning `author_mineflayer_action`, check:
 - `parameters` validates against `input_schema`.
 - `helper_allowlist` contains no unused or unsupported helper.
 - source does not access blocked APIs or raw bot internals.
-- verifier describes real runtime evidence, not provider narration.
+- verifier describes real runtime evidence, not provider narration. Use
+  `helper_event_progress` for general helper-backed physical progress instead
+  of inventing `runtime-evidence` or `unknown` verifier kinds.
 - failure modes are concrete enough for a regeneration prompt.

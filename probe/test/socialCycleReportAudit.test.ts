@@ -272,8 +272,16 @@ test("rejects satisfied settlement checklist items without evidence refs", async
     blocker_histogram: [],
     available_action_skill_ids: [],
     missing_primitive_blockers: [],
+    structure_progress: {
+      status: "none",
+      total_placed_blocks: 0,
+      evidence_refs: [],
+      summaries: [],
+      interpretation_notes: []
+    },
     progress: {
       has_crafting_table: true,
+      has_structure_progress: false,
       has_verified_shelter: false,
       has_shared_storage_contribution: false,
       has_judgment_or_memory: true,

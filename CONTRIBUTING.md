@@ -11,12 +11,16 @@ should keep that direction explicit in code, docs, tests, and commit history.
 - Do not mix unrelated cleanup with feature work.
 - Do not revive the old Voyager architecture as the active implementation path.
 - Keep tests Detroit-style: small, direct, and focused on real owned behavior.
-- Treat `SPEC.md` and `docs/blog-doc/Specification/*` as long-term spec files. Do
+- Treat `SPEC.md` and `project-docs/Specification/*` as long-term spec files. Do
   not fold volatile run status into them.
-- Use `docs/blog-doc/Terminology.md` terms in docs, comments, prompts, and reports.
-- Keep Docusaurus-exposed docs under `docs/blog-doc/`. Use project-root
-  Markdown for repo-internal agent/review guidance, and use
-  `docs/research-archive/` for historical research, stale public plans, and raw
+- Use `project-docs/Terminology.md` terms in docs, comments, prompts, and reports.
+- Keep internal project docs under `project-docs/`.
+- Keep Docusaurus-exposed public docs under `docs/public-docs/`.
+- Do not place private provider access notes, operator budget state, dated
+  handoffs, implementation plans, or agent operating rules under
+  `docs/public-docs/` or `docs/blog/`.
+- Use project-root Markdown for repo-internal agent/review guidance, and use
+  `project-docs/research-archive/` for historical research, stale public plans, and raw
   paper dumps.
 
 ## Code Comments

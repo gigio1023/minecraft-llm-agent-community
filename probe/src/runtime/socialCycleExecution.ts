@@ -12,7 +12,15 @@ import {
   type GeneratedActionSkillCandidate,
   type LegacyPlannerAction
 } from "./goals/types.js";
-import type { ActorTurnResolvedAction } from "./goals/actorEpisode/index.js";
+import {
+  defaultExpectedOutcomeForActionSkill,
+  defaultExpectedOutcomeForPrimitive,
+  evaluateExpectedOutcomeAgainstDeltas,
+  observedDeltasFromHelperEvents,
+  type ActorTurnOutcomeContractEvaluation,
+  type ActorTurnExpectedOutcome,
+  type ActorTurnResolvedAction
+} from "./goals/actorEpisode/index.js";
 import {
   validatePrimitiveActionParameters,
   type MoveToTargetMetadata
@@ -39,6 +47,7 @@ import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
 import { consumeItem, selectFoodCandidateName } from "../tools/consumeItem.js";
+import { equipItem } from "../tools/equipItem.js";
 import { runMineflayerProgram } from "../tools/runMineflayerProgram.js";
 import { placeBlock } from "../tools/placeBlock.js";
 import { buildPattern } from "../tools/buildPattern.js";
@@ -71,6 +80,7 @@ import {
   runPrimitivePostActionHooks,
   runPrimitivePreActionHooks
 } from "./actions/actionHooks.js";
+import { evaluatePrimitiveSessionPreflight } from "./actions/sessionPreflight.js";
 import {
   findMatchingRuntimeRetryConstraint,
   type RuntimeRetryConstraint
@@ -89,6 +99,52 @@ function actorTurnActionParameters(action: ActorTurnResolvedAction): Record<stri
   return action.parameters as Record<string, unknown>;
 }
 
+function expectedOutcomeForGeneratedHelper(helperName: unknown): ActorTurnExpectedOutcome | null {
+  if (typeof helperName !== "string") {
+    return null;
+  }
+  switch (helperName) {
+    case "placeBlock":
+    case "buildPattern":
+    case "mineBlock":
+      return "world_block_delta";
+    case "collectLogs":
+    case "craftItem":
+    case "craftWithTable":
+    case "consumeItem":
+      return "inventory_delta";
+    case "equipItem":
+      return "equipment_delta";
+    case "moveTo":
+      return "position_delta";
+    case "say":
+      return "social_delta";
+    case "observe":
+      return "diagnostic_unlock";
+    default:
+      return null;
+  }
+}
+
+function expectedOutcomeForGeneratedCandidate(
+  candidate: GeneratedActionSkillCandidate
+): ActorTurnExpectedOutcome {
+  const verifier = candidate.verifier;
+  if (typeof verifier === "object" && verifier !== null && !Array.isArray(verifier)) {
+    const outcome = expectedOutcomeForGeneratedHelper((verifier as { helper?: unknown }).helper);
+    if (outcome) {
+      return outcome;
+    }
+  }
+  for (const helperName of candidate.helper_allowlist ?? []) {
+    const outcome = expectedOutcomeForGeneratedHelper(helperName);
+    if (outcome) {
+      return outcome;
+    }
+  }
+  return defaultExpectedOutcomeForActionSkill(candidate.proposed_skill_id ?? "");
+}
+
 function actorTurnActionFromLegacyPlannerAction(
   action: LegacyPlannerAction
 ): ActorTurnResolvedAction {
@@ -103,12 +159,14 @@ function actorTurnActionFromLegacyPlannerAction(
       action_card_id: `legacy:${action.action_skill_id ?? "missing-action-skill"}`,
       action_skill_id: action.action_skill_id ?? "",
       parameters,
+      expected_outcome: defaultExpectedOutcomeForActionSkill(action.action_skill_id ?? ""),
       why_this_action: action.why_this_action,
       expected_evidence: action.expected_evidence,
       fallback_if_blocked: action.fallback_if_blocked
     };
   }
   if (action.kind === "author_and_trial_action_skill") {
+    const candidate = action.candidate as GeneratedActionSkillCandidate;
     return {
       schema: "actor-turn-resolved-action/v1",
       actor_id: action.actor_id,
@@ -116,7 +174,8 @@ function actorTurnActionFromLegacyPlannerAction(
       cycle_goal_id: action.cycle_goal_id,
       kind: "author_mineflayer_action",
       parameters,
-      candidate: action.candidate as GeneratedActionSkillCandidate,
+      candidate,
+      expected_outcome: expectedOutcomeForGeneratedCandidate(candidate),
       why_this_action: action.why_this_action,
       expected_evidence: action.expected_evidence,
       fallback_if_blocked: action.fallback_if_blocked
@@ -134,6 +193,7 @@ function actorTurnActionFromLegacyPlannerAction(
     action_card_id: `legacy:${primitiveId || "missing-primitive"}`,
     primitive_id: primitiveId,
     parameters,
+    expected_outcome: defaultExpectedOutcomeForPrimitive(primitiveId),
     why_this_action: action.why_this_action,
     expected_evidence: action.expected_evidence,
     fallback_if_blocked: action.fallback_if_blocked
@@ -150,6 +210,7 @@ export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
   "craft_item",
   "craft_with_table",
   "consume_item",
+  "equip_item",
   "run_mineflayer_program",
   "place_block",
   "build_pattern",
@@ -888,6 +949,17 @@ async function runSocialPrimitive(input: {
         signal: input.signal
       })) as unknown as JsonValue;
     }
+    case "equip_item": {
+      const itemName = readOptionalString(proposal.args, "itemName");
+      if (!itemName) {
+        return { status: "blocked", reason: "equip_item requires exact itemName" };
+      }
+      return (await equipItem({
+        bot: input.bot,
+        itemName,
+        signal: input.signal
+      })) as unknown as JsonValue;
+    }
     case "run_mineflayer_program": {
       const source = readGeneratedSource(proposal.args);
       const paths = getActorWorkspacePaths(input.actorWorkspaceRootDir, input.actorId);
@@ -1050,10 +1122,14 @@ async function executePrimitiveWithEvidence(input: {
   // Hook records are written into tool evidence so reviewers can separate
   // permission blocks, missing live bots, and post-action progress classification.
   const permission = checkActiveActionSkillPermission(input.gate, input.tool);
+  const sessionPreflight = input.bot
+    ? evaluatePrimitiveSessionPreflight(input.bot)
+    : undefined;
   const preHooks = runPrimitivePreActionHooks({
     tool: input.tool,
     permission,
-    hasLiveBot: Boolean(input.bot)
+    hasLiveBot: sessionPreflight?.has_live_bot ?? false,
+    sessionPreflight
   });
   if (!preHooks.allowed) {
     const toolResult = attachRuntimeHooksToResult({
@@ -1242,10 +1318,16 @@ function toJsonValue(value: unknown): JsonValue {
   }
 }
 
-function generatedTrialLifecycleStatus(
-  verifierStatus: "passed" | "failed" | "not_applicable"
-): GeneratedActionSkillLifecycleStatus {
-  return verifierStatus === "passed" ? "promotable" : "trial_failed";
+function generatedTrialLifecycleStatus(input: {
+  verifierStatus: "passed" | "failed" | "not_applicable";
+  outcomeContract: ActorTurnOutcomeContractEvaluation;
+}): GeneratedActionSkillLifecycleStatus {
+  if (input.outcomeContract.status === "diagnostic_only" || input.outcomeContract.status === "recorded") {
+    return "diagnostic_only";
+  }
+  return input.verifierStatus === "passed" && input.outcomeContract.status === "satisfied"
+    ? "promotable"
+    : "trial_failed";
 }
 
 function isGeneratedMineflayerActionSkill(record: ActorActionSkillRecord) {
@@ -1508,19 +1590,34 @@ async function executeAuthorAndTrialActionSkill(input: {
     candidate: validation.candidate,
     runtimeResult: step.toolResult
   });
-  const verifierStatus = generatedVerifier.status;
-  const lifecycleStatus = generatedTrialLifecycleStatus(verifierStatus);
+  const helperEvents = helperEventsFromToolResult(step.toolResult);
+  const outcomeContract = evaluateExpectedOutcomeAgainstDeltas({
+    expectedOutcome: input.action.expected_outcome,
+    verifierStatus: generatedVerifier.status,
+    observedDeltas: observedDeltasFromHelperEvents(helperEvents)
+  });
+  const verifierStatus =
+    generatedVerifier.status === "failed"
+      ? "failed"
+      : outcomeContract.status === "satisfied"
+        ? "passed"
+        : outcomeContract.status === "diagnostic_only" || outcomeContract.status === "recorded"
+          ? "not_applicable"
+          : "failed";
+  const lifecycleStatus = generatedTrialLifecycleStatus({
+    verifierStatus,
+    outcomeContract
+  });
   const sourceRef = sourceRefFromToolResult({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
     actorId: input.actorId,
     toolResult: step.toolResult
   });
-  const helperEvents = helperEventsFromToolResult(step.toolResult);
   const now = new Date().toISOString();
   const trialReason =
     verifierStatus === "passed"
-      ? generatedVerifier.reason
-      : `Generated candidate trial verifier failed: ${generatedVerifier.reason}`;
+      ? `${generatedVerifier.reason} Outcome contract: ${outcomeContract.reason}`
+      : `Generated candidate trial verifier did not produce promotable progress: ${generatedVerifier.reason}. Outcome contract: ${outcomeContract.reason}`;
 
   const proposal = buildGeneratedActionSkillProposal({
     actorId: input.actorId,
@@ -1532,7 +1629,10 @@ async function executeAuthorAndTrialActionSkill(input: {
     verifierStatus,
     sourceRef,
     helperEvents,
-    verifierOutput: generatedVerifier as unknown as JsonValue,
+    verifierOutput: {
+      ...generatedVerifier,
+      outcome_contract: outcomeContract
+    } as unknown as JsonValue,
     reason: trialReason,
     now
   });
@@ -1557,6 +1657,7 @@ async function executeAuthorAndTrialActionSkill(input: {
       source_ref: sourceRef ?? null,
       parameters: validation.parameters as JsonValue,
       helper_events: helperEvents,
+      outcome_contract: outcomeContract as unknown as JsonValue,
       runtime_result: step.toolResult
     } as JsonValue
   });
@@ -1599,6 +1700,7 @@ async function executeAuthorAndTrialActionSkill(input: {
       active_action_skill_ref: activePromotion?.activeRef ?? null,
       generated_lifecycle_status: lifecycleStatus,
       verifier_status: verifierStatus,
+      outcome_contract: outcomeContract as unknown as JsonValue,
       promotion_policy: validation.candidate.promotion_policy,
       active_promotion_performed: Boolean(activePromotion)
     },

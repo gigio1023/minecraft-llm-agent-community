@@ -15,6 +15,8 @@ import type {
   JsonObject
 } from "../runtime/goals/actorEpisode/index.js";
 import {
+  defaultExpectedOutcomeForActionSkill,
+  defaultExpectedOutcomeForPrimitive,
   resolveActorTurnExecutionDraftToAction,
   type ActionCardProjection
 } from "../runtime/goals/actorEpisode/index.js";
@@ -139,6 +141,9 @@ function deterministicActorTurn(input: {
     choice: "use_existing_action",
     action_card_id: actionCardId,
     parameters,
+    expected_outcome: fallbackMapping?.kind === "use_action_skill"
+      ? defaultExpectedOutcomeForActionSkill(fallbackMapping.action_skill_id)
+      : defaultExpectedOutcomeForPrimitive(preferredPrimitive),
     why_this_action: "Deterministic Actor Turn baseline chooses one mapped Action Card.",
     expected_evidence: ["runtime evidence"],
     fallback_if_blocked: "choose another mapped Action Card"
@@ -307,6 +312,7 @@ function actorTurnOutputFromExistingToolSelection(
     choice: "use_existing_action",
     action_card_id: selection.action_card_id,
     parameters: selection.args.parameters,
+    expected_outcome: selection.args.expected_outcome,
     why_this_action: [
       selection.args.situation_assessment,
       selection.args.why_this_tool
@@ -339,6 +345,7 @@ function actorTurnOutputFromCodegenSelection(input: {
     verifier: toJsonObject(input.codegen.output.candidate.verifier),
     known_failure_modes: [...input.codegen.output.candidate.known_failure_modes],
     promotion_policy: input.codegen.output.candidate.promotion_policy,
+    expected_outcome: input.selection.args.expected_outcome,
     why_this_action: [
       input.selection.args.situation_assessment,
       input.selection.args.why_codegen_is_needed,

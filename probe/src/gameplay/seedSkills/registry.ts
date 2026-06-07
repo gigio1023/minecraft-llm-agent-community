@@ -22,10 +22,11 @@ export type SeedActionSkillId =
   | "inspectSharedChest"
   | "depositSharedItems"
   | "collectDroppedItems"
-  // Survival / utility roadmap (8)
+  // Survival / utility roadmap (10)
   | "exploreForMaterials"
   | "placeCraftingTable"
   | "buildBasicShelter"
+  | "equipHeldItem"
   | "equipBestTool"
   | "placeTorchLightArea"
   | "eatFoodWhenHungry"
@@ -272,16 +273,27 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     primitiveIds: ["observe", "build_pattern", "remember"]
   },
   {
+    id: "equipHeldItem",
+    summary: "Equip one explicit inventory item in hand when a later action needs it",
+    runtimeStatus: "implemented",
+    implementationNotes:
+      "Uses the exact-item equip_item primitive and verifies held-item state. Tool ranking or choosing the best item remains outside this action skill.",
+    intentKinds: ["bootstrap_progress", "recover_basic_tools", "avoid_or_retreat"],
+    validRoles: ["gatherer", "crafter", "settler"],
+    preconditions: ["inventory has the exact item to hold"],
+    primitiveIds: ["observe", "equip_item"]
+  },
+  {
     id: "equipBestTool",
     summary: "Equip the best available tool for the next block or combat task",
     runtimeStatus: "planned",
     implementationNotes:
-      "References mindcraft-ce equip and mineflayer-chatgpt craft_gear. Needs inventory tool ranking and verification that the held item changed.",
+      "References mindcraft-ce equip and mineflayer-chatgpt craft_gear. Exact hand equip now exists, but choosing the best tool for a task still needs a bounded ranking policy.",
     intentKinds: ["bootstrap_progress", "recover_basic_tools", "avoid_or_retreat"],
     validRoles: ["gatherer", "crafter", "settler"],
     preconditions: ["inventory has a usable tool"],
     primitiveIds: ["observe", "wait"],
-    missingPrimitives: ["equip_item", "held_item_observation"]
+    missingPrimitives: ["task_tool_ranking"]
   },
   {
     id: "placeTorchLightArea",

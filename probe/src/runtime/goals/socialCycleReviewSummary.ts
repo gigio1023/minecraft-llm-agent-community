@@ -46,6 +46,16 @@ export type SocialCycleReviewSummary = {
   runtime_retry_constraint_count: number;
   retry_constraint_blocked_attempts: number;
   cycles_with_prior_judgment_context: number;
+  visual_captures: Array<{
+    cycle_id: string;
+    phase: string;
+    status: string;
+    image_ref?: string;
+    image_path?: string;
+    artifact_ref: string;
+    error?: string;
+  }>;
+  visual_failures: Array<{ captured_at: string; error: string }>;
   rows: CycleReviewRow[];
 };
 
@@ -265,6 +275,17 @@ function resolveReportActorDir(
   return path.join(loadProbeConfig().actorWorkspace.rootDir, report.actor_id);
 }
 
+function resolveVisualImagePath(actorDir: string, imageRef: string | undefined, imagePath: string | undefined) {
+  if (imagePath && path.isAbsolute(imagePath)) {
+    return imagePath;
+  }
+  if (!imageRef) {
+    return undefined;
+  }
+  const resolved = resolveActorRefPath(actorDir, imageRef);
+  return resolved.ok ? resolved.filePath : undefined;
+}
+
 export async function buildSocialCycleReviewSummary(
   reportPath: string,
   actorWorkspaceRoot?: string
@@ -280,6 +301,15 @@ export async function buildSocialCycleReviewSummary(
     .flatMap((cycle) => cycle.action_attempts ?? [])
     .filter((attempt) => attempt.retry_constraint_blocked === true).length;
   let cycles_with_prior_judgment_context = 0;
+  const visualCaptures = (report.visual_evidence?.captures ?? []).map((capture) => ({
+    cycle_id: capture.cycle_id,
+    phase: capture.phase,
+    status: capture.status,
+    image_ref: capture.image_ref,
+    image_path: resolveVisualImagePath(actorDir, capture.image_ref, capture.image_path),
+    artifact_ref: capture.artifact_ref,
+    error: capture.error
+  }));
 
   const rows: CycleReviewRow[] = [];
 
@@ -359,6 +389,8 @@ export async function buildSocialCycleReviewSummary(
     runtime_retry_constraint_count: runtimeRetryConstraintCount,
     retry_constraint_blocked_attempts: retryConstraintBlockedAttempts,
     cycles_with_prior_judgment_context,
+    visual_captures: visualCaptures,
+    visual_failures: report.visual_evidence?.failures ?? [],
     rows
   };
 }
@@ -403,6 +435,27 @@ export function formatReviewSummaryMarkdown(summary: SocialCycleReviewSummary): 
     lines.push(
       `| ${row.attempt_id ?? row.cycle_id} | ${row.judgment_outcome} | ${row.verifier_status} | ${action} | ${scanCell} | ${row.movement_contract_status} | ${row.retry_constraint_blocked ? "blocked" : "no"} | ${goal} | ${row.cites_prior ? "yes" : "no"} |`
     );
+  }
+
+  const capturedImages = summary.visual_captures.filter(
+    (capture) => capture.status === "captured" && capture.image_path
+  );
+  if (capturedImages.length > 0 || summary.visual_failures.length > 0) {
+    lines.push("", "## Visual Evidence", "");
+    for (const capture of capturedImages.slice(-12)) {
+      lines.push(
+        `### ${capture.cycle_id} ${capture.phase}`,
+        "",
+        `![${capture.cycle_id} ${capture.phase}](${capture.image_path})`,
+        "",
+        `- image_ref: \`${capture.image_ref ?? ""}\``,
+        `- artifact_ref: \`${capture.artifact_ref}\``,
+        ""
+      );
+    }
+    for (const failure of summary.visual_failures.slice(-5)) {
+      lines.push(`- visual capture failure at ${failure.captured_at}: ${failure.error}`);
+    }
   }
 
   const rowsWithScanRefs = summary.rows.filter((row) => row.world_scan_refs.length > 0);

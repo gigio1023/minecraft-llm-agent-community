@@ -26,6 +26,7 @@ import {
   parseMineflayerCodegenProviderOutput,
   parseActorTurnToolSelection
 } from "../src/provider/socialActorTurnProvider.js";
+import type { ActorTurnAuthorMineflayerActionArgs } from "../src/provider/socialActorTurnToolParser.js";
 import type { ActorTurnInput } from "../src/runtime/goals/actorEpisode/index.js";
 import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
 
@@ -1063,6 +1064,7 @@ test("Actor Turn repair input keeps a rejected Action Card visible with contract
       choice: "use_existing_action",
       action_card_id: rejectedCard.action_card_id,
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try the rejected mining card.",
       expected_evidence: ["mine_block evidence"],
       fallback_if_blocked: "choose another visible card"
@@ -1076,6 +1078,7 @@ test("Actor Turn repair input keeps a rejected Action Card visible with contract
         parameters: {},
         situation_assessment: "The actor should mine now.",
         why_this_tool: "Mine Cobblestone looked useful.",
+        expected_outcome: "inventory_delta",
         success_evidence: ["cobblestone inventory delta"],
         failure_handling: "Try a prerequisite."
       })
@@ -1113,6 +1116,7 @@ test("Actor Turn repair input keeps a rejected Action Card visible with contract
           parameters: {},
           situation_assessment: "The actor should mine now.",
           why_this_tool: "Mine Cobblestone looked useful.",
+          expected_outcome: "inventory_delta",
           success_evidence: ["cobblestone inventory delta"],
           failure_handling: "Try a prerequisite."
         })
@@ -2851,6 +2855,7 @@ test("Actor Turn tool parser maps a visible Action Card function call to runtime
           parameters: { itemName: "oak_planks" },
           situation_assessment: "Current inventory has oak_log and planks are the next inventory-grid prerequisite.",
           why_this_tool: "Craft Item is the visible Action Card for inventory-grid recipes.",
+          expected_outcome: "inventory_delta",
           success_evidence: ["inventory_delta for oak_planks"],
           failure_handling: "Record the missing ingredient blocker and choose resource collection."
         })
@@ -2899,6 +2904,7 @@ test("Actor Turn tool parser rejects visible Action Card extra context fields", 
           parameters: { itemName: "oak_planks" },
           situation_assessment: "Current inventory has oak_log.",
           why_this_tool: "Craft Item handles inventory-grid recipes.",
+          expected_outcome: "inventory_delta",
           success_evidence: ["inventory_delta for oak_planks"],
           failure_handling: "Record blocker.",
           context_summary: "Do not let model-selected summaries enter the tool boundary."
@@ -2943,6 +2949,7 @@ test("Actor Turn author_mineflayer_action parser rejects source and context-pres
           situation_assessment: "Repeated observation is no longer useful.",
           why_codegen_is_needed: "A bounded placement-cell scan is missing from visible Action Cards.",
           desired_minecraft_behavior: "Find a valid adjacent support cell and place a crafting table.",
+          expected_outcome: "world_block_delta",
           existing_tools_considered: [
             {
               action_card_id: "action-card-007",
@@ -2978,6 +2985,7 @@ test("Actor Turn author_mineflayer_action parser rejects nested forbidden contex
           situation_assessment: "The visible Action Cards cannot express a bounded target search.",
           why_codegen_is_needed: "The actor needs a generated helper-limited placement search.",
           desired_minecraft_behavior: "Find a valid support cell and place a crafting table.",
+          expected_outcome: "world_block_delta",
           existing_tools_considered: [
             {
               action_card_id: "action-card-007",
@@ -3026,10 +3034,11 @@ test("Mineflayer codegen request preserves full ActorTurnInput and raw outer fun
       desired_minecraft_behavior: "Place a crafting table."
     })
   };
-  const parsedAuthorToolArgs = {
+  const parsedAuthorToolArgs: ActorTurnAuthorMineflayerActionArgs = {
     situation_assessment: "The actor has a crafting_table item and needs a placed station.",
     why_codegen_is_needed: "Visible Place Block lacks a known valid target cell.",
     desired_minecraft_behavior: "Scan for a valid support cell and place a crafting table.",
+    expected_outcome: "world_block_delta",
     existing_tools_considered: [
       {
         action_card_id: "action-card-007",
@@ -3157,6 +3166,7 @@ test("Gemini GenAI function calls parse through the Actor Turn tool-selection co
         situation_assessment: "The actor has a crafting table item and repeated observe would not help.",
         why_codegen_is_needed: "A valid placement-cell search is missing from visible Action Cards.",
         desired_minecraft_behavior: "Find a valid adjacent support cell and place a crafting table.",
+        expected_outcome: "world_block_delta",
         existing_tools_considered: [
           {
             action_card_id: "action-card-007",

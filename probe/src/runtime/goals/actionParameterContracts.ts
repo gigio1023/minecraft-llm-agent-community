@@ -299,11 +299,12 @@ function validatePhysicalPrimitiveArgs(
       }
       return passed({ primitiveId: input.primitiveId });
     case "consume_item":
+    case "equip_item":
       return hasNonEmptyArg(args, "itemName") || hasActionSkillFallback(input, args)
         ? passed({ primitiveId: input.primitiveId })
         : failed({
             primitiveId: input.primitiveId,
-            error: "consume_item requires itemName unless an actionSkillId fallback is present"
+            error: `${input.primitiveId} requires itemName unless an actionSkillId fallback is present`
           });
     case "run_mineflayer_program":
       return hasNonEmptyArg(args, "source")
@@ -435,6 +436,15 @@ export function primitiveParameterContractSummary(primitiveId: string): Primitiv
         required_structured_args: ["itemName"],
         accepted_forms: [
           "{itemName:string}",
+          "resolved actor-owned action skill primitive args"
+        ]
+      };
+    case "equip_item":
+      return {
+        ...base,
+        required_structured_args: ["itemName"],
+        accepted_forms: [
+          "{itemName:string} for an exact inventory item to equip in hand",
           "resolved actor-owned action skill primitive args"
         ]
       };

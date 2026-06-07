@@ -112,18 +112,24 @@ function resolveRef(ref) {
   return refCache.get(ref);
 }
 
+function resolveOptionalRef(ref) {
+  return typeof ref === "string" && ref.trim().length > 0 ? resolveRef(ref) : null;
+}
+
 function addRefs(refs, target) {
   if (!Array.isArray(refs)) {
     return;
   }
   for (const ref of refs) {
-    target.push(ref);
+    if (typeof ref === "string" && ref.trim().length > 0) {
+      target.push(ref);
+    }
   }
 }
 
 const allRefs = [];
 for (const cycle of report.cycles ?? []) {
-  for (const key of ["cycle_goal_ref", "action_intent_ref", "judgment_ref"]) {
+  for (const key of ["cycle_goal_ref", "action_ref", "action_intent_ref", "judgment_ref"]) {
     if (typeof cycle[key] === "string") {
       allRefs.push(cycle[key]);
     }
@@ -132,6 +138,9 @@ for (const cycle of report.cycles ?? []) {
   addRefs(cycle.provider_output_refs, allRefs);
   addRefs(cycle.evidence_refs, allRefs);
   for (const attempt of cycle.action_attempts ?? []) {
+    if (typeof attempt.action_ref === "string") {
+      allRefs.push(attempt.action_ref);
+    }
     if (typeof attempt.action_intent_ref === "string") {
       allRefs.push(attempt.action_intent_ref);
     }
@@ -174,7 +183,10 @@ const actionSurface = {
   direct_action_skills_available: new Set(),
   direct_primitives_used_as_intent: new Set(),
   direct_action_skills_used: new Set(),
-  direct_primitives_used_as_tool: new Set()
+  direct_primitives_used_as_tool: new Set(),
+  action_cards_available: new Set(),
+  action_cards_used: new Set(),
+  author_mineflayer_action_used: 0
 };
 
 const observation = {
@@ -302,6 +314,47 @@ function inspectEvidence(ref) {
   }
 }
 
+function actionCardLabel(card) {
+  const id = typeof card?.action_card_id === "string" ? card.action_card_id : "missing-card-id";
+  const title = typeof card?.title === "string" ? card.title : "missing-title";
+  return `${id}:${title}`;
+}
+
+function actorTurnActionLabel(action) {
+  if (!isRecord(action)) {
+    return { kind: "missing", label: "missing" };
+  }
+  const kind = action.kind ?? "missing";
+  if (kind === "use_primitive") {
+    return { kind, label: action.primitive_id ?? "missing_primitive" };
+  }
+  if (kind === "use_action_skill") {
+    return { kind, label: action.action_skill_id ?? "missing_action_skill" };
+  }
+  if (kind === "author_mineflayer_action") {
+    return { kind, label: "author_mineflayer_action" };
+  }
+  return { kind, label: String(kind) };
+}
+
+function resolveCurrentAction(cycle) {
+  if (typeof cycle.action_ref === "string") {
+    const action = resolveRef(cycle.action_ref);
+    if (isRecord(action)) {
+      return action;
+    }
+  }
+  for (const attempt of [...(cycle.action_attempts ?? [])].reverse()) {
+    if (typeof attempt.action_ref === "string") {
+      const action = resolveRef(attempt.action_ref);
+      if (isRecord(action)) {
+        return action;
+      }
+    }
+  }
+  return null;
+}
+
 for (const cycle of report.cycles ?? []) {
   const cycleNumberMatch = String(cycle.cycle_id ?? "").match(/(\d+)$/);
   const cycleNumber = cycleNumberMatch ? Number(cycleNumberMatch[1]) : 0;
@@ -321,8 +374,8 @@ for (const cycle of report.cycles ?? []) {
     inspectEvidence(evidenceRef);
   }
 
-  const judgment = resolveRef(cycle.judgment_ref);
-  const intent = resolveRef(cycle.action_intent_ref);
+  const judgment = resolveOptionalRef(cycle.judgment_ref);
+  const intent = resolveOptionalRef(cycle.action_intent_ref);
   const outputRefs = cycle.provider_output_refs ?? [];
 
   for (const inputRef of cycle.provider_input_refs ?? []) {
@@ -337,6 +390,14 @@ for (const cycle of report.cycles ?? []) {
       for (const actionSkill of surface.direct_action_skills ?? []) {
         if (actionSkill?.action_skill_id) {
           actionSurface.direct_action_skills_available.add(actionSkill.action_skill_id);
+        }
+      }
+    }
+    const actionCards = providerInput?.input?.action_cards;
+    if (Array.isArray(actionCards)) {
+      for (const card of actionCards) {
+        if (isRecord(card)) {
+          actionSurface.action_cards_available.add(actionCardLabel(card));
         }
       }
     }
@@ -369,9 +430,20 @@ for (const cycle of report.cycles ?? []) {
     }
   }
 
-  let actionLabel = "missing";
-  let actionKind = "missing";
-  if (isRecord(intent)) {
+  const currentAction = resolveCurrentAction(cycle);
+  let { kind: actionKind, label: actionLabel } = actorTurnActionLabel(currentAction);
+  if (isRecord(currentAction)) {
+    if (currentAction.kind === "use_primitive") {
+      actionSurface.direct_primitives_used_as_intent.add(actionLabel);
+    } else if (currentAction.kind === "use_action_skill") {
+      actionSurface.direct_action_skills_used.add(actionLabel);
+    } else if (currentAction.kind === "author_mineflayer_action") {
+      actionSurface.author_mineflayer_action_used += 1;
+    }
+    if (typeof currentAction.action_card_id === "string") {
+      actionSurface.action_cards_used.add(currentAction.action_card_id);
+    }
+  } else if (isRecord(intent)) {
     actionKind = intent.kind ?? "missing";
     if (intent.kind === "use_primitive") {
       actionLabel = intent.primitive_id ?? "missing";
@@ -471,6 +543,15 @@ const directPrimitivesUsedAsTool = sortedSet(
 );
 const directActionSkillsAvailable = sortedSet(actionSurface.direct_action_skills_available);
 const directActionSkillsUsed = sortedSet(actionSurface.direct_action_skills_used);
+const actionCardsAvailable = sortedSet(actionSurface.action_cards_available);
+const actionCardsUsed = sortedSet(actionSurface.action_cards_used);
+
+const visualCaptures = Array.isArray(report.visual_evidence?.captures)
+  ? report.visual_evidence.captures
+  : [];
+const visualFailures = Array.isArray(report.visual_evidence?.failures)
+  ? report.visual_evidence.failures
+  : [];
 
 const attempts = (report.cycles ?? []).flatMap((cycle) => cycle.action_attempts ?? []);
 const providerTotals = report.provider_usage?.totals ?? [];
@@ -568,7 +649,12 @@ const summary = {
       direct_action_skills_used: directActionSkillsUsed,
       used_action_skill_count: directActionSkillsUsed.length,
       unused_direct_action_skills: directActionSkillsAvailable
-        .filter((actionSkill) => !actionSurface.direct_action_skills_used.has(actionSkill))
+        .filter((actionSkill) => !actionSurface.direct_action_skills_used.has(actionSkill)),
+      action_cards_available: actionCardsAvailable,
+      action_card_count: actionCardsAvailable.length,
+      action_cards_used: actionCardsUsed,
+      used_action_card_count: actionCardsUsed.length,
+      author_mineflayer_action_used: actionSurface.author_mineflayer_action_used
     },
     action_concentration: {
       distinct_action_count: Object.keys(actionCounts).length,
@@ -591,6 +677,27 @@ const summary = {
     items: retryConstraints
   },
   observation,
+  visual_evidence: {
+    method: report.visual_evidence?.method ?? null,
+    first_person: report.visual_evidence?.first_person ?? null,
+    capture_count: visualCaptures.length,
+    failure_count: visualFailures.length,
+    failures: visualFailures,
+    first_captures: visualCaptures.slice(0, 3).map((capture) => ({
+      cycle_id: capture.cycle_id,
+      phase: capture.phase,
+      image_path: capture.image_path,
+      bot_position: capture.bot_position
+    })),
+    last_captures: visualCaptures.slice(-5).map((capture) => ({
+      cycle_id: capture.cycle_id,
+      phase: capture.phase,
+      image_path: capture.image_path,
+      bot_position: capture.bot_position
+    })),
+    review_note:
+      "Visual evidence is renderer evidence only. Compare suspicious pixels with observe/world-state artifacts before treating screenshots as world truth."
+  },
   settlement: {
     state: {
       inventory_counts: report.settlement_state?.inventory_counts ?? null,
@@ -605,15 +712,19 @@ const summary = {
     first_cycles: samples,
     failed_or_blocked_cycles: failedOrBlockedSamples,
     last_cycles: (report.cycles ?? []).slice(-8).map((cycle) => {
-      const judgment = resolveRef(cycle.judgment_ref);
-      const intent = resolveRef(cycle.action_intent_ref);
+      const judgment = resolveOptionalRef(cycle.judgment_ref);
+      const intent = resolveOptionalRef(cycle.action_intent_ref);
+      const currentAction = resolveCurrentAction(cycle);
+      const resolvedAction = actorTurnActionLabel(currentAction);
       return {
         cycle_id: cycle.cycle_id,
         outcome: isRecord(judgment) ? judgment.outcome : "missing",
         verifier_status: cycle.verifier_status,
-        action: isRecord(intent)
-          ? (intent.kind === "use_primitive" ? intent.primitive_id : intent.action_skill_id ?? intent.kind)
-          : "missing",
+        action: resolvedAction.label !== "missing"
+          ? resolvedAction.label
+          : (isRecord(intent)
+            ? (intent.kind === "use_primitive" ? intent.primitive_id : intent.action_skill_id ?? intent.kind)
+            : "missing"),
         what_happened: isRecord(judgment) ? judgment.what_happened : ""
       };
     })

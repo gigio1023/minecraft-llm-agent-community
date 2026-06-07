@@ -236,7 +236,7 @@ export async function callOpenAiFunctionToolSelection(input: {
   const responsePollIntervalMs =
     input.config.responsePollIntervalMs ?? Number(process.env.OPENAI_RESPONSES_POLL_INTERVAL_MS ?? 2_000);
   const responsePollTimeoutMs =
-    input.config.responsePollTimeoutMs ?? Number(process.env.OPENAI_RESPONSES_POLL_TIMEOUT_MS ?? 300_000);
+    input.config.responsePollTimeoutMs ?? Number(process.env.OPENAI_RESPONSES_POLL_TIMEOUT_MS ?? 900_000);
   const usageContext = {
     repoRoot: input.config.repoRoot,
     ledgerPath: input.config.usageLedgerPath,

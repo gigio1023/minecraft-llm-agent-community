@@ -20,6 +20,7 @@ export function isMeaningfulGameplayPrimitive(primitiveId: string): boolean {
 export function isDurableGameplayPrimitive(primitiveId: string): boolean {
   return isMeaningfulGameplayPrimitive(primitiveId) &&
     primitiveId !== "move_to" &&
+    primitiveId !== "equip_item" &&
     primitiveId !== "inspect_chest";
 }
 
@@ -194,6 +195,8 @@ export function isSuccessfulMeaningfulToolStatus(tool: string, status: string): 
       return status === "crafted";
     case "consume_item":
       return status === "consumed";
+    case "equip_item":
+      return status === "equipped" || status === "already_equipped";
     case "run_mineflayer_program":
       return status === "completed_with_evidence";
     case "place_block":

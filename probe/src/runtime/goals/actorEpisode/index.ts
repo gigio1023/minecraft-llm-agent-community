@@ -14,5 +14,6 @@ export * from "./mineflayerCodegenSkill.js";
 export * from "./turnInput.js";
 export * from "./resolver.js";
 export * from "./runtimeClassifier.js";
+export * from "./outcomeContract.js";
 export * from "./store.js";
 export * from "./cycleGoal.js";
