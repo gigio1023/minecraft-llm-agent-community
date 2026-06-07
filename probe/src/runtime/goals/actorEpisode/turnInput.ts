@@ -13,6 +13,7 @@ import { buildActorTurnCurrentStateProjection } from "./currentStateProjection.j
 import { buildActorTurnDecisionFrame } from "./decisionFrame.js";
 import {
   anchorActiveEpisodeToPlanBeadContext,
+  boundActiveEpisodeLineageForHotPacket,
   buildRelationshipContextProjection,
   memoryRefsFromContext,
   planBeadHintsFromContext,
@@ -41,10 +42,12 @@ export function buildActorTurnInput(input: {
     buildActionCardProjection(input.context.action_surface),
     currentState
   );
-  const activeEpisode = anchorActiveEpisodeToPlanBeadContext({
-    activeEpisode: input.activeEpisode,
-    context: input.context
-  });
+  const activeEpisode = boundActiveEpisodeLineageForHotPacket(
+    anchorActiveEpisodeToPlanBeadContext({
+      activeEpisode: input.activeEpisode,
+      context: input.context
+    })
+  );
   const actorTurnInput: ActorTurnInput = {
     schema: "actor-turn-input/v1",
     turn_id: input.turnId,

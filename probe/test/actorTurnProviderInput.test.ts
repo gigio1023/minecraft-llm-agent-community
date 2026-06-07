@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { assembleSocialCycleContext } from "../src/runtime/goals/cycleContextAssembler.js";
 import { compileActorSoulFromProfile } from "../src/runtime/goals/actorSoulStore.js";
 import {
+  ACTIVE_EPISODE_HOT_LINEAGE_LIMIT,
+  boundActiveEpisodeLineageForHotPacket,
   buildActionCardProjection,
   buildActiveEpisodeFromCycleGoal,
   buildActorTurnInput,
@@ -27,7 +29,7 @@ import {
   parseActorTurnToolSelection
 } from "../src/provider/socialActorTurnProvider.js";
 import type { ActorTurnAuthorMineflayerActionArgs } from "../src/provider/socialActorTurnToolParser.js";
-import type { ActorTurnInput } from "../src/runtime/goals/actorEpisode/index.js";
+import type { ActiveEpisode, ActorTurnInput } from "../src/runtime/goals/actorEpisode/index.js";
 import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -3191,4 +3193,133 @@ test("Gemini GenAI function calls parse through the Actor Turn tool-selection co
     assert.equal(parsed.selection.call_id, "gemini-call-1");
     assert.match(parsed.selection.args.why_codegen_is_needed, /placement-cell/);
   }
+});
+
+// --- #1: bounded hot-packet lineage projection (Low-Cost "hot pointer plus
+// artifact ref" discipline). opened_from_refs accumulates one+ ref per
+// deliberation and is audit/lineage only; the runtime's own branch detection
+// reads the stored episode, so windowing the hot packet is behavior-safe. ---
+
+function episodeWithOpenedRefs(openedFromRefs: string[]): ActiveEpisode {
+  return {
+    schema: "active-episode/v1",
+    episode_id: "episode-lineage-test",
+    actor_id: "npc_b",
+    life_goal_ref: "goals/life/life-goal.json",
+    purpose: "exercise lineage windowing",
+    current_focus: "keep the hot packet bounded",
+    actors_visible_or_relevant: [],
+    selected_plan_bead_refs: [],
+    related_plan_bead_refs: [],
+    opened_from_refs: openedFromRefs,
+    success_signals: [],
+    pivot_triggers: [],
+    social_pressure: [],
+    mistake_budget: {
+      allow_exploration_turns: 2,
+      observe_repeat_limit: 1,
+      exact_blocker_repeat_limit: 2
+    },
+    status: "active"
+  };
+}
+
+test("hot-packet lineage projection windows opened_from_refs without mutating the stored record", () => {
+  const fullRefs = Array.from(
+    { length: ACTIVE_EPISODE_HOT_LINEAGE_LIMIT + 50 },
+    (_, index) => `lineage/ref-${index}.json`
+  );
+  const stored = episodeWithOpenedRefs(fullRefs);
+  const projected = boundActiveEpisodeLineageForHotPacket(stored);
+
+  // Bound holds vs age: the hot view never exceeds the limit.
+  assert.equal(projected.opened_from_refs.length, ACTIVE_EPISODE_HOT_LINEAGE_LIMIT);
+  // Recency: the most recent refs are kept (lineage tail), not the oldest.
+  assert.deepEqual(
+    projected.opened_from_refs,
+    fullRefs.slice(-ACTIVE_EPISODE_HOT_LINEAGE_LIMIT)
+  );
+  // No silent cap: the omitted count is surfaced as a typed number.
+  assert.equal(projected.opened_from_refs_omitted_count, 50);
+
+  // Fetchability + dedup safety: the stored record is untouched, so the full
+  // lineage remains the source of truth and the deliberation write-site dedup
+  // still sees every ref (no episode re-open regression).
+  assert.equal(stored.opened_from_refs.length, fullRefs.length);
+  assert.equal(stored.opened_from_refs_omitted_count, undefined);
+  assert.notEqual(projected, stored);
+});
+
+test("hot-packet lineage projection is a no-op at or under the limit", () => {
+  const refs = Array.from(
+    { length: ACTIVE_EPISODE_HOT_LINEAGE_LIMIT },
+    (_, index) => `lineage/ref-${index}.json`
+  );
+  const stored = episodeWithOpenedRefs(refs);
+  const projected = boundActiveEpisodeLineageForHotPacket(stored);
+  assert.equal(projected, stored);
+  assert.equal(projected.opened_from_refs_omitted_count, undefined);
+});
+
+test("buildActorTurnInput bounds lineage in both active_episode and decision_frame", async () => {
+  const soul = compileActorSoulFromProfile("npc_b");
+  const context = await assembleSocialCycleContext({
+    actorWorkspaceRootDir: rootDir,
+    actorId: "npc_b",
+    soul,
+    lifeGoal: lifeGoal(),
+    strategicGoals: [],
+    worldEvents: [],
+    previousJudgments: [],
+    activeActionSkills: [buildNpcBActionSkillRecord()],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      visibleActors: [],
+      inventory: [{ name: "crafting_table", count: 1 }],
+      nearbyBlocks: [{ name: "grass_block", position: { x: 1, y: 63, z: 0 } }]
+    },
+    allowedPrimitiveIds: ["observe", "move_to", "place_block", "say", "remember"],
+    maxActionsPerCycle: 1,
+    cycleIndex: 1,
+    planBeadPacket: planBeadPacket(),
+    runtimeRetryConstraints: []
+  });
+
+  const fullRefs = Array.from(
+    { length: ACTIVE_EPISODE_HOT_LINEAGE_LIMIT + 100 },
+    (_, index) => `lineage/ref-${index}.json`
+  );
+  const activeEpisode: ActiveEpisode = {
+    ...buildActiveEpisodeFromCycleGoal({
+      episodeId: "episode-cycle-0001",
+      context,
+      cycleGoal: cycleGoal(),
+      startedAtTurnRef: "turns/turn-001.json"
+    }),
+    status: "active",
+    opened_from_refs: fullRefs
+  };
+
+  const { actorTurnInput } = buildActorTurnInput({
+    turnId: "turn-001",
+    context,
+    activeEpisode,
+    currentObservationRefs: ["observations/cycle-0001.json"]
+  });
+
+  // Both packet consumers are windowed from the same projected episode.
+  assert.equal(
+    actorTurnInput.active_episode.opened_from_refs.length,
+    ACTIVE_EPISODE_HOT_LINEAGE_LIMIT
+  );
+  assert.ok(
+    actorTurnInput.decision_frame.episode_focus_status.evidence_refs.length <=
+      ACTIVE_EPISODE_HOT_LINEAGE_LIMIT
+  );
+  // The caller's stored episode object is never mutated by packet assembly.
+  assert.equal(activeEpisode.opened_from_refs.length, fullRefs.length);
+  // The projected packet still validates as a well-formed Actor Turn input.
+  assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
 });

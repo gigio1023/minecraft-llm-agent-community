@@ -140,6 +140,33 @@ export function anchorActiveEpisodeToPlanBeadContext(input: {
   };
 }
 
+/** Max `opened_from_refs` kept in the hot packet; the rest stays in the stored record. */
+export const ACTIVE_EPISODE_HOT_LINEAGE_LIMIT = 16;
+
+/**
+ * Bounds the lineage refs an Active Episode carries into the Actor Turn hot
+ * packet.
+ *
+ * @remarks `opened_from_refs` is audit/lineage only: no Actor Turn decision
+ * reads it, and branch detection reads the stored episode, not this projection.
+ * Returns a fresh object and never mutates the stored record, so the full
+ * lineage stays fetchable and the write-site dedup keeps seeing every ref.
+ */
+export function boundActiveEpisodeLineageForHotPacket(
+  episode: ActiveEpisode,
+  recentRefLimit = ACTIVE_EPISODE_HOT_LINEAGE_LIMIT
+): ActiveEpisode {
+  const refs = episode.opened_from_refs;
+  if (refs.length <= recentRefLimit) {
+    return episode;
+  }
+  return {
+    ...episode,
+    opened_from_refs: refs.slice(-recentRefLimit),
+    opened_from_refs_omitted_count: refs.length - recentRefLimit
+  };
+}
+
 export function retryConstraintSummaries(context: SocialCycleContextPacket) {
   return context.runtime_retry_constraints.map((constraint) => ({
     constraint_id: constraint.constraint_id,
