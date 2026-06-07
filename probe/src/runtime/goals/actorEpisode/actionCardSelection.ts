@@ -1,18 +1,19 @@
 import type { ActionCardProjection } from "./actionCards.js";
-import type { ActorTurnCurrentStateProjection } from "./types.js";
 import { unique } from "./projectionUtils.js";
 
 /**
- * Adds provider-visible hints without selecting, hiding, or rejecting actions.
+ * Appends static, parameter-shaping guidance to specific Action Cards without
+ * selecting, hiding, or rejecting actions.
  *
- * @remarks This module must stay out of the Minecraft-planner business. It may
- * surface structured current-state facts that are already in `ActorTurnInput`,
- * but it must not parse prose requirements, compute recipe eligibility, hide
- * tools, inject defaults, or decide which Action Card the LLM should choose.
+ * @remarks Hints stay turn-invariant so the large `action_cards` block remains a
+ * stable prompt prefix (reused by inference prefix caches); live
+ * shared_storage/deposit values are read from `current_state`, not inlined here.
+ * This module must not parse prose
+ * requirements, compute recipe eligibility, hide tools, inject defaults, or
+ * decide which Action Card the LLM should choose.
  */
-export function annotateActionCardsWithCurrentStateHints(
-  projection: ActionCardProjection,
-  currentState: ActorTurnCurrentStateProjection
+export function annotateActionCardsWithStaticParameterHints(
+  projection: ActionCardProjection
 ): ActionCardProjection {
   const actionCards = projection.action_cards.map((card) => {
     if (card.title === "Inspect Chest" || card.title === "Inspect Shared Chest") {
@@ -21,17 +22,7 @@ export function annotateActionCardsWithCurrentStateHints(
         parameter_hints: unique([
           ...card.parameter_hints,
           "Use empty parameters for the bounded shared-chest container snapshot/openability action.",
-          `Current shared_storage status: ${currentState.shared_storage.status}.`,
-          ...(currentState.shared_storage.items.length > 0
-            ? [
-                `Known shared_storage items: ${currentState.shared_storage.items
-                  .map((item) => `${item.name}:${item.count}`)
-                  .join(", ")}.`
-              ]
-            : []),
-          ...(currentState.shared_storage.evidence_refs.length > 0
-            ? [`Shared storage evidence refs: ${currentState.shared_storage.evidence_refs.join(", ")}.`]
-            : [])
+          "Read the live shared_storage status, items, and evidence from current_state.shared_storage."
         ])
       };
     }
@@ -39,22 +30,11 @@ export function annotateActionCardsWithCurrentStateHints(
     if (card.title === "Deposit Shared" ||
       card.title === "Deposit Shared Items" ||
       card.title === "Handoff Item At Chest") {
-      const candidates = currentState.deposit_candidates.slice(0, 6);
       return {
         ...card,
         parameter_hints: unique([
           ...card.parameter_hints,
-          ...(candidates.length > 0
-            ? [
-                `Current deposit candidates: ${candidates
-                  .map((candidate) =>
-                    `${candidate.itemName} inventory=${candidate.inventoryCount} suggestedCount=${candidate.suggestedCount}${
-                      candidate.socially_requested ? " socially_requested" : ""
-                    }`
-                  )
-                  .join("; ")}.`
-              ]
-            : ["No deposit candidates are currently projected from inventory/social context."]),
+          "Read current_state.deposit_candidates for itemName, inventoryCount, suggestedCount, and socially_requested.",
           "If choosing this Action Card, provide explicit itemName and count in parameters; runtime will not infer them from prose."
         ])
       };

@@ -8,7 +8,7 @@ import { soulRef } from "../actorSoulStore.js";
 import { lifeGoalRef } from "../lifeGoalStore.js";
 import type { SocialCycleContextPacket } from "../cycleContextAssembler.js";
 import { buildActionCardProjection, type ActionCardProjection } from "./actionCards.js";
-import { annotateActionCardsWithCurrentStateHints } from "./actionCardSelection.js";
+import { annotateActionCardsWithStaticParameterHints } from "./actionCardSelection.js";
 import { buildActorTurnCurrentStateProjection } from "./currentStateProjection.js";
 import { buildActorTurnDecisionFrame } from "./decisionFrame.js";
 import {
@@ -37,9 +37,8 @@ export function buildActorTurnInput(input: {
 }): { actorTurnInput: ActorTurnInput; actionCardProjection: ActionCardProjection } {
   const currentState = buildActorTurnCurrentStateProjection(input.context);
   const recentEvidenceTrace = [...(input.recentEvidenceTrace ?? [])];
-  const actionCardProjection = annotateActionCardsWithCurrentStateHints(
-    buildActionCardProjection(input.context.action_surface),
-    currentState
+  const actionCardProjection = annotateActionCardsWithStaticParameterHints(
+    buildActionCardProjection(input.context.action_surface)
   );
   const activeEpisode = anchorActiveEpisodeToPlanBeadContext({
     activeEpisode: input.activeEpisode,
