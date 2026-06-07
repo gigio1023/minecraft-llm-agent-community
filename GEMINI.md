@@ -76,17 +76,20 @@ NPC state.
 
 During social-cycle runtime, new Minecraft action skill creation starts only
 from the action-selection stage. In Actor Turn mode, that means
-`author_mineflayer_action`, which resolves into the existing
-`author_and_trial_action_skill` runtime path. Background
+`author_mineflayer_action`, which starts full-context generated Mineflayer
+authoring and trial. The outer tool call carries detailed rationale and desired
+behavior, not TypeScript source and not a lossy context summary. Background
 reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
 review, patch, re-trial, reject, promote, retire, or supersede an existing
 candidate, but they must not originate a new NPC action skill candidate.
 
 Generated Mineflayer code should be used through that explicit author-and-trial
-path with schema-bound parameters, generated TypeScript source, helper API
-version, timeout, verifier, failure modes, promotion policy, helper-event
-evidence, and post-observation. Prose never supplies missing executable
-parameters.
+path. The internal codegen provider receives the full original Actor Turn
+context, the raw outer tool call, parsed authoring arguments, and the Mineflayer
+code-generation agent skill markdown. The generated candidate must include
+schema-bound parameters, generated TypeScript source, helper API version,
+timeout, verifier, failure modes, promotion policy, helper-event evidence, and
+post-observation. Prose never supplies missing executable parameters.
 
 ## Change Discipline
 

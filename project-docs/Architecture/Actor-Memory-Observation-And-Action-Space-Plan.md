@@ -34,9 +34,9 @@ flowchart LR
   Memory["Actor memory<br/>evidence-linked records"]
   Context["Provider context<br/>raw facts plus memory"]
   Goal["CycleGoal<br/>bounded next purpose"]
-  Action["ActionIntent<br/>structured executable args"]
+  Turn["Actor Turn<br/>one function tool selection"]
   Verify["Verifier<br/>success, failure, blocker"]
-  Obs --> Evidence --> Memory --> Context --> Goal --> Action --> Verify
+  Obs --> Evidence --> Memory --> Context --> Goal --> Turn --> Verify
   Evidence --> Context
   Verify --> Memory
 ```
@@ -78,7 +78,7 @@ Memory outputs should also be explicit:
 
 | Output | Used by | Rule |
 |--------|---------|------|
-| `memory_packet` | CycleGoal and ActionIntent providers | context only, never proof of current physical success |
+| `memory_packet` | CycleGoal and Actor Turn providers | context only, never proof of current physical success |
 | relationship context | goal provider | social context only, never tool authority |
 | blocker refs | action surface and planner | suppress exact bad retries, avoid broad superstition |
 | action-skill notes | action-skill review/promotion | candidate evidence, not active behavior by itself |
@@ -124,8 +124,8 @@ flowchart TD
   Candidate["Generated or seed action skill candidate<br/>recipe, preconditions, evidence"]
   Owned["Actor-owned action skill record<br/>status and lifecycle"]
   Surface["action_surface/v1<br/>direct, deferred, expansion opportunities"]
-  Intent["ActionIntent<br/>chooses only allowed executable affordances"]
-  Mineflayer --> Adapter --> Candidate --> Owned --> Surface --> Intent
+  Turn["Actor Turn<br/>chooses one visible tool or authoring path"]
+  Mineflayer --> Adapter --> Candidate --> Owned --> Surface --> Turn
 ```
 
 The runtime should expose three different things without confusing them:

@@ -6,8 +6,10 @@ sidebar_position: 42
 
 Search token: `SOCIAL_CYCLE_LLM_INPUT_CLEANUP`.
 
-Status: implemented cleanup slice and migration input. The target hot-path
-architecture is now `Actor-Episode-And-Actor-Turn-Architecture.md`.
+Status: implemented legacy cleanup slice and migration input. This is not the
+active hot-path provider contract. The active hot-path architecture is
+`Actor-Episode-And-Actor-Turn-Architecture.md` plus
+`Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`.
 
 Recorded: 2026-06-01.
 
@@ -94,9 +96,10 @@ Must not receive:
 - unbounded strategic-goal history;
 - duplicate settlement checklist.
 
-### Action Planner
+### Legacy Action Planner
 
-Purpose: choose one bounded ActionIntent.
+Purpose: choose one bounded legacy planner action during explicit migration or
+historical report playback.
 
 Must receive:
 
@@ -122,7 +125,8 @@ Purpose: judge the executed action from runtime evidence.
 
 Must receive:
 
-- ActorSoul, ActorLifeGoal, CycleGoal, and ActionIntent;
+- ActorSoul, ActorLifeGoal, CycleGoal, and the selected Actor Turn action or
+  legacy planner action when reading old reports;
 - runtime result, evidence refs, executed tools, tool statuses, verifier status;
 - memory, relationship, PlanBead, and settlement-state context;
 - `minecraft_basic_guide` so blocker interpretation can distinguish missing
@@ -172,7 +176,7 @@ Must not receive:
 
 ## Handoff
 
-Continue with phase 2 using a short live run first. If provider inputs look
-clean, run the longer budgeted OpenAI cycle and inspect whether the LLM uses the
-cleaner packets to act, pivot, remember blockers, and update PlanBeads without
-turning PlanBeads into a checklist.
+Do not add new active Actor Turn behavior to this legacy three-stage plan. Use
+the current Actor Turn documents for new work. Keep this page only as historical
+context for why provider packets were split by stage and why unbounded context,
+duplicate affordance catalogs, and domain-strategy scaffolding were removed.

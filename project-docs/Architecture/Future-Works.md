@@ -132,19 +132,19 @@ be a small physical task where the actor chooses or rejects a local worksite,
 uses it for multiple actions, and records a truthful blocker if the site or
 materials are insufficient.
 
-### P0: Planner Argument Contract Hardening
+### P0: Actor Turn Argument Contract Hardening
 
 Status: baseline implemented for direct primitive execution. Keep extending this
 as new primitives become provider-visible.
 
 Current contract rule:
 
-- direct provider `use_primitive` cannot rely on prose fields for executable
+- direct Actor Turn tool selections cannot rely on prose fields for executable
   targets;
-- direct provider `use_primitive` cannot spoof `args.actionSkillId` to borrow an
+- direct primitive mappings cannot spoof `args.actionSkillId` to borrow an
   action-skill-local fallback;
-- direct provider shared-storage transfers must provide explicit `count` or
-  `targetCount`;
+- direct shared-storage transfer tool selections must provide explicit `count`
+  or `targetCount`;
 - safe-looking control actions such as `wait` and `remember` still pass through
   CycleGoal and active action-skill gates;
 - resolved actor-owned action skill primitive calls may use documented local
@@ -153,14 +153,14 @@ Current contract rule:
 
 Future implementation options:
 
-- reject malformed `ActionIntent` before execution and request a repaired
-  provider output;
+- reject malformed Actor Turn function calls before execution and request a
+  repaired provider output;
 - expose structured primitive arg schemas and current affordance hints without
   naming preferred strategies;
 - convert common natural-language outputs into canonical Minecraft ids only when
   the conversion is unambiguous and recorded;
-- write a failed intent artifact when required fields are missing, so the next
-  cycle sees the exact schema problem.
+- write a failed tool-selection artifact when required fields are missing, so
+  the next cycle sees the exact schema problem.
 
 The goal is not broad prompt polish. The goal is to stop wasting live cycles on
 primitive calls that the runtime can prove are malformed before touching
@@ -189,9 +189,9 @@ that the model may ignore.
 
 Current implementation:
 
-- derives constraints from recent action attempts by actor id, ActionIntent
+- derives constraints from recent action attempts by actor id, selected action
   target, normalized structured args, and normalized blocker reason;
-- injects `runtime_retry_constraints` into CycleGoal and ActionIntent provider
+- injects `runtime_retry_constraints` into CycleGoal and Actor Turn provider
   context;
 - blocks a matching retry before Mineflayer execution;
 - writes `retry_constraint_blocked` evidence so the next turn can diagnose the
@@ -216,17 +216,17 @@ flowchart TD
   Context["ActorSoul/LifeGoal + current context"]
   Surface["action_surface: direct and deferred affordances"]
   Blockers["recent blockers and missing affordances"]
-  Context["provider context"]
-  Intent["ActionIntent"]
+  ProviderContext["provider context"]
+  Turn["Actor Turn tool selection"]
   Gate["action skill gate + primitive preconditions"]
   Evidence["Minecraft evidence"]
   Judgment["CycleJudgment"]
 
-  Context --> Context
-  Surface --> Context
-  Blockers --> Context
-  Context --> Intent
-  Intent --> Gate
+  Context --> ProviderContext
+  Surface --> ProviderContext
+  Blockers --> ProviderContext
+  ProviderContext --> Turn
+  Turn --> Gate
   Gate --> Evidence
   Evidence --> Judgment
   Judgment --> Blockers
@@ -274,7 +274,9 @@ Fix target:
 - keep reading nested `cycles[].action_attempts[]`;
 - keep counting `executed_tools` and `tool_statuses` from current report fields;
 - keep detecting previous judgment from provider input snapshots under `.input`;
-- surface `action_intent_contract_failure` and world-state diagnostics clearly;
+- surface runtime action contract failures and world-state diagnostics clearly,
+  including legacy `action_intent_contract_failure` artifacts when old reports
+  are audited;
 - surface `partial_verified_progress` once that status exists.
 
 ### P1: Fresh-World Cleanup Ownership
@@ -423,8 +425,8 @@ or bypassing embodied Mineflayer work.
 
 ## Suggested Next Implementation Order
 
-1. Keep `ActionIntent` argument validation as a regression gate and extend it
-   whenever a new primitive becomes provider-visible.
+1. Keep Actor Turn function-tool argument validation as a regression gate and
+   extend it whenever a new primitive becomes provider-visible.
 2. Extend runtime-level repeated-blocker suppression from the current exact
    target/args gate into live-run diagnosis and threshold/window tuning.
 3. Add partial-progress status to social-cycle reports and review summaries.

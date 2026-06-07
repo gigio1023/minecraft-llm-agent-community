@@ -5,11 +5,11 @@ sidebar_position: 3
 # Bounded Action Skill Creation
 
 Status note: this page remains the baseline lifecycle and evidence contract for
-action skill creation. The newer
-`Action-Selection-Gated-Action-Skill-Authoring-Plan.md` updates the generated
-code decision by allowing an explicit `author_and_trial_action_skill` ActionIntent
-mode. That mode is the only approved path for first creating a generated action
-skill candidate during social-cycle runtime.
+action skill creation. It is not the active Actor Turn provider contract.
+The active outer-selection spec is
+`Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`: new generated Mineflayer
+candidate creation during social-cycle runtime starts only when Actor Turn
+selects `author_mineflayer_action`.
 
 This page defines how this repo should add the future ability to create,
 improve, supersede, and retire Minecraft action skills.
@@ -41,8 +41,8 @@ background reviewer writes JavaScript or TypeScript -> runtime imports/evals it
 ```
 
 The runtime already has a bounded action loop. New action skills should be
-created only when the action planner explicitly chooses the creation path.
-Generated code is allowed as a bounded trial artifact when it is schema-bound,
+created only when Actor Turn explicitly selects the creation path. Generated
+code is allowed as a bounded trial artifact when it is schema-bound,
 helper-limited, recorded, and verified. It is not automatically active action
 skill memory until lifecycle promotion succeeds.
 
@@ -105,7 +105,7 @@ A structured proposed action skill made of already implemented primitives.
 
 Candidate recipes are data, not executable source. They describe:
 
-- task intent;
+- task purpose;
 - required actor role;
 - preconditions;
 - primitive steps;
@@ -138,7 +138,8 @@ outside the action-selection gate.
 
 Create an action skill proposal only from an explicit action-selection decision
 or from offline/manual implementation work. In social-cycle runtime, the first
-candidate record must originate from `author_and_trial_action_skill`.
+candidate record must originate from Actor Turn selecting
+`author_mineflayer_action`.
 
 The decision should be grounded in real evidence:
 
@@ -164,7 +165,7 @@ type ActionSkillProposalRecord = {
   owner_actor_id: string | "shared";
   source_kind: "seed" | "derived" | "manual" | "learned";
   status: "draft";
-  task_intent: string;
+  task_purpose: string;
   evidence_refs: string[];
   preconditions: string[];
   required_primitives: string[];
@@ -307,14 +308,18 @@ open-ended autonomous action skill generation.
 
 The current generated-authoring slice builds on that baseline:
 
-1. `author_and_trial_action_skill` is a first-class ActionIntent kind.
-2. `parameters` are the executable authority, with `args` kept as a migration
-   alias.
-3. Generated TypeScript runs as `run(ctx, params)` through a helper allowlist.
-4. Candidate proposals, generated source refs, helper events, trial evidence,
+1. `author_mineflayer_action` is the only active Actor Turn path that can
+   originate a new generated Mineflayer candidate.
+2. Existing Action Card tool `parameters` are executable authority only after
+   runtime validation; authoring rationale never supplies missing parameters.
+3. The internal codegen provider receives the full original `ActorTurnInput`,
+   raw outer function call, parsed authoring args, and Mineflayer codegen agent
+   skill markdown.
+4. Generated TypeScript runs as `run(ctx, params)` through a helper allowlist.
+5. Candidate proposals, generated source refs, helper events, trial evidence,
    verifier status, and generated lifecycle status are persisted in the actor
    workspace.
-5. Background reviewers cannot originate a generated candidate without an
+6. Background reviewers cannot originate a generated candidate without an
    existing action-selection candidate ref.
 
 ## Review Checklist

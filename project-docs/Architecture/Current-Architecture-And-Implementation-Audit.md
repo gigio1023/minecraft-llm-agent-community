@@ -1,12 +1,18 @@
 # Current Architecture And Implementation Audit
 
-Status: active audit snapshot
+Status: dated audit snapshot. This page predates the current Actor Turn
+tool-calling hot path and is retained for implementation-history context.
+Use `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
+`Actor-Episode-And-Actor-Turn-Architecture.md`, and
+`Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md` for current runtime
+authority.
 Date: 2026-05-24
 Search token: `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT`
 
-This document explains the current runtime architecture, compares it against the
-implemented TypeScript paths, and records the next decisions for settlement-cycle
-work. It is an audit of the active rebuild path, not a replacement for `SPEC.md`.
+This document explains the runtime architecture as of the recorded date,
+compares it against the implemented TypeScript paths at that time, and records
+the next decisions for settlement-cycle work. It is not a replacement for
+`SPEC.md` and not the current Actor Turn provider contract.
 
 ## Scope
 
@@ -122,9 +128,11 @@ It supports `place_block` and `build_pattern` as optional installed tool
 handlers, and it can continue past `deposit_shared_materials` when a caller needs
 handoff evidence after storage completion.
 
-The social-cycle runner implements the same authority split with a different
-goal stack: ActorSoul -> ActorLifeGoal -> StrategicGoal -> CycleGoal ->
-ActionIntent -> runtime execution -> CycleJudgment.
+The social-cycle runner now implements the same authority split through the
+Actor Turn path: ActorSoul -> ActorLifeGoal -> Active Episode / CycleGoal
+context -> Actor Turn function-tool selection -> runtime execution or generated
+action trial -> CycleJudgment. Older report artifacts may still contain legacy
+planner-action refs.
 
 ## Actor Workspace
 
@@ -249,7 +257,7 @@ High-level flow in `probe/src/runtime/socialCycleRunner.ts`:
    - observe the world;
    - assemble context;
    - run cycle goal provider;
-   - run up to `maxActionsPerCycle` ActionPlanner / executor / Judgment turns;
+   - run up to `maxActionsPerCycle` Actor Turn / executor / Judgment turns;
    - persist memory writes from judgments;
    - write report after each cycle.
 8. Finalize runtime status from provider failure, fixture dependency, cycle
@@ -268,7 +276,8 @@ The current goal stack is:
   prompt;
 - StrategicGoal: rolling direction;
 - CycleGoal: current bounded cycle target;
-- ActionIntent: one provider-proposed action;
+- Actor Turn selection: one provider-selected visible function tool or
+  `author_mineflayer_action`;
 - CycleJudgment: evidence-based interpretation of what happened.
 
 This hierarchy is aligned with the current direction. It prevents user prompts
@@ -308,9 +317,9 @@ The first settlement-specific progress vector is now implemented as
 - missing primitive blockers;
 - current settlement objective checklist.
 
-This packet is intentionally runtime-owned. The provider can use it to choose
-CycleGoals and ActionIntents, but it cannot mark checklist success without
-matching evidence and postcondition results.
+This packet is intentionally runtime-owned. The provider can use it as context
+for CycleGoals and Actor Turn selections, but it cannot mark checklist success
+without matching evidence and postcondition results.
 
 ## Providers
 
@@ -319,7 +328,8 @@ The social runtime has three provider stages:
 | Stage | File | Responsibility |
 |-------|------|----------------|
 | CycleGoal provider | `probe/src/provider/socialGoalMindProvider.ts` | choose strategic updates and a CycleGoal |
-| ActionPlanner | `probe/src/provider/socialActionPlannerProvider.ts` | choose one bounded ActionIntent |
+| Legacy ActionPlanner | `probe/src/provider/socialActionPlannerProvider.ts` | choose one bounded legacy planner action when explicit migration paths need it |
+| Actor Turn provider | `probe/src/provider/socialActorTurnProvider.ts` | choose one visible function tool or `author_mineflayer_action` |
 | CycleJudgment | `probe/src/provider/socialCycleJudgmentProvider.ts` | judge evidence and propose memory/relationship updates |
 
 The provider prompts have the right posture:
@@ -345,9 +355,12 @@ Two implementation details matter:
 
 ## Social Executor
 
-`executeSocialActionIntent()` resolves either:
+Current Actor Turn resolution maps a selected Action Card to one validated
+runtime action or starts generated-action authoring. Legacy
+`executeSocialActionIntent()` remains relevant only when reading or running an
+explicit legacy planner path. That legacy path resolves either:
 
-- one `use_primitive` intent; or
+- one `use_primitive` planner action; or
 - every primitive in an owned `use_action_skill` bundle.
 
 It checks:
@@ -397,7 +410,7 @@ provider text still never mutates relationship edges directly.
 | Implemented action skills have verification contracts | Good in live matrix | 14 contracts declared and 14/14 passed with current-run evidence after the shelter-anchor fix. |
 | Settlement action surface includes placement/building | Newly good | `place_block` and `build_pattern` are the right abstractions. |
 | Action skill execution unit semantics | Improving | Social executor now records settlement-facing postcondition results for owned bundles. |
-| Repeated blocked action avoidance | Baseline implemented | ActionPlanner sees `runtime_retry_constraints`, and the executor blocks exact repeated target/args before Mineflayer execution. |
+| Repeated blocked action avoidance | Baseline implemented | Actor Turn sees `runtime_retry_constraints`, and the executor blocks exact repeated target/args before Mineflayer execution. |
 | Social relationship mutation | Guarded path | CycleJudgment proposals route through an applier and may be rejected with reason. |
 | Long-horizon settlement evaluation | Not ready as open-ended target | Needs checklist evaluator and compressed settlement state first. |
 
@@ -424,9 +437,9 @@ The useful lessons are specific:
   agent architecture. For this repo, that points to a local Minecraft knowledge
   layer and explicit task/checklist evaluators, not broader prompt text.
 - ReAct and Inner Monologue support interleaving reasoning, action, and
-  environment feedback. The current CycleGoal -> ActionIntent -> evidence ->
-  Judgment loop is a good fit, but only if recent failures are compacted into
-  actionable context.
+  environment feedback. The current Actor Turn -> evidence -> Judgment loop is a
+  good fit only if recent failures are compacted into actionable context without
+  becoming hidden runtime policy.
 - Reflexion and Generative Agents support memory/reflection, but this repo should
   keep memory evidence-derived. Reflection should improve the next action; it
   must not count as world progress.

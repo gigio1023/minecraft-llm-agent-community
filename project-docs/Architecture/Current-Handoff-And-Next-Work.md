@@ -1451,3 +1451,47 @@ Remaining:
 - Re-run a low-cost 30-cycle Actor Turn smoke before claiming product progress.
 - A 60-cycle run remains required before the overall goal can be considered
   complete.
+
+## 2026-06-07 Actor Turn Documentation Cleanup
+
+This checkpoint aligns documentation with the current PR direction:
+
+- Actor Turn is the ordinary LLM hot path.
+- The provider chooses one visible function tool: an Action Card with strict
+  `parameters`, or `author_mineflayer_action`.
+- `ActionIntent` is legacy/migration terminology only. It must not be described
+  as the current provider-facing or codegen-facing boundary.
+- Generated Mineflayer authoring starts from `author_mineflayer_action`; the
+  outer tool call carries detailed rationale and desired behavior, not source
+  code and not a `context_to_preserve` summary.
+- Internal codegen receives the full original `ActorTurnInput`, raw outer tool
+  call, parsed authoring args, and Mineflayer code-generation agent skill
+  markdown.
+- PlanBeads remain passive actor-owned work state, not an executor, planner,
+  parameter source, retry override, or success oracle.
+
+Documentation changes in this pass:
+
+- Rewrote `Soul-Life-Goal-Runtime-Architecture.md` as an English Actor
+  Turn-oriented architecture note instead of a three-stage `CycleGoal ->
+  ActionIntent -> CycleJudgment` plan.
+- Translated active internal docs and agent-skill docs to English; archived
+  research and static exports remain historical material.
+- Updated `README.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
+  `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` to describe full-context codegen
+  and current Actor Turn authority.
+- Moved dated or legacy plans into supporting-doc status in
+  `Documentation-Map.md`.
+- Updated PlanBeads, memory/action-space, future-work, and live-test docs so
+  they refer to Actor Turn tool selection rather than current `ActionIntent`
+  execution.
+
+Current documentation rule:
+
+- New implementation work should start from
+  `Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`,
+  `Actor-Episode-And-Actor-Turn-Architecture.md`,
+  `Actor-Persistent-State-And-PlanBeads.md`, and
+  `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`.
+- Use legacy `ActionIntent` docs only for historical artifacts, report
+  compatibility, or explicit migration paths.

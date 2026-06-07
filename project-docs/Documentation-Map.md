@@ -119,19 +119,16 @@ Architecture:
 - `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 - `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
 - `project-docs/Architecture/Action-Skill-Verification.md`
-- `project-docs/Architecture/Bounded-Action-Skill-Creation.md`
 - `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
 - `project-docs/Architecture/Minecraft-Basic-Guide.md`
 - `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
 - `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 - `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-- `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
 - `project-docs/Architecture/Async-Reviewer-Sidecars.md`
 
 Current state and operations:
 
 - `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-- `project-docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
 - `project-docs/Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`
 - `project-docs/Architecture/Future-Works.md`
 - `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
@@ -175,6 +172,9 @@ maintainers, but they should not be treated as top-level product direction:
 - `LLM-Context-And-Actor-Workspace.md`
 - `Gemini-Native-Audio-Codegen-Verdict.md`
 - `composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+- `Bounded-Action-Skill-Creation.md`
+- `Social-Cycle-LLM-Input-Cleanup-Plan.md`
+- `Current-Architecture-And-Implementation-Audit.md`
 
 These documents must remain subordinate to the Soul/LifeGoal social runtime and
 must not make benchmark progress, diamond acquisition, or generic autonomy look

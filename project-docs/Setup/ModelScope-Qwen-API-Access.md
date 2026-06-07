@@ -10,43 +10,42 @@ Status: private Qwen model access operation note.
 
 Recorded: 2026-06-07.
 
-이 문서는 ModelScope에서 받은 Qwen 모델 접근 권한을 기술적으로 쓰기
-위한 운영 메모다. 홍보 문구나 역할 설명은 남기지 않고, 요청 endpoint,
-model id, 토큰 보관, usage/rate-limit 확인, repo usage guard 연결 기준만
-기록한다.
+This document records how to use the private Qwen model access currently
+available through ModelScope. It intentionally avoids marketing language and
+role descriptions. It records only model ids, endpoints, token handling,
+quota/rate-limit inspection, and future runtime usage-guard requirements.
 
 ## Current Access
 
-첨부된 ModelScope 모델 페이지 기준으로 현재 접근 가능한 private model id:
+The user's supplied ModelScope model pages showed access to these private model
+ids:
 
 - `Qwen-Ambassador/Qwen3.7-Max`
 - `Qwen-Ambassador/Qwen3.7-Plus`
 
-`Qwen-Ambassador/...`는 요청 payload에 들어가는 ModelScope model id의
-namespace다. 문서나 리포트 설명에서는 역할/마케팅 표현을 쓰지 말고,
-요청 코드와 quota 기록에서만 정확한 model id로 사용한다.
+`Qwen-Ambassador/...` is the namespace that appears in API request payloads.
+Use the exact model id in request code, quota records, and run reports. Avoid
+describing the namespace as a role or product claim.
 
-Use case 기준:
+Suggested experimental use:
 
-- `Qwen3.7-Max`: 텍스트, 코딩, tool-use 평가용 우선 후보.
-- `Qwen3.7-Plus`: 이미지 입력이 필요한 multimodal smoke 또는 UI/screen
-  판단 실험용 후보.
+- `Qwen3.7-Max`: text, coding, and tool-use evaluation.
+- `Qwen3.7-Plus`: multimodal smoke tests that need image input.
 
-이 repo의 Minecraft social-cycle runtime에는 아직 `modelscope-api` provider
-adapter가 없다. 지금 단계의 목적은 수동 smoke, quota 확인, future adapter
-구현 시 사용할 auth/usage contract를 고정하는 것이다.
+This repo does not yet have a `modelscope-api` social-cycle provider adapter.
+The current purpose is manual smoke testing, quota inspection, and fixing the
+auth/usage contract a future adapter should follow.
 
 ## Auth
 
-ModelScope API-Inference는 ModelScope Access Token을 쓴다. 공식 문서의
-토큰 관리 페이지:
+ModelScope API-Inference uses a ModelScope Access Token. Token management pages:
 
 ```text
 https://modelscope.cn/my/myaccesstoken
 https://modelscope.ai/my/myaccesstoken
 ```
 
-Repo-local `.env`에는 다음처럼 저장한다.
+Store local credentials in the repo-local ignored `.env`:
 
 ```text
 MODELSCOPE_API_KEY=...
@@ -54,14 +53,14 @@ MODELSCOPE_BASE_URL=https://api-inference.modelscope.ai/v1
 MODELSCOPE_MODEL=Qwen-Ambassador/Qwen3.7-Max
 ```
 
-주의:
+Rules:
 
-- `MODELSCOPE_API_KEY`는 ModelScope Access Token이다. `OPENAI_API_KEY`,
-  `GEMINI_API_KEY`, `openai-codex` auth store와 다른 인증 경로다.
-- 토큰을 커밋하거나 transcript, report, shell history, docs에 출력하지
-  않는다.
-- 첨부/캡처/예시 코드에 실제 토큰이 노출됐다면 폐기하고 새 토큰으로
-  교체한다.
+- `MODELSCOPE_API_KEY` is a ModelScope Access Token. It is separate from
+  `OPENAI_API_KEY`, `GEMINI_API_KEY`, and any Codex auth store.
+- Do not commit the token or print it into transcripts, reports, shell history,
+  or docs.
+- If the token appears in an attachment, screenshot, example, or committed
+  artifact, revoke it and create a new token.
 
 Official ModelScope CN docs state that API-Inference requires a registered
 ModelScope account, Aliyun account binding, and real-name verification. Private
@@ -70,13 +69,13 @@ quota state is incomplete.
 
 ## Endpoint
 
-Private Qwen model pages supplied in the attachment use:
+The private Qwen model pages supplied by the user used:
 
 ```text
 https://api-inference.modelscope.ai/v1
 ```
 
-Official ModelScope API-Inference docs use:
+Official ModelScope API-Inference docs also show:
 
 ```text
 https://api-inference.modelscope.cn/v1/
@@ -85,16 +84,16 @@ https://api-inference.modelscope.cn/v1/
 Operational rule:
 
 - For these private Qwen models, start from the exact endpoint shown in the
-  model page sample: `https://api-inference.modelscope.ai/v1`.
+  private model page sample: `https://api-inference.modelscope.ai/v1`.
 - If the page sample changes, treat the model page sample as the current source
   of truth for that private model.
 - Do not use `GET` or `HEAD /v1/chat/completions` as an availability test.
-  Chat Completions is a `POST` API, and a 404 from `HEAD` is not enough to prove
-  the provider is unavailable.
+  Chat Completions is a `POST` API, and a 404 from `HEAD` does not prove the
+  provider is unavailable.
 
 ## Minimal Smoke
 
-Use `curl -D` so the response headers are preserved for quota inspection.
+Use `curl -D` so response headers are preserved for quota inspection.
 
 ```bash
 curl -sS -D /tmp/modelscope-qwen.headers \
@@ -193,13 +192,12 @@ Official ModelScope API-Inference limits checked on 2026-06-07:
 - The total daily API-Inference request limit is currently 2000 requests per
   registered user across all models.
 - Each model also has a model-specific daily request limit. That limit is
-  dynamically adjusted and is at most 200; actual available quota can be much
-  lower.
+  dynamically adjusted and is at most 200; actual available quota can be lower.
 - Model concurrency/rate limits are dynamically adjusted by platform pressure,
   with normal single-concurrency use as the stated target.
 - A `429` should be treated as provider quota/rate evidence. Switch models,
   lower concurrency, or wait for the next day instead of retrying aggressively.
-- AIGC image models have separate throttling; do not reuse AIGC quota behavior
+- AIGC image models have separate throttling. Do not reuse AIGC quota behavior
   for these Qwen LLM/MLLM calls.
 
 The official docs do not provide a confirmed reset timezone in the source

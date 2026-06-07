@@ -4,13 +4,13 @@ description: >
   Review real Minecraft LLM agent runs from transcript files, canonical runtime
   artifacts, social-cycle reports, actor workspaces, logs, Langfuse traces,
   human-visible behavior notes, and code diffs, then infer concrete
-  implementation flaws and next fixes. Use for prompts like "agent 행동
-  리뷰해줘", "실행 결과에서 인사이트 뽑아줘", "NPC 행동 패턴 분석",
-  "100 cycle 결과 봐줘", "관찰-행동-목표 루프 분석", "why did the NPC stall?",
-  "matrix 12/12 깨졌어", "collectLogs 3/4에서 멈춰", "스크린샷이 이상해",
-  "visual evidence 봐줘", or "Langfuse trace까지 보고 구현 개선해줘" after
-  Minecraft runtime, action-skill, Actor Turn, generated Mineflayer, or
-  social-cycle runs.
+  implementation flaws and next fixes. Use for prompts like "review this agent
+  run", "extract implementation insights from the run", "analyze the NPC
+  behavior loop", "review the 100-cycle result", "why did the NPC stall?",
+  "the matrix broke at 12/12", "collectLogs stopped at 3/4", "the screenshots
+  look wrong", "review visual evidence", or "use Langfuse traces to propose
+  runtime fixes" after Minecraft runtime, action-skill, Actor Turn, generated
+  Mineflayer, or social-cycle runs.
 ---
 
 # Minecraft Agent Runtime Review

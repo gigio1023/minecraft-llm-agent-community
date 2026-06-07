@@ -174,10 +174,15 @@ current world state, and the action surface still owns executable affordances.
 
 ## Tool Call
 
-A **tool call** is a provider's structured request to run one runtime primitive
-or action skill with validated arguments.
+A **tool call** is a provider's structured request to use one visible function
+tool. In Actor Turn, this means either an Action Card tool with strict
+`parameters` or `author_mineflayer_action` with detailed authoring rationale.
 
-The provider proposes tool calls. The runtime validates and executes them.
+The provider proposes tool calls. The runtime maps valid Action Card selections
+to runtime actions, or starts full-context codegen for
+`author_mineflayer_action`. The runtime still validates schemas, permissions,
+retry constraints, timeouts, verifier output, and evidence before treating any
+result as progress.
 
 ## Action Runner
 

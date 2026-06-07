@@ -29,8 +29,8 @@ ActorSoul + LifeGoal
 -> ready PlanBeads
 -> Active Episode selected/related refs
 -> Actor Turn compact hints
--> ActionIntent
--> runtime execution and evidence
+-> Actor Turn function-tool selection
+-> runtime action, generated-action trial, and evidence
 -> branch-time Deliberation when needed
 -> guarded PlanBead updates
 ```
@@ -131,7 +131,8 @@ tracked concern is satisfied.
 | `PlanBeadDependency` | ordering, blocking, and provenance edges between PlanBeads | runtime truth or broad domain strategy |
 | `PlanBeadGraph` | actor-owned ready/blocked work graph | hidden deterministic planner |
 | `ActorCycleGoal` | bounded current-cycle objective | whole multi-cycle work graph |
-| `ActionIntent` | one structured executable proposal | missing args hidden in prose |
+| Actor Turn tool selection | one visible Action Card or `author_mineflayer_action` function call | missing args hidden in prose |
+| runtime action/trial | validated execution unit or generated-action trial | provider narration or unchecked source |
 | `CycleJudgment` | evidence-backed interpretation and bead-op proposals | unverified success |
 | `ActorMemoryRecord` | historical evidence-linked recall | active work source of truth |
 | runtime evidence | observed game/runtime facts | provider intention |
@@ -151,8 +152,8 @@ flowchart LR
   WorldEvent["WorldEvent<br/>context pressure"] --> Graph
   Graph --> Ready["ready_beads<br/>unblocked work front"]
   Ready --> Cycle["CycleGoal<br/>current-cycle objective"]
-  Cycle --> Intent["ActionIntent<br/>one executable proposal"]
-  Intent --> Evidence["Runtime evidence<br/>Mineflayer artifacts"]
+  Cycle --> Turn["Actor Turn<br/>one function tool selection"]
+  Turn --> Evidence["Runtime evidence<br/>Mineflayer artifacts"]
   Evidence --> Judgment["CycleJudgment<br/>evidence interpretation"]
   Judgment --> Memory
   Judgment --> Graph
@@ -309,13 +310,15 @@ A bead is ready when:
   `notes.next` to support a bounded Active Episode focus or compatibility
   CycleGoal.
 
-The ready front is context, not a command. It helps the CycleGoal provider choose
-what concern to work on now on the legacy path, and it helps branch-time
+The ready front is context, not a command. It helps legacy CycleGoal routing
+when that path is explicitly under migration, and it helps branch-time
 Deliberation / Active Episode selection on the Actor Turn path. The Actor Turn
-provider may see only compact hints. ActionIntent still must pass runtime gates.
-Episode selection may auto-cite one or two matching ready/in-progress beads as
-`selected_plan_bead_refs` for audit continuity; this citation is not executable
-authority and does not force Actor Turn to follow a checklist action.
+provider may see only compact hints. Any selected Action Card or
+`author_mineflayer_action` call still must pass runtime schema, permission,
+retry, source, verifier, and evidence gates. Episode selection may auto-cite one
+or two matching ready/in-progress beads as `selected_plan_bead_refs` for audit
+continuity; this citation is not executable authority and does not force Actor
+Turn to follow a checklist action.
 
 ## Actor Workspace Layout
 
@@ -570,7 +573,8 @@ Run reports should expose:
 - cycle-level `plan_bead_packet_ref` values that point at ready-front snapshots;
 - provider input `compact_plan_bead_hints`, including empty arrays when no
   current graph hints exist;
-- PlanBead refs cited by each CycleGoal and ActionIntent;
+- PlanBead refs cited by each CycleGoal, Active Episode, Actor Turn selection,
+  or runtime action artifact;
 - accepted and rejected bead operations;
 - dependency edges created or cleared;
 - bead status transitions;

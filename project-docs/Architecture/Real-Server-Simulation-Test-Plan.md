@@ -183,8 +183,8 @@ Pass criteria:
 - at least one action attempt executes a meaningful primitive such as
   `collect_logs`, `mine_block`, `craft_item`, or `craft_with_table`;
 - meaningful primitive status matches the primitive verifier contract;
-- every cycle has `ActionIntent`, provider input/output, evidence, and judgment
-  refs;
+- every cycle has provider input/output, selected Actor Turn action or explicit
+  legacy planner action ref, evidence, and judgment refs;
 - cycle 2 or later uses previous judgment or memory.
 
 Evidence inspection:
@@ -277,8 +277,8 @@ This is the next simulation gate, not yet a free pass.
 Target readiness requires:
 
 - an owned action skill or primitive path that can execute the selected target;
-- structured `ActionIntent` args for physical targets, items, positions, or
-  containers;
+- structured Actor Turn tool parameters for physical targets, items, positions,
+  or containers;
 - evidence showing the target, before/after state, and failure reason when the
   action cannot complete;
 - no provider claim of target success without current-run target evidence.

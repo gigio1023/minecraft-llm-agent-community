@@ -46,10 +46,15 @@ Not current goals:
 
 ## Current Runtime Shape
 
-The current implementation is a bounded social-cycle runtime. The provider can
-propose goals, actions, and judgments, but Minecraft truth stays inside the
-runtime: contracts, gates, Mineflayer execution, verification, artifacts, and
-actor workspace state.
+The current implementation is a bounded Actor Turn runtime. On the ordinary hot
+path, the Actor Turn provider sees current state, recent evidence, Action Cards,
+the Minecraft Basic Guide, memory, relationship context, and passive PlanBead
+hints. It then chooses exactly one visible function tool: either an Action Card
+with strict `parameters`, or `author_mineflayer_action` when a new bounded
+Mineflayer behavior needs to be generated and trialed.
+
+Minecraft truth stays inside the runtime: schemas, gates, retry constraints,
+Mineflayer execution, verification, artifacts, and actor workspace state.
 
 For a review-friendly architecture walkthrough with focused Mermaid diagrams,
 see
@@ -76,11 +81,13 @@ In short:
 
 - `action_surface` is the actor's current body, not a domain-specific checklist;
 - `world-state-summary/v1` is query-neutral evidence with explicit scan limits;
-- physical `ActionIntent` args are executable contracts, not prose suggestions;
+- Action Card tool `parameters` are executable contracts, not prose suggestions;
 - `runtime-retry-constraint/v1` blocks exact repeated target/args failures
   before another Mineflayer call;
 - memory can influence later cycles, but Minecraft progress still requires
   verifier-backed runtime evidence.
+- `ActionIntent` is legacy terminology for migration artifacts only; it is not
+  the current Actor Turn provider or codegen boundary.
 
 ## What Success Looks Like
 
@@ -143,8 +150,8 @@ until it is renamed or retired behind a broader typed state contract.
 Recent hardening also makes several fake-success paths visible as blocked
 runtime evidence:
 
-- direct primitive intents cannot carry `action_skill_id`;
-- direct shared-storage transfer intents require explicit `count` or
+- direct primitive tool selections cannot carry `action_skill_id`;
+- direct shared-storage transfer selections require explicit `count` or
   `targetCount`;
 - `wait` and `remember` go through CycleGoal and active action-skill gates;
 - repeated exact target/args blockers become runtime retry constraints and are
@@ -160,7 +167,7 @@ runtime evidence:
 - runtime-owned validation, timeout, verification, and artifacts;
 - query-neutral world-state diagnostics instead of provider-facing gameplay
   taxonomies;
-- structured `ActionIntent` argument contracts instead of hidden executor
+- structured function-tool argument contracts instead of hidden executor
   defaults;
 - actor workspace is the source of truth for actor-owned action skill state;
 - tests stay small and Detroit-style;

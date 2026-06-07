@@ -108,11 +108,17 @@ needed, but PlanBeads do not create source, parameters, permissions, or
 executable authority.
 
 Generated Mineflayer code should be used more actively through this explicit
-author-and-trial path. It must be schema-bound and helper-limited:
+full-context authoring path. The outer Actor Turn function call is a selection
+and rationale boundary only: it must not include generated source and must not
+choose a lossy `context_to_preserve` summary. When `author_mineflayer_action`
+is selected, the runtime passes the full original `ActorTurnInput`, raw outer
+tool call, parsed tool arguments, and Mineflayer code-generation agent skill
+markdown into the internal codegen provider. The generated candidate must then
+be schema-bound and helper-limited:
 
-- provider output must include an input schema, current parameters, generated
-  TypeScript source, helper API version, timeout, verifier, failure modes, and
-  promotion policy;
+- internal codegen output must include an input schema, current parameters,
+  generated TypeScript source, helper API version, timeout, verifier, failure
+  modes, and promotion policy;
 - primitive and action-skill parameters must validate against JSON
   Schema/OpenAPI-style contracts before execution;
 - prose fields such as `why_this_action` never supply missing parameters;
@@ -121,8 +127,11 @@ author-and-trial path. It must be schema-bound and helper-limited:
 - a passed trial is not active action skill authority until lifecycle promotion
   succeeds.
 
-Use `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-as the active implementation plan for this rule.
+Use `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+as the active outer-selection spec for this rule. Use
+`project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+only for generated candidate, helper allowlist, verifier, trial, and promotion
+mechanics after authoring has been selected.
 
 ## Tool Calling And Prose-Parsing Anti-Pattern
 

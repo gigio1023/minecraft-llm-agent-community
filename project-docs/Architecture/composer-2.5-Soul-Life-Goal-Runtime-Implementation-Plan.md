@@ -11,7 +11,12 @@ Search tokens:
 - `OPENAI_API_GPT54_MINI_SOCIAL_RUNTIME`
 - `WORLD_EVENT_NOT_USER_PROMPT`
 
-Status: handoff plan, 2026-05-23.
+Status: superseded handoff plan, 2026-05-23. This page records the historical
+three-stage `CycleGoal -> ActionIntent -> CycleJudgment` implementation request.
+It is not the active Actor Turn provider contract. For current work, use
+`Soul-Life-Goal-Runtime-Architecture.md`,
+`Actor-Episode-And-Actor-Turn-Architecture.md`, and
+`Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`.
 
 ## Request To Composer 2.5
 
