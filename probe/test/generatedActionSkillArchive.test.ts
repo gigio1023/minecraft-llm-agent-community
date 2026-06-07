@@ -1,39 +1,19 @@
-/** Regression coverage for generated action skill policy gates. */
+/** Regression coverage for archived generated action skill records. */
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { shouldExecuteLegacyGeneratedActionSkills } from "../src/skills/generatedLegacyPolicy.js";
-import { archiveLegacyGeneratedSkills } from "../src/skills/legacy/archiveGeneratedSkills.js";
+import { archiveGeneratedSkills } from "../src/skills/archive/archiveGeneratedSkills.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-test("keeps legacy generated TypeScript execution disabled by default", () => {
-  assert.equal(shouldExecuteLegacyGeneratedActionSkills({}), false);
-  assert.equal(
-    shouldExecuteLegacyGeneratedActionSkills({
-      ALLOW_LEGACY_GENERATED_ACTION_SKILLS: "false"
-    }),
-    false
-  );
-});
-
-test("requires explicit opt-in before legacy generated TypeScript can execute", () => {
-  assert.equal(
-    shouldExecuteLegacyGeneratedActionSkills({
-      ALLOW_LEGACY_GENERATED_ACTION_SKILLS: "1"
-    }),
-    true
-  );
-});
-
-test("archives legacy generated TypeScript into actor workspace candidates", async () => {
+test("archives generated TypeScript into actor workspace candidates", async () => {
   const rootDir = path.resolve(
     here,
     "test-artifacts",
-    `legacy-generated-archive-${process.pid}-${Date.now()}`
+    `generated-source-archive-${process.pid}-${Date.now()}`
   );
   const generatedSkillsDir = path.join(rootDir, "build", "generated-skills");
   const archiveDir = path.join(rootDir, "build", "generated-skills-archive");
@@ -48,7 +28,7 @@ test("archives legacy generated TypeScript into actor workspace candidates", asy
       "utf8"
     );
 
-    const archived = await archiveLegacyGeneratedSkills({
+    const archived = await archiveGeneratedSkills({
       generatedSkillsDir,
       archiveDir,
       actorWorkspaceRootDir,
@@ -62,7 +42,8 @@ test("archives legacy generated TypeScript into actor workspace candidates", asy
     const proposal = JSON.parse(await fs.readFile(archived[0].proposalPath, "utf8"));
     assert.equal(proposal.schema, "action-skill-proposal/v1");
     assert.equal(proposal.owner_actor_id, "npc_b");
-    assert.equal(proposal.legacy_generated_code_language, "typescript");
+    assert.equal(proposal.generated_source_language, "typescript");
+    assert.match(proposal.generated_source, /collectLogs/);
     assert.match(proposal.success_verifier, /requires_recipe_conversion/);
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });

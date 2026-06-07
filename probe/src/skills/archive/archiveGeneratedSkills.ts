@@ -1,7 +1,7 @@
 /**
- * Moves legacy generated action skill artifacts out of the active path.
+ * Moves archived generated action skill artifacts out of the active path.
  *
- * @remarks `build/generated-skills` is historical exploratory output; actor
+ * @remarks `build/generated-skills` is archived exploratory output; actor
  * workspace records are the source of truth for current action skill ownership.
  */
 import fs from "node:fs/promises";
@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { writeActionSkillProposal } from "../proposals/proposalStore.js";
 
-export type ArchiveLegacyGeneratedSkillsOptions = {
+export type ArchiveGeneratedSkillsOptions = {
   generatedSkillsDir: string;
   archiveDir: string;
   actorWorkspaceRootDir: string;
@@ -17,7 +17,7 @@ export type ArchiveLegacyGeneratedSkillsOptions = {
   archivedAt?: string;
 };
 
-export type ArchivedLegacyGeneratedSkill = {
+export type ArchivedGeneratedSkill = {
   sourcePath: string;
   archivePath: string;
   proposalPath: string;
@@ -46,12 +46,12 @@ async function listGeneratedSkillFiles(dir: string) {
     .map((entry) => path.join(dir, entry));
 }
 
-export async function archiveLegacyGeneratedSkills(
-  options: ArchiveLegacyGeneratedSkillsOptions
-): Promise<ArchivedLegacyGeneratedSkill[]> {
+export async function archiveGeneratedSkills(
+  options: ArchiveGeneratedSkillsOptions
+): Promise<ArchivedGeneratedSkill[]> {
   const archivedAt = options.archivedAt ?? new Date().toISOString();
   const generatedFiles = await listGeneratedSkillFiles(options.generatedSkillsDir);
-  const archived: ArchivedLegacyGeneratedSkill[] = [];
+  const archived: ArchivedGeneratedSkill[] = [];
 
   await fs.mkdir(options.archiveDir, { recursive: true });
 
@@ -59,7 +59,7 @@ export async function archiveLegacyGeneratedSkills(
     const code = await fs.readFile(sourcePath, "utf8");
     const sourceBaseName = path.basename(sourcePath);
     const skillId = sanitizeId(sourceBaseName.replace(/\.ts$/, ""));
-    const proposalId = `legacy-archive-${Date.now()}-${skillId}`;
+    const proposalId = `generated-source-archive-${Date.now()}-${skillId}`;
     const proposalPath = await writeActionSkillProposal(options.actorWorkspaceRootDir, {
       schema: "action-skill-proposal/v1",
       proposal_id: proposalId,
@@ -67,17 +67,17 @@ export async function archiveLegacyGeneratedSkills(
       owner_actor_id: options.actorId,
       source_kind: "learned",
       status: "draft",
-      task_intent: "Archived legacy generated TypeScript action skill for manual review and recipe conversion.",
+      task_intent: "Archived generated TypeScript action skill for manual review and recipe conversion.",
       evidence_refs: [],
       preconditions: [],
       required_primitives: [],
-      proposed_recipe_id: `legacy-generated-code:${proposalId}`,
-      success_verifier: "not_validated_generated_code_requires_recipe_conversion",
-      known_failure_modes: ["legacy_generated_code_not_runtime_verified"],
+      proposed_recipe_id: `generated-source-import:${proposalId}`,
+      success_verifier: "not_validated_generated_source_requires_recipe_conversion",
+      known_failure_modes: ["generated_source_not_runtime_verified"],
       created_at: archivedAt,
       updated_at: archivedAt,
-      legacy_generated_code: code,
-      legacy_generated_code_language: "typescript",
+      generated_source: code,
+      generated_source_language: "typescript",
       notes: `Archived from ${sourceBaseName}; not executable until converted to a validated recipe.`
     });
     const archivePath = path.join(

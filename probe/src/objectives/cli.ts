@@ -1,5 +1,5 @@
 /**
- * CLI for legacy/direct objective probes.
+ * CLI for direct objective probes.
  *
  * @remarks These probes can produce useful Mineflayer evidence, but they should
  * not revive a benchmark-first or Voyager-style architecture as the active path.

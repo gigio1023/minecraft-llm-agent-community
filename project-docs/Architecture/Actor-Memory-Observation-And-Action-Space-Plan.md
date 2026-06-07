@@ -166,7 +166,7 @@ opportunities into candidate action skills with verifiers.
    `syncRunMemory`, and `compactActorMemory`.
 3. Integrate relationship ledger events and retry constraints as first-class
    memory inputs without duplicating their source-of-truth stores.
-4. Add dry-run migration tooling for legacy generated-skill output.
+4. Add dry-run migration tooling for archived generated-skill output.
 5. Add read-only artifact migration checks for old context field names once
    schema compatibility requirements are explicit.
 6. Add SQLite/FTS indexes only after JSON record semantics and evidence refs are

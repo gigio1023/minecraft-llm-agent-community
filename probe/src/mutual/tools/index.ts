@@ -249,7 +249,7 @@ function mapMutualToolToRuntimePrimitive(tool: string): RuntimeAllowedTool | und
     case "remember":
       return "remember";
     case "drop_item":
-      // Legacy mutual marker handoff is a material-transfer action. Until
+      // Archived mutual marker handoff is a material-transfer action. Until
       // drop/pickup primitives exist, gate it through shared-deposit ownership.
       return "deposit_shared";
   }

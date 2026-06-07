@@ -1,5 +1,5 @@
 /**
- * Declarative ladder of legacy long-objective probe tasks.
+ * Declarative ladder of direct long-objective probe tasks.
  *
  * @remarks The ladder is capability scaffolding for experiments, not a mandatory
  * CycleGoal sequence for Soul-grounded social simulation.

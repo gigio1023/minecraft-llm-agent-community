@@ -63,7 +63,7 @@ The runtime should be strict where it owns authority:
 - actor workspace artifacts.
 
 There is no active `ActionIntent` middle layer in the Actor Turn provider or
-codegen boundary. `ActionIntent` is legacy terminology for historical planner
+codegen boundary. `ActionIntent` is archived terminology for historical planner
 artifacts and migration-only compatibility paths.
 
 ## Near-Term Proof

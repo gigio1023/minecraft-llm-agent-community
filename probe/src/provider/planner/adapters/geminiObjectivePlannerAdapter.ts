@@ -1,5 +1,5 @@
 /**
- * Adapter that routes legacy objective planning through Gemini Live.
+ * Adapter that routes direct objective planning through Gemini Live.
  *
  * @remarks This provider path is experimental and must remain isolated from the
  * default social-cycle action-selection contract.

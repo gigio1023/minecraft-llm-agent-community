@@ -66,8 +66,8 @@ Goal authority should remain layered:
 | WorldEvent | event/context record; never a LifeGoal replacement |
 | PlanBead | checkpointed actor-owned issue-like work item under LifeGoal |
 | PlanBeadGraph | dependency graph whose ready front can guide Actor Turn continuity |
-| StrategicGoal | legacy-adjacent medium-horizon interpretation; use PlanBeads for new persistent work state |
-| CycleGoal | legacy-compatible bounded current-cycle objective |
+| StrategicGoal | archived-adjacent medium-horizon interpretation; use PlanBeads for new persistent work state |
+| CycleGoal | archived-compatible bounded current-cycle objective |
 | Actor Turn | ordinary one-step tool-selection hot path |
 | runtime action | validated Action Card or generated-action path selected for execution/trial |
 | CycleJudgment | evidence-based interpretation of what happened |

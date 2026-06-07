@@ -1,8 +1,3 @@
-import {
-  legacyPlannerActionParameters,
-  type LegacyPlannerAction
-} from "./types.js";
-
 export const ACTION_PARAMETER_CONTRACT_VERSION =
   "actor-turn-action-parameters/v1" as const;
 
@@ -464,16 +459,6 @@ export function primitiveParameterContractSummary(primitiveId: string): Primitiv
         accepted_forms: ["{}"]
       };
   }
-}
-
-export function validateDirectPrimitiveLegacyPlannerActionParameters(
-  action: LegacyPlannerAction
-): ActionParameterContractResult {
-  return validatePrimitiveActionParameters({
-    primitiveId: action.primitive_id ?? action.kind,
-    args: legacyPlannerActionParameters(action),
-    actionSkillId: action.action_skill_id
-  });
 }
 
 /**

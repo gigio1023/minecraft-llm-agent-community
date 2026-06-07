@@ -185,7 +185,7 @@ function scanNearbyBlocks(actor: PositionedActor) {
     return undefined;
   }
 
-  // This legacy hint is nearest-first only. Strategic or station-like priority
+  // This compact hint is nearest-first only. Strategic or station-like priority
   // belongs in runtime-owned action skills or verifiers, not provider context.
   return actor
     .findBlocks({

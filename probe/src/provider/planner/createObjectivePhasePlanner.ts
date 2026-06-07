@@ -1,5 +1,5 @@
 /**
- * Factory for legacy objective phase planner adapters.
+ * Factory for direct objective phase planner adapters.
  *
  * @remarks Planner selection belongs to the direct-objective path and should not
  * alter the active social-cycle provider authority model.

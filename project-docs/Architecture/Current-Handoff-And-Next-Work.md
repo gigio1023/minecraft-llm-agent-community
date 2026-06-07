@@ -138,9 +138,8 @@ Actor Turn tool selection is now aligned with the full-context codegen spec:
   source, runtime parameters, input schema, verifier, helper allowlist, timeout,
   failure modes, and promotion policy are produced by the internal full-context
   codegen stage.
-- The social-cycle runner's ordinary `actor_turn` path executes
-  `ActorTurnResolvedAction` directly. The legacy planner path is explicit and
-  named `LegacyPlannerAction`; it is not the provider/codegen boundary.
+- The social-cycle runner executes Actor Turn actions directly. There is no
+  active archived planner execution path in the ordinary runtime.
 - Actor-owned generated action skill `generated_input_schema` now reaches the
   visible Action Card tool schema, so promoted/generated action skills with
   non-empty params do not collapse to `{}`.
@@ -209,8 +208,8 @@ Longer live runs under OpenAI `gpt-5.4-nano`:
 - `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v19.json`:
   `runtime_status=passed`, 68 provider records, 581,090 total tokens, 30 cycles.
   Provider usage guard projected 8,057,660 / 9,000,000 daily tokens. This run
-  exercised Actor Turn generated Mineflayer action authoring once through
-  `author_and_trial_action_skill`. It exposed two implementation issues: the
+  exercised generated Mineflayer action authoring once through the older
+  authoring path. It exposed two implementation issues: the
   runtime classifier still copied provider absence-like text into memory writes,
   and generated code called `ctx.wait({ durationMs })` while the helper accepted
   only a bare number, producing a Node `TimeoutNaNWarning`.
@@ -393,7 +392,7 @@ Implemented surfaces:
 - actor profile, memory, evidence, reviews, provider inputs, provider outputs,
   and relationship directories;
 - action skill lifecycle directories for active, candidate, retired, rejected,
-  and legacy proposal paths;
+  and archived proposal paths;
 - actor-owned active seed action skill materialization;
 - actor workspace active action skill reads for the runtime gate.
 
@@ -437,7 +436,7 @@ Implemented surfaces:
 - missing timeout and success-by-text rejection;
 - bounded primitive recipe trials with evidence;
 - promotion, supersession, retirement, and rejection helpers;
-- legacy `build/generated-skills` archival into actor workspace candidates.
+- archived `build/generated-skills` archival into actor workspace candidates.
 
 Important files:
 
@@ -1477,8 +1476,8 @@ This checkpoint aligns documentation with the current PR direction:
 - Actor Turn is the ordinary LLM hot path.
 - The provider chooses one visible function tool: an Action Card with strict
   `parameters`, or `author_mineflayer_action`.
-- `ActionIntent` is legacy/migration terminology only. It must not be described
-  as the current provider-facing or codegen-facing boundary.
+- `ActionIntent` is not an active runtime concept. Do not describe it as the
+  current provider-facing or codegen-facing boundary.
 - Generated Mineflayer authoring starts from `author_mineflayer_action`; the
   outer tool call carries detailed rationale and desired behavior, not source
   code and not a `context_to_preserve` summary.
@@ -1498,7 +1497,7 @@ Documentation changes in this pass:
 - Updated `README.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
   `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` to describe full-context codegen
   and current Actor Turn authority.
-- Moved dated or legacy plans into supporting-doc status in
+- Moved dated or archived plans into supporting-doc status in
   `Documentation-Map.md`.
 - Updated PlanBeads, memory/action-space, future-work, and live-test docs so
   they refer to Actor Turn tool selection rather than current `ActionIntent`
@@ -1511,5 +1510,5 @@ Current documentation rule:
   `Actor-Episode-And-Actor-Turn-Architecture.md`,
   `Actor-Persistent-State-And-PlanBeads.md`, and
   `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`.
-- Use legacy `ActionIntent` docs only for historical artifacts, report
-  compatibility, or explicit migration paths.
+- Use archived `ActionIntent` docs only when reading old artifacts. Do not route
+  new implementation through that boundary.

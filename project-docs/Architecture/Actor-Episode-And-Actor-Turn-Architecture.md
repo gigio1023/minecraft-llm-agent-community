@@ -33,7 +33,7 @@ for cycle goal, action planning, and cycle judgment all run on every cycle. It
 does not remove runtime evidence, PlanBeads, action skill ownership, or schema
 validation. For the ordinary hot path, read `Runtime Action Resolver` as direct
 Actor Turn function-tool selection into `ActorTurnResolvedAction`, not as a
-legacy planner action bridge. It narrows authority boundaries so the hot path is
+compressed planner action bridge. It narrows authority boundaries so the hot path is
 simpler and more actionful.
 
 Non-goals:
@@ -72,15 +72,15 @@ anecdotes, or a file-by-file task list.
 | `active-episode/v1`, `actor-turn-input/v1`, `actor-turn-output/v1`, Action Card, Evidence Trace, Deliberation, and PlanBead authority rules | Current implementation checkpoint, temporary bridge status, commands, live-run paths, and worker lane status |
 | What counts as executable authority, current-state contract, provider repair boundary, and generated Mineflayer authoring gate | Which files were touched in a phase and which focused tests were just run |
 | Evidence classifications such as verified mutation, position-only context, container inspection context, and no-progress observation | Specific 30/60-cycle run results and their review notes |
-| Compatibility and migration invariants for legacy `cycle-judgment/v1` and `actor-cycle-goal/v1` artifacts | Cleanup order for removing legacy hot-path calls |
+| Compatibility and cleanup invariants for old `cycle-judgment/v1` and `actor-cycle-goal/v1` artifacts | Cleanup order for removed hot-path calls |
 
 ## As-Is Social-Cycle Architecture
 
 ```mermaid
 flowchart TD
-  Obs["Observation, memory, PlanBeads, relationships, action surface"] --> Goal["Cycle goal provider, legacy goal_mind"]
+  Obs["Observation, memory, PlanBeads, relationships, action surface"] --> Goal["Cycle goal provider"]
   Goal --> Planner["Action planner provider"]
-  Planner --> Runtime["Runtime legacy planner action gate and Mineflayer execution"]
+  Planner --> Runtime["Runtime compressed planner action gate and Mineflayer execution"]
   Runtime --> Judgment["Cycle judgment provider"]
   Judgment --> PlanBeads["Guarded PlanBead operation applier"]
   Judgment --> Next["Next cycle context projection"]
@@ -131,11 +131,10 @@ The hot path is intentionally short. The Actor Turn provider should usually get
 one provider call per turn, choose one action, and let the runtime validate,
 execute, verify, and append evidence.
 
-An initial Deliberation or legacy `goal_mind` compatibility call may open the
-first Active Episode. After that, ordinary Actor Turn cycles should reuse the
-same Active Episode and write compatibility `actor-cycle-goal/v1` records
-without calling `goal_mind` again. A new Deliberation call is justified only
-when a typed branch condition is recorded.
+An initial Deliberation or cycle-goal call may open the first Active Episode.
+After that, ordinary Actor Turn cycles should reuse the same Active Episode. A
+new Deliberation call is justified only when a typed branch condition is
+recorded.
 
 ## State And Authority Boundaries
 
@@ -153,7 +152,7 @@ when a typed branch condition is recorded.
 
 Deliberation output is intentionally narrower than Actor Turn output. It can
 write a new `active-episode/v1` and raw PlanBead operation proposals for the
-guarded applier. It must not emit `legacy planner action`, `ActionCard`, `primitive_id`,
+guarded applier. It must not emit planner actions, `ActionCard`, `primitive_id`,
 `action_skill_id`, generated source, helper configuration, `args`, or
 executable parameters.
 
@@ -569,9 +568,9 @@ these branch conditions is met:
   stale action assumptions.
 
 Deliberation must not run only because a cycle ended.
-In migration reports, a repeated `goal_mind` provider input without a matching
+In current reports, a repeated cycle-goal provider input without a matching
 `deliberation-branch/v1` artifact is evidence that the actor_turn hot path has
-regressed toward the legacy social-cycle loop.
+regressed toward the old per-cycle provider loop.
 
 Scenario examples:
 
@@ -622,15 +621,15 @@ Scenario examples:
   single-actor settlement competence but must not be accepted as a social
   simulation proof.
 
-## Migration From Legacy Social Cycle
+## Cleanup From The Old Social Cycle
 
-| Legacy surface | Target surface | Migration rule |
+| Old surface | Current surface | Cleanup rule |
 |----------------|----------------|----------------|
 | `goal_mind` provider | Deliberation provider | Run only on branch conditions, not every turn |
 | `CycleGoal` | Field inside Active Episode and Actor Turn context | Keep compatibility records while the new episode contract lands |
 | `action_planner` provider | Actor Turn provider | Collapse action choice into one visible Action Card function tool or `author_mineflayer_action` |
 | `use_primitive` vs `use_action_skill` provider choice | Runtime Action Resolver mapping | Provider chooses Action Card, runtime chooses primitive or action skill mapping |
-| `author_and_trial_action_skill` | `author_mineflayer_action` provider choice plus full-context codegen/trial | Keep candidate validation, source guard, trial, verifier, and promotion mechanics as implementation authority |
+| Old author-and-trial planner mode | `author_mineflayer_action` provider choice plus full-context codegen/trial | Keep candidate validation, source guard, trial, verifier, and promotion mechanics as implementation authority |
 | `CycleJudgment` every cycle | Runtime Classifier plus optional boundary review | Runtime computes ordinary turn outcome; provider review is reserved for branch or learning-worthy events |
 | StrategicGoal live accumulation | PlanBeadGraph plus compact episode hints | Do not create another persistent middle layer |
 | Social-cycle report pass | Episode review summary | Pass/fail must cite episode-specific evidence, not generic movement |
@@ -667,8 +666,7 @@ An ordinary Actor Turn may have `bead_op_proposals: []`. That is not evidence
 that PlanBeads disappeared. It means the actor continued the current episode
 without a justified branch-time work-graph mutation. Mutation authority in the
 Actor Turn path belongs to branch-time Deliberation plus the guarded PlanBead
-applier. The legacy CycleJudgment provider may still carry proposal candidates
-only on the legacy path during migration.
+applier.
 
 However, an empty graph for an entire long run is still a behavior gap. If a
 report has ready-front snapshots every cycle but zero selected bead refs, zero

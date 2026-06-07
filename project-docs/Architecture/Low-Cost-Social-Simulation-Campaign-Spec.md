@@ -283,7 +283,7 @@ live behavior gate remains `PARTIAL`.
 
 | Gate | Pass condition | Common failure class |
 |------|----------------|----------------------|
-| `actor-turn-cadence-gate` | Ordinary turns use Actor Turn; Deliberation runs only on branch conditions. | `legacy-hot-path-regression` |
+| `actor-turn-cadence-gate` | Ordinary turns use Actor Turn; Deliberation runs only on branch conditions. | `archived-hot-path-regression` |
 | `actionfulness-gate` | The actor attempts meaningful world, inventory, container, chat, relationship, or shared-storage mutations. | `action-timidness` |
 | `current-state-consumption-gate` | Current state hides or rejects already-satisfied station/action choices and points the actor toward the next useful action. | `state-consolidation-gap` |
 | `recipe-contract-gate` | Inventory-grid and table-bound recipes expose and enforce exact item counts before execution. | `minecraft-mechanics-gap` |
@@ -698,7 +698,7 @@ Primary artifacts:
 
 ## Failure Classes
 
-- `legacy-hot-path-regression`: the run reintroduced ordinary goal/action/judgment provider cadence.
+- `archived-hot-path-regression`: the run reintroduced ordinary goal/action/judgment provider cadence.
 - `action-timidness`: observe, wait, remember, or movement-only actions dominate.
 - `state-consolidation-gap`: verified state is not consumed by the next Actor Turn.
 - `minecraft-mechanics-gap`: basic Minecraft prerequisite or station rules are missing from contracts.

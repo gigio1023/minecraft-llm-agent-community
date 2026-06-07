@@ -118,8 +118,8 @@ export function buildOpenAiJsonSchemaResponseRequest(input: {
       format: {
         type: "json_schema",
         name: input.schemaName,
-        // Strict mode requires every object property in `required`; social
-        // LegacyPlannerAction args vary by primitive and are validated after parse.
+        // Strict mode requires every object property in `required`; some stage
+        // schemas intentionally keep optional sections and validate after parse.
         strict: false,
         schema: input.schema
       }

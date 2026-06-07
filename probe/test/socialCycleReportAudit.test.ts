@@ -45,7 +45,7 @@ function baseReport(): SocialCycleRunReport {
       {
         cycle_id: "cycle-0001",
         cycle_goal_ref: "goals/cycle/cycle-0001-goal.json",
-        action_ref: "goals/cycle/legacy-planner-actions/cycle-0001-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/cycle-0001-actor-turn-action.json",
         provider_input_refs: ["provider-inputs/cycle-0001-input.json"],
         provider_output_refs: ["provider-outputs/cycle-0001-output.json"],
         evidence_refs: ["evidence/cycle-0001-observe.json"],
@@ -55,7 +55,7 @@ function baseReport(): SocialCycleRunReport {
       {
         cycle_id: "cycle-0002",
         cycle_goal_ref: "goals/cycle/cycle-0002-goal.json",
-        action_ref: "goals/cycle/legacy-planner-actions/cycle-0002-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/cycle-0002-actor-turn-action.json",
         provider_input_refs: ["provider-inputs/cycle-0002-input.json"],
         provider_output_refs: ["provider-outputs/cycle-0002-output.json"],
         evidence_refs: ["evidence/cycle-0002-observe.json"],
@@ -109,13 +109,13 @@ async function writeActorWorkspaceFixture(
       summary: "Observe settlement state"
     });
     await writeJson(path.join(actorDir, cycle.action_ref), {
-      schema: "legacy-planner-action/v1",
+      schema: "actor-turn-resolved-action/v1",
       actor_id: actorId,
       cycle_id: cycle.cycle_id,
       cycle_goal_id: cycle.cycle_goal_ref,
       kind: "use_primitive",
       primitive_id: "observe",
-      args: {},
+      parameters: {},
       why_this_action: "Audit fixture",
       expected_evidence: ["observation"],
       fallback_if_blocked: "wait"
@@ -308,25 +308,25 @@ test("rejects move_to actions with empty or invalid structured args", async () =
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_ref), {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
     kind: "use_primitive",
     primitive_id: "move_to",
-    args: {},
+    parameters: {},
     why_this_action: "Move using hidden defaults",
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
   });
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[1]!.action_ref), {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0002",
     cycle_goal_id: report.cycles[1]!.cycle_goal_ref,
     kind: "use_primitive",
     primitive_id: "move_to",
-    args: { target: "npc_a" },
+    parameters: { target: "npc_a" },
     why_this_action: "Move using prose-era target args",
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
@@ -403,7 +403,7 @@ test("rejects physical absence claims backed only by non-exhaustive scan evidenc
     category: "tool_attempt",
     tool_attempt: {
       tool: "observe",
-      args: {},
+      parameters: {},
       result: {
         worldStateSummary: {
           schema: "world-state-summary/v1",
@@ -708,13 +708,13 @@ test("review summary surfaces world scan counts and movement contract status", a
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_ref), {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
     kind: "use_primitive",
     primitive_id: "move_to",
-    args: { direction: "east", distance: 6 },
+    parameters: { direction: "east", distance: 6 },
     why_this_action: "Move toward an explicitly observed waypoint",
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
@@ -726,7 +726,7 @@ test("review summary surfaces world scan counts and movement contract status", a
     category: "tool_attempt",
     tool_attempt: {
       tool: "observe",
-      args: {},
+      parameters: {},
       result: {
         worldStateSummary: {
           schema: "world-state-summary/v1",

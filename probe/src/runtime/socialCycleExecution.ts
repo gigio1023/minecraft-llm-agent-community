@@ -7,18 +7,13 @@ import { Vec3 } from "vec3";
 import type { AllowedTool } from "../tools/index.js";
 import { validateProposal } from "../tools/index.js";
 import {
-  legacyPlannerActionParameters,
   type ActorCycleGoal,
-  type GeneratedActionSkillCandidate,
-  type LegacyPlannerAction
+  type GeneratedActionSkillCandidate
 } from "./goals/types.js";
 import {
-  defaultExpectedOutcomeForActionSkill,
-  defaultExpectedOutcomeForPrimitive,
   evaluateExpectedOutcomeAgainstDeltas,
   observedDeltasFromHelperEvents,
   type ActorTurnOutcomeContractEvaluation,
-  type ActorTurnExpectedOutcome,
   type ActorTurnResolvedAction
 } from "./goals/actorEpisode/index.js";
 import {
@@ -97,107 +92,6 @@ import { evaluateGeneratedActionSkillTrialVerifier } from "../skills/generated/v
 
 function actorTurnActionParameters(action: ActorTurnResolvedAction): Record<string, unknown> {
   return action.parameters as Record<string, unknown>;
-}
-
-function expectedOutcomeForGeneratedHelper(helperName: unknown): ActorTurnExpectedOutcome | null {
-  if (typeof helperName !== "string") {
-    return null;
-  }
-  switch (helperName) {
-    case "placeBlock":
-    case "buildPattern":
-    case "mineBlock":
-      return "world_block_delta";
-    case "collectLogs":
-    case "craftItem":
-    case "craftWithTable":
-    case "consumeItem":
-      return "inventory_delta";
-    case "equipItem":
-      return "equipment_delta";
-    case "moveTo":
-      return "position_delta";
-    case "say":
-      return "social_delta";
-    case "observe":
-      return "diagnostic_unlock";
-    default:
-      return null;
-  }
-}
-
-function expectedOutcomeForGeneratedCandidate(
-  candidate: GeneratedActionSkillCandidate
-): ActorTurnExpectedOutcome {
-  const verifier = candidate.verifier;
-  if (typeof verifier === "object" && verifier !== null && !Array.isArray(verifier)) {
-    const outcome = expectedOutcomeForGeneratedHelper((verifier as { helper?: unknown }).helper);
-    if (outcome) {
-      return outcome;
-    }
-  }
-  for (const helperName of candidate.helper_allowlist ?? []) {
-    const outcome = expectedOutcomeForGeneratedHelper(helperName);
-    if (outcome) {
-      return outcome;
-    }
-  }
-  return defaultExpectedOutcomeForActionSkill(candidate.proposed_skill_id ?? "");
-}
-
-function actorTurnActionFromLegacyPlannerAction(
-  action: LegacyPlannerAction
-): ActorTurnResolvedAction {
-  const parameters = legacyPlannerActionParameters(action) as ActorTurnResolvedAction["parameters"];
-  if (action.kind === "use_action_skill") {
-    return {
-      schema: "actor-turn-resolved-action/v1",
-      actor_id: action.actor_id,
-      cycle_id: action.cycle_id,
-      cycle_goal_id: action.cycle_goal_id,
-      kind: "use_action_skill",
-      action_card_id: `legacy:${action.action_skill_id ?? "missing-action-skill"}`,
-      action_skill_id: action.action_skill_id ?? "",
-      parameters,
-      expected_outcome: defaultExpectedOutcomeForActionSkill(action.action_skill_id ?? ""),
-      why_this_action: action.why_this_action,
-      expected_evidence: action.expected_evidence,
-      fallback_if_blocked: action.fallback_if_blocked
-    };
-  }
-  if (action.kind === "author_and_trial_action_skill") {
-    const candidate = action.candidate as GeneratedActionSkillCandidate;
-    return {
-      schema: "actor-turn-resolved-action/v1",
-      actor_id: action.actor_id,
-      cycle_id: action.cycle_id,
-      cycle_goal_id: action.cycle_goal_id,
-      kind: "author_mineflayer_action",
-      parameters,
-      candidate,
-      expected_outcome: expectedOutcomeForGeneratedCandidate(candidate),
-      why_this_action: action.why_this_action,
-      expected_evidence: action.expected_evidence,
-      fallback_if_blocked: action.fallback_if_blocked
-    };
-  }
-  const primitiveId = action.kind === "use_primitive"
-    ? (action.primitive_id ?? "")
-    : action.kind;
-  return {
-    schema: "actor-turn-resolved-action/v1",
-    actor_id: action.actor_id,
-    cycle_id: action.cycle_id,
-    cycle_goal_id: action.cycle_goal_id,
-    kind: "use_primitive",
-    action_card_id: `legacy:${primitiveId || "missing-primitive"}`,
-    primitive_id: primitiveId,
-    parameters,
-    expected_outcome: defaultExpectedOutcomeForPrimitive(primitiveId),
-    why_this_action: action.why_this_action,
-    expected_evidence: action.expected_evidence,
-    fallback_if_blocked: action.fallback_if_blocked
-  };
 }
 
 export const SOCIAL_EXECUTABLE_PRIMITIVES: ReadonlySet<string> = new Set([
@@ -1399,8 +1293,8 @@ function buildGeneratedActionSkillProposal(input: {
     known_failure_modes: [...input.candidate.known_failure_modes],
     created_at: input.now,
     updated_at: input.now,
-    legacy_generated_code: input.candidate.source,
-    legacy_generated_code_language: "typescript",
+    generated_source: input.candidate.source,
+    generated_source_language: "typescript",
     generated_candidate: input.candidate,
     generated_parameters: input.parameters,
     generated_lifecycle_status: input.lifecycleStatus,
@@ -1520,7 +1414,7 @@ async function executeAuthorAndTrialActionSkill(input: {
       actorId: input.actorId,
       cycleId: input.turnId,
       evidenceId: `${input.turnId}-author-action-skill-contract-blocked`,
-      tool: "author_and_trial_action_skill",
+      tool: "author_mineflayer_action",
       args: actorTurnActionParameters(input.action),
       result: toolResult,
       verifierReason: reason,
@@ -2161,32 +2055,6 @@ export async function executeActorTurnAction(input: {
   };
 }
 
-export async function executeLegacyPlannerAction(input: {
-  actorWorkspaceRootDir: string;
-  actorId: string;
-  cycleId: string;
-  turnId?: string;
-  cycleGoal: ActorCycleGoal;
-  action: LegacyPlannerAction;
-  activeActionSkills: readonly ActorActionSkillRecord[];
-  runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
-  bot?: Bot;
-  targetBot?: Bot;
-}): Promise<SocialCycleExecutionResult> {
-  return executeActorTurnAction({
-    actorWorkspaceRootDir: input.actorWorkspaceRootDir,
-    actorId: input.actorId,
-    cycleId: input.cycleId,
-    turnId: input.turnId,
-    cycleGoal: input.cycleGoal,
-    action: actorTurnActionFromLegacyPlannerAction(input.action),
-    activeActionSkills: input.activeActionSkills,
-    runtimeRetryConstraints: input.runtimeRetryConstraints,
-    bot: input.bot,
-    targetBot: input.targetBot
-  });
-}
-
 export function resolvePrimitivesForActorTurnAction(
   action: ActorTurnResolvedAction,
   activeActionSkills: readonly ActorActionSkillRecord[]
@@ -2242,32 +2110,6 @@ export function resolvePrimitivesForActorTurnAction(
     actionSkillExecutionUnit: false,
     blockedReason: "No primitive resolved for action"
   };
-}
-
-export function resolvePrimitivesForLegacyPlannerAction(
-  action: LegacyPlannerAction,
-  activeActionSkills: readonly ActorActionSkillRecord[]
-): {
-  primitives: AllowedTool[];
-  actionSkillExecutionUnit: boolean;
-  blockedReason?: string;
-} {
-  const parameters = legacyPlannerActionParameters(action);
-  if (
-    action.kind === "use_primitive" &&
-    typeof action.action_skill_id === "string"
-  ) {
-    return {
-      primitives: [],
-      actionSkillExecutionUnit: false,
-      blockedReason:
-        "Direct primitive intents cannot carry action_skill_id or args.actionSkillId; use use_action_skill for actor-owned action skill execution"
-    };
-  }
-  return resolvePrimitivesForActorTurnAction(
-    actorTurnActionFromLegacyPlannerAction(action),
-    activeActionSkills
-  );
 }
 
 /** Role-safe runtime affordances for the Soul/LifeGoal cycle; social context is not a hardcoded strategy funnel. */

@@ -3,8 +3,8 @@
  *
  * @remarks The outer Actor Turn provider chooses one visible Action Card tool
  * or `author_mineflayer_action`. This contract deliberately avoids
- * provider-facing legacy planner summaries and avoids generated
- * source in the outer call.
+ * provider-facing compressed planner summaries and avoids generated source in
+ * the outer call.
  */
 import type { FunctionTool } from "openai/resources/responses/responses";
 
@@ -200,7 +200,7 @@ export const actorTurnToolSelectionSystemPrompt = `You are choosing one Actor Tu
 Call exactly one function tool.
 
 Use the full ActorTurnInput: decision_frame, current_state, source_evidence_bundle, recent_evidence_trace, action_cards, Minecraft Basic Guide, memory refs/cards, relationship context, compact PlanBead hints, and runtime retry constraints.
-Do not produce a legacy planner action object or ordinary text.
+Do not produce a compressed planner action object or ordinary text.
 
 For a visible Action Card tool:
 - choose by title, description, strict function parameter schema, advisory current_state hints, and current evidence;

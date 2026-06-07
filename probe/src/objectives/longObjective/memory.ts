@@ -1,5 +1,5 @@
 /**
- * Memory persistence for legacy long-objective runs.
+ * Memory persistence for direct long-objective runs.
  *
  * @remarks This is probe memory, not ActorSoul/LifeGoal actor memory. Keep its
  * claims tied to long-objective artifacts and reports.

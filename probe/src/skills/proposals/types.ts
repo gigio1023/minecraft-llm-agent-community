@@ -24,8 +24,8 @@ export type ActionSkillProposalRecord = {
   known_failure_modes: string[];
   created_at: string;
   updated_at: string;
-  legacy_generated_code?: string;
-  legacy_generated_code_language?: "typescript";
+  generated_source?: string;
+  generated_source_language?: "typescript";
   generated_candidate?: GeneratedActionSkillCandidate;
   generated_parameters?: Record<string, unknown>;
   generated_lifecycle_status?: GeneratedActionSkillLifecycleStatus;

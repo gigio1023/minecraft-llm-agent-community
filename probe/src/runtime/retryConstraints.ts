@@ -210,7 +210,7 @@ export function runtimeRetryTargetFromIntent(intent: RuntimeRetryComparableActio
       action_skill_id: actionSkillId
     };
   }
-  if (intent.kind === "author_and_trial_action_skill" || intent.kind === "author_mineflayer_action") {
+  if (intent.kind === "author_mineflayer_action") {
     const candidateId = typeof intent.candidate?.proposed_skill_id === "string"
       ? intent.candidate.proposed_skill_id
       : "unknown_generated_candidate";

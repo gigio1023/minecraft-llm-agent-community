@@ -51,8 +51,8 @@ Implementation paths inspected:
 - `probe/src/runtime/socialCycleExecution.ts`
 - `probe/src/runtime/goals/cycleContextAssembler.ts`
 - `probe/src/provider/socialGoalMindProvider.ts`
-- `probe/src/provider/socialActionPlannerProvider.ts`
-- `probe/src/provider/socialCycleJudgmentProvider.ts`
+- `probe/src/provider/socialActorTurnProvider.ts`
+- `probe/src/provider/socialActorTurnToolContract.ts`
 - `probe/src/tools/placeBlock.ts`
 - `probe/src/tools/buildPattern.ts`
 
@@ -99,7 +99,7 @@ The core authority split is:
 
 | Layer | Owns | Must not own |
 |-------|------|--------------|
-| Provider | goal proposals, action-legacy-planner-action proposals, judgment wording | physical success, tool expansion, unverified world claims |
+| Provider | goal proposals, Actor Turn tool selection, branch-only deliberation wording | physical success, tool expansion, unverified world claims |
 | Runtime loop | primitive dispatch, active action skill gate, timeout/cancel behavior, transcript events | high-level narrative success |
 | Mineflayer tools | direct world interaction and inventory/container/block evidence | social meaning or long-horizon goal authority |
 | Verifiers | pass/fail/progress interpretation from tool evidence | optimistic completion without evidence |
@@ -131,8 +131,7 @@ handoff evidence after storage completion.
 The social-cycle runner now implements the same authority split through the
 Actor Turn path: ActorSoul -> ActorLifeGoal -> Active Episode / CycleGoal
 context -> Actor Turn function-tool selection -> runtime execution or generated
-action trial -> CycleJudgment. Older report artifacts may still contain legacy
-planner-action refs.
+action trial -> runtime classifier evidence.
 
 ## Actor Workspace
 
@@ -323,14 +322,14 @@ without matching evidence and postcondition results.
 
 ## Providers
 
-The social runtime has three provider stages:
+The social runtime has an Actor Turn-centered provider path:
 
 | Stage | File | Responsibility |
 |-------|------|----------------|
-| CycleGoal provider | `probe/src/provider/socialGoalMindProvider.ts` | choose strategic updates and a CycleGoal |
-| Legacy ActionPlanner | `probe/src/provider/socialActionPlannerProvider.ts` | choose one bounded legacy planner action when explicit migration paths need it |
+| CycleGoal provider | `probe/src/provider/socialGoalMindProvider.ts` | open or reframe CycleGoal state at episode boundaries |
 | Actor Turn provider | `probe/src/provider/socialActorTurnProvider.ts` | choose one visible function tool or `author_mineflayer_action` |
-| CycleJudgment | `probe/src/provider/socialCycleJudgmentProvider.ts` | judge evidence and propose memory/relationship updates |
+| Actor Turn classifier | `probe/src/runtime/goals/actorEpisode/runtimeClassifier.ts` | classify runtime evidence for the turn |
+| Deliberation provider | `probe/src/provider/socialDeliberationProvider.ts` | reframe only at meaningful branch points |
 
 The provider prompts have the right posture:
 
@@ -356,12 +355,8 @@ Two implementation details matter:
 ## Social Executor
 
 Current Actor Turn resolution maps a selected Action Card to one validated
-runtime action or starts generated-action authoring. Legacy
-`executeSocialActionIntent()` remains relevant only when reading or running an
-explicit legacy planner path. That legacy path resolves either:
-
-- one `use_primitive` planner action; or
-- every primitive in an owned `use_action_skill` bundle.
+runtime action or starts generated-action authoring. There is no active archived
+planner execution path in the social-cycle runtime.
 
 It checks:
 

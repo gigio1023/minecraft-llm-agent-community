@@ -1,5 +1,5 @@
 /**
- * Verifiers for legacy long-objective phase reports.
+ * Verifiers for direct long-objective phase reports.
  *
  * @remarks These checks protect probe reporting from fake success, but they are
  * scoped to direct-objective experiments rather than the social-cycle runtime.

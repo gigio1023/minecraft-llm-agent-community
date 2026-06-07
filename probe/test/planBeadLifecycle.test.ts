@@ -16,7 +16,7 @@ import {
   type ActorPlanBead,
   type PlanBeadOperation
 } from "../src/runtime/goals/planBeads/index.js";
-import type { LegacyPlannerAction } from "../src/runtime/goals/types.js";
+import type { ActorTurnResolvedAction, JsonObject } from "../src/runtime/goals/actorEpisode/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const actorId = "npc_b";
@@ -87,17 +87,18 @@ function bead(input: {
 
 function intent(input: {
   primitiveId: string;
-  parameters?: Record<string, unknown>;
-}): LegacyPlannerAction {
+  parameters?: JsonObject;
+}): ActorTurnResolvedAction {
   return {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-0001",
     kind: "use_primitive",
+    action_card_id: `primitive:${input.primitiveId}`,
     primitive_id: input.primitiveId,
-    args: input.parameters ?? {},
     parameters: input.parameters ?? {},
+    expected_outcome: "record_blocker_or_done",
     why_this_action: "Runtime lifecycle test intent.",
     expected_evidence: ["runtime evidence"],
     fallback_if_blocked: "record blocker"

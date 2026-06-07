@@ -57,7 +57,7 @@ Principle: **LLM plans and generates TypeScript; runtime owns truth.**
 | Auth loader | `probe/src/provider/gemini/auth.ts` | `GEMINI_API_KEY` or `build/provider-auth/gemini.env`; never log key |
 | Config | `probe/src/provider/gemini/config.ts` | Env from handoff: text model, live model, order, timeouts |
 | Text path | `probe/src/provider/gemini/textGenai.ts` | `@google/genai` `generateContent` with `responseMimeType: "application/json"` and `responseJsonSchema` |
-| Facade | `probe/src/provider/gemini/geminiLivePlanner.ts` | Legacy-named facade; provider id `gemini-planner`; snapshots structured source metadata |
+| Facade | `probe/src/provider/gemini/geminiLivePlanner.ts` | Archived-name facade; provider id `gemini-planner`; snapshots structured source metadata |
 | Smoke CLI | `probe/src/provider/gemini/smokeCli.ts` | `probe:gemini-planner-smoke` |
 
 Provider order: `PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai` (default).

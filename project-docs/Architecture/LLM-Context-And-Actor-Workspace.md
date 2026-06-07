@@ -26,7 +26,7 @@ source of truth for active, candidate, retired, and rejected action skill record
 Provider-facing context is built from actor workspace state, recent evidence,
 recent reviews, memory, actor profile, goal stack, and relationships.
 
-Legacy generated output under `build/generated-skills` remains debug or archive
+Archived generated output under `build/generated-skills` remains debug or archive
 material only. It must be migrated into actor workspace candidate proposals and
 validated recipes before it can become actor-owned runtime behavior.
 

@@ -2,7 +2,7 @@
  * Full-context Mineflayer codegen contract for Actor Turn authoring.
  *
  * @remarks The request keeps the original ActorTurnInput and raw outer tool
- * call intact. The model must not receive a legacy planner summary as the
+ * call intact. The model must not receive a compressed planner summary as the
  * primary context for generated Mineflayer source.
  */
 import type {
@@ -126,7 +126,7 @@ export const mineflayerCodegenProviderSchema = {
 export const mineflayerCodegenSystemPrompt = `You are the internal Mineflayer action skill codegen stage for Actor Turn author_mineflayer_action.
 You receive the full original ActorTurnInput, the raw outer Responses function_call, the parsed author_mineflayer_action arguments, and the full injected mineflayer-code-generation SKILL.md body.
 
-Do not operate from a legacy planner summary. Do not ask for context_to_preserve or choose which context survives; the runtime already supplied the full context.
+Do not operate from a compressed planner summary. Do not ask for context_to_preserve or choose which context survives; the runtime already supplied the full context.
 Generate one bounded actor-owned Mineflayer TypeScript action skill candidate that can be trialed now.
 
 Return JSON only with mineflayer_codegen:
@@ -178,7 +178,7 @@ export function buildMineflayerCodegenRequest(input: {
       codegen_rationale:
         "Detailed rationale preserving the outer Actor Turn judgment and full context usage.",
       forbidden_context_boundary:
-        "Do not replace this request with a legacy planner summary, context_to_preserve, selected_context, or any other lossy summary."
+        "Do not replace this request with a compressed planner summary, context_to_preserve, selected_context, or any other lossy summary."
     },
     ...(input.previousValidationError
       ? { previous_validation_error: input.previousValidationError }

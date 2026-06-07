@@ -62,7 +62,7 @@ The actor-workspace and social-feedback slices are now implemented enough to be
 the active public architecture. The next useful work is not to add a larger
 society. It is to validate the runtime against more real Minecraft task
 failures, harden provider/reviewer prompts from actual evidence, and migrate any
-still-useful legacy generated-code experiments into bounded recipes.
+still-useful archived generated-code experiments into bounded recipes.
 
 Deep reconnect refactoring is deferred unless it is required to keep hot-path
 evidence honest. Reconnect remains a runtime responsibility, but it is not the

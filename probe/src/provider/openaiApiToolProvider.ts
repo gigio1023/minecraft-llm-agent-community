@@ -2,9 +2,9 @@
  * OpenAI Responses function-call provider.
  *
  * @remarks This module is separate from the JSON-schema provider because Actor
- * Turn tool selection must not be forced through a provider-facing LegacyPlannerAction
- * JSON object. It returns raw function-call items and leaves runtime validation
- * to the caller.
+ * Turn tool selection must not be forced through a provider-facing compressed
+ * planner object. It returns raw function-call items and leaves runtime
+ * validation to the caller.
  */
 import OpenAI from "openai";
 import type {

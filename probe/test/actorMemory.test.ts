@@ -161,30 +161,30 @@ test("retrieves objective-scoped typed memory without using stale records", asyn
   }
 });
 
-test("retrieval normalizes legacy memory records that do not yet have kind", async () => {
+test("retrieval normalizes memory records that do not yet have kind", async () => {
   const rootDir = path.resolve(
     here,
     "test-artifacts",
-    `actor-memory-legacy-${process.pid}-${Date.now()}`
+    `actor-memory-missing-kind-${process.pid}-${Date.now()}`
   );
 
   try {
-    const legacyPath = path.join(rootDir, "npc_b/memory/episodic/legacy.json");
+    const memoryPath = path.join(rootDir, "npc_b/memory/episodic/missing-kind.json");
     const record = buildDirectGeneratedObjectiveMemoryRecords({
-      report: baseReport({ runId: "legacy-run" }),
+      report: baseReport({ runId: "missing-kind-run" }),
       now: "2026-05-23T00:00:00.000Z"
     })[0]!;
-    const legacyRecord = { ...record } as Partial<ActorMemoryRecord>;
-    delete legacyRecord.kind;
-    await fs.mkdir(path.dirname(legacyPath), { recursive: true });
-    await fs.writeFile(legacyPath, JSON.stringify(legacyRecord, null, 2));
+    const recordWithoutKind = { ...record } as Partial<ActorMemoryRecord>;
+    delete recordWithoutKind.kind;
+    await fs.mkdir(path.dirname(memoryPath), { recursive: true });
+    await fs.writeFile(memoryPath, JSON.stringify(recordWithoutKind, null, 2));
 
     const packet = await retrieveActorMemoryForObjective(rootDir, "npc_b", {
       objectiveId: "craft_current_run_stone_axe_1",
       limit: 8
     });
 
-    assert.equal(packet.retrieved_episodic[0]?.memory_id, "episode-legacy-run");
+    assert.equal(packet.retrieved_episodic[0]?.memory_id, "episode-missing-kind-run");
     assert.equal(packet.retrieved_episodic[0]?.kind, "direct_objective_episode");
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });

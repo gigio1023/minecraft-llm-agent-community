@@ -1,5 +1,5 @@
 /**
- * Registry for legacy objective probe definitions.
+ * Registry for direct objective probe definitions.
  *
  * @remarks Objective probes are useful for Mineflayer capability checks, but
  * they should not define the social runtime's CycleGoal sequence.

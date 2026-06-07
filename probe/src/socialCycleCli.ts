@@ -31,7 +31,6 @@ function parseArgs(argv: string[]) {
     prepareSpawnAccess?: boolean;
     sharedStorageSocialSmoke?: boolean;
     geminiModelRotation?: string[];
-    actionHotPath?: SocialCycleRunOptions["actionHotPath"];
     visualEvidence?: boolean;
     visualEvidenceIntervalCycles?: number;
     visualEvidencePort?: number;
@@ -90,9 +89,6 @@ function parseArgs(argv: string[]) {
     } else if ((arg === "--gemini-model-rotation" || arg === "--models") && next) {
       options.geminiModelRotation = parseCsvList(next);
       index++;
-    } else if (arg === "--action-hot-path" && next) {
-      options.actionHotPath = normalizeActionHotPath(next);
-      index++;
     } else if (arg === "--visual-evidence") {
       options.visualEvidence = true;
     } else if (arg === "--visual-evidence-interval" && next) {
@@ -125,16 +121,6 @@ function normalizeSocialCycleProvider(value: string | undefined): SocialCyclePro
     return value;
   }
   return undefined;
-}
-
-function normalizeActionHotPath(value: string | undefined): SocialCycleRunOptions["actionHotPath"] | undefined {
-  if (!value) {
-    return undefined;
-  }
-  if (value === "legacy" || value === "actor_turn") {
-    return value;
-  }
-  throw new Error("--action-hot-path must be legacy or actor_turn");
 }
 
 function envEnabled(value: string | undefined) {
@@ -180,10 +166,6 @@ async function main() {
   const geminiModelRotation =
     parsed.geminiModelRotation ??
     parseCsvList(process.env.SOCIAL_CYCLE_GEMINI_MODEL_ROTATION || process.env.GEMINI_MODEL_ROTATION);
-  const actionHotPath =
-    parsed.actionHotPath ??
-    normalizeActionHotPath(process.env.SOCIAL_CYCLE_ACTION_HOT_PATH) ??
-    "actor_turn";
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const visualEvidenceEnabled =
@@ -210,7 +192,6 @@ async function main() {
     prepareSpawnAccess: parsed.prepareSpawnAccess,
     sharedStorageSocialSmoke: parsed.sharedStorageSocialSmoke,
     geminiModelRotation,
-    actionHotPath,
     visualEvidence: visualEvidenceEnabled
       ? {
           enabled: true,

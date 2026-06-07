@@ -156,7 +156,7 @@ Future extensions:
   durable home for actor-owned issue-like work state between LifeGoal and
   CycleGoal;
 - production hardening for LLM reviewer prompt/scoring quality;
-- migration of any still-needed legacy skill-village generated-code behavior
+- migration of any still-needed archived skill-village generated-code behavior
   into actor-owned direct generated action skill trials or executable bounded
   recipes.
 
@@ -183,7 +183,7 @@ type ActorActionSkillRecord = {
     reason: string;
     evidence_refs: string[];
   };
-  legacy_source_ref?: string;
+  archived_source_ref?: string;
   notes?: string;
 };
 ```
@@ -265,7 +265,7 @@ propagation format when they are actor-owned and evidence-bound:
 - never counted as success because the generated return value says so.
 
 During the transition, anything still emitted to `build/generated-skills` is a
-legacy artifact. It can be inspected by humans or migration tools, but it is not
+archived artifact. It can be inspected by humans or migration tools, but it is not
 available to runtime selection until it has been converted into a validated
 actor workspace candidate recipe.
 
@@ -347,7 +347,7 @@ and direct-trial planning.
 - active seed action skills can be materialized and read from actor workspace;
 - phase-one runtime action selection blocks primitives that are not backed by
   actor-owned active records;
-- legacy generated action skill output is not treated as actor-owned active or
+- archived generated action skill output is not treated as actor-owned active or
   candidate state;
 - candidate recipes are validated before trial;
 - invalid primitives, missing verifiers, role-incompatible primitives, and

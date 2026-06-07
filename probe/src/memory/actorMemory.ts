@@ -186,7 +186,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function inferLegacyMemoryKind(record: ActorMemoryRecord): ActorMemoryKind {
+function inferMissingMemoryKind(record: ActorMemoryRecord): ActorMemoryKind {
   const contentKind = isRecord(record.content) && typeof record.content.kind === "string"
     ? record.content.kind
     : "";
@@ -219,7 +219,7 @@ function inferLegacyMemoryKind(record: ActorMemoryRecord): ActorMemoryKind {
 function normalizeActorMemoryRecord(record: ActorMemoryRecord): ActorMemoryRecord {
   return {
     ...record,
-    kind: record.kind ?? inferLegacyMemoryKind(record)
+    kind: record.kind ?? inferMissingMemoryKind(record)
   };
 }
 

@@ -1,5 +1,5 @@
 /**
- * CLI for archiving legacy generated action skill files.
+ * CLI for archiving generated action skill files.
  *
  * @remarks Archival keeps old exploratory output visible without treating it as
  * current actor workspace memory or executable authority.
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadProbeConfig } from "../../config.js";
 import { normalizeActorIds } from "../../runtime/actorRoster.js";
-import { archiveLegacyGeneratedSkills } from "./archiveGeneratedSkills.js";
+import { archiveGeneratedSkills } from "./archiveGeneratedSkills.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +18,7 @@ async function main() {
   const actorId = process.argv[2] ?? normalizeActorIds(config.bots)[0];
   const generatedSkillsDir = path.resolve(here, "../../../../build/generated-skills");
   const archiveDir = path.resolve(here, "../../../../build/generated-skills-archive");
-  const archived = await archiveLegacyGeneratedSkills({
+  const archived = await archiveGeneratedSkills({
     generatedSkillsDir,
     archiveDir,
     actorWorkspaceRootDir: config.actorWorkspace.rootDir,
@@ -28,7 +28,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        schema: "legacy-generated-action-skill-archive/v1",
+        schema: "generated-action-skill-archive/v1",
         actorId,
         generatedSkillsDir,
         archiveDir,

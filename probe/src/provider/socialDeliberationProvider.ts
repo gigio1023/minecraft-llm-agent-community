@@ -60,7 +60,7 @@ export const deliberationProviderSchema = {
 
 export const deliberationSystemPrompt = `You are the branch-time Deliberation provider for a Minecraft social simulation actor.
 You may reframe the Active Episode and propose guarded PlanBead operations.
-You must not choose an action, select an Action Card, emit primitive_id, action_skill_id, legacy_planner_action, generated source, helper settings, args, or executable parameters.
+You must not choose an action, select an Action Card, emit primitive_id, action_skill_id, planner_action, generated source, helper settings, args, or executable parameters.
 PlanBeads are durable work-state context only. They never supply physical args or prove Minecraft progress.
 Use runtime evidence, branch reason, ActorSoul/LifeGoal context, memory refs, relationships, world events, and Minecraft Basic Guide.
 Use current_state before older current_episode or PlanBead wording. If current_state.shared_storage is contributed and no deposit candidate is socially_requested, the shared-storage request is already satisfied; do not re-open chest/deposit/openability work unless a new unsatisfied request appears.

@@ -83,7 +83,7 @@ a typed contract, strict schema, permission gate, retry constraint, or verifier.
 - Action Card `parameters` are executable contracts.
 - Natural-language rationale explains intent but never supplies missing args.
 - PlanBeads are passive issue-like actor state, not executable authority.
-- `ActionIntent` is legacy terminology only.
+- Actor Turn actions are direct tool selections with schema-bound parameters.
 - External Minecraft-agent papers are references to adapt, not product specs.
 
 ## Key Documents

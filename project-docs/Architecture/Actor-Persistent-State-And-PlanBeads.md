@@ -137,7 +137,7 @@ tracked concern is satisfied.
 | `ActorMemoryRecord` | historical evidence-linked recall | active work source of truth |
 | runtime evidence | observed game/runtime facts | provider intention |
 
-`StrategicGoal` is a legacy-adjacent medium-horizon interpretation. New
+`StrategicGoal` is a archived-adjacent medium-horizon interpretation. New
 restart-safe multi-cycle work should become PlanBeads and PlanBead dependencies,
 not a second persistent middle layer.
 
@@ -325,7 +325,7 @@ A bead is ready when:
   `notes.next` to support a bounded Active Episode focus or compatibility
   CycleGoal.
 
-The ready front is context, not a command. It helps legacy CycleGoal routing
+The ready front is context, not a command. It helps archived CycleGoal routing
 when that path is explicitly under migration, and it helps branch-time
 Deliberation / Active Episode selection on the Actor Turn path. The Actor Turn
 provider may see only compact hints. Any selected Action Card or
@@ -432,7 +432,7 @@ plus a small blocked/in-progress summary when it explains current choice.
 ## Provider Proposal Boundary
 
 Providers may propose `bead_op_proposals` only through runtime-approved stages.
-The legacy social-cycle path accepts them from `CycleJudgment`, because judgment
+The archived social-cycle path accepts them from `CycleJudgment`, because judgment
 has the latest evidence interpretation in that path. The Actor Episode / Actor
 Turn path moves ordinary turns away from provider `CycleJudgment`; branch-time
 Deliberation is the approved transport for PlanBead operation proposals there.

@@ -17,7 +17,7 @@ Current application rule:
 
 - Keep this plan's Active Episode, evidence trace, Deliberation branching, and
   passive PlanBeads ideas.
-- Do not use this plan's older `ActorTurnOutput -> legacy planner action` bridge as the
+- Do not use this plan's older `ActorTurnOutput -> archived planner action` bridge as the
   active hot path.
 - Ordinary Actor Turn now selects exactly one strict function tool: a visible
   Action Card with logical `parameters`, or `author_mineflayer_action`.
@@ -79,15 +79,14 @@ Implementation checkpoint, 2026-06-03:
   `actor-turn-input/v1`, and expose an Actor Turn provider schema/prompt
   boundary.
 - Actor Turn provider snapshots now carry visible Action Cards and strict
-  function-tool contracts. Legacy action planner snapshots remain only for the
-  explicit legacy path.
+  function-tool contracts. Archived action planner snapshots remain only for the
+  explicit archived path.
 - Runtime Action Resolver now resolves Actor Turn function-tool selections into
   `ActorTurnResolvedAction` and full-context `author_mineflayer_action` codegen
-  rather than using a provider-facing legacy planner action as the boundary.
-- The runner has an `actionHotPath: "actor_turn"` option. In that mode,
-  provider calls write `actor-turn-input/v1` snapshots, execute resolved Actor
-  Turn actions directly, and keep compatibility CycleGoal/CycleJudgment/report
-  artifacts only so old review readers can still inspect runs.
+  rather than using a provider-facing archived planner action as the boundary.
+- The runner uses Actor Turn as the only ordinary action hot path. Provider
+  calls write `actor-turn-input/v1` snapshots and execute resolved Actor Turn
+  actions directly.
 - The social-cycle CLI can select the bridge with
   `--action-hot-path actor_turn` or `SOCIAL_CYCLE_ACTION_HOT_PATH=actor_turn`.
   Reports record `action_hot_path` so review scripts and humans can tell which
@@ -100,7 +99,7 @@ Implementation checkpoint, 2026-06-03:
 - Actor Turn mode now uses a runtime classifier for ordinary turn judgment.
   It writes a `cycle-judgment/v1` compatibility artifact for existing report,
   memory, settlement, and previous-context readers, but it does not call the
-  legacy CycleJudgment provider and does not create PlanBead operations. This
+  archived CycleJudgment provider and does not create PlanBead operations. This
   cuts one provider call per Actor Turn while keeping branch-time Deliberation
   as the intended PlanBead update path.
 - Actor Turn mode now persists `active-episode/v1`, records
@@ -116,7 +115,7 @@ Implementation checkpoint, 2026-06-03:
 - A dedicated branch-time Deliberation provider contract is implemented. Its
   output may reframe `active-episode/v1` and carry raw PlanBead operation
   proposals for the guarded applier, but validators reject executable authority
-  such as `legacy planner action`, `ActionCard`, `primitive_id`, `action_skill_id`,
+  such as `archived planner action`, `ActionCard`, `primitive_id`, `action_skill_id`,
   generated source, helper settings, `args`, or executable parameters.
 - Deterministic Deliberation provider tests prove that branch-time reframing
   writes `deliberation-output/v1`, persists the next Active Episode, and keeps
@@ -354,7 +353,7 @@ Gate status labels:
 
 | Gate | Pass condition | Failure evidence |
 |------|----------------|------------------|
-| `actor-turn-cadence-gate` | ordinary turns use Actor Turn without recurring `goal_mind` or CycleJudgment provider calls | provider input snapshots show repeated legacy stages without `deliberation-branch/v1` |
+| `actor-turn-cadence-gate` | ordinary turns use Actor Turn without recurring `goal_mind` or CycleJudgment provider calls | provider input snapshots show repeated archived stages without `deliberation-branch/v1` |
 | `actionfulness-gate` | at least half of non-branch turns attempt a world, inventory, container, chat, or relationship mutation | observe/wait/move-only loop dominates the action attempts |
 | `observe-suppression-gate` | after observe yields `no_progress` and current_state has a world scan, the next turn suppresses observe and uses existing evidence for action or justified movement | repeated observe outputs appear while inventory/world evidence is already present |
 | `context-reuse-gate` | once shared storage is inspected, the actor uses the container state for a new action unless another actor/inventory event justifies a fresh inspect | repeated `inspect_chest` passes make the run look productive without changing state |
@@ -723,7 +722,7 @@ surface changes:
 
 ```bash
 bun run typecheck
-bun test probe/test/sociallegacy planner actionContracts.test.ts
+bun test probe/test/socialarchived planner actionContracts.test.ts
 bun test probe/test/socialCycleRunner.test.ts
 git diff --check
 cd docs && npm run build

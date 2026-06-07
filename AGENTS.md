@@ -91,21 +91,19 @@ what lands.
 ## Action Skill Authoring Gate
 
 New Minecraft action skill creation during social-cycle runtime must originate
-only from the action-selection stage. In Actor Turn mode, the provider may
-choose `author_mineflayer_action`, which the runtime resolves into full-context
-generated action authoring and trial. Legacy planner paths may still produce
-`author_and_trial_action_skill` while they remain in explicit migration scope.
-In either mode, current observation, CycleGoal or Active Episode, memory,
+only from the Actor Turn action-selection stage. The provider may choose
+`author_mineflayer_action`, which the runtime resolves into full-context
+generated action authoring and trial. Current observation, CycleGoal or Active Episode, memory,
 PlanBeads, relationship context, retry constraints, and the action surface must
 justify creating a new actor-owned behavior candidate.
 
-Background reviewers, async sidecars, PlanBead operations, legacy generated
-skill importers, and offline maintenance scripts must not originate new action
+Background reviewers, async sidecars, PlanBead operations, archived generated
+source importers, and offline maintenance scripts must not originate new action
 skill candidates for an NPC during runtime. They may review, patch, reject,
-retire, supersede, promote, or re-trial an existing action-selection candidate
-with evidence. They may also propose PlanBeads that say a new action skill is
-needed, but PlanBeads do not create source, parameters, permissions, or
-executable authority.
+retire, supersede, promote, or re-trial an existing Actor Turn candidate with
+evidence. They may also propose PlanBeads that say a new action skill is needed,
+but PlanBeads do not create source, parameters, permissions, or executable
+authority.
 
 Generated Mineflayer code should be used more actively through this explicit
 full-context authoring path. The outer Actor Turn function call is a selection
@@ -166,10 +164,10 @@ Do not add provider-facing candidate fields such as `deposit_candidates`,
 world-state context into hidden preselection. Use bounded typed facts in
 `current_state` plus `source_evidence_bundle` cards/refs so the Actor Turn LLM
 can reason from the original evidence.
-No compatibility or legacy compromise is required for this side project when
+No compatibility compromise is required for this side project when
 removing prose parsing or hidden domain-planner behavior.
 When replacing an active runtime/provider contract, do the conversion in one
-coherent pass instead of preserving legacy aliases, source names, or shim fields
+coherent pass instead of preserving old aliases, source names, or shim fields
 inside the new contract. Historical artifacts may remain readable through
 explicit audit/import code, but active TypeScript types, provider inputs,
 schemas, prompts, tests, and docs should use the current concept names only. If
@@ -289,7 +287,7 @@ command output, and volatile evidence in handoff or audit docs instead.
 - `project-docs/Terminology.md` is normative. New docs, code comments, prompts,
   report labels, and agent guides must follow it.
 - If existing code or docs conflict with `Terminology.md`, either update them or
-  add an explicit legacy-identifier mapping in `Terminology.md`. Do not spread
+  add an explicit old-identifier mapping in `Terminology.md`. Do not spread
   outdated wording into new surfaces.
 - Avoid AI-slop wording listed in `Terminology.md`, such as "AI brain",
   "magic", "vibes", "smart NPC", broad "autonomous" claims, ambiguous "skill",
@@ -453,7 +451,7 @@ Important search tokens:
 - `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
 - `ACTION_SKILL_VERIFICATION`
 - `CURRENT_HANDOFF_NEXT_WORK`
-- `GENERATED_ACTION_SKILL_LEGACY_STORE`
+- `GENERATED_ACTION_SKILL_ARCHIVE`
 - `PER_ACTOR_ASYNC_REVIEWER`
 - `IMPLEMENTATION_WORKSTREAMS`
 - `ACTION_SKILL`
@@ -503,7 +501,7 @@ Important search tokens:
   nearest examples, truncation policy, and evidence refs. Do not imply that
   unloaded chunks were inspected. Reviews and audits should count explicit
   `world-state-summary/v1` or `world-state-scan/v1` schema artifacts as scan
-  evidence, not loose legacy keys such as `nearbyBlocks`.
+  evidence, not loose old keys such as `nearbyBlocks`.
 - Do not expose provider-facing world summaries as fixed material-family,
   station-family, construction-readiness, or survival-priority categories.
   World context is evidence substrate: raw Minecraft names, positions,
@@ -568,7 +566,7 @@ Important search tokens:
 - Actor workspace should also become the source of truth for actor-owned
   PlanBead work graph state when that slice is implemented. The purpose is
   state continuity under changing circumstances, not more planning prose.
-- Treat `build/generated-skills` as legacy exploratory output, not as active or
+- Treat `build/generated-skills` as archived exploratory output, not as active or
   candidate actor-owned action skill memory.
 - Prefer structured domain models, typed records, discriminated unions, schemas,
   and validators over ad hoc dictionary blobs. Runtime state, action evidence,
@@ -729,7 +727,7 @@ PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai
 Implementation:
 
 - `probe/src/provider/gemini/textGenai.ts`
-- `callGeminiLivePlanner()` is a legacy-named facade; active planner calls use
+- `callGeminiLivePlanner()` is an archived-name facade; active planner calls use
   only the structured REST `text-genai` path.
 - Long-objective planning goes through `ObjectivePhasePlannerPort`
   (`probe/src/provider/planner/`) — Gemini, OpenAI Codex, or explicit

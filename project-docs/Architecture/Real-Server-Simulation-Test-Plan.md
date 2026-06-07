@@ -184,7 +184,7 @@ Pass criteria:
   `collect_logs`, `mine_block`, `craft_item`, or `craft_with_table`;
 - meaningful primitive status matches the primitive verifier contract;
 - every cycle has provider input/output, selected Actor Turn action or explicit
-  legacy planner action ref, evidence, and judgment refs;
+  archived planner action ref, evidence, and judgment refs;
 - cycle 2 or later uses previous judgment or memory.
 
 Evidence inspection:

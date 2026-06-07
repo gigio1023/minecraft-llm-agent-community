@@ -19,7 +19,7 @@ The current implementation now includes:
 1. actor workspace source-of-truth layout;
 2. action skill recipe schema and validator;
 3. active seed action skill materialization;
-4. shutdown and archive path for legacy `build/generated-skills` output;
+4. shutdown and archive path for archived `build/generated-skills` output;
 5. actor-scoped evidence files;
 6. provider input snapshots for LLM-backed gameplay and dialogue paths;
 7. per-actor reviewer output schema, queue, store, CLI, and provider adapter;
@@ -45,9 +45,8 @@ As of the first implementation pass:
   `reviews/` and `provider-inputs/` dirs, active seed materialization, and
   active action skill reads.
 - Worker B has landed recipe types, validation, proposal records, lifecycle
-  transition guards, and default shutdown of legacy generated TypeScript
-  execution unless explicitly opted in with
-  `ALLOW_LEGACY_GENERATED_ACTION_SKILLS`.
+  transition guards, and archived generated TypeScript recording without
+  auto-execution.
 - Worker C has landed provider input snapshot persistence and credential-key
   rejection, with live dialogue provider calls writing snapshots.
 - Worker D has landed actor-scoped evidence writing for every phase-one
@@ -74,8 +73,8 @@ As of the first implementation pass:
   opt-in `openai-codex` phase-one gameplay provider. Gameplay and live dialogue
   provider inputs include active skills, candidates, recent evidence, reviews,
   and memory.
-- Legacy `build/generated-skills` files can be archived into actor workspace
-  draft candidate proposals through `bun run archive:legacy-skills`.
+- Archived `build/generated-skills` files can be archived into actor workspace
+  draft candidate proposals through `bun run archive:generated-skills`.
 - The social feedback slice has landed canonical actor profiles, goal stacks,
   directional relationship ledgers, reviewer relationship event proposals, a
   guarded runtime-owned proposal applier, and relationship-derived action
@@ -117,7 +116,7 @@ that mode must not be labeled fresh current-run proof.
 Search token: `DIRECT_GENERATED_ACTION_SKILLS`.
 
 Direct generated TypeScript is an accepted supporting propagation path for
-objective work. The implementation should separate it from legacy
+objective work. The implementation should separate it from archived
 `build/generated-skills` dumping:
 
 - generated code is tied to an objective and actor;
@@ -243,7 +242,7 @@ Exclusive ownership:
 
 Shared touch through coordinator:
 
-- legacy generated action skill entry points that currently write to
+- archived generated action skill entry points that currently write to
   `build/generated-skills`.
 
 Deliverables:
@@ -375,9 +374,9 @@ Do not implement these in this slice unless the user re-approves:
 - broad multi-actor society mechanics;
 - deep reconnect refactor unless required by hot-path evidence work.
 
-Loose legacy `build/generated-skills` execution is still deferred. Direct
+Loose archived `build/generated-skills` execution is still deferred. Direct
 generated action skills must be actor-owned objective artifacts, not anonymous
-files read from a legacy output directory.
+files read from a archived output directory.
 
 ## Validation Gate
 
@@ -391,5 +390,5 @@ Run at minimum:
 - hot-path evidence tests;
 - deterministic no-network test path.
 
-The broad test suite may still contain legacy failures. If so, report them
+The broad test suite may still contain archived failures. If so, report them
 separately and do not confuse them with the new slice's targeted validation.

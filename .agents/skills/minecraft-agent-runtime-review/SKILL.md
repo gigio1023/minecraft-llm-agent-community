@@ -141,9 +141,9 @@ For `social-cycle-run-report/v1`, also answer:
 - Did observation change the next action, and how often did that next action
   produce verified progress?
 - How much of the exposed action surface was used as top-level Actor Turn
-  selection or legacy action and as executed tools?
+  selection or archived action and as executed tools?
 - For current Actor Turn reports, did the reviewer resolve `action_ref` /
-  `action_attempts[].action_ref` instead of relying on legacy `action_intent_ref`?
+  `action_attempts[].action_ref` instead of relying on archived `action_intent_ref`?
 - Did action choices concentrate into a narrow gather/craft/place loop?
 - Did verified primitive evidence update settlement checklist/state?
 - Were there social signals: visible actors, `say`, shared storage, relationship
@@ -279,6 +279,6 @@ If there are no blocking issues, say so and list remaining evidence gaps.
   `prismarine-viewer` can render unsupported or version-skewed blocks such as
   `leaf_litter` as strange colored boxes. Cross-check with `observe` block names
   and report the renderer uncertainty explicitly.
-- Current Actor Turn reports do not use legacy `ActionIntent` as the source of
+- Current Actor Turn reports do not use archived `ActionIntent` as the source of
   truth. If a summary says every action is `missing`, fix or bypass the summary
   and read `goals/cycle/actions/*.json` directly.

@@ -348,7 +348,7 @@ evidence, and persistence stay traceable despite that size.
 - Existing Action Card parameters are schema-bound and validated before
   execution.
 - `author_mineflayer_action` uses full-context internal codegen instead of a
-  lossy legacy summary.
+  lossy archived summary.
 - Runtime code rejects missing parameters rather than inferring them from prose.
 - Provider usage and artifacts make live runs auditable.
 - Runtime retry constraints can block exact repeated failures before another
@@ -364,7 +364,7 @@ evidence, and persistence stay traceable despite that size.
    decision frame may warn the model, but durable work state still needs to be
    updated.
 3. `socialCycleRunner.ts` is still a large orchestration file.
-4. Some legacy planner provider files and report schemas remain for explicit
+4. Some archived planner provider files and report schemas remain for explicit
    migration or historical artifact readability; they must not be treated as the
    active Actor Turn contract.
 5. Long-run behavior can still loop on observe/inspect/wait or repeated low-value

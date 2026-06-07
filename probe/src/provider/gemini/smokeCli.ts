@@ -2,7 +2,7 @@
  * Smoke CLI for Gemini provider connectivity and basic response handling.
  *
  * @remarks Provider smoke failures are setup/auth/model-path blockers and should
- * be diagnosed separately from Mineflayer, LegacyPlannerAction, or actor behavior.
+ * be diagnosed separately from Mineflayer, Actor Turn, or actor behavior.
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";

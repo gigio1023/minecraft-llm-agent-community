@@ -110,8 +110,8 @@ probe/src/runtime/goals/cycleReport.ts
 probe/src/runtime/goals/socialCycleReportAuditCli.ts
 probe/src/provider/openaiApiJsonProvider.ts
 probe/src/provider/socialGoalMindProvider.ts
-probe/src/provider/socialActionPlannerProvider.ts
-probe/src/provider/socialCycleJudgmentProvider.ts
+probe/src/provider/socialActorTurnProvider.ts
+probe/src/provider/socialActorTurnToolContract.ts
 probe/src/runtime/socialCycleRunner.ts
 probe/src/socialCycleCli.ts
 probe/test/socialGoalTypes.test.ts
@@ -293,7 +293,7 @@ type WorldEvent = {
 
 ```ts
 type ActionIntent = {
-  schema: "legacy-planner-action/v1";
+  schema: "archived-planner-action/v1";
   actor_id: string;
   cycle_id: string;
   cycle_goal_id: string;

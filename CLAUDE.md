@@ -66,10 +66,10 @@ item-family, station-family, construction-readiness, survival-priority, or
 shelter-first filters. If a tool should be hidden or rejected, express that with
 typed readiness/eligibility contracts, structured state, schemas, gates, retry
 constraints, or evidence. The runtime must not become a hidden Minecraft
-planner. No compatibility or legacy compromise is required when removing prose
+planner. No compatibility compromise is required when removing prose
 parsing or hidden domain-planner behavior.
 When changing an active runtime/provider contract, update the producer, schema,
-tests, prompts, and docs together. Do not keep legacy aliases, source names, or
+tests, prompts, and docs together. Do not keep old aliases, source names, or
 shim fields inside the new contract. Normalize old-shaped input at the boundary
 into current concept names, or remove the old path outright.
 
@@ -108,7 +108,7 @@ from the action-selection stage. In Actor Turn mode, that means
 `author_mineflayer_action`, which starts full-context generated Mineflayer
 authoring and trial. The outer tool call carries detailed rationale and desired
 behavior, not TypeScript source and not a lossy context summary. Background
-reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
+reviewers, PlanBeads, async sidecars, and archived generated-source importers may
 review, patch, re-trial, reject, promote, retire, or supersede an existing
 candidate, but they must not originate a new NPC action skill candidate.
 

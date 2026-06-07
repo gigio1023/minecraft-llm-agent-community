@@ -126,7 +126,7 @@ function runnerStrategicGoal(index: number): StrategicGoal {
   };
 }
 
-test("deterministic-social run writes two cycles and cites prior judgment", async () => {
+test("deterministic-social run writes two Actor Turn cycles and reuses episode context", async () => {
   const reportPath = path.join(rootDir, "deterministic-report.json");
   const result = await runSocialCycle({
     actorId: "npc_b",
@@ -136,8 +136,7 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
     maxActionsPerCycle: 2,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: path.join(rootDir, "actors"),
-    actionHotPath: "legacy"
+    actorWorkspaceRootDir: path.join(rootDir, "actors")
   });
 
   assert.equal(result.report.cycles.length, 2);
@@ -155,22 +154,21 @@ test("deterministic-social run writes two cycles and cites prior judgment", asyn
   assert.equal(result.report.settlement_state?.schema, "settlement-state/v1");
   assert.equal(result.report.settlement_checklist?.schema, "settlement-checklist/v1");
   assert.equal(result.report.memory_reuse?.used_previous_judgment, true);
-  assert.ok((result.report.memory_reuse?.memory_writes ?? 0) >= 2);
+  assert.equal(result.report.memory_reuse?.memory_writes ?? 0, 0);
 
   const actorDir = path.join(rootDir, "actors", "npc_b");
-  const cycle2CycleGoalProviderInput = result.report.cycles[1]?.provider_input_refs[0];
-  assert.ok(cycle2CycleGoalProviderInput);
-  const snapshot = await readJsonIfExists<{ input?: unknown }>(
-    path.join(actorDir, cycle2CycleGoalProviderInput)
+  const cycle2ActorTurnProviderInput = result.report.cycles[1]?.provider_input_refs.find((ref) =>
+    ref.includes("actor-turn")
   );
-  assert.equal(cycleGoalProviderInputIncludesSoulAndLifeGoal(snapshot?.input), true);
-  const prior = (snapshot?.input as { previous_cycle_judgments?: unknown[] })?.previous_cycle_judgments;
-  assert.ok(prior && prior.length > 0);
-  assert.equal(prior.length, 1);
-  assert.equal((prior[0] as { cycle_id?: string }).cycle_id, "cycle-0001");
-  const planBeadPacket = (snapshot?.input as { plan_bead_packet?: { graph_summary?: { open_count?: number } } })
-    ?.plan_bead_packet;
-  assert.equal(planBeadPacket?.graph_summary?.open_count, 0);
+  assert.ok(cycle2ActorTurnProviderInput);
+  const snapshot = await readJsonIfExists<{ input?: { schema?: string; active_episode?: { schema?: string }; previous_cycle_judgments?: unknown[] } }>(
+    path.join(actorDir, cycle2ActorTurnProviderInput)
+  );
+  assert.equal(snapshot?.input?.schema, "actor-turn-input/v1");
+  assert.equal(snapshot?.input?.active_episode?.schema, "active-episode/v1");
+  const prior = snapshot?.input?.previous_cycle_judgments;
+  assert.equal((prior ?? []).some((entry) => (entry as { cycle_id?: string }).cycle_id === "cycle-0007"), false);
+  assert.ok((snapshot?.input as { source_evidence_bundle?: unknown })?.source_evidence_bundle);
 });
 
 test("Gemini social-cycle model rotation selects one model per provider call", () => {
@@ -217,18 +215,17 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
     maxActionsPerCycle: 1,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "legacy"
+    actorWorkspaceRootDir: isolatedRoot
   });
 
   const actorDir = path.join(isolatedRoot, actorId);
   const refs = result.report.cycles[0]?.provider_input_refs ?? [];
   const goalMindRef = refs.find((ref) => ref.includes("goal-mind"));
-  const actionPlannerRef = refs.find((ref) => ref.includes("action-planner"));
-  const judgmentRef = refs.find((ref) => ref.includes("cycle-judgment"));
+  const actorTurnRef = refs.find((ref) => ref.includes("actor-turn"));
   assert.ok(goalMindRef);
-  assert.ok(actionPlannerRef);
-  assert.ok(judgmentRef);
+  assert.ok(actorTurnRef);
+  assert.equal(refs.some((ref) => ref.includes("action-planner")), false);
+  assert.equal(refs.some((ref) => ref.includes("cycle-judgment")), false);
 
   const goalMind = await readJsonIfExists<{ input?: Record<string, unknown> }>(
     path.join(actorDir, goalMindRef)
@@ -303,44 +300,25 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
     undefined
   );
 
-  const actionPlanner = await readJsonIfExists<{ input?: Record<string, unknown> }>(
-    path.join(actorDir, actionPlannerRef)
+  const actorTurn = await readJsonIfExists<{ input?: Record<string, unknown> }>(
+    path.join(actorDir, actorTurnRef)
   );
-  assert.equal(actionPlanner?.input?.schema, "social-action-planner-input/v1");
-  assert.equal(actionPlanner?.input?.action_surface, undefined);
-  assert.equal(actionPlanner?.input?.owned_action_skills, undefined);
-  assert.equal(actionPlanner?.input?.settlement_checklist, undefined);
-  assert.ok(actionPlanner?.input?.minecraft_basic_guide);
-  assert.ok(actionPlanner?.input?.runtime_affordances);
-  assert.ok(actionPlanner?.input?.direct_action_skills);
-  assert.ok(actionPlanner?.input?.candidate_action_skill_search);
+  assert.equal(actorTurn?.input?.schema, "actor-turn-input/v1");
+  assert.ok(actorTurn?.input?.minecraft_basic_guide);
+  assert.ok(actorTurn?.input?.source_evidence_bundle);
+  assert.ok(actorTurn?.input?.current_state);
   assert.equal(
-    (actionPlanner?.input?.actor_turn_contract as { schema?: string })?.schema,
-    "actor-turn-contract/v1"
+    (actorTurn?.input?.mineflayer_codegen_skill as { schema?: string })?.schema,
+    "mineflayer-codegen-skill/v1"
   );
-  assert.ok(Array.isArray(actionPlanner?.input?.action_cards));
+  assert.ok(Array.isArray(actorTurn?.input?.action_cards));
   assert.ok(
-    (actionPlanner?.input?.action_cards as Array<Record<string, unknown>>).every(
+    (actorTurn?.input?.action_cards as Array<Record<string, unknown>>).every(
       (card) =>
         card.schema === "action-card/v1" &&
         card.primitive_id === undefined &&
         card.action_skill_id === undefined
     )
-  );
-
-  const judgment = await readJsonIfExists<{ input?: Record<string, unknown> }>(
-    path.join(actorDir, judgmentRef)
-  );
-  assert.equal(judgment?.input?.schema, "social-cycle-judgment-input/v1");
-  assert.equal(judgment?.input?.action_surface, undefined);
-  assert.equal(judgment?.input?.settlement_checklist, undefined);
-  assert.ok(judgment?.input?.runtime_result);
-  assert.ok(judgment?.input?.minecraft_basic_guide);
-  assert.ok(judgment?.input?.action_surface_summary);
-  assert.equal(
-    (judgment?.input?.action_surface_summary as { direct_action_skills?: unknown })
-      ?.direct_action_skills,
-    undefined
   );
 });
 
@@ -387,8 +365,7 @@ test("deterministic-social actor_turn action path writes Actor Turn snapshots an
     maxActionsPerCycle: 2,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "actor_turn"
+    actorWorkspaceRootDir: isolatedRoot
   });
 
   assert.equal(result.report.action_hot_path, "actor_turn");
@@ -457,7 +434,6 @@ test("shared-storage social smoke writes run-scoped request into Actor Turn cont
     reportPath,
     connectToWorld: false,
     actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "actor_turn",
     sharedStorageSocialSmoke: true
   });
 
@@ -507,8 +483,7 @@ test("deterministic-social actor_turn reuses Active Episode without repeated goa
     maxActionsPerCycle: 2,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "actor_turn"
+    actorWorkspaceRootDir: isolatedRoot
   });
 
   const actorDir = path.join(isolatedRoot, "npc_b");
@@ -556,7 +531,6 @@ test("deterministic-social actor_turn branches through dedicated Deliberation pr
     reportPath,
     connectToWorld: false,
     actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "actor_turn",
     deterministicActorTurnPrimitives: ["move_to", "observe"]
   });
 
@@ -644,8 +618,7 @@ test("stale alphabetically later judgment is not used as previous context", asyn
     maxActionsPerCycle: 1,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "legacy"
+    actorWorkspaceRootDir: isolatedRoot
   });
 
   const actorDir = path.join(isolatedRoot, actorId);
@@ -654,9 +627,7 @@ test("stale alphabetically later judgment is not used as previous context", asyn
     path.join(actorDir, cycle2CycleGoalProviderInput ?? "")
   );
   const prior = snapshot?.input?.previous_cycle_judgments ?? [];
-  assert.equal(prior.length, 1);
-  assert.equal(prior[0]?.cycle_id, "cycle-0001");
-  assert.notEqual(prior[0]?.cycle_id, "cycle-0007");
+  assert.equal(prior.some((entry) => entry.cycle_id === "cycle-0007"), false);
 });
 
 test("provider failure does not report runtime pass", async () => {
@@ -729,22 +700,20 @@ test("deterministic-social run carries PlanBead ready front and guarded operatio
     maxActionsPerCycle: 1,
     reportPath,
     connectToWorld: false,
-    actorWorkspaceRootDir: isolatedRoot,
-    actionHotPath: "legacy"
+    actorWorkspaceRootDir: isolatedRoot
   });
 
   assert.equal(result.report.cycles.length, 2);
   assert.deepEqual(result.report.plan_bead_ready_fronts?.[0]?.in_progress_bead_ids, ["bead-a"]);
   assert.deepEqual(result.report.plan_bead_ready_fronts?.[0]?.ready_bead_ids, ["bead-b"]);
   assert.deepEqual(result.report.cycles[0]?.selected_plan_bead_refs, ["plan-beads/beads/bead-b.json"]);
-  assert.ok((result.report.cycles[0]?.plan_bead_operation_result_refs ?? []).length > 0);
-  assert.equal(result.report.plan_bead_operation_results?.[0]?.status, "accepted");
-  assert.equal(result.report.plan_bead_operation_results?.[0]?.bead_id, "bead-b");
+  assert.equal((result.report.cycles[0]?.plan_bead_operation_result_refs ?? []).length, 0);
+  assert.equal(result.report.plan_bead_operation_results?.length ?? 0, 0);
   assert.equal(result.report.plan_bead_graph_summary?.last_ready_front_ref, result.report.plan_bead_ready_fronts?.[1]?.ref);
 
   const beadB = await readActorPlanBead(isolatedRoot, actorId, "bead-b");
-  assert.equal(beadB?.status, "in_progress");
-  assert.ok((beadB?.checkpoint.version ?? 0) >= 2);
+  assert.equal(beadB?.status, "open");
+  assert.equal(beadB?.checkpoint.version ?? 0, 1);
 
   const actorDir = path.join(isolatedRoot, actorId);
   const goalMindInputRef = result.report.cycles[0]?.provider_input_refs[0];

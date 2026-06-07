@@ -448,7 +448,7 @@ test("Action Card projection exposes primitive/action-skill choice through cards
         schema: "evidence-trace/v1",
         turn_id: "turn-001",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/legacy-planner-actions/turn-001-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/turn-001-actor-turn-action.json",
         runtime_gate_ref: "runtime-gates/turn-001.json",
         outcome: "no_progress",
         compact_summary: "turn-001 observe -> completed"
@@ -723,7 +723,7 @@ test("Actor Turn input keeps Remember visible after repeated no-progress memory 
         schema: "evidence-trace/v1",
         turn_id: "turn-012",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/legacy-planner-actions/turn-012-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/turn-012-actor-turn-action.json",
         runtime_gate_ref: "runtime-gates/turn-012.json",
         outcome: "no_progress",
         compact_summary: "turn-012 remember -> wrote a status note without runtime progress"
@@ -732,7 +732,7 @@ test("Actor Turn input keeps Remember visible after repeated no-progress memory 
         schema: "evidence-trace/v1",
         turn_id: "turn-013",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/legacy-planner-actions/turn-013-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/turn-013-actor-turn-action.json",
         runtime_gate_ref: "runtime-gates/turn-013.json",
         outcome: "no_progress",
         compact_summary: "turn-013 remember -> repeated the same blocker note"
@@ -793,7 +793,7 @@ test("Actor Turn input keeps Move To visible after repeated movement without dur
         schema: "evidence-trace/v1",
         turn_id: "turn-010",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/legacy-planner-actions/turn-010-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/turn-010-actor-turn-action.json",
         runtime_gate_ref: "runtime-gates/turn-010.json",
         outcome: "position_delta",
         compact_summary: "turn-010 move_to -> completed"
@@ -802,7 +802,7 @@ test("Actor Turn input keeps Move To visible after repeated movement without dur
         schema: "evidence-trace/v1",
         turn_id: "turn-011",
         episode_id: activeEpisode.episode_id,
-        action_ref: "goals/cycle/legacy-planner-actions/turn-011-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/turn-011-actor-turn-action.json",
         runtime_gate_ref: "runtime-gates/turn-011.json",
         outcome: "no_progress",
         compact_summary: "turn-011 move_to -> completed"
@@ -916,7 +916,7 @@ test("Actor Turn input keeps cobblestone mining available after repeated success
       schema: "evidence-trace/v1" as const,
       turn_id: `turn-mine-${index}`,
       episode_id: activeEpisode.episode_id,
-      action_ref: `goals/cycle/legacy-planner-actions/turn-mine-${index}-legacy-planner-action.json`,
+      action_ref: `goals/cycle/actor-turn-actions/turn-mine-${index}-actor-turn-action.json`,
       runtime_gate_ref: `runtime-gates/turn-mine-${index}.json`,
       outcome: "verified_mutation" as const,
       compact_summary: `turn-mine-${index} observe,mine_block,wait -> completed`
@@ -985,7 +985,7 @@ test("Actor Turn input keeps cobblestone mining visible for an explicit shortage
       schema: "evidence-trace/v1" as const,
       turn_id: `turn-mine-shortage-${index}`,
       episode_id: activeEpisode.episode_id,
-      action_ref: `goals/cycle/legacy-planner-actions/turn-mine-shortage-${index}-legacy-planner-action.json`,
+      action_ref: `goals/cycle/actor-turn-actions/turn-mine-shortage-${index}-actor-turn-action.json`,
       runtime_gate_ref: `runtime-gates/turn-mine-shortage-${index}.json`,
       outcome: "verified_mutation" as const,
       compact_summary: `turn-mine-shortage-${index} observe,mine_block,wait -> completed`
@@ -2600,7 +2600,7 @@ test("Actor Turn input keeps Say visible after recent no-progress chat follow-up
         schema: "evidence-trace/v1",
         turn_id: "cycle-0002-action-01",
         episode_id: "episode-social-followup-no-repeat",
-        action_ref: "goals/cycle/legacy-planner-actions/cycle-0002-action-01-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/cycle-0002-action-01-actor-turn-action.json",
         runtime_gate_ref: "runtime-gates/cycle-0002-action-01.json",
         execution_ref: "evidence/cycle-0002-action-01-say.json",
         verifier_ref: "judgments/cycle-0002-action-01-judgment.json",
@@ -3035,7 +3035,7 @@ test("Mineflayer codegen request preserves full ActorTurnInput and raw outer fun
   assert.deepEqual(request.raw_outer_tool_call, rawOuterToolCall);
   assert.deepEqual(request.parsed_author_tool_args, parsedAuthorToolArgs);
   assert.match(request.mineflayer_codegen_skill_markdown, /Mineflayer Code Generation/);
-  assert.match(request.output_contract.forbidden_context_boundary, /legacy planner|context_to_preserve/i);
+  assert.match(request.output_contract.forbidden_context_boundary, /compressed planner|context_to_preserve/i);
 });
 
 test("Mineflayer codegen parser rejects extra candidate context fields", () => {

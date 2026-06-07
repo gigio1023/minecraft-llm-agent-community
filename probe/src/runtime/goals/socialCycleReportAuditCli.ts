@@ -530,7 +530,7 @@ function collectWorldScanCounts(
     return empty;
   }
 
-  // Only explicit world-state schemas count as scan evidence. Legacy hints such
+  // Only explicit world-state schemas count as scan evidence. Compact hints such
   // as nearbyBlocks are useful debug context, but they are too weak to support
   // absence claims in an audit.
   if (value.schema === "world-state-summary/v1" || value.schema === "world-state-scan/v1") {

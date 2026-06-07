@@ -102,7 +102,7 @@ function memoryItemNamesFromWorldEvents(worldEvents: readonly WorldEvent[]) {
   return [...new Set(summaries.match(/\b[a-z0-9]+(?:_[a-z0-9]+)+\b/g) ?? [])];
 }
 
-/** Builds the compact context packet used by CycleGoal, LegacyPlannerAction, and judgment providers. */
+/** Builds the compact context packet used by CycleGoal and Actor Turn providers. */
 export async function assembleSocialCycleContext(input: {
   actorWorkspaceRootDir: string;
   actorId: string;
@@ -240,8 +240,4 @@ export function contextCitesPreviousJudgment(
 export type ParsedCycleGoalProviderOutput = {
   strategic_goal_updates: StrategicGoal[];
   cycle_goal: ActorCycleGoal;
-};
-
-export type ParsedActionPlannerOutput = {
-  legacy_planner_action: import("./types.js").LegacyPlannerAction;
 };
