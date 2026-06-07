@@ -108,7 +108,7 @@ PlanBeads verdict:
   `selected_plan_bead_refs=0`,
   `plan_bead_operation_result_refs=0`,
   `plan_bead_operation_results=0`,
-  and Actor Turn `compact_plan_bead_hints=[]`.
+  and Actor Turn `source_evidence_bundle.plan_bead_cards=[]`.
 - The actor workspace for this run contained only
   `plan-beads/indexes/plan-bead-ready-front-cycle-*.json`; no PlanBead record,
   event, history, or operation-result artifact was created.
@@ -291,10 +291,11 @@ What improved in this slice:
 - Actor Turn runtime classifier writes neutral evidence-linked memory summaries
   instead of copying provider `why_this_action` prose into CycleJudgment memory
   writes.
-- Actor Turn provider input now injects the repo's
+- Mineflayer codegen request construction now injects the repo's
   `.agents/skills/mineflayer-code-generation/SKILL.md` body into
-  `mineflayer_codegen_skill.skill_markdown`, so every
-  `author_mineflayer_action` turn sees the bounded Mineflayer generation rules.
+  `mineflayer_codegen_skill_markdown`, so every `author_mineflayer_action`
+  codegen turn sees the bounded Mineflayer generation rules without bloating the
+  outer Actor Turn input.
 - Actor Turn decision-frame code has been split into responsibility-focused
   modules for current-state projection, episode context, Action Cards,
   selection hints, Minecraft basic guide injection, Mineflayer codegen skill

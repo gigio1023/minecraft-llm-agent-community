@@ -121,6 +121,23 @@ source, helper API version, timeout, verifier, failure modes, promotion policy,
 helper-event evidence, and post-observation. Prose never supplies missing
 executable parameters.
 
+## Commenting Expectations
+
+This repo needs comments where code carries architecture authority, not comments
+that restate TypeScript. Provider-facing Actor Turn code must explain whether a
+field is prompt context, strict tool-call input, runtime executable authority, or
+review-only evidence.
+
+For Action Card function schemas, document that primitive/action-skill parameter
+schemas are tool-calling contracts. They require the LLM to supply explicit
+logical parameters, but they must not pick item names, coordinates, strategy, or
+eligibility through hidden Minecraft heuristics.
+
+For `author_mineflayer_action`, document the two-call boundary: the outer Actor
+Turn function call is selection plus detailed rationale, while the internal
+Mineflayer codegen request receives the full original `ActorTurnInput`, raw outer
+tool call, parsed authoring args, and code-generation agent skill markdown.
+
 ## Karpathy Guidelines
 
 Search token: `KARPATHY_GUIDELINES`.

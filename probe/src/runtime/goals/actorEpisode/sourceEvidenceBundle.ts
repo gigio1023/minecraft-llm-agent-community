@@ -179,6 +179,7 @@ export function buildActorTurnSourceEvidenceBundle(input: {
     })),
     recent_action_details: input.recentEvidenceTrace.slice(-6).map((entry) => ({
       turn_id: entry.turn_id,
+      episode_id: entry.episode_id,
       outcome: entry.outcome,
       compact_summary: entry.compact_summary,
       ...(entry.selected_action ? { selected_action: { ...entry.selected_action } } : {}),

@@ -586,8 +586,8 @@ Run reports should expose:
 - PlanBeadGraph summary at run start and end;
 - ready front at each cycle, when available;
 - cycle-level `plan_bead_packet_ref` values that point at ready-front snapshots;
-- provider input `compact_plan_bead_hints`, including empty arrays when no
-  current graph hints exist;
+- provider input `source_evidence_bundle.plan_bead_cards`, including empty
+  arrays when no current graph cards exist;
 - PlanBead refs cited by each CycleGoal, Active Episode, Actor Turn selection,
   or runtime action artifact;
 - accepted and rejected bead operations;

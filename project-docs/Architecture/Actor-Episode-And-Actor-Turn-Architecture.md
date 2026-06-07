@@ -280,11 +280,8 @@ type ActorTurnInputV1 = {
   turn_id: string;
   active_episode: ActiveEpisodeV1;
   actor_context: ActorSoulAndLifeGoalProjection;
-  current_observation_refs: string[];
   current_state: ActorTurnCurrentStateV1;
-  recent_evidence_trace: EvidenceTraceEntryV1[];
-  compact_plan_bead_hints: PlanBeadHintV1[];
-  memory_refs: string[];
+  source_evidence_bundle: ActorTurnSourceEvidenceBundleV1;
   relationship_context: RelationshipContextProjection;
   runtime_retry_constraints: RuntimeRetryConstraintSummary[];
   action_cards: ActionCardV1[];
@@ -294,7 +291,9 @@ type ActorTurnInputV1 = {
 ```
 
 The input should be compact enough for cheap models. It should still preserve
-the evidence refs needed to audit claims.
+the evidence refs needed to audit claims. Current observations, recent action
+details, memory cards, and PlanBead cards live under `source_evidence_bundle`
+rather than duplicated as top-level Actor Turn fields.
 
 ### `plan-bead-hint/v1`
 
@@ -314,8 +313,8 @@ type PlanBeadHintV1 = {
 };
 ```
 
-`compact_plan_bead_hints` are a lossy read-only projection from the
-PlanBeadGraph. They must preserve the parts a cheap model needs to avoid
+`source_evidence_bundle.plan_bead_cards` are a bounded read-only projection from
+the PlanBeadGraph. They preserve the parts a cheap model needs to avoid
 forgetting durable work: priority, what remains open, blockers, dependency refs,
 checkpoint ref, and acceptance evidence. They must not expose executable args,
 primitive ids, action-skill ids, or physical success claims.
@@ -642,7 +641,7 @@ PlanBeads are not removed. They move behind the hot path:
 PlanBeadGraph
 -> Deliberation branch context
 -> Active Episode selected/related bead refs
--> compact hints for Actor Turn
+-> source_evidence_bundle.plan_bead_cards for Actor Turn
 -> guarded operation results on branch-time mutation
 ```
 
@@ -658,7 +657,7 @@ Observable PlanBead presence in Actor Turn mode is this artifact chain:
 actor workspace plan-beads/*
 -> plan_bead_ready_fronts[] in the report
 -> cycle.plan_bead_packet_ref
--> provider input compact_plan_bead_hints
+-> provider input source_evidence_bundle.plan_bead_cards
 -> plan_bead_graph_summary.last_ready_front_ref
 ```
 
@@ -670,9 +669,9 @@ applier.
 
 However, an empty graph for an entire long run is still a behavior gap. If a
 report has ready-front snapshots every cycle but zero selected bead refs, zero
-operation results, and empty `compact_plan_bead_hints`, reviewers should record
-"PlanBeads wired but not substantively used" rather than treating packet
-presence as planning continuity.
+operation results, and empty `source_evidence_bundle.plan_bead_cards`, reviewers
+should record "PlanBeads wired but not substantively used" rather than treating
+packet presence as planning continuity.
 
 Deliberation may emit either valid `plan-bead-operation/v1` objects or looser
 work-state proposals. The runtime may adapt looser branch-time proposals into
@@ -745,10 +744,10 @@ Architecture acceptance requires:
 - Generic branch-only PlanBead creates and duplicate open creates are rejected
   or dropped before they can dominate the ready front.
 - Actor Turn mode records PlanBead ready-front/context artifacts every cycle;
-  empty `compact_plan_bead_hints` is interpreted as "no current graph hints",
-  not as PlanBeads removal.
-- Actor Turn `compact_plan_bead_hints` preserve priority, next hints, blockers,
-  dependency refs, checkpoint ref, and evidence refs.
+  empty `source_evidence_bundle.plan_bead_cards` is interpreted as "no current
+  graph cards", not as PlanBeads removal.
+- Actor Turn `source_evidence_bundle.plan_bead_cards` preserve priority, next
+  hints, blockers, dependency refs, checkpoint ref, and evidence refs.
 - Settlement state consolidates shared chest inspect/deposit evidence into both
   `shared_storage` and `known_positions.shared_chest`.
 - Branch-time Deliberation carries current Active Episode fields forward when a

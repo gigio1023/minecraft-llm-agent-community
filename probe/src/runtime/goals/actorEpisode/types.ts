@@ -243,6 +243,7 @@ export type ActorTurnSourceEvidenceBundle = {
   }>;
   recent_action_details: Array<{
     turn_id: string;
+    episode_id: string;
     outcome: EvidenceTraceOutcome;
     compact_summary: string;
     selected_action?: EvidenceTraceEntry["selected_action"];
@@ -493,17 +494,12 @@ export type ActorTurnInput = {
   decision_frame: ActorTurnDecisionFrame;
   active_episode: ActiveEpisode;
   actor_context: ActorSoulAndLifeGoalProjection;
-  current_observation_refs: string[];
   current_state: ActorTurnCurrentStateProjection;
   source_evidence_bundle: ActorTurnSourceEvidenceBundle;
-  recent_evidence_trace: EvidenceTraceEntry[];
-  compact_plan_bead_hints: PlanBeadHint[];
-  memory_refs: string[];
   relationship_context: RelationshipContextProjection;
   runtime_retry_constraints: RuntimeRetryConstraintSummary[];
   action_cards: ActionCard[];
   minecraft_basic_guide: MinecraftBasicGuideProjection;
-  mineflayer_codegen_skill: MineflayerCodegenSkillProjection;
   provider_budget_hint: ProviderBudgetHint;
 };
 

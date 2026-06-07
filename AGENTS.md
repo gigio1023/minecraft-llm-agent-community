@@ -609,6 +609,23 @@ practice.
   which fields may become executable authority after validation. Prose fields,
   memory, PlanBeads, and decision-frame hints should be explicitly described as
   non-authoritative wherever that distinction is easy to blur.
+- For Actor Turn function-tool code, comments should make the boundary obvious:
+  a visible Action Card function schema is a tool-calling contract, not a hidden
+  Minecraft planner. It may require logical parameters such as item names,
+  counts, directions, or coordinates, but it must not choose those values from
+  prose, heuristics, or domain strategy. The LLM supplies them in strict tool
+  args; runtime validation then accepts or rejects them.
+- For `author_mineflayer_action` and Mineflayer codegen code, comments should
+  distinguish the outer selection call from the internal codegen call. The outer
+  call carries detailed rationale and desired behavior; the internal request
+  carries the full original `ActorTurnInput`, raw outer tool call, parsed tool
+  args, and codegen agent skill markdown. Do not leave future readers guessing
+  whether `raw_outer_tool_call` is the Actor Turn output.
+- When a module intentionally keeps duplicated-looking context, such as compact
+  facts plus source evidence refs, comment the reason: bounded facts help the
+  model read quickly, while source evidence prevents lossy summary-only
+  decisions. When duplication is only accidental or compatibility-driven, remove
+  it instead of documenting it.
 - For persistence and artifact code, document what record is the source of truth,
   what evidence survives compaction, and which claims are only diagnostic context
   rather than proof of Minecraft progress.

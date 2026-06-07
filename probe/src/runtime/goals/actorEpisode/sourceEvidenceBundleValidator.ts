@@ -138,6 +138,7 @@ function validateRecentActionDetail(value: unknown, path: string, errors: string
     return;
   }
   assertString(value, "turn_id", path, errors);
+  assertString(value, "episode_id", path, errors);
   if (
     typeof value.outcome !== "string" ||
     !evidenceTraceOutcomes.includes(value.outcome as (typeof evidenceTraceOutcomes)[number])

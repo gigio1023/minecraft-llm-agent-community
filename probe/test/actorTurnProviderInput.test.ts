@@ -491,37 +491,36 @@ test("Action Card projection exposes primitive/action-skill choice through cards
     actorTurnPlaceBlockCard.current_state_requirements.includes("check whether inventory has the requested block item")
   );
   assert.equal(actorTurnInput.runtime_retry_constraints.length, 1);
-  assert.equal(actorTurnInput.compact_plan_bead_hints[0]?.bead_id, "bead-crafting-table-access");
+  const planBeadCard = actorTurnInput.source_evidence_bundle.plan_bead_cards[0];
+  assert.equal(planBeadCard?.bead_id, "bead-crafting-table-access");
   assert.deepEqual(actorTurnInput.active_episode.selected_plan_bead_refs, [
     "plan-beads/beads/bead-crafting-table-access.json"
   ]);
-  assert.equal(actorTurnInput.compact_plan_bead_hints[0]?.priority, 0);
-  assert.deepEqual(actorTurnInput.compact_plan_bead_hints[0]?.next_hints, [
+  assert.equal(planBeadCard?.priority, 0);
+  assert.deepEqual(planBeadCard?.next_hints, [
     "Use current_state before choosing a place-block action."
   ]);
-  assert.deepEqual(actorTurnInput.compact_plan_bead_hints[0]?.blockers, [
+  assert.deepEqual(planBeadCard?.blockers, [
     "occupied target from prior placement attempt"
   ]);
   assert.equal(
-    actorTurnInput.compact_plan_bead_hints[0]?.dependency_refs[0],
+    planBeadCard?.dependency_refs[0],
     "plan-bead-dependency:npc_b:bead-crafting-table-access:blocks:bead-toolmaking"
   );
   assert.equal(
-    actorTurnInput.compact_plan_bead_hints[0]?.checkpoint_ref,
+    planBeadCard?.checkpoint_ref,
     "plan-beads/beads/bead-crafting-table-access.json"
   );
   assert.equal(actorTurnInput.relationship_context.visible_actor_ids[0], "npc_a");
   assert.match(actorTurnInput.minecraft_basic_guide.item_flows.join("\n"), /log -> matching planks/);
-  assert.match(actorTurnInput.mineflayer_codegen_skill.skill_markdown, /# Mineflayer Code Generation/);
-  assert.match(actorTurnInput.mineflayer_codegen_skill.skill_markdown, /Required Output Shape/);
 
   const toolPayload = buildActorTurnToolSelectionPayload({
     actorTurnInput,
     actionCardProjection,
     runId: "run-1"
   });
-  assert.match(toolPayload.user, /# Mineflayer Code Generation/);
-  assert.match(toolPayload.user, /Required Output Shape/);
+  assert.doesNotMatch(toolPayload.user, /# Mineflayer Code Generation/);
+  assert.doesNotMatch(toolPayload.user, /Required Output Shape/);
   assert.equal(toolPayload.usageContext.stage, "actor_turn_tool_selection");
   assert.match(toolPayload.system, /Call exactly one function tool/);
   assert.match(toolPayload.system, /current_state, Action Card hints, or runtime code/);
@@ -1678,8 +1677,7 @@ test("Action Card tool schema exposes generated action-skill input schema", () =
       schema: "actor-turn-input/v1",
       turn_id: "turn-generated-schema",
       active_episode: { actor_id: "npc_b" },
-      action_cards: projection.action_cards,
-      mineflayer_codegen_skill: { skill_markdown: "# Mineflayer Code Generation" }
+      action_cards: projection.action_cards
     } as unknown as ActorTurnInput,
     actionCardProjection: projection
   });
@@ -2995,9 +2993,6 @@ test("Mineflayer codegen request preserves full ActorTurnInput and raw outer fun
     },
     current_state: {
       inventory_counts: { crafting_table: 1 }
-    },
-    mineflayer_codegen_skill: {
-      skill_markdown: "# Mineflayer Code Generation\nUse bounded helpers."
     }
   } as unknown as ActorTurnInput;
   const rawOuterToolCall = {
@@ -3095,10 +3090,7 @@ test("Gemini GenAI function declarations reuse Actor Turn tool schemas", () => {
         readiness: "requires_current_state_check",
         runtime_mapping_ref: "action-card-mappings/action-card-001.json"
       }
-    ],
-    mineflayer_codegen_skill: {
-      skill_markdown: "# Mineflayer Code Generation"
-    }
+    ]
   } as unknown as ActorTurnInput;
   const payload = buildActorTurnToolSelectionPayload({
     actorTurnInput,

@@ -35,7 +35,7 @@ flowchart TD
   Author --> Request["detailed codegen rationale<br/>no source, no context summary"]
   Input --> Codegen["Internal Mineflayer codegen LLM"]
   Request --> Codegen
-  Skill["mineflayer_codegen_skill.skill_markdown"] --> Codegen
+  Skill["mineflayer-code-generation SKILL.md<br/>injected only into codegen request"] --> Codegen
   Codegen --> Candidate["source + schema + params<br/>verifier + timeout + helper allowlist"]
   Candidate --> Trial["source guard, helper trial,<br/>verifier, evidence, promotion"]
   Runtime --> Evidence["Evidence trace<br/>actor workspace artifacts"]
@@ -55,7 +55,11 @@ flowchart TD
 
 ## Function Tool Contract
 
-Each visible Action Card becomes a function tool. The tool schema exposes:
+Each visible Action Card becomes its own function tool. The Actor Turn provider
+does not choose between only two function names; it chooses exactly one function
+from the current visible Action Card tools plus `author_mineflayer_action`.
+
+The Action Card tool schema exposes:
 
 - `parameters`: the logical parameters the LLM must fill;
 - `expected_outcome`: enum of the evidence delta that should prove success;
@@ -83,9 +87,12 @@ When Actor Turn selects `author_mineflayer_action`, the runtime builds a
 codegen request from:
 
 1. the full original `ActorTurnInput`;
-2. the raw outer function call;
-3. the parsed outer tool arguments;
-4. the full `mineflayer_codegen_skill.skill_markdown`;
+2. the raw outer function call, which is the preserved Actor Turn
+   `author_mineflayer_action` output;
+3. the parsed outer tool arguments, which are the same output after local schema
+   validation;
+4. the full Mineflayer code-generation agent skill markdown, injected by the
+   codegen request builder rather than carried in the outer Actor Turn input;
 5. any concrete validation/source-guard error when repairing a generated
    candidate.
 

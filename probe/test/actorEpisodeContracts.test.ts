@@ -4,7 +4,6 @@ import test from "node:test";
 
 import {
   auditEpisodeReviewSummary,
-  buildMineflayerCodegenSkillProjection,
   validateActionCard,
   validateActiveEpisode,
   validateActorTurnInput,
@@ -110,7 +109,6 @@ function actorTurnInput(): ActorTurnInput {
       life_goal_ref: "goals/life/active.json",
       life_goal_summary: "Become reliable in settlement work through evidence-backed action."
     },
-    current_observation_refs: ["observations/turn-002-pre.json"],
     current_state: {
       schema: "actor-turn-current-state/v1",
       observer_id: "npc_b",
@@ -159,6 +157,7 @@ function actorTurnInput(): ActorTurnInput {
       recent_action_details: [
         {
           turn_id: evidenceTrace.turn_id,
+          episode_id: evidenceTrace.episode_id,
           outcome: evidenceTrace.outcome,
           compact_summary: evidenceTrace.compact_summary,
           evidence_refs: []
@@ -180,23 +179,6 @@ function actorTurnInput(): ActorTurnInput {
         }
       ]
     },
-    recent_evidence_trace: [evidenceTrace],
-    compact_plan_bead_hints: [
-      {
-        bead_id: "bead-crafting-table-access",
-        title: "Crafting table access is blocked",
-        status: "in_progress",
-        priority: 1,
-        why_it_matters: "Toolmaking cannot continue until the table issue is physically resolved.",
-        next_hints: ["Repair table placement before trying table-sized recipes."],
-        blockers: ["last placement target was occupied"],
-        acceptance_evidence_required: ["block or inventory evidence for table access"],
-        evidence_refs: ["evidence/turn-001-place.json"],
-        dependency_refs: ["plan-bead-dependency:npc_b:bead-crafting-table-access:blocks:bead-toolmaking"],
-        checkpoint_ref: "plan-beads/beads/bead-crafting-table-access.json"
-      }
-    ],
-    memory_refs: ["memory/episodic/toolmaking-blocker.json"],
     relationship_context: {
       relationship_refs: ["relationships/npc_a-npc_b.json"],
       visible_actor_ids: ["npc_a"],
@@ -244,7 +226,6 @@ function actorTurnInput(): ActorTurnInput {
       blocker_recovery_guides: ["if placement target is occupied, pick another adjacent valid cell"],
       observe_stop_guides: ["do not repeat observe after scan-backed blocker evidence"]
     },
-    mineflayer_codegen_skill: buildMineflayerCodegenSkillProjection(),
     provider_budget_hint: {
       provider_id: "gemini-api",
       model: "gemma-4-31b-it",

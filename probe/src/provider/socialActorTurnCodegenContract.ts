@@ -10,7 +10,10 @@ import type {
   JsonObject,
   JsonValue
 } from "../runtime/goals/actorEpisode/index.js";
-import { mineflayerActionSkillHelperNames } from "../runtime/goals/actorEpisode/index.js";
+import {
+  buildMineflayerCodegenSkillProjection,
+  mineflayerActionSkillHelperNames
+} from "../runtime/goals/actorEpisode/index.js";
 import type { GeneratedActionSkillCandidate } from "../runtime/goals/types.js";
 import type { ActorTurnAuthorMineflayerActionArgs } from "./socialActorTurnToolParser.js";
 
@@ -20,9 +23,26 @@ export type MineflayerCodegenRequest = {
   actor_id: string;
   turn_id: string;
   created_at: string;
+  /**
+   * Full Actor Turn context as it was shown to the outer selection model.
+   *
+   * @remarks This is the main defense against lossy `ActionIntent`-style
+   * bottlenecks. Codegen should reason from the same current_state,
+   * source_evidence_bundle, action surface, memory cards, PlanBead cards, guide,
+   * and retry constraints that produced the outer authoring decision.
+   */
   actor_turn_input: ActorTurnInput;
+  /**
+   * Raw function-call item returned by Actor Turn for `author_mineflayer_action`.
+   *
+   * @remarks This is the outer Actor Turn output, preserved before local parsing
+   * so reviewers and the codegen stage can see the exact selected tool call. It
+   * is paired with `parsed_author_tool_args`, not a replacement for it.
+   */
   raw_outer_tool_call: JsonObject;
+  /** Parsed rationale and desired behavior from the outer authoring tool call. */
   parsed_author_tool_args: ActorTurnAuthorMineflayerActionArgs;
+  /** Full injected agent-skill body that constrains generated Mineflayer source. */
   mineflayer_codegen_skill_markdown: string;
   output_contract: {
     runtime_parameters: string;
@@ -159,6 +179,7 @@ export function buildMineflayerCodegenRequest(input: {
   parsedAuthorToolArgs: ActorTurnAuthorMineflayerActionArgs;
   previousValidationError?: string;
 }): MineflayerCodegenRequest {
+  const codegenSkill = buildMineflayerCodegenSkillProjection();
   return {
     schema: "mineflayer-codegen-request/v1",
     request_id: input.requestId,
@@ -168,8 +189,7 @@ export function buildMineflayerCodegenRequest(input: {
     actor_turn_input: input.actorTurnInput,
     raw_outer_tool_call: input.rawOuterToolCall,
     parsed_author_tool_args: input.parsedAuthorToolArgs,
-    mineflayer_codegen_skill_markdown:
-      input.actorTurnInput.mineflayer_codegen_skill.skill_markdown,
+    mineflayer_codegen_skill_markdown: codegenSkill.skill_markdown,
     output_contract: {
       runtime_parameters:
         "Exact current runtime inputs for the generated action; every key must be declared by candidate.input_schema.",

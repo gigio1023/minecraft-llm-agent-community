@@ -26,9 +26,7 @@ import {
   type EvidenceTraceEntry
 } from "./types.js";
 import {
-  boundedMineflayerMethodNames,
-  mineflayerActionSkillHelperNames,
-  mineflayerCodegenSkillRef
+  mineflayerActionSkillHelperNames
 } from "./mineflayerCodegenSkill.js";
 import { validateSourceEvidenceBundle } from "./sourceEvidenceBundleValidator.js";
 
@@ -402,81 +400,6 @@ function validateKnownStringArray(
   }
 }
 
-function validateArrayContainsAll(input: {
-  record: Record<string, unknown>;
-  key: string;
-  path: string;
-  expected: readonly string[];
-  errors: string[];
-}) {
-  assertNonEmptyStringArray(input.record, input.key, input.path, input.errors);
-  const value = input.record[input.key];
-  if (!Array.isArray(value)) {
-    return;
-  }
-  const actual = new Set(value.filter((entry): entry is string => typeof entry === "string"));
-  for (const expected of input.expected) {
-    if (!actual.has(expected)) {
-      input.errors.push(`${input.path}.${input.key} must include ${expected}`);
-    }
-  }
-}
-
-function validateMineflayerCodegenSkillProjection(
-  value: unknown,
-  path: string,
-  errors: string[]
-) {
-  if (!isRecord(value)) {
-    errors.push(`${path} must be an object`);
-    return;
-  }
-  if (value.schema !== "mineflayer-codegen-skill/v1") {
-    errors.push(`${path}.schema must be mineflayer-codegen-skill/v1`);
-  }
-  if (value.skill_ref !== mineflayerCodegenSkillRef) {
-    errors.push(`${path}.skill_ref must be ${mineflayerCodegenSkillRef}`);
-  }
-  assertString(value, "skill_markdown", path, errors);
-  if (
-    typeof value.skill_markdown === "string" &&
-    !/\bMineflayer Code Generation\b/.test(value.skill_markdown)
-  ) {
-    errors.push(`${path}.skill_markdown must contain the Mineflayer Code Generation agent skill body`);
-  }
-  assertString(value, "upstream_ref", path, errors);
-  if (value.applies_when !== "outer Actor Turn selected author_mineflayer_action") {
-    errors.push(`${path}.applies_when must be outer Actor Turn selected author_mineflayer_action`);
-  }
-  if (value.helper_api_version !== "mineflayer-action-skill-helper/v1") {
-    errors.push(`${path}.helper_api_version must be mineflayer-action-skill-helper/v1`);
-  }
-  validateArrayContainsAll({
-    record: value,
-    key: "allowed_ctx_helpers",
-    path,
-    expected: mineflayerActionSkillHelperNames,
-    errors
-  });
-  validateArrayContainsAll({
-    record: value,
-    key: "bounded_mineflayer_methods",
-    path,
-    expected: boundedMineflayerMethodNames,
-    errors
-  });
-  for (const key of [
-    "output_schema_rules",
-    "helper_call_contracts",
-    "mineflayer_api_notes",
-    "forbidden_source_patterns",
-    "verifier_and_evidence_rules",
-    "common_failure_modes"
-  ] as const) {
-    assertNonEmptyStringArray(value, key, path, errors);
-  }
-}
-
 function validateAuthoringInputSchemaDefinition(input: {
   schema: Record<string, unknown>;
   parameters: Record<string, unknown> | null;
@@ -685,20 +608,8 @@ export function validateActorTurnInput(
     assertString(actorContext, "life_goal_ref", "ActorTurnInput.actor_context", errors);
     assertString(actorContext, "life_goal_summary", "ActorTurnInput.actor_context", errors);
   }
-  assertStringArray(value, "current_observation_refs", "ActorTurnInput", errors);
   validateCurrentStateProjection(value.current_state, "ActorTurnInput.current_state", errors);
   validateSourceEvidenceBundle(value.source_evidence_bundle, "ActorTurnInput.source_evidence_bundle", errors);
-  assertStringArray(value, "memory_refs", "ActorTurnInput", errors);
-
-  for (const [index, entry] of assertArray(value, "recent_evidence_trace", "ActorTurnInput", errors).entries()) {
-    const result = validateEvidenceTraceEntry(entry);
-    if (!result.ok) {
-      errors.push(...result.errors.map((error) => `ActorTurnInput.recent_evidence_trace[${index}]: ${error}`));
-    }
-  }
-  for (const [index, hint] of assertArray(value, "compact_plan_bead_hints", "ActorTurnInput", errors).entries()) {
-    validatePlanBeadHint(hint, `ActorTurnInput.compact_plan_bead_hints[${index}]`, errors);
-  }
   for (const [index, constraint] of assertArray(value, "runtime_retry_constraints", "ActorTurnInput", errors).entries()) {
     validateRetryConstraint(constraint, `ActorTurnInput.runtime_retry_constraints[${index}]`, errors);
   }
@@ -726,11 +637,6 @@ export function validateActorTurnInput(
     assertStringArray(guide, "blocker_recovery_guides", "ActorTurnInput.minecraft_basic_guide", errors);
     assertStringArray(guide, "observe_stop_guides", "ActorTurnInput.minecraft_basic_guide", errors);
   }
-  validateMineflayerCodegenSkillProjection(
-    value.mineflayer_codegen_skill,
-    "ActorTurnInput.mineflayer_codegen_skill",
-    errors
-  );
   const budget = assertRecord(value, "provider_budget_hint", "ActorTurnInput", errors);
   if (budget) {
     assertString(budget, "provider_id", "ActorTurnInput.provider_budget_hint", errors);

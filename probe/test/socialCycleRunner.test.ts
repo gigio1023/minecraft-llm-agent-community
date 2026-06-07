@@ -307,10 +307,7 @@ test("social-cycle provider inputs are stage-specific and bounded", async () => 
   assert.ok(actorTurn?.input?.minecraft_basic_guide);
   assert.ok(actorTurn?.input?.source_evidence_bundle);
   assert.ok(actorTurn?.input?.current_state);
-  assert.equal(
-    (actorTurn?.input?.mineflayer_codegen_skill as { schema?: string })?.schema,
-    "mineflayer-codegen-skill/v1"
-  );
+  assert.equal(actorTurn?.input?.mineflayer_codegen_skill, undefined);
   assert.ok(Array.isArray(actorTurn?.input?.action_cards));
   assert.ok(
     (actorTurn?.input?.action_cards as Array<Record<string, unknown>>).every(
@@ -499,7 +496,7 @@ test("deterministic-social actor_turn reuses Active Episode without repeated goa
   const actorTurnSnapshots = await Promise.all(
     providerInputRefs
       .filter((ref) => ref.includes("actor-turn"))
-      .map((ref) => readJsonIfExists<{ input?: { active_episode?: { episode_id?: string; current_focus?: string }; recent_evidence_trace?: Array<{ episode_id?: string }> } }>(
+      .map((ref) => readJsonIfExists<{ input?: { active_episode?: { episode_id?: string; current_focus?: string }; source_evidence_bundle?: { recent_action_details?: Array<{ episode_id?: string }> } } }>(
         path.join(actorDir, ref)
       ))
   );
@@ -509,8 +506,9 @@ test("deterministic-social actor_turn reuses Active Episode without repeated goa
   assert.deepEqual([...episodeIds], ["episode-cycle-0001"]);
 
   const cycle2Turn = actorTurnSnapshots[2]?.input;
-  assert.ok((cycle2Turn?.recent_evidence_trace?.length ?? 0) > 0);
-  assert.ok(cycle2Turn?.recent_evidence_trace?.every((entry) => entry.episode_id === "episode-cycle-0001"));
+  const cycle2RecentDetails = cycle2Turn?.source_evidence_bundle?.recent_action_details ?? [];
+  assert.ok(cycle2RecentDetails.length > 0);
+  assert.ok(cycle2RecentDetails.every((entry) => entry.episode_id === "episode-cycle-0001"));
 
   const cycle2Goal = await readJsonIfExists<{ source?: string; summary?: string }>(
     path.join(actorDir, result.report.cycles[1]!.cycle_goal_ref)

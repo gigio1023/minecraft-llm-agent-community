@@ -100,6 +100,17 @@ function strictSchemaFromRecord(schema: Record<string, unknown> | undefined): Js
   };
 }
 
+/**
+ * Builds the provider-facing parameter contract for direct primitive Action Cards.
+ *
+ * @remarks This is intentionally a tool-calling schema, not Minecraft strategy.
+ * It names the logical inputs a model must provide in the function call, such as
+ * `itemName` or `targetPosition`, so the runtime can validate them before
+ * Mineflayer execution. It must not infer those values from Action Card prose,
+ * `current_state_requirements`, item-family heuristics, or survival priorities.
+ * If the model cannot provide valid parameters, the turn should be rejected or
+ * repaired, not silently filled by this module.
+ */
 function structuredParameterSchemaForPrimitive(primitiveId: string): JsonSchemaObject {
   switch (primitiveId) {
     case "move_to":
@@ -144,6 +155,14 @@ function structuredParameterSchemaForPrimitive(primitiveId: string): JsonSchemaO
   }
 }
 
+/**
+ * Returns the strict function-call schema for one visible Action Card.
+ *
+ * @remarks Primitive cards use local schemas because primitives are repo-owned
+ * runtime contracts. Actor-owned action skills use their stored `input_schema`.
+ * Both cases expose only logical parameters plus rationale fields to the LLM;
+ * hidden runtime ids and executable mapping details stay outside the tool args.
+ */
 function structuredParameterSchemaForActionCard(mapping: ActionCardRuntimeMapping | null) {
   if (mapping?.kind === "use_primitive") {
     return structuredParameterSchemaForPrimitive(mapping.primitive_id);
@@ -161,6 +180,15 @@ function existingActionCardToolParameters(mapping: ActionCardRuntimeMapping | nu
   });
 }
 
+/**
+ * Outer authoring tool contract.
+ *
+ * @remarks This schema is deliberately rationale-only. It lets Actor Turn explain
+ * why existing Action Cards are not enough and what bounded Minecraft behavior is
+ * needed, but forbids source, params schema, helper settings, verifier config, and
+ * context-selection summaries. The internal codegen stage receives the full
+ * original ActorTurnInput automatically after this tool is selected.
+ */
 const authorMineflayerActionToolParameters = {
   type: "object",
   additionalProperties: false,
@@ -199,7 +227,7 @@ const authorMineflayerActionToolParameters = {
 export const actorTurnToolSelectionSystemPrompt = `You are choosing one Actor Turn inside an Active Episode through function calling.
 Call exactly one function tool.
 
-Use the full ActorTurnInput: decision_frame, current_state, source_evidence_bundle, recent_evidence_trace, action_cards, Minecraft Basic Guide, memory refs/cards, relationship context, compact PlanBead hints, and runtime retry constraints.
+Use the full ActorTurnInput: decision_frame, current_state, source_evidence_bundle, action_cards, Minecraft Basic Guide, relationship context, and runtime retry constraints.
 Do not produce a compressed planner action object or ordinary text.
 
 For a visible Action Card tool:

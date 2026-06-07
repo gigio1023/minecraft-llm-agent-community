@@ -242,7 +242,7 @@ flowchart TB
   Observe["Current observation<br/>world, inventory, actors, transcript"]
   Episode["Active Episode<br/>ordinary bounded focus"]
   Branch["Deliberation<br/>meaningful branch points only"]
-  TurnInput["ActorTurnInput<br/>current_state, Evidence Trace, Action Cards, guide, hints"]
+  TurnInput["ActorTurnInput<br/>current_state, source evidence, Action Cards, guide"]
   ActorTurn["Actor Turn provider<br/>one function tool call"]
   Tool["Visible Action Card<br/>strict parameters"]
   Author["author_mineflayer_action<br/>detailed rationale, no source"]
@@ -342,7 +342,8 @@ receives:
 1. the full original `ActorTurnInput`;
 2. the full raw outer function call;
 3. the parsed authoring arguments;
-4. the full Mineflayer code-generation agent skill markdown.
+4. the full Mineflayer code-generation agent skill markdown injected by the
+   codegen request builder.
 
 It does not receive a short `ActionIntent` summary or a model-selected
 `context_to_preserve` field.

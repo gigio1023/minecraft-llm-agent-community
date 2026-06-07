@@ -269,9 +269,10 @@ Implementation checkpoint, 2026-06-03:
   verdicts, do-not-repeat items, and open progress fronts. It must not expose
   parameter candidates, top eligible Action Cards, recommended next candidates,
   generated chat text, coordinates, recipe decisions, or hidden social-request
-  candidates. PlanBeads remain durable work graph context through
-  `compact_plan_bead_hints`; `decision_frame` is the per-turn lens that tells
-  the model how to consume current evidence before older episode wording.
+    candidates. PlanBeads remain durable work graph context through
+  `source_evidence_bundle.plan_bead_cards`; `decision_frame` is the per-turn lens
+  that tells the model how to consume current evidence before older episode
+  wording.
 - `source_evidence_bundle` is now the companion layer for observations, world
   events, recent action details, memory cards, and PlanBead cards. It prevents
   compact current-state facts from becoming summary-only bottlenecks.
@@ -446,7 +447,7 @@ the next workstream. The durable plan should keep:
 | Action Card `current_state_requirements` | Runtime Action Resolver | impossible current-state choices and insufficient recipe counts are stopped before Mineflayer execution | that the next provider repair will choose the best prerequisite |
 | `evidence-trace/v1` | runtime classifier | prior turn result and refs are available to the next turn | physical success without verifier evidence |
 | `plan_bead_ready_fronts[]` and `plan_bead_packet_ref` | PlanBead ready-front builder | PlanBead graph context was preserved and exposed | PlanBead mutation or satisfaction |
-| Actor Turn `compact_plan_bead_hints` | Actor Turn input builder | high-priority PlanBead context reached the cheap model with next hints, blockers, dependency refs, checkpoint ref, and evidence refs | that the provider used the hint correctly |
+| Actor Turn `source_evidence_bundle.plan_bead_cards` | Actor Turn input builder | high-priority PlanBead context reached the cheap model with next hints, blockers, dependency refs, checkpoint ref, and evidence refs | that the provider used the card correctly |
 | `plan_bead_operation_results[]` | guarded PlanBead applier | each proposed mutation was accepted or rejected with reason, including generic or duplicate create rejections | that a satisfied close semantically matched the bead concern unless review checks it |
 | settlement state `known_positions` | settlement consolidator | station and shared-chest inspect/deposit evidence reached current state | that the actor will choose the socially best next action |
 | social signal artifacts | runtime/social context | visible actors, chat, obligations, relationships, or shared-storage consequences existed | broad social simulation competence |

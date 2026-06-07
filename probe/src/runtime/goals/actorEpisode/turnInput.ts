@@ -14,12 +14,10 @@ import { buildActorTurnDecisionFrame } from "./decisionFrame.js";
 import {
   anchorActiveEpisodeToPlanBeadContext,
   buildRelationshipContextProjection,
-  memoryRefsFromContext,
   planBeadHintsFromContext,
   retryConstraintSummaries
 } from "./episodeContextProjection.js";
 import { buildMinecraftBasicGuideProjection } from "./minecraftBasicGuide.js";
-import { buildMineflayerCodegenSkillProjection } from "./mineflayerCodegenSkill.js";
 import { buildActorTurnSourceEvidenceBundle } from "./sourceEvidenceBundle.js";
 import type {
   ActiveEpisode,
@@ -63,7 +61,6 @@ export function buildActorTurnInput(input: {
       life_goal_ref: lifeGoalRef(),
       life_goal_summary: input.context.ActorLifeGoal.objective
     },
-    current_observation_refs: [...input.currentObservationRefs],
     current_state: currentState,
     source_evidence_bundle: buildActorTurnSourceEvidenceBundle({
       context: input.context,
@@ -72,14 +69,10 @@ export function buildActorTurnInput(input: {
       recentEvidenceTrace,
       planBeadHints
     }),
-    recent_evidence_trace: recentEvidenceTrace,
-    compact_plan_bead_hints: planBeadHints,
-    memory_refs: memoryRefsFromContext(input.context),
     relationship_context: buildRelationshipContextProjection(input.context),
     runtime_retry_constraints: retryConstraintSummaries(input.context),
     action_cards: actionCardProjection.action_cards,
     minecraft_basic_guide: buildMinecraftBasicGuideProjection(),
-    mineflayer_codegen_skill: buildMineflayerCodegenSkillProjection(),
     provider_budget_hint: input.providerBudgetHint ?? {
       provider_id: "unknown",
       model: "unknown",
