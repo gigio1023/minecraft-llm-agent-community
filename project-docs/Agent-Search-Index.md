@@ -67,7 +67,9 @@ guidance.
 | `CURRENT_HANDOFF_NEXT_WORK` | Landed work, verified commands, live evidence, and next improvement order | `Architecture/Current-Handoff-And-Next-Work.md`, `Architecture/Future-Works.md` |
 | `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT` | Dated architecture/implementation cross-check snapshot, superseded for Actor Turn hot-path authority by the current architecture review | `Architecture/Current-Architecture-And-Implementation-Audit.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
 | `OPENAI_GPT54MINI_NO_OUTPUT_CAP_RUN_2026_06_04` | Dated 60-cycle OpenAI `gpt-5.4-mini` run verifying provider output-cap removal and exposing stale Active Episode / empty PlanBeads behavior weakness | `Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `ROOFLESS_HUT_FLAT_SCENARIO_RUN_2026_06_08` | Dated 40-cycle OpenAI `gpt-5.4-mini` fixture run proving the flat roofless-hut scenario setup works while Actor Turn still stalls on repeated movement/no-progress behavior | `Architecture/Roofless-Hut-Flat-Scenario-Run-2026-06-08.md`, `Setup/World-Scenario-Testing.md`, `probe/src/server/worldScenarios.ts` |
 | `REAL_SERVER_SIMULATION_TEST_PLAN` | Live-server simulation protocol and readiness gates | `Architecture/Real-Server-Simulation-Test-Plan.md`, `Setup/Headless-Server.md`, `Setup/Provider-Setup.md` |
+| `WORLD_SCENARIO_TESTING` | Separates fixture probes from natural survival/social runs, with explicit world setup artifacts that never count as actor progress | `Setup/World-Scenario-Testing.md`, `Setup/Headless-Server.md`, `probe/src/server/worldScenarios.ts` |
 | `FUTURE_WORKS` | Substrate follow-ups from live runs and external references, not spec changes | `Architecture/Future-Works.md` |
 
 ## Provider And Operations

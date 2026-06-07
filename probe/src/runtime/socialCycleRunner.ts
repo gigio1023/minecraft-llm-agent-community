@@ -66,6 +66,15 @@ import { ensureLiveSmokeServer } from "../server/liveSmokeServer.js";
 import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
 import { startDockerServer } from "../server/dockerServer.js";
 import {
+  applyWorldScenarioToConfig,
+  buildWorldScenarioCommands,
+  createWorldScenarioManifest,
+  getWorldScenario,
+  runWorldScenarioCommands,
+  type WorldScenarioId,
+  type WorldScenarioManifest
+} from "../server/worldScenarios.js";
+import {
   buildSettlementState,
   type ActionSkillPostconditionResult,
   type ToolResultRecord
@@ -552,6 +561,11 @@ export type SocialCycleRunOptions = {
   isolateWorkspace?: boolean;
   /** Start a disposable Minecraft server/world for this run instead of reusing the live-smoke world. */
   freshWorld?: boolean;
+  /**
+   * Named test environment. Scenario setup is fixture evidence only; Actor Turn
+   * still owns action selection and runtime verifiers still own progress truth.
+   */
+  worldScenario?: WorldScenarioId;
   worldSeed?: string;
   levelType?: string;
   /** Prepare a small, live-world spawn access point for long survival/settlement runs. */
@@ -773,13 +787,17 @@ function sharedStorageSocialSmokeSummary(actorId: string) {
 export async function runSocialCycle(input: SocialCycleRunOptions): Promise<SocialCycleRunResult> {
   const repoRoot = input.repoRoot ?? path.resolve(process.cwd(), "..");
   const loadedConfig = loadProbeConfig();
-  const config: ProbeConfig = {
+  const worldScenario = getWorldScenario(input.worldScenario);
+  const requestedConfig: ProbeConfig = {
     ...loadedConfig,
     world: {
+      ...loadedConfig.world,
       seed: input.worldSeed ?? loadedConfig.world.seed,
       levelType: input.levelType ?? loadedConfig.world.levelType
     }
   };
+  const config = applyWorldScenarioToConfig(requestedConfig, worldScenario);
+  const useFreshWorld = input.freshWorld === true || worldScenario.requiresFreshWorld;
   const runId = `social-cycle-${randomUUID()}`;
   const workspaceBaseDir = input.actorWorkspaceRootDir ?? config.actorWorkspace.rootDir;
   const rootDir =
@@ -800,10 +818,20 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   report.agency_status.builtin_execution_source = input.providerId === "deterministic-social";
   report.actor_workspace_root_dir = rootDir;
   report.server = {
-    mode: input.freshWorld ? "fresh_world" : "live_smoke",
+    mode: useFreshWorld ? "fresh_world" : "live_smoke",
     seed: config.world.seed,
     level_type: config.world.levelType,
-    version: config.server.version
+    version: config.server.version,
+    ...(config.world.generatorSettings ? { generator_settings: config.world.generatorSettings } : {}),
+    generate_structures: config.world.generateStructures ?? true,
+    world_scenario: {
+      scenario_id: worldScenario.id,
+      lane: worldScenario.lane,
+      fixture_dependency: worldScenario.fixtureDependency,
+      requires_fresh_world: worldScenario.requiresFreshWorld,
+      setup_status: "not_applicable",
+      ...(worldScenario.buildArea ? { build_area: worldScenario.buildArea } : {})
+    }
   };
 
   const openAi: OpenAiJsonProviderConfig | undefined =
@@ -859,6 +887,35 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   report.agency_status.used_soul = true;
   report.agency_status.used_life_goal = true;
 
+  let worldScenarioManifest: WorldScenarioManifest | undefined;
+  let worldScenarioManifestRef: string | undefined;
+  if (worldScenario.id !== "natural-survival") {
+    const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
+    worldScenarioManifestRef = path.join(
+      "evidence",
+      "world-scenarios",
+      `${sanitizeWorkspaceFileId(runId)}-${sanitizeWorkspaceFileId(worldScenario.id)}.json`
+    );
+    worldScenarioManifest = createWorldScenarioManifest(worldScenario);
+    await writeJson(path.join(actorDir, worldScenarioManifestRef), worldScenarioManifest);
+    if (report.server?.world_scenario) {
+      report.server.world_scenario.manifest_ref = worldScenarioManifestRef;
+    }
+    report.agency_status.fixture_dependency = report.agency_status.fixture_dependency ||
+      worldScenario.fixtureDependency;
+  }
+
+  if (worldScenario.worldEventSummary) {
+    const event = createWorldEvent({
+      summary: worldScenario.worldEventSummary,
+      kind: "scenario_event",
+      actorRefs: [input.actorId],
+      authority: "context_only",
+      runId
+    });
+    await writeWorldEvent(rootDir, input.actorId, event);
+  }
+
   if (input.sharedStorageSocialSmoke) {
     const event = createWorldEvent({
       summary: sharedStorageSocialSmokeSummary(input.actorId),
@@ -895,7 +952,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
   if (input.connectToWorld !== false) {
     try {
-      const server = await resolveServerEndpoint(config, { freshWorld: input.freshWorld });
+      const server = await resolveServerEndpoint(config, { freshWorld: useFreshWorld });
       if (!server) {
         throw new Error("No joinable Minecraft endpoint");
       }
@@ -906,6 +963,26 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         mode: server.mode,
         endpoint: `${server.host}:${server.port}`
       };
+      if (worldScenarioManifest && worldScenarioManifestRef && serverRunRcon) {
+        const preBotRun = await runWorldScenarioCommands({
+          phase: "pre_bot",
+          commands: buildWorldScenarioCommands({
+            scenario: worldScenario,
+            phase: "pre_bot",
+            serverVersion: config.server.version
+          }),
+          runRcon: serverRunRcon
+        });
+        worldScenarioManifest.command_runs.push(preBotRun);
+        await writeJson(
+          path.join(getActorWorkspacePaths(rootDir, input.actorId).actorDir, worldScenarioManifestRef),
+          worldScenarioManifest
+        );
+        if (preBotRun.required_failure) {
+          throw new Error(`World scenario ${worldScenario.id} pre-bot setup failed`);
+        }
+      }
+
       const bots = await createBots({ ...config, bots: [input.actorId] }, server);
       bot = bots[input.actorId];
       if (bot) {
@@ -913,6 +990,29 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           actorId: input.actorId,
           bot
         });
+      }
+      if (worldScenarioManifest && worldScenarioManifestRef && bot && serverRunRcon) {
+        const postBotRun = await runWorldScenarioCommands({
+          phase: "post_bot",
+          commands: buildWorldScenarioCommands({
+            scenario: worldScenario,
+            phase: "post_bot",
+            serverVersion: config.server.version,
+            bot
+          }),
+          runRcon: serverRunRcon
+        });
+        worldScenarioManifest.command_runs.push(postBotRun);
+        await writeJson(
+          path.join(getActorWorkspacePaths(rootDir, input.actorId).actorDir, worldScenarioManifestRef),
+          worldScenarioManifest
+        );
+        if (report.server?.world_scenario) {
+          report.server.world_scenario.setup_status = postBotRun.required_failure ? "failed" : "passed";
+        }
+        if (postBotRun.required_failure) {
+          throw new Error(`World scenario ${worldScenario.id} post-bot setup failed`);
+        }
       }
       if ((input.prepareSpawnAccess || input.sharedStorageSocialSmoke) && bot && serverRunRcon) {
         const spawnAccessPosition = await prepareSpawnAccessPoint({
@@ -935,6 +1035,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     } catch (error) {
       environmentBlocked = true;
       report.agency_status.fixture_dependency = true;
+      if (report.server?.world_scenario) {
+        report.server.world_scenario.setup_status = "failed";
+      }
       report.server = {
         ...report.server,
         error_kind: "environment_blocked",

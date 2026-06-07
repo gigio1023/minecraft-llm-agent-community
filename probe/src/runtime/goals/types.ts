@@ -298,14 +298,29 @@ export type SocialCycleRunReport = {
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";
   active_episode_refs?: string[];
   deliberation_branch_refs?: string[];
-  server?: {
-    mode: "manual" | "live_smoke" | "fresh_world";
-    seed: string;
-    level_type: string;
-    version: string;
-	    endpoint?: string;
-	    spawn_access_prepared?: boolean;
-	    spawn_access_position?: { x: number; y: number; z: number };
+	  server?: {
+	    mode: "manual" | "live_smoke" | "fresh_world";
+	    seed: string;
+	    level_type: string;
+	    version: string;
+	    generator_settings?: string;
+	    generate_structures?: boolean;
+	    world_scenario?: {
+	      scenario_id: string;
+	      lane: "survival_social_run" | "fixture_probe";
+	      fixture_dependency: boolean;
+	      requires_fresh_world: boolean;
+	      manifest_ref?: string;
+	      setup_status?: "not_applicable" | "passed" | "failed";
+	      build_area?: {
+	        center: { x: number; y: number; z: number };
+	        half_extent: number;
+	        purpose: string;
+	      };
+	    };
+		    endpoint?: string;
+		    spawn_access_prepared?: boolean;
+		    spawn_access_position?: { x: number; y: number; z: number };
 	    shared_storage_social_smoke?: boolean;
 	    starter_inventory_seeded?: boolean;
 	    error_kind?: "environment_blocked";

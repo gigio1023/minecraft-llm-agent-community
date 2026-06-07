@@ -14,6 +14,14 @@ export type ProbeConfig = {
   world: {
     seed: string;
     levelType: string;
+    generatorSettings?: string;
+    generateStructures?: boolean;
+    spawnNpcs?: boolean;
+    spawnAnimals?: boolean;
+    spawnMonsters?: boolean;
+    difficulty?: "peaceful" | "easy" | "normal" | "hard";
+    viewDistance?: number;
+    simulationDistance?: number;
   };
   spawn: {
     x: number;
@@ -137,7 +145,15 @@ export function loadProbeConfig(): ProbeConfig {
     composeFile: path.resolve(here, "../compose.yaml"),
     world: {
       seed: process.env.PROBE_WORLD_SEED ?? process.env.MC_WORLD_SEED ?? yamlConfig.world?.seed ?? "",
-      levelType: process.env.PROBE_LEVEL_TYPE ?? yamlConfig.world?.levelType ?? "default"
+      levelType: process.env.PROBE_LEVEL_TYPE ?? yamlConfig.world?.levelType ?? "default",
+      generatorSettings: process.env.PROBE_GENERATOR_SETTINGS,
+      generateStructures: undefined,
+      spawnNpcs: undefined,
+      spawnAnimals: undefined,
+      spawnMonsters: undefined,
+      difficulty: undefined,
+      viewDistance: undefined,
+      simulationDistance: undefined
     },
     spawn: {
       x: parseNumberEnv(process.env.PROBE_SPAWN_X, yamlConfig.spawn?.x ?? 49.9),
@@ -205,19 +221,20 @@ export function buildServerEnv(config: ProbeConfig) {
     TYPE: "VANILLA",
     ONLINE_MODE: "FALSE",
     MODE: "survival",
-    DIFFICULTY: "peaceful",
+    DIFFICULTY: config.world.difficulty ?? "peaceful",
     LEVEL_TYPE: config.world.levelType || "default",
+    GENERATOR_SETTINGS: config.world.generatorSettings ?? "",
     SEED: config.world.seed || "",
-    GENERATE_STRUCTURES: "true",
-    SPAWN_NPCS: "true",
-    SPAWN_ANIMALS: "true",
-    SPAWN_MONSTERS: "false",
+    GENERATE_STRUCTURES: String(config.world.generateStructures ?? true),
+    SPAWN_NPCS: String(config.world.spawnNpcs ?? true),
+    SPAWN_ANIMALS: String(config.world.spawnAnimals ?? true),
+    SPAWN_MONSTERS: String(config.world.spawnMonsters ?? false),
     // Live probes mutate blocks around the configured spawn. Vanilla spawn
     // protection would make survival bots look like they are digging while the
     // server rejects the block break, so managed smoke worlds disable it.
     SPAWN_PROTECTION: "0",
-    VIEW_DISTANCE: "10",
-    SIMULATION_DISTANCE: "10",
+    VIEW_DISTANCE: String(config.world.viewDistance ?? 10),
+    SIMULATION_DISTANCE: String(config.world.simulationDistance ?? 10),
     ENABLE_COMMAND_BLOCK: "true",
     ENABLE_RCON: "true"
   } satisfies Record<string, string>;

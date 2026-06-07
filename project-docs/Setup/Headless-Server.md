@@ -88,6 +88,10 @@ server. The probe validates this override before bypassing the managed server.
 In manual mode, RCON setup may be unavailable and the probe falls back to chat
 commands.
 
+For controlled behavior probes, prefer named world scenarios over ad hoc seed
+selection. See `project-docs/Setup/World-Scenario-Testing.md`. Fixture setup is
+environment evidence only; it never proves actor progress.
+
 ## Important Rules
 
 - local headless setup only for the first proof;

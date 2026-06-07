@@ -12,6 +12,7 @@ import fs from "node:fs/promises";
 import { loadRepoDotEnv } from "./config/loadRepoDotEnv.js";
 import { runSocialCycle, type SocialCycleRunOptions } from "./runtime/socialCycleRunner.js";
 import type { SocialCycleProviderId, WorldEventKind } from "./runtime/goals/types.js";
+import { parseWorldScenarioId, type WorldScenarioId } from "./server/worldScenarios.js";
 
 function parseArgs(argv: string[]) {
   const options: {
@@ -26,6 +27,7 @@ function parseArgs(argv: string[]) {
     connectToWorld?: boolean;
     isolateWorkspace?: boolean;
     freshWorld?: boolean;
+    worldScenario?: WorldScenarioId;
     worldSeed?: string;
     levelType?: string;
     prepareSpawnAccess?: boolean;
@@ -76,6 +78,9 @@ function parseArgs(argv: string[]) {
       options.isolateWorkspace = true;
     } else if (arg === "--fresh-world") {
       options.freshWorld = true;
+    } else if (arg === "--world-scenario" && next) {
+      options.worldScenario = parseWorldScenarioId(next);
+      index++;
     } else if (arg === "--world-seed" && next) {
       options.worldSeed = next;
       index++;
@@ -157,6 +162,8 @@ async function main() {
   });
 
   const parsed = parseArgs(process.argv.slice(2));
+  const worldScenario =
+    parsed.worldScenario ?? parseWorldScenarioId(process.env.SOCIAL_CYCLE_WORLD_SCENARIO);
   const actorId = parsed.actor ?? "npc_b";
   const providerId =
     parsed.provider ??
@@ -187,6 +194,7 @@ async function main() {
     connectToWorld: parsed.connectToWorld,
     isolateWorkspace: parsed.isolateWorkspace,
     freshWorld: parsed.freshWorld,
+    worldScenario,
     worldSeed: parsed.worldSeed,
     levelType: parsed.levelType,
     prepareSpawnAccess: parsed.prepareSpawnAccess,

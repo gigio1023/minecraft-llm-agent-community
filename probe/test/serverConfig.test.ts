@@ -40,9 +40,10 @@ test("loads probe config and builds vanilla server env", () => {
   assert.equal(env.TYPE, "VANILLA");
   assert.equal(env.ONLINE_MODE, "FALSE");
   assert.equal(env.MODE, "survival");
-  assert.equal(env.DIFFICULTY, "peaceful");
-  assert.equal(env.LEVEL_TYPE, "default");
-  assert.equal(env.GENERATE_STRUCTURES, "true");
+	  assert.equal(env.DIFFICULTY, "peaceful");
+	  assert.equal(env.LEVEL_TYPE, "default");
+	  assert.equal(env.GENERATOR_SETTINGS, "");
+	  assert.equal(env.GENERATE_STRUCTURES, "true");
   assert.equal(env.SPAWN_NPCS, "true");
   assert.equal(env.SPAWN_ANIMALS, "true");
   assert.equal(env.SPAWN_MONSTERS, "false");

@@ -131,9 +131,11 @@ Current state and operations:
 
 - `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
 - `project-docs/Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`
+- `project-docs/Architecture/Roofless-Hut-Flat-Scenario-Run-2026-06-08.md`
 - `project-docs/Architecture/Future-Works.md`
 - `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `project-docs/Setup/Headless-Server.md`
+- `project-docs/Setup/World-Scenario-Testing.md`
 - `project-docs/Setup/Provider-Setup.md`
 - `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 - `project-docs/Setup/OpenAI-Tier3-Free-Usage.md`
