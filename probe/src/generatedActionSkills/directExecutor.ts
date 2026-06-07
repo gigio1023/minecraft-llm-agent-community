@@ -157,7 +157,7 @@ function withHelperLogging<TContext extends DirectGeneratedActionSkillContext>(
         try {
           const result = value.apply(target, args);
           if (result && typeof (result as Promise<unknown>).then === "function") {
-            return (result as Promise<unknown>).then(
+            const tracked = (result as Promise<unknown>).then(
               (resolved) => {
                 helperEvents.push({ name: property, args, status: "completed", result: resolved });
                 return resolved;
@@ -168,6 +168,13 @@ function withHelperLogging<TContext extends DirectGeneratedActionSkillContext>(
                 throw error;
               }
             );
+            // Generated code may invoke a helper without awaiting it (a common LLM
+            // mistake). The failure is already recorded above; this no-op handler
+            // keeps an un-awaited rejection from escaping as an unhandled rejection
+            // that kills the whole run. Any awaiter of `tracked` still sees the
+            // rejection, so the awaited path is unchanged.
+            tracked.catch(() => {});
+            return tracked;
           }
 
           helperEvents.push({ name: property, args, status: "completed", result });

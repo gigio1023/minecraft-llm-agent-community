@@ -164,6 +164,19 @@ function defaultModelForProvider(providerId: SocialCycleProviderId) {
 }
 
 async function main() {
+  // Backstop for floating promise rejections originating in untrusted generated
+  // action-skill code (a helper invoked without await, or a bare Promise.reject
+  // in generated source). The withHelperLogging proxy already neutralizes the
+  // common un-awaited-helper case; this net keeps any remaining un-awaited
+  // rejection from terminating a bounded multi-cycle run. It logs loudly instead
+  // of swallowing silently so genuine runtime rejection bugs stay visible — and
+  // it does not bypass the runner's fatal paths, which fail via return values
+  // (providerFailed / runtime_status), not unhandled rejections.
+  process.on("unhandledRejection", (reason) => {
+    const detail = reason instanceof Error ? `${reason.message}\n${reason.stack ?? ""}` : String(reason);
+    console.error(`[social-cycle] swallowed unhandled rejection (run continues): ${detail}`);
+  });
+
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../..");
   loadRepoDotEnv(repoRoot, {

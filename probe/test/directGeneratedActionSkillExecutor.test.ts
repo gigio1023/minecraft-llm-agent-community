@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 
 import {
   assertDirectGeneratedActionSkillSource,
-  runDirectGeneratedActionSkill
+  runDirectGeneratedActionSkill,
+  type GeneratedActionSkillHelperEvent
 } from "../src/generatedActionSkills/directExecutor.js";
 
 test("direct generated action skill executor runs TypeScript and records helper calls", async () => {
@@ -172,4 +173,43 @@ test("direct generated action skill executor reports timeout", async () => {
   });
 
   assert.equal(result.status, "timeout");
+});
+
+test("un-awaited generated helper rejection does not crash the run", async () => {
+  // Reproduces a live crash: generated code calls a helper without awaiting it,
+  // the helper throws, and the floating rejection would otherwise become an
+  // unhandled rejection that terminates the whole process.
+  const helperEvents: GeneratedActionSkillHelperEvent[] = [];
+  const result = await runDirectGeneratedActionSkill({
+    actorId: "npc_b",
+    skillName: "fireAndForgetThrow",
+    helperEvents,
+    source: `
+      export async function run(ctx: {
+        setControlState(args: Record<string, unknown>): Promise<unknown>;
+        wait(ms: number): Promise<void>;
+      }, params: Record<string, never>) {
+        // Not awaited — mirrors the LLM mistake that crashed an actor mid-run.
+        ctx.setControlState({ forward: true });
+        await ctx.wait(1);
+        return { status: "completed" };
+      }
+    `,
+    ctx: {
+      async setControlState() {
+        throw new Error("Control  is not exposed by run_mineflayer_program");
+      },
+      wait(ms: number) {
+        return new Promise<void>((resolve) => setTimeout(resolve, ms));
+      }
+    }
+  });
+  // Flush microtasks so the recorded-failure event lands before asserting.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(result.status, "completed");
+  assert.ok(
+    helperEvents.some((event) => event.name === "setControlState" && event.status === "failed"),
+    "the un-awaited failing helper call is still recorded as evidence"
+  );
 });
