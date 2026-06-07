@@ -132,6 +132,17 @@ export const actionSkillVerificationContracts: ActionSkillVerificationContract[]
     protectedBy: ["test/buildPattern.test.ts", "test/socialCycleExecution.test.ts"]
   },
   {
+    skillId: "equipHeldItem",
+    primitiveIds: ["observe", "equip_item"],
+    evidence: [
+      "observation exposes current held item and exact inventory item names",
+      "equip_item accepts only an exact itemName from inventory evidence",
+      "Mineflayer equip is called for the hand destination",
+      "success is verified by held-item state rather than response text"
+    ],
+    protectedBy: ["test/equipItem.test.ts", "test/socialCycleExecution.test.ts"]
+  },
+  {
     skillId: "inspectSharedChest",
     primitiveIds: ["observe", "inspect_chest", "wait"],
     evidence: [

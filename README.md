@@ -46,10 +46,15 @@ Not current goals:
 
 ## Current Runtime Shape
 
-The current implementation is a bounded social-cycle runtime. The provider can
-propose goals, actions, and judgments, but Minecraft truth stays inside the
-runtime: contracts, gates, Mineflayer execution, verification, artifacts, and
-actor workspace state.
+The current implementation is a bounded Actor Turn runtime. On the ordinary hot
+path, the Actor Turn provider sees current state, recent evidence, Action Cards,
+the Minecraft Basic Guide, memory, relationship context, and passive PlanBead
+hints. It then chooses exactly one visible function tool: either an Action Card
+with strict `parameters`, or `author_mineflayer_action` when a new bounded
+Mineflayer behavior needs to be generated and trialed.
+
+Minecraft truth stays inside the runtime: schemas, gates, retry constraints,
+Mineflayer execution, verification, artifacts, and actor workspace state.
 
 For a review-friendly architecture walkthrough with focused Mermaid diagrams,
 see
@@ -76,11 +81,13 @@ In short:
 
 - `action_surface` is the actor's current body, not a domain-specific checklist;
 - `world-state-summary/v1` is query-neutral evidence with explicit scan limits;
-- physical `ActionIntent` args are executable contracts, not prose suggestions;
+- Action Card tool `parameters` are executable contracts, not prose suggestions;
 - `runtime-retry-constraint/v1` blocks exact repeated target/args failures
   before another Mineflayer call;
 - memory can influence later cycles, but Minecraft progress still requires
   verifier-backed runtime evidence.
+- `ActionIntent` is legacy terminology for migration artifacts only; it is not
+  the current Actor Turn provider or codegen boundary.
 
 ## What Success Looks Like
 
@@ -128,7 +135,7 @@ partial-progress reporting, review-summary schema catch-up, fresh-world cleanup
 ownership, broader action-surface diagnostics, and bounded target discovery.
 Required action arguments and exact repeated-blocker retry constraints are now
 baseline runtime gates.
-See `docs/blog-doc/Architecture/Future-Works.md`.
+See `project-docs/Architecture/Future-Works.md`.
 
 The active social-cycle implementation now carries runtime-owned
 `action-surface/v1`, `runtime-retry-constraint/v1`, `settlement-state/v1`, and
@@ -143,8 +150,8 @@ until it is renamed or retired behind a broader typed state contract.
 Recent hardening also makes several fake-success paths visible as blocked
 runtime evidence:
 
-- direct primitive intents cannot carry `action_skill_id`;
-- direct shared-storage transfer intents require explicit `count` or
+- direct primitive tool selections cannot carry `action_skill_id`;
+- direct shared-storage transfer selections require explicit `count` or
   `targetCount`;
 - `wait` and `remember` go through CycleGoal and active action-skill gates;
 - repeated exact target/args blockers become runtime retry constraints and are
@@ -160,7 +167,7 @@ runtime evidence:
 - runtime-owned validation, timeout, verification, and artifacts;
 - query-neutral world-state diagnostics instead of provider-facing gameplay
   taxonomies;
-- structured `ActionIntent` argument contracts instead of hidden executor
+- structured function-tool argument contracts instead of hidden executor
   defaults;
 - actor workspace is the source of truth for actor-owned action skill state;
 - tests stay small and Detroit-style;
@@ -193,23 +200,23 @@ Read these first:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CLAUDE.md`
-4. `docs/blog-doc/Specification/Soul-Grounded-Social-Simulation.md`
-5. `docs/blog-doc/Specification/Runtime-Evidence-And-Action-Skills.md`
-6. `docs/blog-doc/Specification/Engineering-Governance-And-Testing.md`
-7. `docs/blog-doc/Specification/Reference-Adaptation-Guide.md`
-8. `docs/blog-doc/Documentation-Map.md`
-9. `docs/blog-doc/Agent-Search-Index.md`
-10. `docs/blog-doc/Terminology.md`
-11. `docs/blog-doc/Architecture/Minimal-Probe.md`
-12. `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-13. `docs/blog-doc/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+4. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+5. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+6. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+7. `project-docs/Specification/Reference-Adaptation-Guide.md`
+8. `project-docs/Documentation-Map.md`
+9. `project-docs/Agent-Search-Index.md`
+10. `project-docs/Terminology.md`
+11. `project-docs/Architecture/Minimal-Probe.md`
+12. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+13. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-15. `docs/blog-doc/Architecture/Real-Server-Simulation-Test-Plan.md`
-16. `docs/blog-doc/Architecture/Future-Works.md`
-17. `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+15. `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
+16. `project-docs/Architecture/Future-Works.md`
+17. `project-docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
 
 Historical plans, research pages, and raw paper dumps live under
-`docs/research-archive/`. They are preserved for context, but they are not
+`project-docs/research-archive/`. They are preserved for context, but they are not
 active implementation instructions unless an active spec or handoff doc promotes
 them.
 
@@ -355,8 +362,9 @@ Primary evidence should come from:
 | Directory | Purpose |
 |-----------|---------|
 | `probe/` | Runtime code, bot orchestration, tools, server setup, transcript handling. |
-| `docs/blog-doc/` | Docusaurus-exposed public docs. |
-| `docs/research-archive/` | Internal historical research, old plans, and paper dumps. |
+| `project-docs/` | Internal project docs: specs, architecture, setup, handoffs, terminology, routing. |
+| `docs/public-docs/` | Docusaurus-exposed public docs for external readers. |
+| `project-docs/research-archive/` | Internal historical research, old plans, and paper dumps. |
 | `docs/blog/` | Docusaurus blog posts. |
 | `build/provider-auth/` | Ignored local provider auth storage. |
 
@@ -364,8 +372,9 @@ Primary evidence should come from:
 flowchart TB
   Spec["SPEC.md"]
   Agents["AGENTS.md"]
-  DocsSpec["docs/blog-doc/Specification/*"]
-  Arch["docs/blog-doc/Architecture/*"]
+  DocsSpec["project-docs/Specification/*"]
+  Arch["project-docs/Architecture/*"]
+  PublicDocs["docs/public-docs/*"]
   Runtime["probe/src/runtime/*"]
   Provider["probe/src/provider/*"]
   Tools["probe/src/tools/*"]
@@ -374,6 +383,7 @@ flowchart TB
   Spec --> DocsSpec
   Spec --> Agents
   DocsSpec --> Arch
+  Spec --> PublicDocs
   Arch --> Runtime
   Runtime --> Provider
   Runtime --> Tools
@@ -386,21 +396,23 @@ flowchart TB
 - `AGENTS.md` is the canonical repo guidance for agents.
 - `CLAUDE.md` mirrors the binding repo-agent rules for Claude Code and points
   back to `AGENTS.md` when rules conflict.
-- `docs/blog-doc/Documentation-Map.md` classifies docs as active spec, active
+- `project-docs/Documentation-Map.md` classifies docs as active spec, active
   architecture, current state, supporting track, or historical context.
-- `docs/blog-doc/Terminology.md` is the normative vocabulary for docs, comments,
+- `project-docs/Terminology.md` is the normative vocabulary for docs, comments,
   prompts, and report labels.
-- `docs/blog-doc/Architecture/Minimal-Probe.md` describes the active current-phase goal.
-- `docs/blog-doc/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
+- `project-docs/Architecture/Minimal-Probe.md` describes the active current-phase goal.
+- `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md` separates
   runtime success from actor soul, life goal, and cycle-goal authority.
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
   explains the current implementation with focused diagrams for review.
-- `docs/blog-doc/Architecture/Future-Works.md` records live-run follow-ups and
+- `project-docs/Architecture/Future-Works.md` records live-run follow-ups and
   external reference ideas without changing the long-term spec.
-- `docs/blog-doc/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
+- `project-docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`
   is the current Composer 2.5 implementation handoff for that architecture.
-- Docusaurus-exposed docs live under `docs/blog-doc/`; internal research and old
-  plans live under `docs/research-archive/`.
+- Docusaurus-exposed public docs live under `docs/public-docs/`.
+- Internal specs, setup notes, provider/API access notes, handoffs, and
+  implementation plans live under `project-docs/`.
+- Internal research and old plans live under `project-docs/research-archive/`.
 
 ## License
 

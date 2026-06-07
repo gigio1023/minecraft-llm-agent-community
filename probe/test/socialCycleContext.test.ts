@@ -194,7 +194,7 @@ test("assembled context always includes ActorSoul and LifeGoal", async () => {
   );
   assert.ok(
     context.action_surface.mineflayer_expansion_opportunities.some((entry) =>
-      entry.capability_id === "inventory_equipment_management"
+      entry.capability_id === "equipment_management_beyond_hand_equip"
     )
   );
   assert.equal(context.settlement_state.inventory_counts.oak_log, 2);

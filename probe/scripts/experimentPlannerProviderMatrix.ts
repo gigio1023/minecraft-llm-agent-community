@@ -103,7 +103,6 @@ async function runGenaiJob(
         config: {
           systemInstruction: system,
           temperature: 0.2,
-          maxOutputTokens: 2048,
           ...(spec.outputMode === "json_schema"
             ? {
                 responseMimeType: "application/json",
@@ -144,9 +143,6 @@ async function runOpenAiJob(
             model: spec.model,
             messages,
             temperature: 0.2,
-            ...(spec.channel === "openai-api"
-              ? { max_completion_tokens: 2048 }
-              : { max_tokens: 2048 }),
             ...(spec.outputMode === "json_schema"
               ? {
                   response_format: {
@@ -245,8 +241,8 @@ async function main() {
     },
     parallelLimit: PARALLEL_LIMIT,
     docs: [
-      "docs/blog-doc/Setup/OpenAI-Tier3-Free-Usage.md",
-      "docs/blog-doc/Architecture/Gemini-Native-Audio-Codegen-Verdict.md"
+      "project-docs/Setup/OpenAI-Tier3-Free-Usage.md",
+      "project-docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md"
     ]
   };
 

@@ -305,6 +305,15 @@ export type CycleJudgment = {
   what_happened: string;
   why_it_mattered_for_life_goal: string;
   verifier_status: "passed" | "failed" | "not_applicable";
+  outcome_contract?: {
+    schema: "actor-turn-outcome-contract-evaluation/v1";
+    expected_outcome: string;
+    observed_deltas: string[];
+    status: string;
+    outcome_override?: CycleJudgmentOutcome;
+    branch_recommended: boolean;
+    reason: string;
+  };
   evidence_refs: string[];
   memory_writes: Array<{
     layer: "episodic" | "procedural" | "social" | "belief" | "guardrail";
@@ -328,6 +337,38 @@ export type CycleJudgment = {
 };
 
 export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
+
+export type SocialCycleVisualEvidenceCapture = {
+  schema: "visual-evidence-capture/v1";
+  actor_id: string;
+  run_id: string;
+  cycle_id: string;
+  phase: "initial" | "cycle_end" | "final" | "startup";
+  status: "captured" | "failed";
+  captured_at: string;
+  method: "prismarine-viewer-web-screenshot";
+  artifact_ref: string;
+  image_ref?: string;
+  image_path?: string;
+  viewer_url?: string;
+  bot_position?: { x: number; y: number; z: number; yaw: number; pitch: number };
+  error?: string;
+};
+
+export type SocialCycleVisualEvidence = {
+  schema: "social-cycle-visual-evidence/v1";
+  enabled: true;
+  method: "prismarine-viewer-web-screenshot";
+  first_person: true;
+  interval_cycles: number;
+  viewport: { width: number; height: number };
+  viewer_url?: string;
+  viewer_port?: number;
+  chrome_executable_path?: string;
+  captures: SocialCycleVisualEvidenceCapture[];
+  failures: Array<{ captured_at: string; error: string }>;
+  notes: string[];
+};
 
 export type SocialCycleRunReport = {
   schema: "social-cycle-run-report/v1";
@@ -452,6 +493,7 @@ export type SocialCycleRunReport = {
     bead_id?: string;
     reason?: string;
   }>;
+  visual_evidence?: SocialCycleVisualEvidence;
   relationship_application_results?: Array<{
     event_id: string;
     from_actor_id: string;

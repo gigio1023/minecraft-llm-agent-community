@@ -56,11 +56,26 @@ function fakeObserveBot(username = "npc_b"): Bot {
   } as unknown as Bot;
 }
 
+function fakeEquipBot(username = "npc_b"): Bot {
+  const pickaxe = { name: "wooden_pickaxe", count: 1 };
+  const bot = fakeObserveBot(username) as any;
+  bot.heldItem = null;
+  bot.inventory = {
+    items: () => [pickaxe]
+  };
+  bot.equip = async (item: { name: string; count: number }, destination: "hand") => {
+    assert.equal(destination, "hand");
+    bot.heldItem = item;
+  };
+  return bot as Bot;
+}
+
 test("gatherer social affordances expose the role-safe runtime body", () => {
   const allowed = compileSocialAllowedPrimitives("gatherer");
   assert.ok(allowed.includes("collect_logs"));
   assert.ok(allowed.includes("move_to"));
   assert.ok(allowed.includes("consume_item"));
+  assert.ok(allowed.includes("equip_item"));
   assert.ok(allowed.includes("run_mineflayer_program"));
   assert.ok(allowed.includes("say"));
   assert.ok(allowed.includes("observe"));
@@ -71,6 +86,7 @@ test("crafter social affordances are not forced through gatherer resource strate
   assert.ok(allowed.includes("move_to"));
   assert.ok(allowed.includes("craft_item"));
   assert.ok(allowed.includes("craft_with_table"));
+  assert.ok(allowed.includes("equip_item"));
   assert.ok(allowed.includes("say"));
   assert.equal(allowed.includes("collect_logs"), false);
 });
@@ -89,6 +105,7 @@ test("settler social affordances expose settlement survival body", () => {
   assert.ok(allowed.includes("place_block"));
   assert.ok(allowed.includes("build_pattern"));
   assert.ok(allowed.includes("mine_block"));
+  assert.ok(allowed.includes("equip_item"));
   assert.ok(allowed.includes("inspect_chest"));
   assert.ok(allowed.includes("deposit_shared"));
 });
@@ -143,6 +160,7 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
     ["craft_item", "crafted"],
     ["craft_with_table", "crafted"],
     ["consume_item", "consumed"],
+    ["equip_item", "equipped"],
     ["run_mineflayer_program", "completed_with_evidence"],
     ["place_block", "placed"],
     ["place_block", "already_present"],
@@ -157,6 +175,21 @@ test("deriveProgressVerifierStatus recognizes implemented progress statuses", ()
       `${tool}=${status} should count as verified progress`
     );
   }
+});
+
+test("equip_item verifies equipment state but does not count as durable progress by itself", () => {
+  assert.equal(
+    deriveProgressVerifierStatus({ toolAttempts: [{ tool: "equip_item", status: "equipped" }] }),
+    "passed"
+  );
+  assert.equal(
+    deterministicJudgmentOutcome({
+      verifierStatus: "passed",
+      executedTools: ["equip_item"],
+      toolStatuses: [{ tool: "equip_item", status: "equipped" }]
+    }),
+    "no_progress"
+  );
 });
 
 test("move_to verifies movement but does not count as durable social-cycle progress by itself", () => {
@@ -328,6 +361,7 @@ test("Actor Turn runtime classifier does not copy provider absence claims into j
       action_card_id: "test-observe-card",
       primitive_id: "observe",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "No nearby container target is available, so observe current loaded state.",
       expected_evidence: ["observation"],
       fallback_if_blocked: "record blocker"
@@ -512,6 +546,67 @@ test("executor rejects direct primitive args actionSkillId fallback", async () =
   assert.equal(result.contractBlocked, true);
   assert.deepEqual(result.executedTools, ["craft_item"]);
   assert.match(JSON.stringify(result.runtimeResult), /Direct primitive intents cannot carry args.actionSkillId/);
+});
+
+test("executor runs equip_item only with exact structured itemName and active ownership", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "social-equip-item-"));
+  const result = await executeLegacyPlannerAction({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: {
+      schema: "actor-cycle-goal/v1",
+      actor_id: "npc_b",
+      goal_id: "cycle-goal-1",
+      life_goal_id: "life-goal-1",
+      cycle_id: "cycle-0001",
+      status: "active",
+      source: "llm_planner",
+      summary: "equip a carried tool before mining",
+      rationale: "Equipment changes are runtime preparation evidence, not durable world progress.",
+      derived_from: {
+        soul_ref: "soul.json",
+        observation_refs: [],
+        world_event_refs: [],
+        memory_refs: [],
+        relationship_refs: [],
+        previous_cycle_judgment_refs: []
+      },
+      success_condition: {
+        verifier: "runtime_primitive_or_evidence",
+        evidence_required: ["held item evidence"]
+      },
+      allowed_action_skill_ids: [],
+      allowed_primitive_ids: ["equip_item"],
+      stop_conditions: ["equipped"]
+    },
+    action: {
+      schema: "legacy-planner-action/v1",
+      actor_id: "npc_b",
+      cycle_id: "cycle-0001",
+      cycle_goal_id: "cycle-goal-1",
+      kind: "use_primitive",
+      primitive_id: "equip_item",
+      args: { itemName: "wooden_pickaxe" },
+      why_this_action: "prepare the wooden pickaxe for a later mining action",
+      expected_evidence: ["held item is wooden_pickaxe"],
+      fallback_if_blocked: "remember"
+    },
+    bot: fakeEquipBot(),
+    activeActionSkills: [
+      testActionSkillRecord("equipHeldItem", ["equip_item"], "npc_b")
+    ]
+  });
+
+  assert.equal(result.gateBlocked, false);
+  assert.equal(result.contractBlocked, false);
+  assert.deepEqual(result.executedTools, ["equip_item"]);
+  assert.equal(result.verifierStatus, "passed");
+  assert.equal(
+    ((result.runtimeResult as { last_tool_result?: { status?: string } }).last_tool_result)?.status,
+    "equipped"
+  );
+  assert.deepEqual(result.toolStatuses, [{ tool: "equip_item", status: "equipped" }]);
 });
 
 test("executor authors and trials a generated action skill candidate only through action selection", async () => {

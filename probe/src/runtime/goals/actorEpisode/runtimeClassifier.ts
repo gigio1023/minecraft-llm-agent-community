@@ -5,6 +5,7 @@ import {
   type CycleJudgment
 } from "../types.js";
 import type { ActorTurnResolvedAction } from "./types.js";
+import { evaluateActorTurnOutcomeContract } from "./outcomeContract.js";
 import {
   clampCycleJudgmentOutcome,
   deterministicJudgmentOutcome,
@@ -35,12 +36,16 @@ function runtimeStatusSummary(input: {
 function branchReason(input: {
   verifierStatus: CycleJudgment["verifier_status"];
   retryConstraintBlocked?: boolean;
+  outcomeContractBranchReason?: string;
 }) {
   if (input.retryConstraintBlocked) {
     return "exact runtime retry constraint blocked this turn";
   }
   if (input.verifierStatus === "failed") {
     return "runtime verifier failed";
+  }
+  if (input.outcomeContractBranchReason) {
+    return input.outcomeContractBranchReason;
   }
   return "";
 }
@@ -167,9 +172,17 @@ export async function classifyActorTurnRuntime(input: {
     executedTools: [...input.executedTools],
     toolStatuses: input.toolStatuses
   });
+  const outcomeContract = evaluateActorTurnOutcomeContract({
+    action: input.action,
+    verifierStatus: input.verifierStatus,
+    toolStatuses: input.toolStatuses
+  });
   const reason = branchReason({
     verifierStatus: input.verifierStatus,
-    retryConstraintBlocked: input.retryConstraintBlocked
+    retryConstraintBlocked: input.retryConstraintBlocked,
+    outcomeContractBranchReason: outcomeContract.branch_recommended
+      ? `outcome contract requires a pivot: ${outcomeContract.reason}`
+      : undefined
   });
   const judgment = clampCycleJudgmentOutcome({
     judgment: {
@@ -178,15 +191,16 @@ export async function classifyActorTurnRuntime(input: {
       cycle_id: input.cycleId,
       ...(input.runId ? { run_id: input.runId } : {}),
       cycle_goal_id: input.cycleGoal.goal_id,
-      outcome,
-      what_happened: runtimeStatusSummary(input),
+      outcome: outcomeContract.outcome_override ?? outcome,
+      what_happened: `${runtimeStatusSummary(input)} Outcome contract=${outcomeContract.status}; expected=${outcomeContract.expected_outcome}; observed=${outcomeContract.observed_deltas.join(",") || "none"}.`,
       why_it_mattered_for_life_goal:
-        `Runtime evidence for ${input.cycleGoal.goal_id} updates the active episode under ActorSoul/LifeGoal context. This classifier records executed-tool results only; it does not assert unscanned world state, infer PlanBead operations from prose, or grant executable authority.`,
+        `Runtime evidence for ${input.cycleGoal.goal_id} updates the active episode under ActorSoul/LifeGoal context. This classifier records executed-tool results and compares the selected tool's expected_outcome against observed evidence deltas; it does not assert unscanned world state, infer PlanBead operations from prose, or grant executable authority.`,
       verifier_status: input.verifierStatus,
+      outcome_contract: outcomeContract,
       evidence_refs: [...input.evidenceRefs],
       memory_writes: memoryWritesForRuntime({
         action: input.action,
-        outcome,
+        outcome: outcomeContract.outcome_override ?? outcome,
         verifierStatus: input.verifierStatus,
         evidenceRefCount: input.evidenceRefs.length
       }),

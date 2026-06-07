@@ -68,6 +68,111 @@ function episodeFocusStatus(input: {
   };
 }
 
+function structureProgressTruths(currentState: ActorTurnCurrentStateProjection) {
+  const progress = currentState.structure_progress;
+  if (!progress) {
+    return [];
+  }
+  return unique([
+    `structure_progress=${progress.status} placed_blocks=${progress.total_placed_blocks}`,
+    ...(progress.latest_anchor
+      ? [
+          `structure_latest_anchor=(${progress.latest_anchor.x},${progress.latest_anchor.y},${progress.latest_anchor.z})`
+        ]
+      : []),
+    ...(progress.latest_verifier
+      ? [
+          `structure_local_verifier=${progress.latest_verifier.status}${
+            progress.latest_verifier.wall_coverage !== undefined
+              ? ` wall_coverage=${progress.latest_verifier.wall_coverage}`
+              : ""
+          }${
+            progress.latest_verifier.roof_coverage !== undefined
+              ? ` roof_coverage=${progress.latest_verifier.roof_coverage}`
+              : ""
+          }`
+        ]
+      : []),
+    ...progress.interpretation_notes
+  ]).slice(0, 8);
+}
+
+function sessionLifecycleTruths(currentState: ActorTurnCurrentStateProjection) {
+  const lifecycle = currentState.session_lifecycle;
+  if (!lifecycle) {
+    return [];
+  }
+  return unique([
+    `session_status=${lifecycle.status} deaths=${lifecycle.death_count} spawns=${lifecycle.spawn_count}`,
+    lifecycle.inventory_may_have_reset
+      ? "inventory_may_have_reset_after_death=true; current inventory_counts overrides older memory or episode assumptions"
+      : "",
+    lifecycle.last_event
+      ? `last_session_event=${lifecycle.last_event.kind} at ${lifecycle.last_event.observed_at}${
+          lifecycle.last_event.position
+            ? ` pos=(${lifecycle.last_event.position.x},${lifecycle.last_event.position.y},${lifecycle.last_event.position.z})`
+            : ""
+        }`
+      : "",
+    ...lifecycle.notes
+  ]).slice(0, 6);
+}
+
+function openProgressFront(input: {
+  currentState: ActorTurnCurrentStateProjection;
+  recentEvidenceTrace: readonly EvidenceTraceEntry[];
+}): ActorTurnDecisionFrame["open_progress_front"] {
+  const structureProgress = input.currentState.structure_progress;
+  const structureFront = structureProgress &&
+    (structureProgress.status === "progressing" || structureProgress.status === "blocked")
+    ? [
+        {
+          id: "structure_progress",
+          status: structureProgress.status,
+          next_theme:
+            "Use physical structure evidence and the active goal wording to continue, adapt, or pivot; local pattern verifier status is not universal goal authority.",
+          evidence_refs: structureProgress.evidence_refs.slice(0, 6)
+        }
+      ]
+    : [];
+  const blockerFront = input.currentState.settlement_progress.recent_blockers.slice(0, 2).map((blocker) => ({
+    id: `recent_blocker:${blocker.key}`,
+    status: "blocked",
+    next_theme: blocker.example ?? `Recent blocker repeated ${blocker.count} time(s).`,
+    evidence_refs: []
+  }));
+  const recentRuntimeBlockers = input.recentEvidenceTrace
+    .slice(-4)
+    .filter((entry) =>
+      entry.outcome === "blocked" ||
+      entry.outcome === "rejected_by_contract" ||
+      entry.outcome === "timed_out" ||
+      entry.outcome === "environment_blocked"
+    )
+    .map((entry) => ({
+      id: `runtime_trace:${entry.turn_id}`,
+      status: entry.outcome,
+      next_theme: entry.compact_summary,
+      evidence_refs: traceEvidenceRefs(entry)
+    }));
+  const byId = new Map<string, ActorTurnDecisionFrame["open_progress_front"][number]>();
+  for (const entry of [...structureFront, ...blockerFront, ...recentRuntimeBlockers]) {
+    if (!byId.has(entry.id)) {
+      byId.set(entry.id, entry);
+    }
+  }
+  return [...byId.values()].slice(0, 4);
+}
+
+function hasRepeatedMemoryOnlyNoProgress(recentEvidenceTrace: readonly EvidenceTraceEntry[]) {
+  const recent = recentEvidenceTrace.slice(-4);
+  return recent.length >= 3 &&
+    recent.filter((entry) =>
+      entry.outcome === "no_progress" &&
+      /\b(remember|memory|note)\b/i.test(entry.compact_summary)
+    ).length >= 3;
+}
+
 export function buildActorTurnDecisionFrame(input: {
   activeEpisode: ActiveEpisode;
   currentState: ActorTurnCurrentStateProjection;
@@ -97,12 +202,14 @@ export function buildActorTurnDecisionFrame(input: {
     `inventory=${Object.entries(input.currentState.inventory_counts)
       .map(([name, count]) => `${name}:${count}`)
       .join(",") || "empty"}`,
+    ...sessionLifecycleTruths(input.currentState),
     requestedDeposits.length > 0
       ? `open_social_deposit=${requestedDeposits
           .map((candidate) => `${candidate.itemName}:${candidate.suggestedCount}`)
           .join(",")}`
       : "no_open_social_deposit_candidate",
-    input.currentState.settlement_progress.known_position_summaries.join("; ")
+    input.currentState.settlement_progress.known_position_summaries.join("; "),
+    ...structureProgressTruths(input.currentState)
   ]);
 
   const completedWork = unique([
@@ -166,15 +273,10 @@ export function buildActorTurnDecisionFrame(input: {
       evidence_refs: traceEvidenceRefs(entry)
     })),
     do_not_repeat: doNotRepeat,
-    open_progress_front: input.currentState.settlement_progress.checklist
-      .filter((item) => item.status !== "satisfied")
-      .map((item) => ({
-        id: item.id,
-        status: item.status,
-        next_theme: item.reason,
-        evidence_refs: []
-      }))
-      .slice(0, 4),
+    open_progress_front: openProgressFront({
+      currentState: input.currentState,
+      recentEvidenceTrace: input.recentEvidenceTrace
+    }),
     next_action_guidance: unique([
       ...(hasCompletedSharedContribution && requestedDeposits.length === 0
         ? [
@@ -194,6 +296,21 @@ export function buildActorTurnDecisionFrame(input: {
         : []),
       ...(requestedDeposits.length > 0 && !visibleCardTitles.has("Deposit Shared")
         ? ["a request is open but deposit is not currently eligible; choose the nearest visible prerequisite such as chest inspection or movement"]
+        : []),
+      ...(input.currentState.structure_progress
+        ? [
+            "structure_progress is physical context only; compare it with the active episode/world event before deciding whether more building is useful"
+          ]
+        : []),
+      ...(input.currentState.session_lifecycle?.branch_recommended
+        ? [
+            "session lifecycle changed; recover from current position/inventory/vitals before continuing older episode assumptions"
+          ]
+        : []),
+      ...(hasRepeatedMemoryOnlyNoProgress(input.recentEvidenceTrace)
+        ? [
+            "recent memory-only no_progress turns already preserved the blocker; prefer a runtime action, fresh observation with a concrete question, or author_mineflayer_action instead of another Remember"
+          ]
         : []),
       "prefer runtime evidence over memory-only turns when a visible Action Card can create world, inventory, position, container, chat, or verifier evidence"
     ])

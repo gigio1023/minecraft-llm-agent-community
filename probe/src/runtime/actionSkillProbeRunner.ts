@@ -28,6 +28,7 @@ import { mineBlock } from "../tools/mineBlock.js";
 import { craftItem } from "../tools/craftItem.js";
 import { craftWithTable } from "../tools/craftWithTable.js";
 import { consumeItem } from "../tools/consumeItem.js";
+import { equipItem } from "../tools/equipItem.js";
 import { runMineflayerProgram } from "../tools/runMineflayerProgram.js";
 import { placeBlock, type Positioned } from "../tools/placeBlock.js";
 import { buildPattern } from "../tools/buildPattern.js";
@@ -112,6 +113,7 @@ const deterministicProbeDriverSkillIds = [
   "placeCraftingTable",
   "eatFoodWhenHungry",
   "buildBasicShelter",
+  "equipHeldItem",
   "inspectSharedChest",
   "depositSharedItems",
   "approachAndRequestItem",
@@ -136,6 +138,7 @@ export type ActionSkillProbePreconditionMode =
   | "placeable_crafting_table"
   | "hungry_with_food"
   | "shelter_build_materials"
+  | "explicit_hand_item"
   | "placed_stone_with_pickaxe"
   | "inspectable_shared_chest"
   | "depositable_shared_chest"
@@ -152,6 +155,7 @@ const actionSkillProbePreconditionModes = {
   placeCraftingTable: "placeable_crafting_table",
   eatFoodWhenHungry: "hungry_with_food",
   buildBasicShelter: "shelter_build_materials",
+  equipHeldItem: "explicit_hand_item",
   inspectSharedChest: "inspectable_shared_chest",
   depositSharedItems: "depositable_shared_chest",
   approachAndRequestItem: "social_bootstrap_inventory",
@@ -468,6 +472,10 @@ export function buildProbePreconditionRconCommands(input: {
     give("dirt", 64);
   }
 
+  if (preconditionMode === "explicit_hand_item") {
+    give("wooden_pickaxe", 1);
+  }
+
   if (preconditionMode === "inspectable_shared_chest") {
     give("crafting_table", 1);
     placeChestFixture('{Items:[{Slot:0b,id:"minecraft:oak_log",Count:2b}]}');
@@ -709,6 +717,17 @@ function createActionSkillProbeProvider(
           input.observation?.inventory?.find((item) => item.name === "bread" && item.count > 0)?.name ??
           "bread";
         return { tool: "consume_item", args: { itemName } };
+      }
+
+      if (skillId === "equipHeldItem") {
+        if (
+          input.lastResult.tool === "equip_item" &&
+          (input.lastResult.status === "equipped" || input.lastResult.status === "already_equipped")
+        ) {
+          return { tool: "remember", args: { note: "equipHeldItem verified a named inventory item in hand" } };
+        }
+
+        return { tool: "equip_item", args: { itemName: "wooden_pickaxe" } };
       }
 
       if (skillId === "buildBasicShelter") {
@@ -1455,6 +1474,37 @@ export const actionSkillPostconditionSpecs: Partial<Record<SeedActionSkillId, Ac
         : "buildBasicShelter did not record a built starter shelter with passing world-state verifier evidence";
     }
   },
+  equipHeldItem: {
+    skillId: "equipHeldItem",
+    evidenceSummary: [
+      "equip_item used an exact inventory item name",
+      "equip_item verified the held item after Mineflayer equip"
+    ],
+    minimumPassingTranscript: {
+      steps: [{
+        tool: "equip_item",
+        args: { itemName: "wooden_pickaxe" },
+        result: {
+          status: "equipped",
+          itemName: "wooden_pickaxe",
+          beforeHeldItem: null,
+          afterHeldItem: "wooden_pickaxe",
+          beforeCount: 1,
+          afterCount: 1
+        }
+      }]
+    },
+    validate(steps) {
+      return hasToolResult(steps, "equip_item", (result) =>
+        (result.status === "equipped" || result.status === "already_equipped") &&
+        result.itemName === "wooden_pickaxe" &&
+        result.afterHeldItem === "wooden_pickaxe" &&
+        (numberField(result, "afterCount") ?? 0) > 0
+      )
+        ? null
+        : "equipHeldItem did not verify wooden_pickaxe as the held item with exact inventory evidence";
+    }
+  },
   inspectSharedChest: {
     skillId: "inspectSharedChest",
     evidenceSummary: ["shared chest inspection returned a ledger-backed chest id and non-empty positive item snapshot"],
@@ -1970,6 +2020,15 @@ export async function runLiveActionSkillProbe(
               signal
             }),
             { tool: "consume_item" }
+          ),
+        equip_item: ({ actor, args }) =>
+          withActionWrapper(
+            (signal) => equipItem({
+              bot: actor,
+              itemName: readStringArg(args, "itemName"),
+              signal
+            }),
+            { tool: "equip_item" }
           ),
         run_mineflayer_program: ({ actor, target, args }) =>
           withActionWrapper(

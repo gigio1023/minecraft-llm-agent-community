@@ -14,7 +14,7 @@ export type RoleContract = {
 const roleContracts: Record<RoleId, RoleContract> = {
   gatherer: {
     roleId: "gatherer",
-    allowedTools: ["observe", "move_to", "collect_logs", "mine_block", "consume_item", "run_mineflayer_program", "inspect_chest", "deposit_shared", "say", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "collect_logs", "mine_block", "consume_item", "equip_item", "run_mineflayer_program", "inspect_chest", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_log",
       "birch_log",
@@ -51,6 +51,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
       "craft_item",
       "craft_with_table",
       "consume_item",
+      "equip_item",
       "run_mineflayer_program",
       "place_block",
       "build_pattern",
@@ -99,7 +100,7 @@ const roleContracts: Record<RoleId, RoleContract> = {
   },
   crafter: {
     roleId: "crafter",
-    allowedTools: ["observe", "move_to", "craft_item", "craft_with_table", "consume_item", "run_mineflayer_program", "place_block", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
+    allowedTools: ["observe", "move_to", "craft_item", "craft_with_table", "consume_item", "equip_item", "run_mineflayer_program", "place_block", "inspect_chest", "withdraw_shared", "deposit_shared", "say", "wait", "remember"],
     depositAllowedItemNames: [
       "oak_planks",
       "birch_planks",

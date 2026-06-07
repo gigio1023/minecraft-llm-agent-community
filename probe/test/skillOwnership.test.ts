@@ -67,6 +67,14 @@ test("assigns visible active seed action skill ownership per actor role", () => 
     "quartermaster must not actively own collectLogs because its role contract cannot use collect_logs"
   );
   assert.equal(
+    ownership.some((record) =>
+      record.owner_actor_id === "npc_a" &&
+      record.skill_id === "equipHeldItem"
+    ),
+    false,
+    "quartermaster must not actively own equipHeldItem because its role contract cannot use equip_item"
+  );
+  assert.equal(
     ownership.some((record) => record.skill_id === "mineCoal"),
     false,
     "planned Minecraft roadmap action skills must not appear as active ownership"
@@ -82,6 +90,7 @@ test("settler owns gather, craft, mining, and storage seed skills", () => {
   assert.ok(activeSkillIds.has("craftCraftingTable"));
   assert.ok(activeSkillIds.has("craftWoodenPickaxe"));
   assert.ok(activeSkillIds.has("mineCobblestone"));
+  assert.ok(activeSkillIds.has("equipHeldItem"));
   assert.ok(activeSkillIds.has("inspectSharedChest"));
   assert.ok(activeSkillIds.has("depositSharedItems"));
 });

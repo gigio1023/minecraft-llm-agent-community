@@ -29,6 +29,19 @@ const progressHelperStatuses: Record<string, Set<string>> = {
   say: new Set(["delivered"])
 };
 
+const helperProgressVerifierAliases = new Set([
+  "runtime-evidence",
+  "runtime_evidence",
+  "runtime evidence",
+  "runtime-progress",
+  "runtime_progress",
+  "runtime progress",
+  "runtime_primitive_or_evidence",
+  "physical-evidence",
+  "physical_evidence",
+  "physical evidence"
+]);
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -109,6 +122,16 @@ function progressHelperEvents(events: JsonRecord[]) {
   });
 }
 
+function normalizedVerifierKind(kind: string, events: JsonRecord[]) {
+  if (helperProgressVerifierAliases.has(kind)) {
+    return "helper_event_progress";
+  }
+  if (kind === "unknown" && progressHelperEvents(events).length > 0) {
+    return "helper_event_progress";
+  }
+  return kind;
+}
+
 function inventoryCount(observation: JsonRecord | undefined, itemName: string) {
   const inventory = Array.isArray(observation?.inventory) ? observation.inventory : [];
   return inventory.filter(isRecord).reduce((total, item) => {
@@ -151,8 +174,9 @@ export function evaluateGeneratedActionSkillTrialVerifier(input: {
   runtimeResult: JsonValue;
 }): GeneratedActionSkillTrialVerifierResult {
   const verifier = input.candidate.verifier;
-  const kind = typeof verifier.kind === "string" ? verifier.kind : "unknown";
+  const rawKind = typeof verifier.kind === "string" ? verifier.kind : "unknown";
   const events = helperEventsFromRuntimeResult(input.runtimeResult);
+  const kind = normalizedVerifierKind(rawKind, events);
   const observation = postObservationFromRuntimeResult(input.runtimeResult);
   const runtimeStatus = isRecord(input.runtimeResult) && typeof input.runtimeResult.status === "string"
     ? input.runtimeResult.status
@@ -188,7 +212,13 @@ export function evaluateGeneratedActionSkillTrialVerifier(input: {
   if (kind === "helper_event_progress" || kind === "block_or_inventory_delta") {
     const matched = progressHelperEvents(events);
     return matched.length > 0
-      ? pass(kind, "At least one helper produced verifier-classified progress evidence.", matched)
+      ? pass(
+          kind,
+          rawKind === kind
+            ? "At least one helper produced verifier-classified progress evidence."
+            : `Verifier kind ${rawKind} was treated as helper_event_progress because runtime helper evidence is the trial authority.`,
+          matched
+        )
       : fail(kind, "No helper produced verifier-classified progress evidence.");
   }
 

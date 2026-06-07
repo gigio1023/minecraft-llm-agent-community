@@ -37,6 +37,18 @@ export const actorTurnChoices = [
 
 export type ActorTurnChoice = (typeof actorTurnChoices)[number];
 
+export const actorTurnExpectedOutcomes = [
+  "world_block_delta",
+  "inventory_delta",
+  "equipment_delta",
+  "position_delta",
+  "social_delta",
+  "diagnostic_unlock",
+  "record_blocker_or_done"
+] as const;
+
+export type ActorTurnExpectedOutcome = (typeof actorTurnExpectedOutcomes)[number];
+
 export const evidenceTraceOutcomes = [
   "verified_mutation",
   "position_delta",
@@ -185,6 +197,24 @@ export type ActorTurnCurrentStateProjection = {
     held_item?: { name: string; count?: number };
     food_candidates: Array<{ name: string; count: number }>;
   };
+  session_lifecycle?: {
+    schema: "runtime-session-lifecycle/v1";
+    status: "active" | "dead_or_respawning" | "respawned_after_death" | "disconnected_or_error";
+    death_count: number;
+    spawn_count: number;
+    last_event?: {
+      kind: "death" | "spawn" | "end" | "kicked" | "error";
+      observed_at: string;
+      position?: { x: number; y: number; z: number };
+      health?: number;
+      food?: number;
+      reason?: string;
+    };
+    inventory_may_have_reset: boolean;
+    branch_recommended: boolean;
+    branch_reason?: "danger_or_survival_pressure" | "environment_blocked";
+    notes: string[];
+  };
   visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
   obligation_summaries?: string[];
   nearby_block_hints: Array<{ name: string; distance?: number }>;
@@ -213,6 +243,24 @@ export type ActorTurnCurrentStateProjection = {
     truncated: boolean;
     retained_block_counts: Array<{ name: string; count: number }>;
     limitations: string[];
+  };
+  structure_progress?: {
+    status: string;
+    total_placed_blocks: number;
+    latest_pattern_id?: string;
+    latest_anchor?: { x: number; y: number; z: number };
+    latest_material?: string;
+    latest_verifier?: {
+      status: string;
+      wall_coverage?: number;
+      roof_coverage?: number;
+      placed_shell_blocks?: number;
+      required_shell_blocks?: number;
+      reason?: string;
+    };
+    evidence_refs: string[];
+    summaries: string[];
+    interpretation_notes: string[];
   };
   settlement_progress: {
     inventory_counts: Record<string, number>;
@@ -363,6 +411,7 @@ export type ActorTurnExecutionDraft =
       choice: "use_existing_action";
       action_card_id: string;
       parameters: JsonObject;
+      expected_outcome: ActorTurnExpectedOutcome;
       why_this_action: string;
       expected_evidence: string[];
       fallback_if_blocked: string;
@@ -382,6 +431,7 @@ export type ActorTurnExecutionDraft =
       verifier: JsonObject;
       known_failure_modes: string[];
       promotion_policy: "promote_after_passed_trial";
+      expected_outcome: ActorTurnExpectedOutcome;
       why_this_action: string;
       expected_evidence: string[];
       fallback_if_blocked: string;
@@ -397,6 +447,7 @@ export type ActorTurnResolvedAction =
       action_card_id: string;
       primitive_id: string;
       parameters: JsonObject;
+      expected_outcome: ActorTurnExpectedOutcome;
       why_this_action: string;
       expected_evidence: string[];
       fallback_if_blocked: string;
@@ -410,6 +461,7 @@ export type ActorTurnResolvedAction =
       action_card_id: string;
       action_skill_id: string;
       parameters: JsonObject;
+      expected_outcome: ActorTurnExpectedOutcome;
       why_this_action: string;
       expected_evidence: string[];
       fallback_if_blocked: string;
@@ -422,6 +474,7 @@ export type ActorTurnResolvedAction =
       kind: "author_mineflayer_action";
       parameters: JsonObject;
       candidate: GeneratedActionSkillCandidate;
+      expected_outcome: ActorTurnExpectedOutcome;
       why_this_action: string;
       expected_evidence: string[];
       fallback_if_blocked: string;

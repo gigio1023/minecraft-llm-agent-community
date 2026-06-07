@@ -9,6 +9,7 @@ export const runtimePrimitives = [
   { id: "craft_item", category: "crafting" },
   { id: "craft_with_table", category: "crafting" },
   { id: "consume_item", category: "survival" },
+  { id: "equip_item", category: "inventory" },
   { id: "run_mineflayer_program", category: "generated" },
   { id: "place_block", category: "building" },
   { id: "build_pattern", category: "building" },

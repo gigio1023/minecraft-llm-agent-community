@@ -11,6 +11,7 @@ import {
   actionCardReadinesses,
   activeEpisodeStatuses,
   actorTurnChoices,
+  actorTurnExpectedOutcomes,
   deliberationBranchReasons,
   episodeFailureClassifications,
   episodeVerdictStatuses,
@@ -253,6 +254,26 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
   if (value.obligation_summaries !== undefined) {
     assertStringArray(value, "obligation_summaries", path, errors);
   }
+  if (value.session_lifecycle !== undefined) {
+    const lifecycle = isRecord(value.session_lifecycle) ? value.session_lifecycle : null;
+    if (!lifecycle) {
+      errors.push(`${path}.session_lifecycle must be an object`);
+    } else {
+      if (lifecycle.schema !== "runtime-session-lifecycle/v1") {
+        errors.push(`${path}.session_lifecycle.schema must be runtime-session-lifecycle/v1`);
+      }
+      assertString(lifecycle, "status", `${path}.session_lifecycle`, errors);
+      assertNonNegativeInteger(lifecycle, "death_count", `${path}.session_lifecycle`, errors);
+      assertNonNegativeInteger(lifecycle, "spawn_count", `${path}.session_lifecycle`, errors);
+      if (typeof lifecycle.inventory_may_have_reset !== "boolean") {
+        errors.push(`${path}.session_lifecycle.inventory_may_have_reset must be boolean`);
+      }
+      if (typeof lifecycle.branch_recommended !== "boolean") {
+        errors.push(`${path}.session_lifecycle.branch_recommended must be boolean`);
+      }
+      assertStringArray(lifecycle, "notes", `${path}.session_lifecycle`, errors);
+    }
+  }
   assertArray(value, "nearby_block_hints", path, errors);
   const sharedStorage = assertRecord(value, "shared_storage", path, errors);
   if (sharedStorage) {
@@ -277,6 +298,20 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
     assertStringArray(candidateRecord, "requested_by_actor_ids", `${path}.deposit_candidates[${index}]`, errors);
     assertStringArray(candidateRecord, "request_summaries", `${path}.deposit_candidates[${index}]`, errors);
     assertStringArray(candidateRecord, "evidence_refs", `${path}.deposit_candidates[${index}]`, errors);
+  }
+  if (value.structure_progress !== undefined) {
+    const structureProgress = isRecord(value.structure_progress) ? value.structure_progress : null;
+    if (!structureProgress) {
+      errors.push(`${path}.structure_progress must be an object`);
+    } else {
+      assertString(structureProgress, "status", `${path}.structure_progress`, errors);
+      assertNonNegativeInteger(structureProgress, "total_placed_blocks", `${path}.structure_progress`, errors);
+      assertOptionalString(structureProgress, "latest_pattern_id", `${path}.structure_progress`, errors);
+      assertOptionalString(structureProgress, "latest_material", `${path}.structure_progress`, errors);
+      assertStringArray(structureProgress, "evidence_refs", `${path}.structure_progress`, errors);
+      assertStringArray(structureProgress, "summaries", `${path}.structure_progress`, errors);
+      assertStringArray(structureProgress, "interpretation_notes", `${path}.structure_progress`, errors);
+    }
   }
   const settlement = assertRecord(value, "settlement_progress", path, errors);
   if (settlement) {
@@ -752,6 +787,9 @@ export function validateActorTurnExecutionDraft(
   assertString(value, "why_this_action", "ActorTurnExecutionDraft", errors);
   assertStringArray(value, "expected_evidence", "ActorTurnExecutionDraft", errors);
   assertString(value, "fallback_if_blocked", "ActorTurnExecutionDraft", errors);
+  if (!includesString(actorTurnExpectedOutcomes, value.expected_outcome)) {
+    errors.push("ActorTurnExecutionDraft.expected_outcome must be a known Actor Turn expected outcome");
+  }
 
   if (value.choice === "use_existing_action") {
     assertString(value, "action_card_id", "ActorTurnExecutionDraft", errors);

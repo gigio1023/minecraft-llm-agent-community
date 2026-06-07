@@ -68,10 +68,30 @@ export type RecentBlockerHistogram = Array<{
 
 export type SettlementProgressVector = {
   has_crafting_table: boolean;
+  has_structure_progress: boolean;
   has_verified_shelter: boolean;
   has_shared_storage_contribution: boolean;
   has_judgment_or_memory: boolean;
   has_blocker_summary: boolean;
+};
+
+export type StructureProgressSummary = {
+  status: "none" | "progressing" | "verified" | "blocked";
+  total_placed_blocks: number;
+  latest_pattern_id?: string;
+  latest_anchor?: { x: number; y: number; z: number };
+  latest_material?: string;
+  latest_verifier?: {
+    status: string;
+    wall_coverage?: number;
+    roof_coverage?: number;
+    placed_shell_blocks?: number;
+    required_shell_blocks?: number;
+    reason?: string;
+  };
+  evidence_refs: string[];
+  summaries: string[];
+  interpretation_notes: string[];
 };
 
 export type SettlementState = {
@@ -84,6 +104,7 @@ export type SettlementState = {
   blocker_histogram: RecentBlockerHistogram;
   available_action_skill_ids: string[];
   missing_primitive_blockers: string[];
+  structure_progress: StructureProgressSummary;
   progress: SettlementProgressVector;
   checklist: SettlementChecklist;
 };
@@ -266,6 +287,103 @@ function craftingTablePlacementFromToolResults(results: readonly ToolResultRecor
   }
 
   return undefined;
+}
+
+function resultEvidenceRefs(entry: ToolResultRecord) {
+  return entry.evidence_ref ? [entry.evidence_ref] : [];
+}
+
+function placementLedger(value: unknown): Record<string, unknown>[] {
+  if (!isRecord(value) || !Array.isArray(value.placementLedger)) {
+    return [];
+  }
+  return value.placementLedger.filter(isRecord);
+}
+
+function countPlacedBlocks(value: unknown) {
+  return placementLedger(value).filter((entry) => entry.status === "placed").length;
+}
+
+function buildPatternVerifier(value: unknown): StructureProgressSummary["latest_verifier"] {
+  if (!isRecord(value) || !isRecord(value.verification)) {
+    return undefined;
+  }
+  const verification = value.verification;
+  return {
+    status: typeof verification.status === "string" ? verification.status : "unknown",
+    ...(typeof verification.wallCoverage === "number" ? { wall_coverage: verification.wallCoverage } : {}),
+    ...(typeof verification.roofCoverage === "number" ? { roof_coverage: verification.roofCoverage } : {}),
+    ...(typeof verification.placedShellBlocks === "number" ? { placed_shell_blocks: verification.placedShellBlocks } : {}),
+    ...(typeof verification.requiredShellBlocks === "number" ? { required_shell_blocks: verification.requiredShellBlocks } : {}),
+    ...(typeof verification.reason === "string" ? { reason: verification.reason } : {})
+  };
+}
+
+function buildStructureProgressFromToolResults(
+  results: readonly ToolResultRecord[] = []
+): StructureProgressSummary {
+  const buildResults = results.filter((entry) => entry.tool === "build_pattern");
+  if (buildResults.length === 0) {
+    return {
+      status: "none",
+      total_placed_blocks: 0,
+      evidence_refs: [],
+      summaries: [],
+      interpretation_notes: []
+    };
+  }
+
+  const evidenceRefs = [...new Set(buildResults.flatMap(resultEvidenceRefs))];
+  const totalPlacedBlocks = buildResults.reduce((sum, entry) => sum + countPlacedBlocks(entry.result), 0);
+  const latest = [...buildResults].reverse().find((entry) => isRecord(entry.result));
+  const latestResult = latest && isRecord(latest.result) ? latest.result : undefined;
+  const latestVerifier = buildPatternVerifier(latestResult);
+  const latestAnchor = latestResult ? readPosition(latestResult.anchor) : undefined;
+  const hasVerifiedStructure = buildResults.some((entry) =>
+    isRecord(entry.result) &&
+    entry.result.status === "built" &&
+    isRecord(entry.result.verification) &&
+    entry.result.verification.status === "passed"
+  );
+  const hasBlockedAttempt = buildResults.some((entry) =>
+    entry.status === "blocked" ||
+    entry.status === "failed" ||
+    entry.status === "error" ||
+    (isRecord(entry.result) && entry.result.status === "blocked")
+  );
+  const status: StructureProgressSummary["status"] = hasVerifiedStructure
+    ? "verified"
+    : totalPlacedBlocks > 0
+      ? "progressing"
+      : hasBlockedAttempt
+        ? "blocked"
+        : "none";
+
+  return {
+    status,
+    total_placed_blocks: totalPlacedBlocks,
+    ...(typeof latestResult?.patternId === "string" ? { latest_pattern_id: latestResult.patternId } : {}),
+    ...(latestAnchor ? { latest_anchor: latestAnchor } : {}),
+    ...(typeof latestResult?.materialUsed === "string" ? { latest_material: latestResult.materialUsed } : {}),
+    ...(latestVerifier ? { latest_verifier: latestVerifier } : {}),
+    evidence_refs: evidenceRefs,
+    summaries: [
+      `build_pattern attempts=${buildResults.length} placed_blocks=${totalPlacedBlocks}`,
+      ...(latestVerifier
+        ? [
+            `latest local verifier=${latestVerifier.status}${
+              latestVerifier.wall_coverage !== undefined ? ` wall_coverage=${latestVerifier.wall_coverage}` : ""
+            }${
+              latestVerifier.roof_coverage !== undefined ? ` roof_coverage=${latestVerifier.roof_coverage}` : ""
+            }`
+          ]
+        : [])
+    ],
+    interpretation_notes: [
+      "Structure progress is physical evidence context, not a universal goal-completion rule.",
+      "A pattern verifier describes that action skill's local postcondition; Actor Turn should compare it with the active goal wording before continuing, adapting, or pivoting."
+    ]
+  };
 }
 
 function findNearbyBlock(observation: ObserveResult | Record<string, unknown>, blockName: string) {
@@ -578,8 +696,28 @@ export function buildSettlementState(input: {
     craftingTablePostcondition?.evidence_refs ??
     toolCraftingTable?.evidence_refs ??
     (tableNearby ? evidenceRefs : []);
+  const structureProgress = buildStructureProgressFromToolResults(input.recentToolResults);
+  const normalizedStructureProgress: StructureProgressSummary = shelterPostcondition
+    ? {
+        ...structureProgress,
+        status: "verified",
+        evidence_refs: [...new Set([...structureProgress.evidence_refs, ...shelterPostcondition.evidence_refs])],
+        summaries: structureProgress.summaries.length > 0
+          ? structureProgress.summaries
+          : ["starter shelter verification passed from action-skill postcondition"],
+        interpretation_notes: structureProgress.interpretation_notes.length > 0
+          ? structureProgress.interpretation_notes
+          : [
+              "Structure progress is physical evidence context, not a universal goal-completion rule.",
+              "A pattern verifier describes that action skill's local postcondition; Actor Turn should compare it with the active goal wording before continuing, adapting, or pivoting."
+            ]
+      }
+    : structureProgress;
   const progress: SettlementProgressVector = {
     has_crafting_table: tableNearby || Boolean(craftingTablePostcondition) || Boolean(toolCraftingTable),
+    has_structure_progress:
+      normalizedStructureProgress.status === "progressing" ||
+      normalizedStructureProgress.status === "verified",
     has_verified_shelter: Boolean(shelterPostcondition),
     has_shared_storage_contribution:
       Boolean(storagePostcondition) || toolSharedStorage.status === "contributed",
@@ -651,8 +789,15 @@ export function buildSettlementState(input: {
         evidence_refs: storagePostcondition?.evidence_refs ?? sharedStorage.evidence_refs
       },
       shelter: {
-        status: shelterPostcondition ? "verified" : "unknown",
-        evidence_refs: shelterPostcondition?.evidence_refs ?? []
+        status: shelterPostcondition
+          ? "verified"
+          : normalizedStructureProgress.status === "progressing"
+            ? "progressing"
+            : normalizedStructureProgress.status === "blocked"
+              ? "blocked"
+              : "unknown",
+        ...(normalizedStructureProgress.latest_anchor ? { anchor: normalizedStructureProgress.latest_anchor } : {}),
+        evidence_refs: shelterPostcondition?.evidence_refs ?? normalizedStructureProgress.evidence_refs
       }
     },
     blocker_histogram: blockers,
@@ -661,6 +806,7 @@ export function buildSettlementState(input: {
       .filter((record) => record.required_primitives.length === 0)
       .map((record) => record.skill_id)
       .sort(),
+    structure_progress: normalizedStructureProgress,
     progress,
     checklist
   };

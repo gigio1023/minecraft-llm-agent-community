@@ -75,8 +75,6 @@ const generatedActionSkillCandidateSchema = {
 } as const;
 
 const MAX_LEGACY_PLANNER_ACTION_REGENERATION_ATTEMPTS = 2;
-const DEFAULT_ACTION_PLANNER_MAX_COMPLETION_TOKENS = 4096;
-
 const REPAIRABLE_LEGACY_PLANNER_ACTION_METADATA_ERRORS = new Set([
   "why_this_action must be a non-empty string",
   "fallback_if_blocked must be a non-empty string"
@@ -183,24 +181,6 @@ function directActionSkillSurface(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function optionalPositiveInteger(value: string | undefined) {
-  if (value === undefined || value.trim() === "") {
-    return undefined;
-  }
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function openAiConfigForActionPlanner(config: OpenAiJsonProviderConfig) {
-  const stageCap =
-    optionalPositiveInteger(process.env.SOCIAL_ACTION_PLANNER_MAX_COMPLETION_TOKENS) ??
-    DEFAULT_ACTION_PLANNER_MAX_COMPLETION_TOKENS;
-  return {
-    ...config,
-    maxCompletionTokens: Math.max(config.maxCompletionTokens ?? 0, stageCap)
-  };
 }
 
 function hasDirectPrimitiveActionSkillFallback(intent: LegacyPlannerAction) {
@@ -493,7 +473,7 @@ Do not claim success through text. Pick actions whose evidence can be verified b
     }) : await callOpenAiJsonSchema<{
       legacy_planner_action: ProviderLegacyPlannerActionPayload;
     }>({
-      config: openAiConfigForActionPlanner(input.openAi!),
+      config: input.openAi!,
       ...providerCall
     });
 

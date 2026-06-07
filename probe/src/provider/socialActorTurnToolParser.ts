@@ -7,7 +7,11 @@
  */
 import type { ResponseFunctionToolCall } from "openai/resources/responses/responses";
 
-import type { JsonObject } from "../runtime/goals/actorEpisode/index.js";
+import {
+  actorTurnExpectedOutcomes,
+  type ActorTurnExpectedOutcome,
+  type JsonObject
+} from "../runtime/goals/actorEpisode/index.js";
 import {
   AUTHOR_MINEFLAYER_ACTION_TOOL_NAME,
   type ActorTurnActionCardToolMapping
@@ -15,6 +19,7 @@ import {
 
 export type ActorTurnExistingActionToolArgs = {
   parameters: JsonObject;
+  expected_outcome: ActorTurnExpectedOutcome;
   situation_assessment: string;
   why_this_tool: string;
   success_evidence: string[];
@@ -25,6 +30,7 @@ export type ActorTurnAuthorMineflayerActionArgs = {
   situation_assessment: string;
   why_codegen_is_needed: string;
   desired_minecraft_behavior: string;
+  expected_outcome: ActorTurnExpectedOutcome;
   existing_tools_considered: Array<{
     action_card_id: string;
     title: string;
@@ -197,6 +203,19 @@ function requireStringArray(input: {
   return values;
 }
 
+function requireExpectedOutcome(input: {
+  record: Record<string, unknown>;
+  path: string;
+  errors: string[];
+}) {
+  const value = input.record.expected_outcome;
+  if (typeof value !== "string" || !actorTurnExpectedOutcomes.includes(value as ActorTurnExpectedOutcome)) {
+    input.errors.push(`${input.path}.expected_outcome must be a known Actor Turn expected outcome`);
+    return "record_blocker_or_done";
+  }
+  return value as ActorTurnExpectedOutcome;
+}
+
 function parseExistingToolArgs(args: Record<string, unknown>): {
   ok: true;
   args: ActorTurnExistingActionToolArgs;
@@ -206,6 +225,7 @@ function parseExistingToolArgs(args: Record<string, unknown>): {
     args,
     fields: [
       "parameters",
+      "expected_outcome",
       "situation_assessment",
       "why_this_tool",
       "success_evidence",
@@ -239,6 +259,7 @@ function parseExistingToolArgs(args: Record<string, unknown>): {
     parameters: isRecord(parameters)
       ? toJsonObject(parameters)
       : {},
+    expected_outcome: requireExpectedOutcome({ record: args, path: "tool_args", errors }),
     situation_assessment: requireString({ record: args, key: "situation_assessment", path: "tool_args", errors }),
     why_this_tool: requireString({ record: args, key: "why_this_tool", path: "tool_args", errors }),
     success_evidence: requireStringArray({ record: args, key: "success_evidence", path: "tool_args", errors }),
@@ -297,6 +318,7 @@ function parseAuthorToolArgs(args: Record<string, unknown>): {
       "situation_assessment",
       "why_codegen_is_needed",
       "desired_minecraft_behavior",
+      "expected_outcome",
       "existing_tools_considered",
       "success_evidence",
       "failure_handling"
@@ -324,6 +346,7 @@ function parseAuthorToolArgs(args: Record<string, unknown>): {
       path: "tool_args",
       errors
     }),
+    expected_outcome: requireExpectedOutcome({ record: args, path: "tool_args", errors }),
     existing_tools_considered: parseExistingToolsConsidered(args.existing_tools_considered, errors),
     success_evidence: requireStringArray({ record: args, key: "success_evidence", path: "tool_args", errors }),
     failure_handling: requireString({ record: args, key: "failure_handling", path: "tool_args", errors })

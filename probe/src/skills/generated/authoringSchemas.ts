@@ -19,7 +19,11 @@ export const GENERATED_ACTION_SKILL_CANDIDATE_SCHEMA =
 export const ACTION_SKILL_AUTHORING_HELPER_API_VERSION =
   "mineflayer-action-skill-helper/v1" as const;
 
-export type GeneratedActionSkillLifecycleStatus = "draft" | "trial_failed" | "promotable";
+export type GeneratedActionSkillLifecycleStatus =
+  | "draft"
+  | "trial_failed"
+  | "diagnostic_only"
+  | "promotable";
 
 const allowedHelperNames = new Set<string>(mineflayerActionSkillHelperNames);
 

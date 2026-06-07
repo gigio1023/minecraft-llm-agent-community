@@ -22,13 +22,15 @@ observed failure.
 Treat user-visible reports as first-class evidence, especially when they include
 specific motion or repeated patterns:
 
-- "캐는 시늉만 한다" means animation or intent is not proof of block removal.
-- "일정한 방향으로 멀리 간다" suggests target selection, pathfinder drift, stale
-  entity/item pursuit, or uncancelled movement.
-- "다시 캐려고 하다가 멀리 간다" suggests the provider repeats a primitive whose
-  internal state was not reset or whose failure evidence was too weak.
-- "아무것도 없다" suggests observation/search radius, spawn/teleport, target
-  depletion, or artifact visibility problems.
+- "It only looks like it is mining" means animation or intent is not proof of
+  block removal.
+- "It keeps walking far in one direction" suggests target selection, pathfinder
+  drift, stale entity/item pursuit, or uncancelled movement.
+- "It tries to mine again and then walks away" suggests the provider repeats a
+  primitive whose internal state was not reset or whose failure evidence was too
+  weak.
+- "There is nothing nearby" suggests observation/search radius, spawn/teleport,
+  target depletion, or artifact visibility problems.
 
 When the transcript lacks fields to confirm the observation, classify that as an
 `artifact-gap` and propose the missing fields.

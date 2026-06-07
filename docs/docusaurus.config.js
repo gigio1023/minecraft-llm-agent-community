@@ -46,7 +46,7 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          path: 'blog-doc',
+          path: 'public-docs',
           sidebarPath: './sidebars.js',
           editUrl:
             'https://github.com/naem1023/minecraft-llm-agent-community/tree/main/docs/',
@@ -77,7 +77,7 @@ const config = {
         items: [
           {
             type: 'docSidebar',
-            sidebarId: 'blogDocSidebar',
+            sidebarId: 'publicDocsSidebar',
             position: 'left',
             label: 'Docs',
           },
@@ -100,12 +100,12 @@ const config = {
                 to: '/docs/intro',
               },
               {
-                label: 'Architecture Spec',
-                to: '/docs/Architecture/SPEC',
+                label: 'Architecture',
+                to: '/docs/architecture',
               },
               {
-                label: 'Headless Server',
-                to: '/docs/Setup/Headless-Server',
+                label: 'Getting Started',
+                to: '/docs/getting-started',
               },
             ],
           },

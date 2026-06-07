@@ -89,6 +89,11 @@ function primitiveCurrentStateHints(primitive: ActionSurfacePrimitive) {
       ];
     case "consume_item":
       return ["check whether inventory has the requested edible item"];
+    case "equip_item":
+      return [
+        "check whether inventory has the exact requested itemName",
+        "held-item evidence may already satisfy the preparation step"
+      ];
     case "deposit_shared":
       return ["check whether a shared chest is nearby", "check whether inventory has the requested depositable item"];
     case "inspect_chest":

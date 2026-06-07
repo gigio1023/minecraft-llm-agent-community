@@ -8,7 +8,11 @@
  */
 import type { FunctionTool } from "openai/resources/responses/responses";
 
-import type { ActorTurnInput, ActionCard } from "../runtime/goals/actorEpisode/index.js";
+import {
+  actorTurnExpectedOutcomes,
+  type ActorTurnInput,
+  type ActionCard
+} from "../runtime/goals/actorEpisode/index.js";
 import {
   resolveActionCardMapping,
   type ActionCardProjection,
@@ -40,6 +44,7 @@ export type ActorTurnToolSelectionPayload = {
 };
 
 const rationaleFieldSchemas = {
+  expected_outcome: { type: "string", enum: actorTurnExpectedOutcomes },
   situation_assessment: { type: "string" },
   why_this_tool: { type: "string" },
   success_evidence: { type: "array", items: { type: "string" } },
@@ -117,6 +122,7 @@ function structuredParameterSchemaForPrimitive(primitiveId: string): JsonSchemaO
     case "craft_item":
     case "craft_with_table":
     case "consume_item":
+    case "equip_item":
       return strictObject({ itemName: { type: "string" } });
     case "deposit_shared":
     case "withdraw_shared":
@@ -175,6 +181,7 @@ const authorMineflayerActionToolParameters = {
         required: ["action_card_id", "title", "why_not_enough"]
       }
     },
+    expected_outcome: { type: "string", enum: actorTurnExpectedOutcomes },
     success_evidence: { type: "array", items: { type: "string" } },
     failure_handling: { type: "string" }
   },
@@ -183,6 +190,7 @@ const authorMineflayerActionToolParameters = {
     "why_codegen_is_needed",
     "desired_minecraft_behavior",
     "existing_tools_considered",
+    "expected_outcome",
     "success_evidence",
     "failure_handling"
   ]
@@ -199,12 +207,14 @@ For a visible Action Card tool:
 - put only the provider-supplied structured arguments in parameters;
 - do not add actor ids, primitive ids, action skill ids, timeouts, evidence paths, verifier ids, generated source, or other hidden runtime fields;
 - do not expect current_state, Action Card hints, or runtime code to synthesize safe target cells, item names, counts, or other defaults;
+- set expected_outcome to the evidence delta that should prove this action worked: world_block_delta, inventory_delta, equipment_delta, position_delta, social_delta, diagnostic_unlock, or record_blocker_or_done;
 - write detailed situation_assessment, why_this_tool, success_evidence, and failure_handling;
 - do not rely on prose to supply missing coordinates, item names, counts, or permissions.
 
 For author_mineflayer_action:
 - choose it only when no visible Action Card can express the needed bounded Mineflayer behavior;
 - do not include TypeScript source, input_schema, candidate, helper_allowlist, timeout_ms, verifier, promotion_policy, or parameters;
+- set expected_outcome to the concrete delta the generated program should create; use diagnostic_unlock only for a short bounded probe that must unlock a later physical action, and not as a substitute for acting;
 - write detailed rationale so the internal codegen stage can continue the same decision without losing context;
 - never add context_to_preserve, selected_context, relevant_context_refs, or similar summary fields.
 

@@ -151,3 +151,56 @@ test("shared-storage handoff is evaluable from verified deposit evidence", () =>
     evidenceRefs
   );
 });
+
+test("partial build_pattern placement survives as structure progress without verifying shelter", () => {
+  const state = buildSettlementState({
+    actorId: "npc_b",
+    activeActionSkills: [],
+    previousJudgments: [],
+    observation: {
+      status: "ok",
+      observerId: "npc_b",
+      position: { x: 0, y: 64, z: 0 },
+      inventory: []
+    },
+    recentToolResults: [
+      {
+        tool: "build_pattern",
+        status: "progressing",
+        evidence_ref: "evidence/cycle-0017-action-01-build_pattern.json",
+        result: {
+          status: "progressing",
+          patternId: "starter_shelter_2x2_v1",
+          anchor: { x: -2, y: 64, z: -22 },
+          materialUsed: "oak_planks",
+          placementLedger: [
+            { status: "placed", targetPosition: { x: -2, y: 64, z: -22 } },
+            { status: "placed", targetPosition: { x: -1, y: 64, z: -22 } },
+            { status: "blocked", targetPosition: { x: 0, y: 64, z: -22 } }
+          ],
+          verification: {
+            status: "progressing",
+            wallCoverage: 0.417,
+            roofCoverage: 0,
+            placedShellBlocks: 2,
+            requiredShellBlocks: 27,
+            reason: "starter shelter shell is incomplete in current world blocks."
+          }
+        }
+      }
+    ],
+    now: "2026-06-03T00:00:00.000Z"
+  });
+
+  assert.equal(state.progress.has_structure_progress, true);
+  assert.equal(state.progress.has_verified_shelter, false);
+  assert.equal(state.structure_progress.status, "progressing");
+  assert.equal(state.structure_progress.total_placed_blocks, 2);
+  assert.equal(state.structure_progress.latest_verifier?.status, "progressing");
+  assert.equal(state.known_positions.shelter?.status, "progressing");
+  assert.deepEqual(state.known_positions.shelter?.anchor, { x: -2, y: 64, z: -22 });
+  assert.equal(
+    state.checklist.items.find((item) => item.id === "starter_shelter_verified")?.status,
+    "pending"
+  );
+});

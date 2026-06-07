@@ -46,6 +46,7 @@ const DEFAULT_TIMEOUT_POLICY: ActionTimeoutPolicy = {
     craft_item: 5_000,
     craft_with_table: 6_000,
     consume_item: 5_000,
+    equip_item: 3_000,
     run_mineflayer_program: 12_000,
     place_block: 8_000,
     build_pattern: 90_000,

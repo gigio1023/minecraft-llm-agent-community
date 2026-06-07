@@ -3,27 +3,28 @@
 This directory contains the Docusaurus documentation site for
 `minecraft-llm-agent-community`.
 
-Docusaurus-exposed docs live under:
+Docusaurus-exposed public docs live under:
 
 ```text
-docs/blog-doc/
+docs/public-docs/
 ```
 
 The route on the generated site can still be `/docs/...`; the repository path is
-the important ownership boundary. Do not add new public docs under `docs/docs/`.
+the important ownership boundary. Do not add internal specs, setup notes,
+handoffs, provider-access notes, or implementation plans to the public docs
+tree.
 
-Repo-internal docs live at the project root. Historical research, stale public
-plans, and raw paper dumps live under `docs/research-archive/`.
+Repo-internal project docs live under `project-docs/`. Historical research,
+stale public plans, and raw paper dumps live under `project-docs/research-archive/`.
 
-Keep the web docs in sync with `SPEC.md`, `README.md`,
-`CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
-`docs/blog-doc/Documentation-Map.md`, and
-`docs/blog-doc/Agent-Search-Index.md`.
+Keep the web docs consistent with the public-facing direction in `README.md`,
+while keeping internal authority and operation detail in `SPEC.md`,
+`AGENTS.md`, `project-docs/Documentation-Map.md`, and
+`project-docs/Agent-Search-Index.md`.
 
 Long-term spec changes still require explicit approval. Future implementation
-ideas discovered from live runs belong in
-`docs/blog-doc/Architecture/Future-Works.md` unless they are promoted through spec
-governance.
+ideas discovered from live runs belong in internal handoff or future-work docs
+under `project-docs/` unless they are promoted through spec governance.
 
 ### Installation
 

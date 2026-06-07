@@ -21,7 +21,6 @@ export type OpenAiJsonProviderConfig = {
   apiKey: string;
   model: string;
   reasoning?: string;
-  maxCompletionTokens?: number;
   maxRetries?: number;
   responsesBackground?: boolean;
   responsePollIntervalMs?: number;
@@ -49,6 +48,8 @@ export type OpenAiJsonCallResult<T> =
         | "quota"
         | "rate_limit"
         | "billing"
+        | "timeout"
+        | "server_error"
         | "parse_error"
         | "empty_output"
         | "api_error";
@@ -98,7 +99,6 @@ function responsesBackgroundEnabled(config: OpenAiJsonProviderConfig) {
 
 export function buildOpenAiJsonSchemaResponseRequest(input: {
   model: string;
-  maxCompletionTokens: number;
   reasoning?: string;
   background?: boolean;
   schemaName: string;
@@ -112,7 +112,6 @@ export function buildOpenAiJsonSchemaResponseRequest(input: {
     model: input.model,
     instructions: input.system,
     input: input.user,
-    max_output_tokens: input.maxCompletionTokens,
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     ...(background ? { background: true, store: true } : { store: false }),
     text: {
@@ -183,11 +182,16 @@ function responseFailureMessage(response: Response) {
 
 function classifyOpenAiError(error: unknown): OpenAiErrorKind {
   const message = error instanceof Error ? error.message : String(error);
+  const record = typeof error === "object" && error !== null
+    ? error as { status?: unknown; code?: unknown }
+    : {};
+  const status = typeof record.status === "number" ? record.status : undefined;
+  const code = typeof record.code === "string" ? record.code.toLowerCase() : "";
   const lower = message.toLowerCase();
   if (lower.includes("model") && (lower.includes("not found") || lower.includes("does not exist"))) {
     return "model_not_found";
   }
-  if (lower.includes("rate limit")) {
+  if (status === 429 || lower.includes("rate limit")) {
     return "rate_limit";
   }
   if (lower.includes("quota") || lower.includes("insufficient")) {
@@ -196,7 +200,24 @@ function classifyOpenAiError(error: unknown): OpenAiErrorKind {
   if (lower.includes("billing")) {
     return "billing";
   }
+  if (lower.includes("timeout") || lower.includes("timed out") || code === "etimedout") {
+    return "timeout";
+  }
+  if (status === 500 || status === 502 || status === 503 || status === 504) {
+    return "server_error";
+  }
   return "api_error";
+}
+
+function shouldRetryOpenAiJsonError(
+  errorKind: OpenAiErrorKind,
+  attemptIndex: number,
+  maxRetries: number
+) {
+  if (attemptIndex >= maxRetries) {
+    return false;
+  }
+  return errorKind === "server_error" || errorKind === "timeout" || errorKind === "rate_limit";
 }
 
 function extractFirstJsonValue(text: string) {
@@ -278,21 +299,19 @@ export async function callOpenAiJsonSchema<T>(input: {
 }): Promise<OpenAiJsonCallResult<T>> {
   const started = Date.now();
   const model = input.config.model;
-  const maxCompletionTokens = input.config.maxCompletionTokens ?? 1600;
   const maxRetries = input.config.maxRetries ?? Number(process.env.OPENAI_JSON_MAX_RETRIES ?? 2);
   const useBackgroundResponses = responsesBackgroundEnabled(input.config);
   const responsePollIntervalMs =
     input.config.responsePollIntervalMs ?? Number(process.env.OPENAI_RESPONSES_POLL_INTERVAL_MS ?? 2_000);
   const responsePollTimeoutMs =
-    input.config.responsePollTimeoutMs ?? Number(process.env.OPENAI_RESPONSES_POLL_TIMEOUT_MS ?? 300_000);
+    input.config.responsePollTimeoutMs ?? Number(process.env.OPENAI_RESPONSES_POLL_TIMEOUT_MS ?? 900_000);
   const usageContext = {
     repoRoot: input.config.repoRoot,
     ledgerPath: input.config.usageLedgerPath,
     ...input.usageContext
   };
   const estimatedUsage = buildEstimatedUsage({
-    inputText: `${input.system}\n${input.user}`,
-    maxOutputTokens: maxCompletionTokens
+    inputText: `${input.system}\n${input.user}`
   });
 
   if (!input.config.apiKey.trim()) {
@@ -334,7 +353,6 @@ export async function callOpenAiJsonSchema<T>(input: {
     try {
       const initialResponse = await client.responses.create(buildOpenAiJsonSchemaResponseRequest({
         model,
-        maxCompletionTokens,
         reasoning: input.config.reasoning,
         background: useBackgroundResponses,
         schemaName: input.schemaName,
@@ -422,6 +440,7 @@ export async function callOpenAiJsonSchema<T>(input: {
         break;
       }
     } catch (error) {
+      const errorKind = classifyOpenAiError(error);
       const usageRecord = await appendProviderUsageRecord({
         providerId: "openai-api",
         model,
@@ -432,15 +451,20 @@ export async function callOpenAiJsonSchema<T>(input: {
         elapsedMs: Date.now() - started,
         budgetDecision
       });
-      return {
+      lastFailure = {
         ok: false,
-        errorKind: classifyOpenAiError(error),
+        errorKind,
         message: error instanceof Error ? error.message : String(error),
         elapsedMs: Date.now() - started,
         model,
         usageRecord,
         budgetDecision
       };
+      if (shouldRetryOpenAiJsonError(errorKind, attemptIndex, maxRetries)) {
+        await delay(1_000 * 2 ** attemptIndex);
+        continue;
+      }
+      return lastFailure;
     }
   }
 

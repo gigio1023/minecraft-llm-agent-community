@@ -150,3 +150,40 @@ test("buildPattern blocks truthfully when no solid build material is available",
   assert.equal(result.status, "blocked");
   assert.match(result.reason, /no solid build material/);
 });
+
+test("buildPattern adjusts away from a liquid requested anchor before placing", async () => {
+  const bot = createBuildBot("dirt", 64);
+  const requestedAnchor = { x: 2, y: 64, z: 2 };
+  const requestedBlueprint = starterShelterShellPositions(requestedAnchor);
+  for (const position of [
+    ...requestedBlueprint.shellPositions,
+    ...requestedBlueprint.interiorPositions,
+    ...requestedBlueprint.floorSupportPositions
+  ]) {
+    bot.blocks.set(key(position), {
+      name: "water",
+      position,
+      boundingBox: "empty"
+    });
+  }
+
+  const result = await buildPattern({
+    bot,
+    anchor: requestedAnchor,
+    preferredMaterials: ["dirt"]
+  });
+
+  assert.notDeepEqual(result.anchor, requestedAnchor);
+  assert.equal(result.anchorResolution?.adjusted, true);
+  assert.ok(result.anchorResolution?.rejectedCandidates.some((candidate) =>
+    candidate.issues.includes("liquid_cells=24") ||
+    candidate.issues.some((issue) => issue.startsWith("liquid_cells="))
+  ));
+  assert.ok(result.placementLedger.every((entry) => entry.status !== "placed" ||
+    !requestedBlueprint.shellPositions.some((position) =>
+      position.x === entry.targetPosition.x &&
+      position.y === entry.targetPosition.y &&
+      position.z === entry.targetPosition.z
+    )
+  ));
+});

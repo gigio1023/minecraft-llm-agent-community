@@ -1,6 +1,7 @@
 import type { JsonValue } from "../../provider/inputSnapshot.js";
 import type { AllowedTool } from "../../tools/index.js";
 import type { ActiveActionSkillPermission } from "../activeActionSkillGate.js";
+import type { PrimitiveSessionPreflight } from "./sessionPreflight.js";
 import {
   isPartialMeaningfulToolStatus,
   isSuccessfulMeaningfulToolStatus
@@ -36,6 +37,7 @@ export function runPrimitivePreActionHooks(input: {
   tool: AllowedTool;
   permission: ActiveActionSkillPermission;
   hasLiveBot: boolean;
+  sessionPreflight?: PrimitiveSessionPreflight;
 }): PreActionHookResult {
   if (!input.permission.allowed) {
     const record: RuntimeActionHookRecord = {
@@ -49,6 +51,27 @@ export function runPrimitivePreActionHooks(input: {
       allowed: false,
       blockedResult: { status: "blocked", reason: input.permission.reason },
       records: [record]
+    };
+  }
+
+  if (input.sessionPreflight && input.sessionPreflight.status !== "ready") {
+    const reason = input.sessionPreflight.reason;
+    return {
+      allowed: false,
+      blockedResult: {
+        status: "blocked",
+        reason,
+        session_preflight: input.sessionPreflight as unknown as JsonValue
+      },
+      records: [
+        {
+          schema: "runtime-action-hook/v1",
+          phase: "pre",
+          hook_id: "runtime_session_preflight",
+          status: "blocked",
+          reason
+        }
+      ]
     };
   }
 

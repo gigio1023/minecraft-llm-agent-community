@@ -66,6 +66,7 @@ const primitiveDescriptions: Record<string, string> = {
   craft_item: "Craft an inventory-grid recipe such as planks, sticks, or crafting_table when exact ingredients exist.",
   craft_with_table: "Craft a table-bound recipe such as wooden_pickaxe against a placed crafting table, placing a carried table locally when possible. Do not use for planks, sticks, or crafting_table.",
   consume_item: "Consume an explicit edible inventory item and verify inventory or vitals changed.",
+  equip_item: "Equip one exact inventory item in hand and verify held-item state; this prepares later physical actions but is not itself durable world progress.",
   run_mineflayer_program: "Run a bounded generated Mineflayer helper program and record source, helper calls, result, and post-observation evidence.",
   place_block: "Place one explicit inventory block into an empty/replaceable target cell, or onto a named support surface, and verify the world block afterward.",
   build_pattern: "Run one bounded block-pattern executor only when current context makes building relevant.",
@@ -79,12 +80,12 @@ const primitiveDescriptions: Record<string, string> = {
 
 const mineflayerExpansionCatalog: MineflayerExpansionOpportunity[] = [
   {
-    capability_id: "inventory_equipment_management",
+    capability_id: "equipment_management_beyond_hand_equip",
     category: "inventory",
     status: "unadapted_mineflayer_capability",
-    opens_affordance: "equip, unequip, and prepare tools or armor before a physical action",
+    opens_affordance: "unequip, armor preparation, and richer equipment state beyond direct hand equip",
     required_boundary: "bounded_runtime_adapter",
-    reason: "Mineflayer exposes inventory and equipment control, but this runtime has no verified equipment primitive yet."
+    reason: "The runtime has a direct hand-equipment primitive; broader equipment management still needs typed args, timeouts, and verifier evidence."
   },
   {
     capability_id: "item_use_beyond_food_consumption",

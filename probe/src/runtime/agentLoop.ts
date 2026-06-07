@@ -140,6 +140,7 @@ export type AgentLoopTools<TActor extends RuntimeActor> = {
   craft_item(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   craft_with_table?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   consume_item?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
+  equip_item?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   run_mineflayer_program?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   place_block?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
   build_pattern?(input: ToolContext<TActor>): Promise<ToolResult> | ToolResult;
@@ -308,6 +309,15 @@ async function executeTool<TActor extends RuntimeActor>(
             ok: false,
             status: "blocked",
             message: "consume_item handler is not installed"
+          };
+    case "equip_item":
+      return tools.equip_item
+        ? tools.equip_item({ actor, target, args: validated.args })
+        : {
+            tool: "equip_item",
+            ok: false,
+            status: "blocked",
+            message: "equip_item handler is not installed"
           };
     case "run_mineflayer_program":
       return tools.run_mineflayer_program

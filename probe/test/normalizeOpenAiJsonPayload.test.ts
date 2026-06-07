@@ -36,7 +36,6 @@ test("parses the first JSON value when a schema response duplicates the object",
 test("OpenAI Responses JSON schema requests pass configured reasoning effort", () => {
   const request = buildOpenAiJsonSchemaResponseRequest({
     model: "gpt-5.4-nano",
-    maxCompletionTokens: 32,
     reasoning: "medium",
     background: true,
     schemaName: "tiny_schema",
@@ -69,6 +68,27 @@ test("OpenAI Responses JSON schema requests pass configured reasoning effort", (
       additionalProperties: false
     }
   });
+});
+
+test("OpenAI Responses JSON schema requests omit output cap", () => {
+  const request = buildOpenAiJsonSchemaResponseRequest({
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    background: false,
+    schemaName: "tiny_schema",
+    schema: {
+      type: "object",
+      properties: {
+        ok: { type: "boolean" }
+      },
+      required: ["ok"],
+      additionalProperties: false
+    },
+    system: "Return JSON.",
+    user: "Say ok."
+  });
+
+  assert.equal("max_output_tokens" in request, false);
 });
 
 test("OpenAI reasoning effort normalization rejects unknown values", () => {

@@ -14,13 +14,13 @@ import {
 
 test("seed action skill registry provides roadmap action skills covering core, survival utility, social, and hostile categories", () => {
   const all = listSeedActionSkills();
-  assert.equal(all.length, 31);
+  assert.equal(all.length, 32);
 
   const coreIds = listCoreActionSkillIds();
   assert.equal(coreIds.length, 12);
 
   const survivalUtilityIds = listSurvivalUtilityActionSkillIds();
-  assert.equal(survivalUtilityIds.length, 9);
+  assert.equal(survivalUtilityIds.length, 10);
 
   const socialIds = listSocialActionSkillIds();
   assert.equal(socialIds.length, 4);
@@ -58,6 +58,7 @@ test("seed action skill registry separates implemented action skills from planne
   assert.ok(implementedIds.includes("mineCobblestone"));
   assert.ok(implementedIds.includes("placeCraftingTable"));
   assert.ok(implementedIds.includes("buildBasicShelter"));
+  assert.ok(implementedIds.includes("equipHeldItem"));
   assert.ok(implementedIds.includes("eatFoodWhenHungry"));
   assert.ok(plannedIds.includes("mineCoal"));
   assert.ok(plannedIds.includes("smeltRawIron"));
@@ -73,7 +74,7 @@ test("seed action skill registry separates implemented action skills from planne
 test("reference-derived initial abilities stay planned until their primitives exist", () => {
   const plannedRuntimeSkills = [
     ["exploreForMaterials", ["explore_until", "world_diff"]],
-    ["equipBestTool", ["equip_item", "held_item_observation"]],
+    ["equipBestTool", ["task_tool_ranking"]],
     ["placeTorchLightArea", ["place_block", "light_level_observation"]],
     ["sleepAtNight", ["use_bed", "time_observation"]],
     ["fleeDanger", ["observe_hostiles", "flee_from_entity"]],
@@ -91,6 +92,13 @@ test("eatFoodWhenHungry is active once vitals observation and consume_item are r
   const actionSkill = getSeedActionSkill("eatFoodWhenHungry");
   assert.equal(actionSkill.runtimeStatus, "implemented");
   assert.deepEqual(actionSkill.primitiveIds, ["observe", "consume_item"]);
+  assert.equal(actionSkill.missingPrimitives, undefined);
+});
+
+test("equipHeldItem is active once exact hand equip is runtime-owned", () => {
+  const actionSkill = getSeedActionSkill("equipHeldItem");
+  assert.equal(actionSkill.runtimeStatus, "implemented");
+  assert.deepEqual(actionSkill.primitiveIds, ["observe", "equip_item"]);
   assert.equal(actionSkill.missingPrimitives, undefined);
 });
 

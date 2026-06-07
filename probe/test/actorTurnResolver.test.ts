@@ -262,6 +262,7 @@ test("Runtime Action Resolver maps use_existing_action cards to primitive ActorT
       choice: "use_existing_action",
       action_card_id: "card-place-block",
       parameters: { itemName: "crafting_table", targetPosition: { x: 0, y: 64, z: 1 } },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Place the table in a different explicit cell.",
       expected_evidence: ["block delta"],
       fallback_if_blocked: "try another adjacent cell"
@@ -293,6 +294,7 @@ test("Runtime Action Resolver rejects primitive Action Cards with missing requir
       choice: "use_existing_action",
       action_card_id: "card-say",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Tell npc_a the deposit is done.",
       expected_evidence: ["runtime evidence from say"],
       fallback_if_blocked: "use the recommended text candidate"
@@ -315,6 +317,7 @@ test("Runtime Action Resolver rejects place_block without an explicit structured
       choice: "use_existing_action",
       action_card_id: "card-place-block",
       parameters: { itemName: "crafting_table" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try to place a crafting table without a target cell.",
       expected_evidence: ["block delta"],
       fallback_if_blocked: "choose another explicit target"
@@ -359,6 +362,7 @@ test("Runtime Action Resolver treats crafting-table placement current-state requ
       choice: "use_existing_action",
       action_card_id: "card-place-crafting-table",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try placing the table again.",
       expected_evidence: ["crafting_table still visible"],
       fallback_if_blocked: "craft a table-bound tool instead"
@@ -405,6 +409,7 @@ test("Runtime Action Resolver does not turn crafting-table proximity requirement
       choice: "use_existing_action",
       action_card_id: "card-craft-wooden-pickaxe",
       parameters: { itemName: "wooden_pickaxe" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft a wooden pickaxe at the known table.",
       expected_evidence: ["wooden_pickaxe inventory delta"],
       fallback_if_blocked: "craft or place a local table"
@@ -450,6 +455,7 @@ test("Runtime Action Resolver allows crafting a new table when the known table i
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft a local table because the known placed table is not usable now.",
       expected_evidence: ["crafted crafting_table"],
       fallback_if_blocked: "collect logs"
@@ -469,6 +475,7 @@ test("Runtime Action Resolver maps use_existing_action cards to action skill Act
       choice: "use_existing_action",
       action_card_id: "card-collect-logs",
       parameters: { targetCount: 2 },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Use the actor-owned collection bundle.",
       expected_evidence: ["inventory logs increased"],
       fallback_if_blocked: "record blocker and scout"
@@ -508,6 +515,7 @@ test("Runtime Action Resolver rejects action-skill parameters that fail mapped i
       choice: "use_existing_action",
       action_card_id: "card-collect-logs",
       parameters: { targetCount: "two" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Use the actor-owned collection bundle with invalid typed parameters.",
       expected_evidence: ["inventory logs increased"],
       fallback_if_blocked: "provide schema-valid parameters"
@@ -549,6 +557,7 @@ test("Runtime Action Resolver treats broad planks-and-sticks current-state requi
       choice: "use_existing_action",
       action_card_id: "card-craft-planks-and-sticks",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft more generic wood materials.",
       expected_evidence: ["crafted planks or sticks"],
       fallback_if_blocked: "choose the next physical need"
@@ -587,6 +596,7 @@ test("Runtime Action Resolver keeps planks-and-sticks crafting valid when sticks
       choice: "use_existing_action",
       action_card_id: "card-craft-planks-and-sticks",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft sticks from existing wood materials.",
       expected_evidence: ["stick inventory increase"],
       fallback_if_blocked: "choose another prerequisite"
@@ -606,6 +616,7 @@ test("Runtime Action Resolver rejects unmapped Action Cards", () => {
       choice: "use_existing_action",
       action_card_id: "card-missing",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try an unmapped card.",
       expected_evidence: ["runtime evidence"],
       fallback_if_blocked: "choose a mapped card"
@@ -640,6 +651,7 @@ test("Runtime Action Resolver does not reject only because current_state require
       choice: "use_existing_action",
       action_card_id: "card-place-block",
       parameters: { itemName: "crafting_table", targetPosition: { x: 0, y: 64, z: 1 } },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try to place a crafting table that is not in inventory.",
       expected_evidence: ["block delta"],
       fallback_if_blocked: "collect logs and craft a crafting table item"
@@ -679,6 +691,7 @@ test("Runtime Action Resolver leaves recipe count requirements advisory", () => 
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Crafting table would help toolmaking.",
       expected_evidence: ["crafted crafting_table"],
       fallback_if_blocked: "craft planks first"
@@ -714,6 +727,7 @@ test("Runtime Action Resolver leaves usable-table redundancy requirements adviso
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft another table even though one is already reachable.",
       expected_evidence: ["crafted crafting_table"],
       fallback_if_blocked: "use the nearby table"
@@ -749,6 +763,7 @@ test("Runtime Action Resolver leaves carried crafting-table requirements advisor
       choice: "use_existing_action",
       action_card_id: "card-craft-crafting-table",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft another table even though one is already carried.",
       expected_evidence: ["crafted crafting_table"],
       fallback_if_blocked: "place the carried table"
@@ -784,6 +799,7 @@ test("Runtime Action Resolver rejects inventory-grid recipes through table-bound
       choice: "use_existing_action",
       action_card_id: "card-craft-with-table",
       parameters: { itemName: "stick" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try to craft an inventory-grid recipe through the table-bound primitive.",
       expected_evidence: ["crafted stick"],
       fallback_if_blocked: "use craft_item for inventory-grid recipes"
@@ -823,6 +839,7 @@ test("Runtime Action Resolver leaves wooden-pickaxe redundancy requirements advi
       choice: "use_existing_action",
       action_card_id: "card-craft-wooden-pickaxe",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft another wooden pickaxe even though one is already present.",
       expected_evidence: ["crafted wooden_pickaxe"],
       fallback_if_blocked: "mine stone with the existing pickaxe"
@@ -858,6 +875,7 @@ test("Runtime Action Resolver does not enforce table-bound inventory counts from
       choice: "use_existing_action",
       action_card_id: "card-craft-with-table",
       parameters: { itemName: "wooden_pickaxe" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try to craft another wooden pickaxe.",
       expected_evidence: ["crafted wooden_pickaxe"],
       fallback_if_blocked: "craft sticks first"
@@ -891,6 +909,7 @@ test("Runtime Action Resolver does not enforce table-bound inventory counts from
       choice: "use_existing_action",
       action_card_id: "card-craft-with-table",
       parameters: { itemName: "furnace" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft a furnace from exact table-bound ingredients.",
       expected_evidence: ["crafted furnace"],
       fallback_if_blocked: "record missing cobblestone"
@@ -927,6 +946,7 @@ test("Runtime Action Resolver requires craft_item itemName but leaves recipe ing
       choice: "use_existing_action",
       action_card_id: "card-craft-item",
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Try to craft without naming an item.",
       expected_evidence: ["crafted inventory item"],
       fallback_if_blocked: "provide itemName"
@@ -947,6 +967,7 @@ test("Runtime Action Resolver requires craft_item itemName but leaves recipe ing
         choice: "use_existing_action",
         action_card_id: "card-craft-item",
         parameters: { itemName },
+        expected_outcome: "record_blocker_or_done",
         why_this_action: `Try to craft ${itemName} without exact ingredients.`,
         expected_evidence: [`crafted ${itemName}`],
         fallback_if_blocked: "choose a non-crafting action"
@@ -968,6 +989,7 @@ test("Runtime Action Resolver requires craft_item itemName but leaves recipe ing
       choice: "use_existing_action",
       action_card_id: "card-craft-item",
       parameters: { itemName: "stick" },
+      expected_outcome: "record_blocker_or_done",
       why_this_action: "Craft sticks from exact inventory-grid ingredients.",
       expected_evidence: ["crafted stick"],
       fallback_if_blocked: "use another action"
@@ -993,6 +1015,7 @@ test("Runtime Action Resolver maps author_mineflayer_action to generated ActorTu
         properties: { text: { type: "string" } }
       },
       parameters: { text: "I am blocked placing the crafting table; trying a new cell." },
+      expected_outcome: "record_blocker_or_done",
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.say(params.text); return { status: 'ok' }; }",
       helper_api_version: "mineflayer-action-skill-helper/v1",
@@ -1045,6 +1068,7 @@ test("Runtime Action Resolver allows generated shared chest probe when strict au
       purpose: "Check whether the shared chest can be opened and snapshot the container.",
       input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.observe({}); return { status: 'checked' }; }",
       helper_api_version: "mineflayer-action-skill-helper/v1",
@@ -1091,6 +1115,7 @@ test("Runtime Action Resolver allows generated crafting-table reachability probe
       purpose: "Verify crafting table station reachability before table-bound crafting.",
       input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.observe({}); return { status: 'checked' }; }",
       helper_api_version: "mineflayer-action-skill-helper/v1",
@@ -1126,6 +1151,7 @@ test("Runtime Action Resolver rejects invalid generated promotion policy", () =>
         properties: {}
       },
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.wait(1); }",
       helper_api_version: "mineflayer-action-skill-helper/v1",
@@ -1162,6 +1188,7 @@ test("Runtime Action Resolver rejects generated parameters that fail input_schem
         properties: { text: { type: "string" } }
       },
       parameters: {},
+      expected_outcome: "record_blocker_or_done",
       source_language: "typescript",
       source: "export async function run(ctx, params) { await ctx.say(params.text); }",
       helper_api_version: "mineflayer-action-skill-helper/v1",

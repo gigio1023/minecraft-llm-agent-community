@@ -32,6 +32,11 @@ function parseArgs(argv: string[]) {
     sharedStorageSocialSmoke?: boolean;
     geminiModelRotation?: string[];
     actionHotPath?: SocialCycleRunOptions["actionHotPath"];
+    visualEvidence?: boolean;
+    visualEvidenceIntervalCycles?: number;
+    visualEvidencePort?: number;
+    visualEvidenceWidth?: number;
+    visualEvidenceHeight?: number;
   } = { worldEvents: [] };
 
   for (let index = 0; index < argv.length; index++) {
@@ -88,6 +93,20 @@ function parseArgs(argv: string[]) {
     } else if (arg === "--action-hot-path" && next) {
       options.actionHotPath = normalizeActionHotPath(next);
       index++;
+    } else if (arg === "--visual-evidence") {
+      options.visualEvidence = true;
+    } else if (arg === "--visual-evidence-interval" && next) {
+      options.visualEvidenceIntervalCycles = Number(next);
+      index++;
+    } else if (arg === "--visual-evidence-port" && next) {
+      options.visualEvidencePort = Number(next);
+      index++;
+    } else if (arg === "--visual-evidence-width" && next) {
+      options.visualEvidenceWidth = Number(next);
+      index++;
+    } else if (arg === "--visual-evidence-height" && next) {
+      options.visualEvidenceHeight = Number(next);
+      index++;
     }
   }
 
@@ -116,6 +135,18 @@ function normalizeActionHotPath(value: string | undefined): SocialCycleRunOption
     return value;
   }
   throw new Error("--action-hot-path must be legacy or actor_turn");
+}
+
+function envEnabled(value: string | undefined) {
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function optionalPositiveInteger(value: number | string | undefined) {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function defaultModelForProvider(providerId: SocialCycleProviderId) {
@@ -155,6 +186,8 @@ async function main() {
     "actor_turn";
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
+  const visualEvidenceEnabled =
+    parsed.visualEvidence ?? envEnabled(process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE);
   const reportPath = parsed.report
     ? path.resolve(parsed.report)
     : path.resolve(repoRoot, `tmp/social-cycle-${actorId}.json`);
@@ -178,6 +211,24 @@ async function main() {
     sharedStorageSocialSmoke: parsed.sharedStorageSocialSmoke,
     geminiModelRotation,
     actionHotPath,
+    visualEvidence: visualEvidenceEnabled
+      ? {
+          enabled: true,
+          intervalCycles: optionalPositiveInteger(
+            parsed.visualEvidenceIntervalCycles ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_INTERVAL
+          ),
+          port: optionalPositiveInteger(
+            parsed.visualEvidencePort ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_PORT
+          ),
+          width: optionalPositiveInteger(
+            parsed.visualEvidenceWidth ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_WIDTH
+          ),
+          height: optionalPositiveInteger(
+            parsed.visualEvidenceHeight ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_HEIGHT
+          ),
+          chromeExecutablePath: process.env.SOCIAL_CYCLE_VISUAL_CHROME_PATH
+        }
+      : undefined,
     reasoning: process.env.SOCIAL_CYCLE_REASONING,
     repoRoot
   });

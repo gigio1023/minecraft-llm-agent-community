@@ -273,6 +273,7 @@ test("Actor Turn output uses Action Cards instead of primitive or action-skill a
     choice: "use_existing_action",
     action_card_id: "card-place-block-nearby",
     parameters: { item: "crafting_table", position: { x: 1, y: 64, z: 1 } },
+    expected_outcome: "record_blocker_or_done",
     why_this_action: "Use the existing placement card with explicit parameters.",
     expected_evidence: ["block delta"],
     fallback_if_blocked: "try a different adjacent target"
@@ -287,6 +288,7 @@ test("Actor Turn output uses Action Cards instead of primitive or action-skill a
     action_skill_id: "placeCraftingTable",
     args: { item: "crafting_table" },
     parameters: { item: "crafting_table" },
+    expected_outcome: "record_blocker_or_done",
     why_this_action: "This leaks old selection taxonomy.",
     expected_evidence: ["block delta"],
     fallback_if_blocked: "observe"
@@ -311,6 +313,7 @@ test("Actor Turn output accepts bounded Mineflayer authoring without raw executi
       properties: { item: { const: "crafting_table" } }
     },
     parameters: { item: "crafting_table" },
+    expected_outcome: "record_blocker_or_done",
     source_language: "typescript",
     source: "export async function run(ctx, params) { await ctx.placeBlock(params.item, { x: 1, y: 64, z: 0 }); }",
     helper_api_version: "mineflayer-action-skill-helper/v1",

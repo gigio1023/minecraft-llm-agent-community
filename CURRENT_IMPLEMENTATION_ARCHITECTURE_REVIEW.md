@@ -10,27 +10,28 @@ Location: project root. This is not a Docusaurus public page.
 
 ## What This Document Is For
 
-이 문서는 현재 repo를 처음 읽는 사람이 아래 질문에 빠르게 답할 수 있게 하기
-위한 안내서다.
+This document helps a reader who is new to the current repository answer these
+questions quickly:
 
-1. 이 프로젝트는 무엇을 만들고 있는가.
-2. LLM/provider, TypeScript runtime, Mineflayer, actor workspace가 각각
-   무엇을 맡는가.
-3. Actor Turn, Action Cards, PlanBeads, generated action skills가 어떻게
-   연결되는가.
-4. 실제 Minecraft 진행과 가짜 진행을 어떻게 구분하는가.
-5. 지금 가장 큰 구현 리스크가 무엇인가.
+1. What is this project building right now?
+2. What does the LLM/provider own, and what do the TypeScript runtime,
+   Mineflayer, and actor workspace own?
+3. How do Actor Turn, Action Cards, PlanBeads, and generated action skills fit
+   together?
+4. How does the runtime distinguish real Minecraft progress from fake progress?
+5. What are the largest current implementation risks?
 
-한 문장으로 줄이면, 이 repo는 **Soul/LifeGoal을 가진 한 actor가 Minecraft에서
-작은 행동을 직접 시도하고, runtime이 그 행동을 검증/실행/기록하는 headless
-runtime**을 만들고 있다.
+In one sentence: this repository is building a **headless runtime where one
+Soul/LifeGoal-grounded actor directly attempts small Minecraft actions, while
+the runtime validates, executes, verifies, and records what happened**.
 
-중요한 점은 LLM/provider가 Minecraft truth를 소유하지 않는다는 것이다.
-Provider는 Actor Turn에서 하나의 visible Action Card function tool 또는
-`author_mineflayer_action`을 고른다. Runtime은 구조화된 parameters, permission,
-retry, source guard, verifier, evidence를 검사한다. Mineflayer는 실제 Minecraft
-client API를 호출한다. Actor workspace는 결과 evidence, memory, PlanBeads,
-relationships, generated action skill state를 다음 turn으로 넘긴다.
+The important boundary is that the LLM/provider does not own Minecraft truth.
+During Actor Turn, the provider chooses one visible Action Card function tool or
+`author_mineflayer_action`. The runtime checks structured parameters,
+permissions, retry constraints, source guards, verifier output, and evidence.
+Mineflayer calls the actual Minecraft client API. The actor workspace carries
+evidence, memory, PlanBeads, relationships, and generated action-skill state
+into later turns.
 
 ## One-Page Mental Model
 
@@ -58,14 +59,14 @@ flowchart LR
   Runtime --> MC --> Evidence --> Workspace
 ```
 
-화살표는 권한 이동이 아니라 정보와 artifact 흐름이다. Provider text는
-실행이나 성공을 확정하지 않는다. 오직 validated runtime action, Mineflayer
-execution, verifier-backed evidence가 Minecraft progress를 만든다.
+Arrows show information and artifact flow, not authority transfer. Provider text
+does not establish execution or success. Only validated runtime actions,
+Mineflayer execution, and verifier-backed evidence create Minecraft progress.
 
 ## Current Product Scope
 
-장기 방향은 Soul-grounded Minecraft social simulation seed다. 하지만 현재
-delivery target은 작다.
+The long-term direction is a Soul-grounded Minecraft social simulation seed.
+The current delivery target is deliberately smaller.
 
 | Scope | Current target |
 | --- | --- |
@@ -76,7 +77,7 @@ delivery target은 작다.
 | Generated behavior | Actor Turn-only `author_mineflayer_action`, then bounded codegen/trial |
 | Continuity | actor workspace evidence, memory, PlanBeads, relationships, action skill state |
 
-현재 목표가 아닌 것:
+Current non-goals:
 
 - Voyager-style architecture revival;
 - race-to-diamond benchmark optimization;
@@ -88,7 +89,7 @@ delivery target은 작다.
 
 ## Actor Perspective
 
-NPC 관점에서 현재 runtime은 이렇게 읽어야 한다.
+From the NPC/actor perspective, the current runtime should be read this way:
 
 ```mermaid
 flowchart TD
@@ -112,11 +113,11 @@ flowchart TD
   Consequence --> Work
 ```
 
-`ActorSoul`이 조심스럽다고 해서 runtime이 몰래 안전한 좌표를 추측해 이동하지
-않는다. `LifeGoal`이 공동체를 중시한다고 해서 모든 turn이 storage나 shelter
-planner로 바뀌지 않는다. LLM은 현재 evidence와 Action Cards를 보고 직접
-판단한다. Runtime은 그 판단이 명시적 structured parameters와 gate를 통과할 때만
-실행한다.
+If `ActorSoul` says the actor is cautious, the runtime must not secretly guess a
+safe coordinate and move there. If `LifeGoal` values the community, the runtime
+must not turn every turn into a storage or shelter planner. The LLM reads the
+current evidence and Action Cards and decides directly. The runtime executes
+only when that decision passes explicit structured parameters and gates.
 
 ## Core Terms
 
@@ -371,12 +372,12 @@ If documents disagree, start from:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `docs/blog-doc/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-4. `docs/blog-doc/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-5. `docs/blog-doc/Architecture/Current-Handoff-And-Next-Work.md`
-6. `docs/blog-doc/Documentation-Map.md`
-7. `docs/blog-doc/Terminology.md`
+3. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+4. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+5. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+6. `project-docs/Documentation-Map.md`
+7. `project-docs/Terminology.md`
 
-Historical docs and `docs/research-archive/**` are references only. They are not
+Historical docs and `project-docs/research-archive/**` are references only. They are not
 active implementation specs unless a current architecture document explicitly
 routes to them.

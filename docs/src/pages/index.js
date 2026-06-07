@@ -14,17 +14,17 @@ const links = [
   {
     title: 'Run the probe',
     text: 'Start the local Minecraft server and Mineflayer actor.',
-    to: '/docs/Setup/Headless-Server',
+    to: '/docs/getting-started',
   },
   {
     title: 'Runtime loop',
     text: 'How turns become verified artifacts.',
-    to: '/docs/Architecture/Runtime-Loop-And-Verification',
+    to: '/docs/architecture',
   },
   {
-    title: 'Future works',
-    text: 'What the latest live home-base run exposed.',
-    to: '/docs/Architecture/Future-Works',
+    title: 'Evidence',
+    text: 'What the runtime records and why it matters.',
+    to: '/docs/evidence-and-artifacts',
   },
 ];
 
@@ -53,7 +53,7 @@ function HomePage() {
             <Link className={styles.primaryAction} to="/docs/intro">
               Read overview
             </Link>
-            <Link className={styles.secondaryAction} to="/docs/Setup/Headless-Server">
+            <Link className={styles.secondaryAction} to="/docs/getting-started">
               Run locally
             </Link>
           </div>
