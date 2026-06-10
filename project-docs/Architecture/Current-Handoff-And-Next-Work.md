@@ -27,6 +27,21 @@ is reliable.
 
 ## Latest Live Evidence
 
+Recorded 2026-06-10 (`UTC`).
+
+Natural-world spawn research and handoff are recorded in
+`project-docs/Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`.
+The main conclusion is that `server.properties` can select a natural world and a
+seed, but it cannot prove a safe, tree-nearby, non-canopy spawn. The next
+implementation should add a `natural-safe-spawn-v1` scenario that validates a
+natural spawn from runtime evidence without placing resources or flattening
+terrain.
+
+The latest roofless-hut flat run also exposed a setup truthfulness bug: required
+RCON fixture commands returned failure-like output such as `That position is not
+loaded`, but `runWorldScenarioCommands` recorded them as `passed`. Fix RCON
+output validation before spending another provider-heavy construction run.
+
 Recorded 2026-06-07 (`Asia/Seoul`).
 
 Current code baseline after the context-projection cleanup:
