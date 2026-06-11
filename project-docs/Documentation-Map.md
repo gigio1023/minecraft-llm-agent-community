@@ -133,6 +133,7 @@ Current state and operations:
 - `project-docs/Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`
 - `project-docs/Architecture/Roofless-Hut-Flat-Scenario-Run-2026-06-08.md`
 - `project-docs/Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`
+- `project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`
 - `project-docs/Architecture/Future-Works.md`
 - `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `project-docs/Setup/Headless-Server.md`

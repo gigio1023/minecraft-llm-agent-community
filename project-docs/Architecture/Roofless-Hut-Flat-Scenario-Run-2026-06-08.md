@@ -6,7 +6,19 @@ sidebar_position: 100
 
 Search token: `ROOFLESS_HUT_FLAT_SCENARIO_RUN_2026_06_08`.
 
-Status: dated runtime experiment record.
+Status: dated runtime experiment record with a later setup-truthfulness caveat.
+
+Later caveat:
+
+- `project-docs/Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`
+  found that the recorded scenario manifest marked required RCON setup commands
+  as `passed` even when their output contained failure text such as
+  `Incomplete` and `That position is not loaded`.
+- Treat this run as useful evidence that the previous experiment lane needed
+  stronger setup truthfulness. Do not treat it as proof that the flat worksite
+  and oak-log rack were successfully prepared.
+- The active follow-up plan is
+  `project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
 
 Recorded:
 
@@ -109,7 +121,7 @@ Docker containers were the pre-existing Langfuse services.
 
 ## Fixture Evidence
 
-The fixture did what it was supposed to do:
+The manifest intended to prove the following fixture setup:
 
 - `LEVEL_TYPE=FLAT`
 - flat plains generator settings were passed through `GENERATOR_SETTINGS`
@@ -121,7 +133,10 @@ The fixture did what it was supposed to do:
 - actor inventory was cleared
 
 The manifest recorded 20 passed `pre_bot` commands and 3 passed `post_bot`
-commands. There were no required or optional setup failures.
+commands. A later RCON-output review found this status was too optimistic:
+several required commands returned failure-like output while still being stored
+as `passed`. That means these bullets describe the intended fixture contract,
+not confirmed setup truth.
 
 ## Behavioral Diagnosis
 
@@ -154,14 +169,13 @@ outline or placed hut blocks. That agrees with the runtime review:
 
 ## Review Conclusion
 
-Verdict: `FIXTURE_PASSED_ACTOR_TURN_BLOCKED`.
+Verdict after later setup review:
+`FIXTURE_TRUTHFULNESS_UNPROVEN_ACTOR_TURN_SIGNAL_INCONCLUSIVE`.
 
-The environment split is valid and useful. It proves that the earlier forest
-spawn issue was not the only blocker. With a clean flat worksite and reachable
-fixture material available, the actor still failed because the ordinary Actor
-Turn loop treated repeated position changes and notes as enough activity and
-did not pivot into resource acquisition, block placement, or generated
-Mineflayer authoring.
+The environment split remains valid and useful, but this run no longer proves
+that a clean flat worksite and reachable fixture material were actually
+available. The repeated movement/no-progress pattern is still a useful warning
+signal, but the next verdict must first prove setup truthfulness.
 
 This should not be fixed by adding a hidden hut planner. The next improvement
 should preserve the repo direction:

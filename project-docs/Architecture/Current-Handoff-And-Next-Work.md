@@ -1528,3 +1528,26 @@ Current documentation rule:
   `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`.
 - Use archived `ActionIntent` docs only when reading old artifacts. Do not route
   new implementation through that boundary.
+
+## 2026-06-12 World Scenario Truthfulness Plan
+
+The next implementation slice should start from
+`project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
+
+Current conclusion:
+
+- The latest flat roofless-hut manifests are not trustworthy enough to prove
+  that the worksite and oak-log rack were prepared.
+- Required RCON setup commands were stored as `passed` even when command output
+  contained failure text such as `Incomplete` and `That position is not loaded`.
+- This makes setup truthfulness the blocker before another provider-heavy
+  Actor Turn behavior verdict.
+
+Next order:
+
+1. harden `runWorldScenarioCommands` so failure-like RCON output marks commands
+   failed and blocks required setup;
+2. repair or reframe the flat fixture after setup failure detection is truthful;
+3. add `natural-safe-spawn-v1` as a natural-world run lane with spawn validation
+   artifacts and no terrain/resource fixture mutation;
+4. run a short smoke before spending 40/60-cycle provider budget.
