@@ -160,6 +160,12 @@ function resolveActorRefPath(actorDir: string, ref: string): ActorRefResolution 
 
 function collectReportRefs(report: SocialCycleRunReport) {
   const refs: string[] = [];
+  if (report.server?.world_scenario?.manifest_ref) {
+    refs.push(report.server.world_scenario.manifest_ref);
+  }
+  if (report.server?.world_scenario?.validation_ref) {
+    refs.push(report.server.world_scenario.validation_ref);
+  }
   for (const cycle of report.cycles) {
     refs.push(cycle.cycle_goal_ref, cycle.action_ref, cycle.judgment_ref);
     if (cycle.plan_bead_packet_ref) {
@@ -296,6 +302,28 @@ async function auditRequiredActorRef(input: {
   }
 }
 
+async function auditRequiredActorWorkspaceRef(input: {
+  actorDir: string;
+  errors: string[];
+  label: string;
+  ref: unknown;
+}) {
+  if (typeof input.ref !== "string" || input.ref.length === 0) {
+    input.errors.push(`Missing ${input.label} ref`);
+    return;
+  }
+
+  const resolved = resolveActorRefPath(input.actorDir, input.ref);
+  if (!resolved.ok) {
+    input.errors.push(`Invalid ${input.label} ref ${input.ref}: ${resolved.reason}`);
+    return;
+  }
+
+  if (!await pathExists(resolved.filePath)) {
+    input.errors.push(`Missing ${input.label}: ${input.ref}`);
+  }
+}
+
 async function auditRequiredActorRefList(input: {
   actorDir: string;
   errors: string[];
@@ -340,6 +368,11 @@ function readContractOnlyMode(report: ReportWithMetadata) {
     audit?.contract_only === true ||
     audit?.contractOnly === true
   );
+}
+
+function isWorldScenarioSetupBlocked(report: ReportWithMetadata) {
+  return report.runtime_status === "environment_blocked" &&
+    report.server?.world_scenario?.setup_status === "failed";
 }
 
 async function readProviderInput(actorDir: string, ref: string) {
@@ -1075,8 +1108,33 @@ export async function auditSocialCycleReport(reportPath: string): Promise<string
   errors.push(...resolvedActorDir.errors);
   const actorDir = resolvedActorDir.actorDir;
 
-  if (report.cycles.length < 2) {
+  if (report.cycles.length < 2 && !isWorldScenarioSetupBlocked(report)) {
     errors.push("Expected at least 2 cycles in report");
+  }
+
+  if (actorDir && report.server?.world_scenario?.manifest_ref) {
+    await auditRequiredActorWorkspaceRef({
+      actorDir,
+      errors,
+      label: "world scenario manifest artifact",
+      ref: report.server.world_scenario.manifest_ref
+    });
+  }
+  if (actorDir && report.server?.world_scenario?.validation_ref) {
+    await auditRequiredActorWorkspaceRef({
+      actorDir,
+      errors,
+      label: "world scenario validation artifact",
+      ref: report.server.world_scenario.validation_ref
+    });
+  }
+  if (
+    isWorldScenarioSetupBlocked(report) &&
+    report.server?.world_scenario?.scenario_id === "natural-safe-spawn-v1" &&
+    report.server.world_scenario.validation_status === "failed" &&
+    !report.server.world_scenario.validation_ref
+  ) {
+    errors.push("World scenario setup failed without natural spawn validation artifact ref");
   }
 
   for (const [index, cycle] of report.cycles.entries()) {

@@ -35,6 +35,23 @@ seed, and server defaults.
 Use it after the target behavior is already stable enough that terrain, trees,
 water, caves, and animals are useful environment pressure rather than noise.
 
+### `natural-safe-spawn-v1`
+
+Fresh natural survival/social lane for ordinary terrain with a validated start
+near loaded-world tree evidence. It uses:
+
+- `LEVEL_TYPE=default`
+- no `GENERATOR_SETTINGS`
+- `requiresFreshWorld=true`
+- no `fill`, `setblock`, resource rack, cleared pad, or starter structure
+
+After the Mineflayer bot joins and chunks settle, the runtime writes a
+`natural-spawn-validation/v1` artifact. Passing validation means the candidate
+had passable feet/head cells, solid natural support, no dense canopy/tree-top
+support, no loaded hazard, and at least one nearby loaded natural log observed
+within the bounded scan. It does not prove unloaded chunks, and it is not actor
+progress.
+
 ### `roofless-hut-flat-survival-v1`
 
 Flat survival construction fixture for the small roofless-hut experiment.
@@ -106,6 +123,7 @@ The manifest records:
 - pre-bot and post-bot RCON command results;
 - optional command failures that were recorded but did not block setup;
 - required command failures that blocked the run.
+- validation artifact refs for scenarios that require setup validation.
 
 The social-cycle report links this manifest under:
 
@@ -115,7 +133,10 @@ The social-cycle report links this manifest under:
     "world_scenario": {
       "scenario_id": "roofless-hut-flat-survival-v1",
       "lane": "fixture_probe",
-      "manifest_ref": "evidence/world-scenarios/..."
+      "manifest_ref": "evidence/world-scenarios/...",
+      "validation_ref": "evidence/world-scenarios/...",
+      "validation_status": "passed",
+      "setup_status": "passed"
     }
   }
 }

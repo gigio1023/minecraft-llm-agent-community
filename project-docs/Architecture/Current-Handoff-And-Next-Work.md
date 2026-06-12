@@ -1533,6 +1533,12 @@ Current documentation rule:
 
 The next implementation slice should start from
 `project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
+That file is now the index for split plan docs rather than a growing monolith:
+
+- `project-docs/Architecture/World-Scenario-RCON-Truthfulness-Plan.md`
+- `project-docs/Architecture/Natural-Safe-Spawn-Scenario-Contract.md`
+- `project-docs/Architecture/Natural-Spawn-Validation-Artifact-Contract.md`
+- `project-docs/Architecture/World-Scenario-Smoke-Gates.md`
 
 Current conclusion:
 
@@ -1540,14 +1546,17 @@ Current conclusion:
   that the worksite and oak-log rack were prepared.
 - Required RCON setup commands were stored as `passed` even when command output
   contained failure text such as `Incomplete` and `That position is not loaded`.
+- `natural-safe-spawn-v1` must force a fresh default world by default, then
+  validate the chosen start from post-bot Mineflayer loaded-world evidence.
 - This makes setup truthfulness the blocker before another provider-heavy
   Actor Turn behavior verdict.
 
 Next order:
 
 1. harden `runWorldScenarioCommands` so failure-like RCON output marks commands
-   failed and blocks required setup;
+   failed and aggregate `setup_status` covers all required setup phases;
 2. repair or reframe the flat fixture after setup failure detection is truthful;
 3. add `natural-safe-spawn-v1` as a natural-world run lane with spawn validation
    artifacts and no terrain/resource fixture mutation;
-4. run a short smoke before spending 40/60-cycle provider budget.
+4. link manifest and validation refs from reports/audits;
+5. run a short smoke before spending 40/60-cycle provider budget.

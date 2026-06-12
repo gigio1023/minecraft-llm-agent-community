@@ -134,6 +134,10 @@ Current state and operations:
 - `project-docs/Architecture/Roofless-Hut-Flat-Scenario-Run-2026-06-08.md`
 - `project-docs/Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`
 - `project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`
+- `project-docs/Architecture/World-Scenario-RCON-Truthfulness-Plan.md`
+- `project-docs/Architecture/Natural-Safe-Spawn-Scenario-Contract.md`
+- `project-docs/Architecture/Natural-Spawn-Validation-Artifact-Contract.md`
+- `project-docs/Architecture/World-Scenario-Smoke-Gates.md`
 - `project-docs/Architecture/Future-Works.md`
 - `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `project-docs/Setup/Headless-Server.md`

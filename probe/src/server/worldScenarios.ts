@@ -4,6 +4,7 @@ import type { ProbeConfig } from "../config.js";
 
 export const worldScenarioIds = [
   "natural-survival",
+  "natural-safe-spawn-v1",
   "roofless-hut-flat-survival-v1"
 ] as const;
 
@@ -20,10 +21,18 @@ export type WorldScenarioCommand = {
   purpose: string;
 };
 
+export type WorldScenarioCommandFailureKind =
+  | "unloaded_position"
+  | "incomplete_command"
+  | "incorrect_argument"
+  | "unknown_command"
+  | "missing_player";
+
 export type WorldScenarioCommandResult = WorldScenarioCommand & {
   status: "passed" | "failed";
   output?: string;
   error?: string;
+  failure_kind?: WorldScenarioCommandFailureKind;
 };
 
 export type WorldScenarioCommandRun = {
@@ -73,6 +82,7 @@ export type WorldScenarioManifest = {
   world_event_summary?: string;
   notes: string[];
   command_runs: WorldScenarioCommandRun[];
+  validation_refs: string[];
 };
 
 export type WorldScenario = {
@@ -148,6 +158,31 @@ const scenarios: Record<WorldScenarioId, WorldScenario> = {
       "World noise, terrain, trees, and animals are part of the scenario rather than setup failures."
     ]
   },
+  "natural-safe-spawn-v1": {
+    id: "natural-safe-spawn-v1",
+    lane: "survival_social_run",
+    title: "Natural Safe Spawn Survival World",
+    description:
+      "A normal fresh survival world for validating an ordinary playable natural spawn without terrain or resource fixtures.",
+    fixtureDependency: false,
+    requiresFreshWorld: true,
+    world: {
+      seed: "natural-safe-spawn-v1",
+      levelType: "default",
+      generateStructures: true,
+      spawnNpcs: true,
+      spawnAnimals: true,
+      spawnMonsters: false,
+      difficulty: "peaceful",
+      viewDistance: 10,
+      simulationDistance: 10
+    },
+    notes: [
+      "This scenario configures ordinary natural generation; a later spawn-validation slice must prove the concrete start position.",
+      "Setup must not use fill, setblock, resource racks, cleared pads, or starter structures.",
+      "Spawn validation and pinning evidence is setup context only and must not be credited as actor progress."
+    ]
+  },
   "roofless-hut-flat-survival-v1": {
     id: "roofless-hut-flat-survival-v1",
     lane: "fixture_probe",
@@ -213,12 +248,17 @@ export function applyWorldScenarioToConfig(config: ProbeConfig, scenario: WorldS
     return config;
   }
 
+  const scenarioWorld = {
+    ...config.world,
+    ...scenario.world
+  };
+  if (scenario.world.generatorSettings === undefined) {
+    delete scenarioWorld.generatorSettings;
+  }
+
   return {
     ...config,
-    world: {
-      ...config.world,
-      ...scenario.world
-    },
+    world: scenarioWorld,
     ...(scenario.actorStart
       ? {
           spawn: {
@@ -259,7 +299,8 @@ export function createWorldScenarioManifest(scenario: WorldScenario): WorldScena
     ...(scenario.resourceFixture ? { resource_fixture: scenario.resourceFixture } : {}),
     ...(scenario.worldEventSummary ? { world_event_summary: scenario.worldEventSummary } : {}),
     notes: [...scenario.notes],
-    command_runs: []
+    command_runs: [],
+    validation_refs: []
   };
 }
 
@@ -308,6 +349,73 @@ function stableFixtureGamerules(version: string): WorldScenarioCommand[] {
     required: false,
     purpose
   }));
+}
+
+export function buildNaturalSpawnPinningCommands(input: {
+  username: string;
+  position: { x: number; y: number; z: number };
+  serverVersion: string;
+}): WorldScenarioCommand[] {
+  const x = Math.floor(input.position.x);
+  const y = Math.floor(input.position.y);
+  const z = Math.floor(input.position.z);
+  const tpX = String(x + 0.5);
+  const tpZ = String(z + 0.5);
+  const respawnRadiusRule = supportsNamespacedGamerules(input.serverVersion)
+    ? "minecraft:respawn_radius"
+    : "spawnRadius";
+
+  return [
+    {
+      phase: "post_bot",
+      args: ["setworldspawn", String(x), String(y), String(z), "0"],
+      required: true,
+      purpose: "pin the validated natural world spawn after loaded-world validation"
+    },
+    {
+      phase: "post_bot",
+      args: ["gamerule", respawnRadiusRule, "0"],
+      required: true,
+      purpose: "avoid random spawn spreading around the validated natural start"
+    },
+    {
+      phase: "post_bot",
+      args: ["spawnpoint", input.username, String(x), String(y), String(z), "0"],
+      required: true,
+      purpose: "pin the actor-specific respawn to the validated natural start"
+    },
+    {
+      phase: "post_bot",
+      args: ["tp", input.username, tpX, String(y), tpZ, "0", "0"],
+      required: true,
+      purpose: "place the actor at the validated natural start before provider cycles"
+    }
+  ];
+}
+
+const rconOutputFailureSignatures: Array<{
+  text: string;
+  failure_kind: WorldScenarioCommandFailureKind;
+}> = [
+  { text: "That position is not loaded", failure_kind: "unloaded_position" },
+  { text: "Unknown or incomplete command", failure_kind: "unknown_command" },
+  { text: "Incorrect argument for command", failure_kind: "incorrect_argument" },
+  { text: "No player was found", failure_kind: "missing_player" },
+  { text: "Incomplete", failure_kind: "incomplete_command" }
+];
+
+function classifyRconCommandOutput(output: string):
+  | { status: "passed" }
+  | { status: "failed"; failure_kind: WorldScenarioCommandFailureKind } {
+  for (const signature of rconOutputFailureSignatures) {
+    if (output.includes(signature.text)) {
+      return {
+        status: "failed",
+        failure_kind: signature.failure_kind
+      };
+    }
+  }
+  return { status: "passed" };
 }
 
 export function buildWorldScenarioCommands(input: {
@@ -434,11 +542,19 @@ export async function runWorldScenarioCommands(input: {
   for (const command of input.commands) {
     try {
       const output = await input.runRcon(command.args);
+      const classification = classifyRconCommandOutput(output);
       results.push({
         ...command,
-        status: "passed",
-        ...(output ? { output } : {})
+        status: classification.status,
+        ...(output ? { output } : {}),
+        ...(classification.status === "failed"
+          ? { failure_kind: classification.failure_kind }
+          : {})
       });
+      if (command.required && classification.status === "failed") {
+        requiredFailure = true;
+        break;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       results.push({

@@ -239,6 +239,77 @@ test("rejects synthetic passed reports without verifier-backed gameplay progress
   );
 });
 
+test("allows world scenario setup-blocked reports with setup artifact refs before cycles", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-world-scenario-setup-blocked");
+  const report = baseReport();
+  report.actor_workspace_root_dir = workspaceRoot;
+  report.runtime_status = "environment_blocked";
+  report.cycles = [];
+  report.server = {
+    mode: "fresh_world",
+    seed: "natural-safe-spawn-v1",
+    level_type: "default",
+    version: "1.21.11",
+    generate_structures: true,
+    world_scenario: {
+      scenario_id: "natural-safe-spawn-v1",
+      lane: "survival_social_run",
+      fixture_dependency: false,
+      requires_fresh_world: true,
+      manifest_ref: "evidence/world-scenarios/run-natural-safe-spawn-v1.json",
+      validation_ref: "evidence/world-scenarios/run-natural-safe-spawn-v1-natural-spawn-validation.json",
+      validation_status: "failed",
+      setup_status: "failed"
+    },
+    error_kind: "environment_blocked",
+    error: "World scenario natural-safe-spawn-v1 natural spawn validation failed"
+  };
+  const actorDir = path.join(workspaceRoot, actorId);
+  const reportPath = path.join(workspaceRoot, "report.json");
+  const worldScenario = report.server.world_scenario!;
+  await writeJson(path.join(actorDir, "actor.json"), {
+    schema: "actor-workspace/v1",
+    actor_id: actorId
+  });
+  await writeJson(path.join(actorDir, worldScenario.manifest_ref!), {
+    schema: "world-scenario-manifest/v1",
+    scenario_id: "natural-safe-spawn-v1",
+    validation_refs: [worldScenario.validation_ref],
+    command_runs: []
+  });
+  await writeJson(path.join(actorDir, worldScenario.validation_ref!), {
+    schema: "natural-spawn-validation/v1",
+    scenario_id: "natural-safe-spawn-v1",
+    run_id: report.run_id,
+    actor_id: actorId,
+    credited_as_actor_progress: false,
+    status: "failed",
+    world: {
+      seed: "natural-safe-spawn-v1",
+      dimension: "overworld",
+      server_version: "1.21.11",
+      level_type: "default"
+    },
+    scan: {
+      center: { x: 0, y: 64, z: 0 },
+      radius: 24,
+      vertical_range: { min_y: 58, max_y: 72 },
+      loaded_world_only: true,
+      null_or_unloaded_block_count: 1,
+      candidate_limit: 128
+    },
+    selected_candidate: null,
+    rejected_candidates: [],
+    post_validation_commands: [],
+    notes: ["setup failure fixture"]
+  });
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.deepEqual(errors, []);
+});
+
 test("rejects satisfied settlement checklist items without evidence refs", async () => {
   const workspaceRoot = await makeWorkspaceRoot("social-audit-settlement-evidence");
   const report = baseReport();

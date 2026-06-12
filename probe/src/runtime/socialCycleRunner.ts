@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Bot } from "mineflayer";
+import { Vec3 } from "vec3";
 
 import { loadProbeConfig, type ProbeConfig } from "../config.js";
 import { assignSeedActionSkillOwnership } from "../skills/ownership.js";
@@ -67,6 +68,7 @@ import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
 import { startDockerServer } from "../server/dockerServer.js";
 import {
   applyWorldScenarioToConfig,
+  buildNaturalSpawnPinningCommands,
   buildWorldScenarioCommands,
   createWorldScenarioManifest,
   getWorldScenario,
@@ -74,6 +76,11 @@ import {
   type WorldScenarioId,
   type WorldScenarioManifest
 } from "../server/worldScenarios.js";
+import {
+  buildNaturalSpawnValidationArtifact,
+  type NaturalSpawnValidationArtifact,
+  type NaturalSpawnValidationPosition
+} from "../server/naturalSpawnValidation.js";
 import {
   buildSettlementState,
   type ActionSkillPostconditionResult,
@@ -718,6 +725,64 @@ function floorBotPosition(bot: Bot) {
   };
 }
 
+type WorldScenarioSetupTracker = {
+  started: boolean;
+  requiredFailure: boolean;
+  validationRequired: boolean;
+  validationStatus: "not_applicable" | "passed" | "failed";
+};
+
+function computeWorldScenarioSetupStatus(
+  tracker: WorldScenarioSetupTracker
+): "not_applicable" | "passed" | "failed" {
+  if (!tracker.started) {
+    return "not_applicable";
+  }
+  if (tracker.requiredFailure || tracker.validationStatus === "failed") {
+    return "failed";
+  }
+  if (tracker.validationRequired && tracker.validationStatus !== "passed") {
+    return "not_applicable";
+  }
+  return "passed";
+}
+
+function refreshWorldScenarioSetupStatus(
+  report: SocialCycleRunReport,
+  tracker: WorldScenarioSetupTracker
+) {
+  if (!report.server?.world_scenario) {
+    return;
+  }
+  report.server.world_scenario.setup_status = computeWorldScenarioSetupStatus(tracker);
+  report.server.world_scenario.validation_status = tracker.validationStatus;
+}
+
+function createNaturalSpawnBlockLookup(bot: Bot) {
+  return {
+    blockAt(position: NaturalSpawnValidationPosition) {
+      let block: ReturnType<Bot["blockAt"]>;
+      try {
+        block = bot.blockAt(new Vec3(position.x, position.y, position.z), true);
+      } catch {
+        return null;
+      }
+      if (!block) {
+        return null;
+      }
+      return {
+        name: block.name,
+        position: {
+          x: Math.floor(block.position.x),
+          y: Math.floor(block.position.y),
+          z: Math.floor(block.position.z)
+        },
+        ...(typeof block.boundingBox === "string" ? { boundingBox: block.boundingBox } : {})
+      };
+    }
+  };
+}
+
 async function prepareSpawnAccessPoint(input: {
   bot: Bot;
   runRcon: (args: string[]) => Promise<string>;
@@ -887,10 +952,16 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   report.agency_status.used_soul = true;
   report.agency_status.used_life_goal = true;
 
+  const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
   let worldScenarioManifest: WorldScenarioManifest | undefined;
   let worldScenarioManifestRef: string | undefined;
+  const worldScenarioSetupTracker: WorldScenarioSetupTracker = {
+    started: false,
+    requiredFailure: false,
+    validationRequired: worldScenario.id === "natural-safe-spawn-v1",
+    validationStatus: "not_applicable"
+  };
   if (worldScenario.id !== "natural-survival") {
-    const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
     worldScenarioManifestRef = path.join(
       "evidence",
       "world-scenarios",
@@ -900,6 +971,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     await writeJson(path.join(actorDir, worldScenarioManifestRef), worldScenarioManifest);
     if (report.server?.world_scenario) {
       report.server.world_scenario.manifest_ref = worldScenarioManifestRef;
+      report.server.world_scenario.validation_status = worldScenarioSetupTracker.validationStatus;
     }
     report.agency_status.fixture_dependency = report.agency_status.fixture_dependency ||
       worldScenario.fixtureDependency;
@@ -964,22 +1036,29 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         endpoint: `${server.host}:${server.port}`
       };
       if (worldScenarioManifest && worldScenarioManifestRef && serverRunRcon) {
-        const preBotRun = await runWorldScenarioCommands({
+        const preBotCommands = buildWorldScenarioCommands({
+          scenario: worldScenario,
           phase: "pre_bot",
-          commands: buildWorldScenarioCommands({
-            scenario: worldScenario,
-            phase: "pre_bot",
-            serverVersion: config.server.version
-          }),
-          runRcon: serverRunRcon
+          serverVersion: config.server.version
         });
-        worldScenarioManifest.command_runs.push(preBotRun);
-        await writeJson(
-          path.join(getActorWorkspacePaths(rootDir, input.actorId).actorDir, worldScenarioManifestRef),
-          worldScenarioManifest
-        );
-        if (preBotRun.required_failure) {
-          throw new Error(`World scenario ${worldScenario.id} pre-bot setup failed`);
+        if (preBotCommands.length > 0) {
+          worldScenarioSetupTracker.started = true;
+          const preBotRun = await runWorldScenarioCommands({
+            phase: "pre_bot",
+            commands: preBotCommands,
+            runRcon: serverRunRcon
+          });
+          worldScenarioManifest.command_runs.push(preBotRun);
+          worldScenarioSetupTracker.requiredFailure =
+            worldScenarioSetupTracker.requiredFailure || preBotRun.required_failure;
+          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
+          await writeJson(
+            path.join(actorDir, worldScenarioManifestRef),
+            worldScenarioManifest
+          );
+          if (preBotRun.required_failure) {
+            throw new Error(`World scenario ${worldScenario.id} pre-bot setup failed`);
+          }
         }
       }
 
@@ -992,26 +1071,92 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         });
       }
       if (worldScenarioManifest && worldScenarioManifestRef && bot && serverRunRcon) {
-        const postBotRun = await runWorldScenarioCommands({
-          phase: "post_bot",
-          commands: buildWorldScenarioCommands({
-            scenario: worldScenario,
-            phase: "post_bot",
-            serverVersion: config.server.version,
-            bot
-          }),
-          runRcon: serverRunRcon
-        });
-        worldScenarioManifest.command_runs.push(postBotRun);
-        await writeJson(
-          path.join(getActorWorkspacePaths(rootDir, input.actorId).actorDir, worldScenarioManifestRef),
-          worldScenarioManifest
-        );
-        if (report.server?.world_scenario) {
-          report.server.world_scenario.setup_status = postBotRun.required_failure ? "failed" : "passed";
+        if (worldScenario.id === "natural-safe-spawn-v1") {
+          worldScenarioSetupTracker.started = true;
+          const validationRef = path.join(
+            "evidence",
+            "world-scenarios",
+            `${sanitizeWorkspaceFileId(runId)}-${sanitizeWorkspaceFileId(worldScenario.id)}-natural-spawn-validation.json`
+          );
+          const validationArtifact: NaturalSpawnValidationArtifact =
+            await buildNaturalSpawnValidationArtifact({
+              scenarioId: worldScenario.id,
+              runId,
+              actorId: input.actorId,
+              center: floorBotPosition(bot),
+              blockLookup: createNaturalSpawnBlockLookup(bot),
+              world: {
+                seed: config.world.seed,
+                dimension: "overworld",
+                server_version: config.server.version,
+                level_type: config.world.levelType
+              }
+            });
+
+          worldScenarioSetupTracker.validationStatus = validationArtifact.status;
+          if (report.server?.world_scenario) {
+            report.server.world_scenario.validation_ref = validationRef;
+            report.server.world_scenario.validation_status = validationArtifact.status;
+          }
+          worldScenarioManifest.validation_refs.push(validationRef);
+
+          if (validationArtifact.status === "passed" && validationArtifact.selected_candidate) {
+            const pinningCommands = buildNaturalSpawnPinningCommands({
+              username: bot.username,
+              position: validationArtifact.selected_candidate.position,
+              serverVersion: config.server.version
+            });
+            validationArtifact.post_validation_commands = pinningCommands.map((command) => command.args);
+            const pinningRun = await runWorldScenarioCommands({
+              phase: "post_bot",
+              commands: pinningCommands,
+              runRcon: serverRunRcon
+            });
+            worldScenarioManifest.command_runs.push(pinningRun);
+            worldScenarioSetupTracker.requiredFailure =
+              worldScenarioSetupTracker.requiredFailure || pinningRun.required_failure;
+          }
+
+          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
+          await writeJson(path.join(actorDir, validationRef), validationArtifact);
+          await writeJson(
+            path.join(actorDir, worldScenarioManifestRef),
+            worldScenarioManifest
+          );
+          if (validationArtifact.status === "failed") {
+            throw new Error(`World scenario ${worldScenario.id} natural spawn validation failed`);
+          }
+          if (worldScenarioSetupTracker.requiredFailure) {
+            throw new Error(`World scenario ${worldScenario.id} post-validation spawn pinning failed`);
+          }
         }
-        if (postBotRun.required_failure) {
-          throw new Error(`World scenario ${worldScenario.id} post-bot setup failed`);
+
+        const postBotCommands = buildWorldScenarioCommands({
+          scenario: worldScenario,
+          phase: "post_bot",
+          serverVersion: config.server.version,
+          bot
+        });
+        if (postBotCommands.length > 0) {
+          worldScenarioSetupTracker.started = true;
+          const postBotRun = await runWorldScenarioCommands({
+            phase: "post_bot",
+            commands: postBotCommands,
+            runRcon: serverRunRcon
+          });
+          worldScenarioManifest.command_runs.push(postBotRun);
+          worldScenarioSetupTracker.requiredFailure =
+            worldScenarioSetupTracker.requiredFailure || postBotRun.required_failure;
+          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
+          await writeJson(
+            path.join(actorDir, worldScenarioManifestRef),
+            worldScenarioManifest
+          );
+          if (postBotRun.required_failure) {
+            throw new Error(`World scenario ${worldScenario.id} post-bot setup failed`);
+          }
+        } else {
+          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
         }
       }
       if ((input.prepareSpawnAccess || input.sharedStorageSocialSmoke) && bot && serverRunRcon) {

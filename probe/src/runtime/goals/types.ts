@@ -311,6 +311,8 @@ export type SocialCycleRunReport = {
 	      fixture_dependency: boolean;
 	      requires_fresh_world: boolean;
 	      manifest_ref?: string;
+	      validation_ref?: string;
+	      validation_status?: "not_applicable" | "passed" | "failed";
 	      setup_status?: "not_applicable" | "passed" | "failed";
 	      build_area?: {
 	        center: { x: number; y: number; z: number };
