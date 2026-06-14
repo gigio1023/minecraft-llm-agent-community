@@ -17,6 +17,9 @@ Status: active dated experiment record.
   provider-free natural seed smoke for the next benchmark.
 - `placed-furnace-natural-60/index.html` - Qwen Max/Plus 60-cycle natural-world
   placed-furnace benchmark observation report with trend charts.
+- `placed-furnace-natural-60/scored-index.html` - first-pass objective-progress
+  score report with milestone ladder, progress/cost charts, and benchmark
+  readiness notes.
 - `placed-furnace-natural-60/README.md` - run setup, quota summary, and review.
 - `natural-stone-tool-world-smoke/README.md` - rejected dense bamboo-jungle
   seed smoke kept for audit history.

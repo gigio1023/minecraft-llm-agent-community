@@ -1,0 +1,462 @@
+import type {
+  BenchmarkMilestoneId,
+  BenchmarkObservationMetrics
+} from "./socialCycleBenchmarkMetrics.js";
+
+export type BenchmarkMilestoneScoringRule = {
+  milestone_id: BenchmarkMilestoneId;
+  label: string;
+  weight: number;
+  expected_order: number;
+};
+
+export type BenchmarkScoredRun = {
+  run_id: string;
+  model: string;
+  short_model_name: string;
+  target_reached: boolean;
+  progress_score_100: number;
+  achieved_weight: number;
+  total_weight: number;
+  achieved_milestones: Array<BenchmarkMilestoneScoringRule & { first_cycle: number }>;
+  missing_milestones: BenchmarkMilestoneScoringRule[];
+  best_milestone?: BenchmarkMilestoneScoringRule & { first_cycle: number };
+  best_cycle?: number;
+  cycles_completed: number;
+  total_tool_attempts: number;
+  first_milestone_cycles: number;
+  provider_usage: {
+    requests: number;
+    total_tokens: number;
+    elapsed_ms_total?: number;
+    elapsed_ms_avg?: number;
+    elapsed_ms_p95?: number;
+  };
+  estimated_to_best_milestone?: {
+    estimation_method: "proportional_by_cycle_from_run_totals";
+    cycle_ratio: number;
+    requests: number;
+    total_tokens: number;
+    elapsed_ms_total?: number;
+  };
+  efficiency: {
+    milestones_per_1m_tokens?: number;
+    score_per_1m_tokens?: number;
+    score_per_request?: number;
+    score_per_tool_attempt?: number;
+  };
+  post_best_milestone: {
+    cycles_after_best: number;
+    outcome_counts: Record<string, number>;
+    action_counts: Record<string, number>;
+  };
+  progress_curve: Array<{
+    cycle_index: number;
+    progress_score_100: number;
+  }>;
+};
+
+export type BenchmarkScoreBundle = {
+  schema: "benchmark-score-bundle/v1";
+  generated_at: string;
+  benchmark_id: string;
+  target_description: string;
+  scoring_plan: BenchmarkMilestoneScoringRule[];
+  scored_runs: BenchmarkScoredRun[];
+  benchmark_readiness: {
+    current_run_count: number;
+    model_ranking_ready: boolean;
+    summary: string;
+    next_internal_step: string;
+    external_dataset_assessment: string;
+  };
+  limitations: string[];
+};
+
+export const FURNACE_BLOCK_SCORING_PLAN: BenchmarkMilestoneScoringRule[] = [
+  { milestone_id: "log_inventory_observed", label: "Log acquired", weight: 8, expected_order: 1 },
+  { milestone_id: "planks_inventory_observed", label: "Planks crafted", weight: 8, expected_order: 2 },
+  { milestone_id: "crafting_table_item_observed", label: "Crafting table item crafted", weight: 8, expected_order: 3 },
+  { milestone_id: "crafting_table_block_observed", label: "Crafting table placed", weight: 8, expected_order: 4 },
+  { milestone_id: "sticks_inventory_observed", label: "Sticks crafted", weight: 8, expected_order: 5 },
+  { milestone_id: "wooden_pickaxe_inventory_observed", label: "Wooden pickaxe crafted", weight: 14, expected_order: 6 },
+  { milestone_id: "cobblestone_inventory_observed", label: "Cobblestone acquired", weight: 10, expected_order: 7 },
+  { milestone_id: "cobblestone_8_observed", label: "Eight cobblestone acquired", weight: 14, expected_order: 8 },
+  { milestone_id: "furnace_item_observed", label: "Furnace item crafted", weight: 10, expected_order: 9 },
+  { milestone_id: "furnace_block_observed", label: "Furnace placed", weight: 12, expected_order: 10 }
+];
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function shortModelName(model: string) {
+  return model.replace("Qwen-Ambassador/", "").replace("Qwen", "Qwen ");
+}
+
+function round(value: number, digits = 2) {
+  const scale = 10 ** digits;
+  return Math.round(value * scale) / scale;
+}
+
+function countBy(record: Record<string, number>, key: string) {
+  record[key] = (record[key] ?? 0) + 1;
+}
+
+function scoreCurve(
+  metric: BenchmarkObservationMetrics,
+  scoringPlan: BenchmarkMilestoneScoringRule[],
+  totalWeight: number
+) {
+  return metric.aggregate_metrics.cycle_time_series.map((cycle) => {
+    const weight = scoringPlan.reduce((sum, rule) => {
+      const firstCycle = metric.target_observations.milestone_first_cycles[rule.milestone_id];
+      return firstCycle && firstCycle <= cycle.cycle_index ? sum + rule.weight : sum;
+    }, 0);
+    return {
+      cycle_index: cycle.cycle_index,
+      progress_score_100: round((weight / totalWeight) * 100, 1)
+    };
+  });
+}
+
+function scoreRun(
+  metric: BenchmarkObservationMetrics,
+  scoringPlan: BenchmarkMilestoneScoringRule[]
+): BenchmarkScoredRun {
+  const totalWeight = scoringPlan.reduce((sum, rule) => sum + rule.weight, 0);
+  const achievedMilestones = scoringPlan.flatMap((rule) => {
+    const firstCycle = metric.target_observations.milestone_first_cycles[rule.milestone_id];
+    return firstCycle ? [{ ...rule, first_cycle: firstCycle }] : [];
+  });
+  const missingMilestones = scoringPlan.filter((rule) => {
+    return !metric.target_observations.milestone_first_cycles[rule.milestone_id];
+  });
+  const achievedWeight = achievedMilestones.reduce((sum, milestone) => sum + milestone.weight, 0);
+  const bestMilestone = achievedMilestones.at(-1);
+  const bestCycle = bestMilestone?.first_cycle;
+  const cyclesCompleted = metric.run.total_cycles;
+  const totalToolAttempts = metric.aggregate_metrics.cycle_time_series.reduce(
+    (sum, cycle) => sum + cycle.tool_attempts.length,
+    0
+  );
+  const firstMilestoneCycles = new Set(achievedMilestones.map((milestone) => milestone.first_cycle)).size;
+  const totalTokens = metric.provider_usage.total_tokens;
+  const requests = metric.provider_usage.requests;
+  const progressScore = round((achievedWeight / totalWeight) * 100, 1);
+  const postBestOutcomeCounts: Record<string, number> = {};
+  const postBestActionCounts: Record<string, number> = {};
+  const cyclesAfterBest = bestCycle
+    ? metric.aggregate_metrics.cycle_time_series.filter((cycle) => cycle.cycle_index > bestCycle)
+    : metric.aggregate_metrics.cycle_time_series;
+  for (const cycle of cyclesAfterBest) {
+    countBy(postBestOutcomeCounts, cycle.judgment_outcome);
+    countBy(postBestActionCounts, cycle.action_id);
+  }
+
+  let estimatedToBest: BenchmarkScoredRun["estimated_to_best_milestone"];
+  if (bestCycle && cyclesCompleted > 0) {
+    const ratio = bestCycle / cyclesCompleted;
+    estimatedToBest = {
+      estimation_method: "proportional_by_cycle_from_run_totals",
+      cycle_ratio: round(ratio, 4),
+      requests: Math.ceil(requests * ratio),
+      total_tokens: Math.ceil(totalTokens * ratio),
+      elapsed_ms_total: metric.provider_usage.elapsed_ms_total
+        ? Math.ceil(metric.provider_usage.elapsed_ms_total * ratio)
+        : undefined
+    };
+  }
+
+  return {
+    run_id: metric.run.run_id,
+    model: metric.run.model,
+    short_model_name: shortModelName(metric.run.model),
+    target_reached: Boolean(metric.target_observations.milestone_first_cycles.furnace_block_observed),
+    progress_score_100: progressScore,
+    achieved_weight: achievedWeight,
+    total_weight: totalWeight,
+    achieved_milestones: achievedMilestones,
+    missing_milestones: missingMilestones,
+    best_milestone: bestMilestone,
+    best_cycle: bestCycle,
+    cycles_completed: cyclesCompleted,
+    total_tool_attempts: totalToolAttempts,
+    first_milestone_cycles: firstMilestoneCycles,
+    provider_usage: {
+      requests,
+      total_tokens: totalTokens,
+      elapsed_ms_total: metric.provider_usage.elapsed_ms_total,
+      elapsed_ms_avg: metric.provider_usage.elapsed_ms_avg,
+      elapsed_ms_p95: metric.provider_usage.elapsed_ms_p95
+    },
+    estimated_to_best_milestone: estimatedToBest,
+    efficiency: {
+      milestones_per_1m_tokens: totalTokens > 0 ? round((achievedMilestones.length / totalTokens) * 1_000_000, 3) : undefined,
+      score_per_1m_tokens: totalTokens > 0 ? round((progressScore / totalTokens) * 1_000_000, 3) : undefined,
+      score_per_request: requests > 0 ? round(progressScore / requests, 3) : undefined,
+      score_per_tool_attempt: totalToolAttempts > 0 ? round(progressScore / totalToolAttempts, 3) : undefined
+    },
+    post_best_milestone: {
+      cycles_after_best: cyclesAfterBest.length,
+      outcome_counts: postBestOutcomeCounts,
+      action_counts: postBestActionCounts
+    },
+    progress_curve: scoreCurve(metric, scoringPlan, totalWeight)
+  };
+}
+
+export function scoreBenchmarkMetrics(
+  metrics: BenchmarkObservationMetrics[],
+  scoringPlan = FURNACE_BLOCK_SCORING_PLAN
+): BenchmarkScoreBundle {
+  const scoredRuns = metrics.map((metric) => scoreRun(metric, scoringPlan));
+  return {
+    schema: "benchmark-score-bundle/v1",
+    generated_at: new Date().toISOString(),
+    benchmark_id: metrics[0]?.benchmark_id ?? "unknown-benchmark",
+    target_description:
+      metrics[0]?.target_observations.target_description ??
+      "Reach and place a furnace in a natural Minecraft world.",
+    scoring_plan: scoringPlan,
+    scored_runs: scoredRuns,
+    benchmark_readiness: {
+      current_run_count: scoredRuns.length,
+      model_ranking_ready: scoredRuns.length >= 12,
+      summary:
+        scoredRuns.length >= 12
+          ? "The run count is large enough for preliminary model ranking if task, seed, and provider limits are controlled."
+          : "This is enough to inspect instrumentation and task bottlenecks, but not enough to rank models generally.",
+      next_internal_step:
+        "Run the same scored task across multiple natural seeds and repeated trials per model before treating the score as a benchmark table.",
+      external_dataset_assessment:
+        "External Minecraft benchmarks are useful now for task taxonomy and milestone design, but this repo should first stabilize internal Mineflayer-runtime scoring because visual/key-mouse datasets do not directly score this action-skill runtime."
+    },
+    limitations: [
+      "The scorer uses observed evidence artifacts and milestone first cycles; it does not infer hidden progress from provider prose.",
+      "Provider requests, tokens, and elapsed time are available at run level, so cost-to-best-milestone is a proportional estimate by cycle rather than exact per-cycle billing.",
+      "The current bundle has one run per model on one seed and one objective, so it should not be used as a broad model-ranking claim.",
+      "The score deliberately ignores tool schema and structured-argument compliance because those are provider/runtime contract assumptions, not benchmark targets for this project."
+    ]
+  };
+}
+
+function formatNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("en-US") : "n/a";
+}
+
+function entriesTable(entries: Record<string, number>, empty = "None") {
+  const sorted = Object.entries(entries).sort((a, b) => b[1] - a[1]);
+  if (sorted.length === 0) {
+    return `<span class="muted">${escapeHtml(empty)}</span>`;
+  }
+  return sorted.map(([key, count]) => `${escapeHtml(key)} ${escapeHtml(count)}`).join("<br>");
+}
+
+function metricCard(label: string, value: unknown, sub = "") {
+  return `<section class="metric"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="sub">${escapeHtml(sub)}</div></section>`;
+}
+
+function progressChart(scoredRuns: BenchmarkScoredRun[]) {
+  const width = 900;
+  const height = 280;
+  const pad = 42;
+  const innerW = width - pad * 2;
+  const innerH = height - pad * 2;
+  const colors = ["#126b4f", "#9f3a38", "#2f5f98", "#7a4f01"];
+  const maxCycle = Math.max(1, ...scoredRuns.flatMap((run) => run.progress_curve.map((point) => point.cycle_index)));
+  const x = (cycle: number) => pad + (cycle / maxCycle) * innerW;
+  const y = (score: number) => pad + innerH - (score / 100) * innerH;
+  const lines = scoredRuns.map((run, index) => {
+    const points = run.progress_curve.map((point) => `${x(point.cycle_index).toFixed(1)},${y(point.progress_score_100).toFixed(1)}`).join(" ");
+    const color = colors[index % colors.length];
+    return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="4"/>`;
+  }).join("");
+  const labels = scoredRuns.map((run, index) => {
+    const color = colors[index % colors.length];
+    return `<span><i style="background:${color}"></i>${escapeHtml(run.short_model_name)}</span>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="goal progress score by cycle">
+    <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
+    <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#d8d6ce"/>
+    <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#d8d6ce"/>
+    <text x="8" y="24" font-size="12" fill="#6b7280">score</text>
+    <text x="${width - 82}" y="${height - 10}" font-size="12" fill="#6b7280">cycle</text>
+    <text x="${pad - 32}" y="${y(100) + 4}" font-size="11" fill="#6b7280">100</text>
+    <text x="${pad - 24}" y="${y(50) + 4}" font-size="11" fill="#6b7280">50</text>
+    <text x="${pad - 18}" y="${y(0) + 4}" font-size="11" fill="#6b7280">0</text>
+    ${lines}
+  </svg><div class="legend">${labels}</div>`;
+}
+
+function scatterChart(scoredRuns: BenchmarkScoredRun[]) {
+  const width = 640;
+  const height = 260;
+  const pad = 42;
+  const innerW = width - pad * 2;
+  const innerH = height - pad * 2;
+  const maxTokens = Math.max(1, ...scoredRuns.map((run) => run.provider_usage.total_tokens));
+  const x = (tokens: number) => pad + (tokens / maxTokens) * innerW;
+  const y = (score: number) => pad + innerH - (score / 100) * innerH;
+  const colors = ["#126b4f", "#9f3a38", "#2f5f98", "#7a4f01"];
+  const points = scoredRuns.map((run, index) => {
+    const color = colors[index % colors.length];
+    return `<g>
+      <circle cx="${x(run.provider_usage.total_tokens).toFixed(1)}" cy="${y(run.progress_score_100).toFixed(1)}" r="7" fill="${color}"/>
+      <text x="${x(run.provider_usage.total_tokens) + 10}" y="${y(run.progress_score_100) + 4}" font-size="12" fill="#1f2937">${escapeHtml(run.short_model_name)}</text>
+    </g>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="progress score by total tokens">
+    <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
+    <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#d8d6ce"/>
+    <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#d8d6ce"/>
+    <text x="8" y="24" font-size="12" fill="#6b7280">score</text>
+    <text x="${width - 118}" y="${height - 10}" font-size="12" fill="#6b7280">total tokens</text>
+    ${points}
+  </svg>`;
+}
+
+function ladder(bundle: BenchmarkScoreBundle) {
+  const runs = bundle.scored_runs;
+  return `<table><thead><tr><th>Milestone</th><th>Weight</th>${runs.map((run) => `<th>${escapeHtml(run.short_model_name)}</th>`).join("")}</tr></thead><tbody>
+    ${bundle.scoring_plan.map((rule) => `<tr>
+      <td>${escapeHtml(rule.expected_order)}. ${escapeHtml(rule.label)}</td>
+      <td>${escapeHtml(rule.weight)}</td>
+      ${runs.map((run) => {
+        const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === rule.milestone_id);
+        return `<td>${achieved ? `<span class="ok">cycle ${escapeHtml(achieved.first_cycle)}</span>` : `<span class="missing">missing</span>`}</td>`;
+      }).join("")}
+    </tr>`).join("")}
+  </tbody></table>`;
+}
+
+export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
+  const best = [...bundle.scored_runs].sort((a, b) => b.progress_score_100 - a.progress_score_100)[0];
+  const targetReached = bundle.scored_runs.filter((run) => run.target_reached).length;
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(bundle.benchmark_id)} scored report</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f2937; background: #f6f5ef; }
+    header, main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    header { padding-top: 34px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 12px; font-size: 20px; letter-spacing: 0; }
+    h3 { margin: 24px 0 10px; font-size: 16px; letter-spacing: 0; }
+    p { line-height: 1.55; }
+    .muted { color: #6b7280; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    .metric, .panel, .note { background: #fff; border: 1px solid #d8d6ce; border-radius: 8px; padding: 14px; }
+    .metric .label { color: #6b7280; font-size: 12px; }
+    .metric .value { font-size: 25px; font-weight: 750; margin-top: 4px; }
+    .metric .sub { color: #6b7280; font-size: 12px; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8d6ce; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid #ecebe6; text-align: left; font-size: 13px; vertical-align: top; }
+    th { background: #ecebe6; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    svg { width: 100%; height: auto; border: 1px solid #d8d6ce; border-radius: 8px; }
+    .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; color: #4b5563; font-size: 13px; }
+    .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+    .ok { color: #126b4f; font-weight: 700; }
+    .missing { color: #9f3a38; font-weight: 700; }
+    .two { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr); }
+    code { background: #ecebe6; padding: 2px 5px; border-radius: 4px; }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+    li { margin: 6px 0; }
+    @media (max-width: 800px) { .two { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>${escapeHtml(bundle.benchmark_id)} scored report</h1>
+    <p class="muted">Generated ${escapeHtml(bundle.generated_at)}. Target: ${escapeHtml(bundle.target_description)}</p>
+  </header>
+  <main>
+    <section class="grid">
+      ${metricCard("Best progress score", best ? `${best.short_model_name} ${best.progress_score_100}/100` : "n/a", "milestone-weighted")}
+      ${metricCard("Target reached", `${targetReached}/${bundle.scored_runs.length}`, "furnace block placed")}
+      ${metricCard("Run count", bundle.scored_runs.length, bundle.benchmark_readiness.model_ranking_ready ? "preliminary ranking possible" : "not ranking-ready")}
+      ${metricCard("Scoring scope", "objective progress", "schema/tool-call behavior excluded")}
+    </section>
+
+    <h2>Goal Progress</h2>
+    <div class="two">
+      <section class="panel">
+        <h3>Score by Cycle</h3>
+        ${progressChart(bundle.scored_runs)}
+      </section>
+      <section class="panel">
+        <h3>Score by Token Spend</h3>
+        ${scatterChart(bundle.scored_runs)}
+      </section>
+    </div>
+
+    <h2>Milestone Ladder</h2>
+    ${ladder(bundle)}
+
+    <h2>Efficiency Table</h2>
+    <table><thead><tr>
+      <th>Model</th><th>Score</th><th>Best milestone</th><th>Total calls</th><th>Total tokens</th><th>Score / 1M tokens</th><th>Score / call</th><th>Post-best cycles</th>
+    </tr></thead><tbody>
+      ${bundle.scored_runs.map((run) => `<tr>
+        <td>${escapeHtml(run.short_model_name)}</td>
+        <td>${escapeHtml(run.progress_score_100)}/100</td>
+        <td>${run.best_milestone ? `${escapeHtml(run.best_milestone.label)} at cycle ${escapeHtml(run.best_milestone.first_cycle)}` : "none"}</td>
+        <td>${escapeHtml(formatNumber(run.provider_usage.requests))}</td>
+        <td>${escapeHtml(formatNumber(run.provider_usage.total_tokens))}</td>
+        <td>${escapeHtml(formatNumber(run.efficiency.score_per_1m_tokens))}</td>
+        <td>${escapeHtml(formatNumber(run.efficiency.score_per_request))}</td>
+        <td>${escapeHtml(run.post_best_milestone.cycles_after_best)}</td>
+      </tr>`).join("")}
+    </tbody></table>
+
+    <h2>Estimated Cost To Best Milestone</h2>
+    <p class="muted">These rows estimate cost-to-progress by proportional cycle share because the current metrics bundle stores provider usage at run level, not exact provider cost per cycle.</p>
+    <table><thead><tr><th>Model</th><th>Best cycle</th><th>Estimated calls</th><th>Estimated tokens</th><th>Estimated provider elapsed</th></tr></thead><tbody>
+      ${bundle.scored_runs.map((run) => `<tr>
+        <td>${escapeHtml(run.short_model_name)}</td>
+        <td>${escapeHtml(run.best_cycle ?? "n/a")}</td>
+        <td>${escapeHtml(formatNumber(run.estimated_to_best_milestone?.requests))}</td>
+        <td>${escapeHtml(formatNumber(run.estimated_to_best_milestone?.total_tokens))}</td>
+        <td>${escapeHtml(run.estimated_to_best_milestone?.elapsed_ms_total ? `${formatNumber(Math.round(run.estimated_to_best_milestone.elapsed_ms_total / 1000))} s` : "n/a")}</td>
+      </tr>`).join("")}
+    </tbody></table>
+
+    <h2>Post-Best Stall Review</h2>
+    <table><thead><tr><th>Model</th><th>Cycles after best milestone</th><th>Outcomes after best</th><th>Top actions after best</th></tr></thead><tbody>
+      ${bundle.scored_runs.map((run) => `<tr>
+        <td>${escapeHtml(run.short_model_name)}</td>
+        <td>${escapeHtml(run.post_best_milestone.cycles_after_best)}</td>
+        <td>${entriesTable(run.post_best_milestone.outcome_counts)}</td>
+        <td>${entriesTable(run.post_best_milestone.action_counts)}</td>
+      </tr>`).join("")}
+    </tbody></table>
+
+    <h2>What This Shows</h2>
+    <section class="note">
+      <p>${escapeHtml(bundle.benchmark_readiness.summary)}</p>
+      <p>In this run, progress is visible enough to distinguish objective movement from empty activity: Qwen 3.7 Plus reached the eight-cobblestone prerequisite, while Qwen 3.7 Max stopped at sticks. Neither model completed the furnace-item or furnace-block milestones, so this is a failure on the end target for both models.</p>
+      <p>The main benchmark signal is not only <code>blocked</code> or <code>no_progress</code>. The useful signal is the weighted milestone curve combined with requests, tokens, elapsed time, tool attempts, and post-best stall cycles.</p>
+    </section>
+
+    <h2>Dataset Decision</h2>
+    <section class="note">
+      <p>${escapeHtml(bundle.benchmark_readiness.external_dataset_assessment)}</p>
+      <p>${escapeHtml(bundle.benchmark_readiness.next_internal_step)}</p>
+    </section>
+
+    <h2>Limitations</h2>
+    <ul>
+      ${bundle.limitations.map((limitation) => `<li>${escapeHtml(limitation)}</li>`).join("")}
+    </ul>
+  </main>
+</body>
+</html>`;
+}

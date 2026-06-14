@@ -2,16 +2,16 @@
 
 Search token: `EXPERIMENT_2026_06_14_PLACED_FURNACE_NATURAL_60`.
 
-Status: completed observation run, not final scored benchmark.
+Status: completed observation run with first-pass objective-progress scoring.
 
 ## Setup
 
 - Date: 2026-06-14
 - Benchmark id: `placed_furnace_natural_60`
 - Target: obtain and place one `furnace` block in a fresh natural survival world.
-- Scoring boundary: this record stores observations only. A later benchmark
-  scorer should decide pass/fail from `benchmark-observation-metrics/v1` and raw
-  evidence refs.
+- Scoring boundary: raw observations remain in `summary.json`; the first-pass
+  milestone scorer writes derived results to `scored-summary.json` and
+  `scored-index.html`.
 - Provider/models: ModelScope Qwen Ambassador `Qwen3.7-Max` and `Qwen3.7-Plus`
 - Reasoning configuration: `SOCIAL_CYCLE_REASONING=qwen-no-think`
 - Cycle budget: 60 cycles, `max_actions_per_cycle=1`
@@ -39,6 +39,22 @@ Outcome counts:
 | `Qwen3.7-Max` | 19 | 16 | 25 |
 | `Qwen3.7-Plus` | 21 | 10 | 29 |
 
+## Objective-Progress Scoring
+
+The first scorer uses a 100-point milestone ladder for the target "obtain and
+place one furnace block." It does not score tool schema, structured arguments,
+or provider transport compliance.
+
+| Model | Target reached | Progress score | Best milestone | Post-best cycles |
+| --- | --- | ---: | --- | ---: |
+| `Qwen-Ambassador/Qwen3.7-Max` | no | 40/100 | sticks crafted at cycle 7 | 53 |
+| `Qwen-Ambassador/Qwen3.7-Plus` | no | 78/100 | eight cobblestone acquired at cycle 31 | 29 |
+
+Interpretation: the current data is strong enough to show where this benchmark
+stalls, but not strong enough to claim a general model ranking. `Qwen3.7-Plus`
+made materially deeper target progress in this one run, while both models failed
+the final furnace item/block milestones.
+
 ## Quota
 
 No OpenAI API calls were made.
@@ -55,6 +71,9 @@ monthly call counts from the local ledger:
 
 - `index.html` - combined visual report with trend charts and screenshot samples.
 - `summary.json` - `benchmark-observation-metrics-bundle/v1`.
+- `scored-index.html` - milestone-weighted score report with progress/cost
+  charts and dataset-readiness notes.
+- `scored-summary.json` - `benchmark-score-bundle/v1`.
 - `qwen-3.7-max/report.json` - raw `social-cycle-run-report/v1`.
 - `qwen-3.7-plus/report.json` - raw `social-cycle-run-report/v1`.
 - `qwen-3.7-max/metrics.json` and `qwen-3.7-plus/metrics.json` - per-run
