@@ -1,6 +1,6 @@
-# 2026-06-14 Qwen Benchmark Experiments
+# 2026-06-14 Minecraft Benchmark Experiments
 
-Search token: `EXPERIMENT_2026_06_14_QWEN_BENCHMARKS`.
+Search token: `EXPERIMENT_2026_06_14_MINECRAFT_BENCHMARKS`.
 
 Status: active dated experiment record.
 
@@ -15,8 +15,9 @@ Status: active dated experiment record.
   and next natural-world benchmark proposal.
 - `natural-seed-candidate-9137002542963915989-smoke/README.md` - accepted
   provider-free natural seed smoke for the next benchmark.
-- `placed-furnace-natural-60/index.html` - Qwen Max/Plus 60-cycle natural-world
-  placed-furnace benchmark observation report with trend charts.
+- `placed-furnace-natural-60/index.html` - Qwen Max/Plus and OpenAI
+  `gpt-5.4-mini` 60-cycle natural-world placed-furnace benchmark observation
+  report with trend charts.
 - `placed-furnace-natural-60/scored-index.html` - first-pass objective-progress
   score report with milestone ladder, progress/cost charts, and benchmark
   readiness notes.
@@ -39,4 +40,7 @@ This date also updated provider quota documentation and runtime guard behavior:
   balance, projected-token review, and explicit operator approval before any
   future `openai-api` benchmark.
 
-No OpenAI API calls were made in the Qwen 60-cycle experiment.
+The later `placed-furnace-natural-60/gpt-5.4-mini/` run did use OpenAI API after
+local preflight and operator approval. It ended under the local `gpt-5.4-mini`
+9M/day token guard at 3,065,794 total tokens, with the preflight artifact stored
+as `placed-furnace-natural-60/gpt-5.4-mini/preflight.json`.
