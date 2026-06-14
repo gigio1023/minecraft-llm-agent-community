@@ -366,10 +366,26 @@ function ceilToStep(value: number, step: number) {
   return Math.max(step, Math.ceil(value / step) * step);
 }
 
+function axisModelLabel(shortModelNameValue: string) {
+  if (shortModelNameValue.includes("Max")) {
+    return "Max";
+  }
+  if (shortModelNameValue.includes("Plus")) {
+    return "Plus";
+  }
+  return shortModelNameValue
+    .replace(/^Qwen\s+/i, "")
+    .replace(/^GPT\s+/i, "GPT ")
+    .split(/[ /-]/)
+    .filter(Boolean)
+    .slice(-2)
+    .join(" ");
+}
+
 function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkMilestoneScoringRule[]) {
-  const width = 1220;
+  const width = 1160;
   const height = 430;
-  const padLeft = 356;
+  const padLeft = 296;
   const padRight = 42;
   const padTop = 34;
   const padBottom = 48;
@@ -400,19 +416,19 @@ function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkM
     const modelResults = scoredRuns.map((run, index) => {
       const color = colors[index % colors.length];
       const achieved = run.achieved_milestones.find((item) => item.milestone_id === milestone.milestone_id);
-      const label = `${run.short_model_name.replace("Qwen ", "")} ${achieved ? `C${achieved.first_cycle}` : "-"}`;
-      const textX = padLeft - 122 + index * 58;
+      const label = `${axisModelLabel(run.short_model_name)} ${achieved ? `C${achieved.first_cycle}` : "-"}`;
+      const textX = padLeft - 98 + index * 52;
       return `<g>
-        <rect x="${textX - 3}" y="${(markerY - 8).toFixed(1)}" width="52" height="16" rx="3" fill="${achieved ? "#ffffff" : "#f3f4f6"}" stroke="${achieved ? color : "#c7c7c7"}"/>
-        <text x="${textX + 23}" y="${(markerY + 4).toFixed(1)}" font-size="9.5" fill="${achieved ? color : "#6b7280"}" text-anchor="middle">${escapeHtml(label)}</text>
+        <rect x="${textX - 3}" y="${(markerY - 8).toFixed(1)}" width="48" height="16" rx="3" fill="${achieved ? "#ffffff" : "#f3f4f6"}" stroke="${achieved ? color : "#c7c7c7"}"/>
+        <text x="${textX + 21}" y="${(markerY + 4).toFixed(1)}" font-size="9.5" fill="${achieved ? color : "#6b7280"}" text-anchor="middle">${escapeHtml(label)}</text>
       </g>`;
     }).join("");
     return `<g>
       <line x1="${padLeft}" y1="${markerY.toFixed(1)}" x2="${width - padRight}" y2="${markerY.toFixed(1)}" stroke="#e3e0d8" stroke-dasharray="4 5"/>
       <line x1="${padLeft - 10}" y1="${markerY.toFixed(1)}" x2="${padLeft}" y2="${markerY.toFixed(1)}" stroke="#9ca3af"/>
-      <text x="${padLeft - 338}" y="${(markerY + 4).toFixed(1)}" font-size="11" fill="#4b5563" text-anchor="start">${escapeHtml(cumulativeScore)}</text>
-      <image href="${escapeHtml(milestone.icon_src)}" x="${padLeft - 310}" y="${(markerY - 11).toFixed(1)}" width="22" height="22" style="image-rendering: pixelated"/>
-      <text x="${padLeft - 280}" y="${(markerY + 4).toFixed(1)}" font-size="10.5" fill="#4b5563">${escapeHtml(milestone.label)}</text>
+      <text x="${padLeft - 278}" y="${(markerY + 4).toFixed(1)}" font-size="11" fill="#4b5563" text-anchor="start">${escapeHtml(cumulativeScore)}</text>
+      <image href="${escapeHtml(milestone.icon_src)}" x="${padLeft - 250}" y="${(markerY - 11).toFixed(1)}" width="22" height="22" style="image-rendering: pixelated"/>
+      <text x="${padLeft - 220}" y="${(markerY + 4).toFixed(1)}" font-size="10.5" fill="#4b5563">${escapeHtml(milestone.label)}</text>
       ${modelResults}
       <title>${escapeHtml(`${cumulativeScore} pts: ${milestone.label} (+${milestone.weight})`)}</title>
     </g>`;
@@ -425,7 +441,7 @@ function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkM
     <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
     <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${height - padBottom}" stroke="#9ca3af" stroke-width="1.5"/>
     <line x1="${padLeft}" y1="${height - padBottom}" x2="${width - padRight}" y2="${height - padBottom}" stroke="#d8d6ce"/>
-    <text x="${padLeft - 338}" y="20" font-size="12" fill="#6b7280">score / milestone / model result</text>
+    <text x="${padLeft - 278}" y="20" font-size="12" fill="#6b7280">score / milestone / result</text>
     <text x="${width - 82}" y="${height - 12}" font-size="12" fill="#6b7280">cycle</text>
     <text x="${padLeft - 18}" y="${y(0) + 4}" font-size="11" fill="#6b7280" text-anchor="end">0</text>
     ${axisMilestones}
