@@ -180,6 +180,73 @@ export const FURNACE_BLOCK_SCORING_PLAN: BenchmarkMilestoneScoringRule[] = [
   }
 ];
 
+type ItemStateFigureStep = {
+  milestone_id: BenchmarkMilestoneId;
+  state_label: string;
+  state_code: string;
+};
+
+type ItemStateFigureRow = {
+  item_label: string;
+  icon_src: string;
+  icon_alt: string;
+  steps: ItemStateFigureStep[];
+};
+
+const FURNACE_ITEM_STATE_ROWS: ItemStateFigureRow[] = [
+  {
+    item_label: "Log",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/oak_log.png",
+    icon_alt: "log",
+    steps: [{ milestone_id: "log_inventory_observed", state_label: "acquired", state_code: "acq" }]
+  },
+  {
+    item_label: "Planks",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/oak_planks.png",
+    icon_alt: "planks",
+    steps: [{ milestone_id: "planks_inventory_observed", state_label: "crafted", state_code: "craft" }]
+  },
+  {
+    item_label: "Crafting table",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/crafting_table_top.png",
+    icon_alt: "crafting table",
+    steps: [
+      { milestone_id: "crafting_table_item_observed", state_label: "crafted", state_code: "craft" },
+      { milestone_id: "crafting_table_block_observed", state_label: "placed", state_code: "place" }
+    ]
+  },
+  {
+    item_label: "Sticks",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/items/stick.png",
+    icon_alt: "stick",
+    steps: [{ milestone_id: "sticks_inventory_observed", state_label: "crafted", state_code: "craft" }]
+  },
+  {
+    item_label: "Wooden pickaxe",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/items/wooden_pickaxe.png",
+    icon_alt: "wooden pickaxe",
+    steps: [{ milestone_id: "wooden_pickaxe_inventory_observed", state_label: "crafted", state_code: "craft" }]
+  },
+  {
+    item_label: "Cobblestone",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/cobblestone.png",
+    icon_alt: "cobblestone",
+    steps: [
+      { milestone_id: "cobblestone_inventory_observed", state_label: "1+ acquired", state_code: "1+" },
+      { milestone_id: "cobblestone_8_observed", state_label: "8+ acquired", state_code: "8+" }
+    ]
+  },
+  {
+    item_label: "Furnace",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/furnace_front.png",
+    icon_alt: "furnace",
+    steps: [
+      { milestone_id: "furnace_item_observed", state_label: "crafted", state_code: "craft" },
+      { milestone_id: "furnace_block_observed", state_label: "placed", state_code: "place" }
+    ]
+  }
+];
+
 function escapeHtml(value: unknown) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -380,6 +447,87 @@ function axisModelLabel(shortModelNameValue: string) {
     .filter(Boolean)
     .slice(-2)
     .join(" ");
+}
+
+function itemStateTimeline(scoredRuns: BenchmarkScoredRun[]) {
+  const width = 1160;
+  const rowHeight = 62;
+  const padLeft = 186;
+  const padRight = 42;
+  const padTop = 46;
+  const padBottom = 52;
+  const height = padTop + FURNACE_ITEM_STATE_ROWS.length * rowHeight + padBottom;
+  const innerW = width - padLeft - padRight;
+  const colors = ["#126b4f", "#9f3a38", "#2f5f98", "#7a4f01"];
+  const maxCycle = Math.max(1, ...scoredRuns.flatMap((run) => run.progress_curve.map((point) => point.cycle_index)));
+  const x = (cycle: number) => padLeft + (cycle / maxCycle) * innerW;
+  const cycleTicks = [0, 10, 20, 30, 40, 50, 60].filter((tick) => tick <= maxCycle);
+  const modelOffset = (index: number) => {
+    const offsets = scoredRuns.length === 1 ? [0] : scoredRuns.length === 2 ? [-9, 9] : [-14, 0, 14, 28];
+    return offsets[index] ?? 0;
+  };
+  const grid = cycleTicks.map((tick) => `<g>
+    <line x1="${x(tick).toFixed(1)}" y1="${padTop - 12}" x2="${x(tick).toFixed(1)}" y2="${height - padBottom + 12}" stroke="#ecebe6"/>
+    <text x="${x(tick).toFixed(1)}" y="${height - 20}" font-size="11" fill="#6b7280" text-anchor="middle">C${escapeHtml(tick)}</text>
+  </g>`).join("");
+  const rows = FURNACE_ITEM_STATE_ROWS.map((row, rowIndex) => {
+    const rowY = padTop + rowIndex * rowHeight + rowHeight / 2;
+    const stateMarkers = scoredRuns.map((run, runIndex) => {
+      const color = colors[runIndex % colors.length];
+      const runY = rowY + modelOffset(runIndex);
+      return row.steps.map((step, stepIndex) => {
+        const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === step.milestone_id);
+        if (!achieved) {
+          return "";
+        }
+        const markerX = x(achieved.first_cycle);
+        const labelY = runY + (stepIndex % 2 === 0 ? -10 : 18);
+        return `<g>
+          <line x1="${markerX.toFixed(1)}" y1="${runY.toFixed(1)}" x2="${markerX.toFixed(1)}" y2="${labelY.toFixed(1)}" stroke="${color}" stroke-width="1.2"/>
+          <circle cx="${markerX.toFixed(1)}" cy="${runY.toFixed(1)}" r="6" fill="#fff" stroke="${color}" stroke-width="3"/>
+          <text x="${(markerX + 9).toFixed(1)}" y="${(labelY + 4).toFixed(1)}" font-size="10.5" fill="${color}">${escapeHtml(`${axisModelLabel(run.short_model_name)} ${step.state_code} C${achieved.first_cycle}`)}</text>
+          <title>${escapeHtml(`${run.short_model_name}: ${row.item_label} ${step.state_label}, cycle ${achieved.first_cycle}`)}</title>
+        </g>`;
+      }).join("");
+    }).join("");
+    return `<g>
+      <rect x="0" y="${(rowY - rowHeight / 2 + 1).toFixed(1)}" width="${width}" height="${rowHeight - 2}" fill="${rowIndex % 2 === 0 ? "#ffffff" : "#fafafa"}"/>
+      <line x1="${padLeft}" y1="${rowY.toFixed(1)}" x2="${width - padRight}" y2="${rowY.toFixed(1)}" stroke="#d8d6ce"/>
+      <image href="${escapeHtml(row.icon_src)}" x="22" y="${(rowY - 17).toFixed(1)}" width="34" height="34" style="image-rendering: pixelated"/>
+      <text x="66" y="${(rowY - 2).toFixed(1)}" font-size="13" font-weight="700" fill="#1f2937">${escapeHtml(row.item_label)}</text>
+      <text x="66" y="${(rowY + 14).toFixed(1)}" font-size="10.5" fill="#6b7280">${escapeHtml(row.steps.map((step) => step.state_label).join(" -> "))}</text>
+      ${stateMarkers}
+    </g>`;
+  }).join("");
+  const labels = scoredRuns.map((run, index) => {
+    const color = colors[index % colors.length];
+    return `<span><i style="background:${color}"></i>${escapeHtml(run.short_model_name)}</span>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="item grouped milestone timeline">
+    <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
+    <text x="20" y="22" font-size="13" font-weight="700" fill="#1f2937">Figure A. Item-state timeline</text>
+    <text x="${width - 118}" y="${height - 10}" font-size="12" fill="#6b7280">cycle</text>
+    ${grid}
+    ${rows}
+  </svg><div class="legend">${labels}<span><i class="event-dot"></i>first observed item-state milestone</span></div>`;
+}
+
+function itemStateTable(scoredRuns: BenchmarkScoredRun[]) {
+  return `<table><thead><tr><th>Item</th><th>State chain</th>${scoredRuns.map((run) => `<th>${escapeHtml(run.short_model_name)}</th>`).join("")}</tr></thead><tbody>
+    ${FURNACE_ITEM_STATE_ROWS.map((row) => `<tr>
+      <td><span class="item-label"><img src="${escapeHtml(row.icon_src)}" alt="${escapeHtml(row.icon_alt)}">${escapeHtml(row.item_label)}</span></td>
+      <td>${escapeHtml(row.steps.map((step) => step.state_label).join(" -> "))}</td>
+      ${scoredRuns.map((run) => {
+        const states = row.steps.map((step) => {
+          const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === step.milestone_id);
+          return achieved
+            ? `<span class="ok">${escapeHtml(step.state_code)} C${escapeHtml(achieved.first_cycle)}</span>`
+            : `<span class="missing">${escapeHtml(step.state_code)} -</span>`;
+        }).join("<br>");
+        return `<td>${states}</td>`;
+      }).join("")}
+    </tr>`).join("")}
+  </tbody></table>`;
 }
 
 function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkMilestoneScoringRule[]) {
@@ -601,6 +749,14 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
       <p>This does not grant partial credit inside a milestone. A model with one log and a model with ten logs both get the same 8 points for <code>Log acquired</code>; resource quantity only matters when a separate milestone encodes it, such as <code>Eight cobblestone acquired</code>.</p>
     </section>
 
+    <h2>Publication Figures</h2>
+    <section class="panel">
+      <p class="muted">This figure groups milestones by Minecraft item/block. The same item stays on one row; different runtime states such as acquired, crafted, placed, and quantity threshold appear as state markers on that row.</p>
+      ${itemStateTimeline(bundle.scored_runs)}
+    </section>
+    <h3>Item-State Matrix</h3>
+    ${itemStateTable(bundle.scored_runs)}
+
     <h2>Goal Progress</h2>
     <div class="chart-stack">
       <section class="panel">
@@ -660,7 +816,7 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
     <h2>What This Shows</h2>
     <section class="note">
       <p>${escapeHtml(bundle.benchmark_readiness.summary)}</p>
-      <p>In this run, progress is visible enough to distinguish objective movement from empty activity: Qwen 3.7 Plus reached the eight-cobblestone prerequisite, while Qwen 3.7 Max stopped at sticks. Neither model completed the furnace-item or furnace-block milestones, so this is a failure on the end target for both models.</p>
+      <p>In this run, progress is visible enough to distinguish objective movement from empty activity: Qwen 3.7 Plus reached the eight-cobblestone prerequisite, Qwen 3.7 Max stopped at sticks, and gpt-5.4-mini stopped at the crafting-table item milestone before the run shifted into session recovery. No model completed the furnace-item or furnace-block milestones, so this is a failure on the end target for every model in this bundle.</p>
       <p>The main benchmark signal is not only <code>blocked</code> or <code>no_progress</code>. The useful signal is the weighted milestone curve combined with requests, tokens, elapsed time, tool attempts, and post-best stall cycles.</p>
     </section>
 

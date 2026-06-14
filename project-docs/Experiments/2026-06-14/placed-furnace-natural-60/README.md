@@ -89,8 +89,8 @@ monthly call counts from the local ledger:
 
 - `index.html` - combined visual report with trend charts and screenshot samples.
 - `summary.json` - `benchmark-observation-metrics-bundle/v1`.
-- `scored-index.html` - milestone-weighted score report with progress/cost
-  charts and dataset-readiness notes.
+- `scored-index.html` - milestone-weighted score report with the item-state
+  timeline figure, progress/cost charts, and dataset-readiness notes.
 - `scored-summary.json` - `benchmark-score-bundle/v1`.
 - `qwen-3.7-max/report.json` - raw `social-cycle-run-report/v1`.
 - `qwen-3.7-plus/report.json` - raw `social-cycle-run-report/v1`.
@@ -122,3 +122,8 @@ The next useful benchmark improvement is not a harder target yet. It is a
 scorer pass that consumes `benchmark-observation-metrics/v1` and labels target
 success, partial milestone score, repeated-action stall, and recoverable blocker
 handling without trusting provider prose.
+
+The report now includes a publication-oriented item-state timeline in addition
+to the original score-by-cycle debug chart. The item-state figure keeps each
+Minecraft item or block on one row and displays runtime states such as acquired,
+crafted, placed, and quantity threshold as cycle markers.
