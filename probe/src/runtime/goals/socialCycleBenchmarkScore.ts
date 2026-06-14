@@ -355,36 +355,34 @@ function metricCard(label: string, value: unknown, sub = "") {
   return `<section class="metric"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="sub">${escapeHtml(sub)}</div></section>`;
 }
 
-function milestoneScoreAt(run: BenchmarkScoredRun, cycleIndex: number) {
-  return run.progress_curve.find((point) => point.cycle_index === cycleIndex)?.progress_score_100 ?? 0;
-}
-
-function progressChart(scoredRuns: BenchmarkScoredRun[]) {
-  const width = 900;
-  const height = 280;
-  const pad = 42;
-  const innerW = width - pad * 2;
-  const innerH = height - pad * 2;
+function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkMilestoneScoringRule[]) {
+  const width = 980;
+  const height = 360;
+  const padLeft = 136;
+  const padRight = 42;
+  const padTop = 30;
+  const padBottom = 48;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBottom;
   const colors = ["#126b4f", "#9f3a38", "#2f5f98", "#7a4f01"];
   const maxCycle = Math.max(1, ...scoredRuns.flatMap((run) => run.progress_curve.map((point) => point.cycle_index)));
-  const x = (cycle: number) => pad + (cycle / maxCycle) * innerW;
-  const y = (score: number) => pad + innerH - (score / 100) * innerH;
+  const x = (cycle: number) => padLeft + (cycle / maxCycle) * innerW;
+  const y = (score: number) => padTop + innerH - (score / 100) * innerH;
   const lines = scoredRuns.map((run, index) => {
     const points = run.progress_curve.map((point) => `${x(point.cycle_index).toFixed(1)},${y(point.progress_score_100).toFixed(1)}`).join(" ");
     const color = colors[index % colors.length];
     return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="4"/>`;
   }).join("");
-  const markers = scoredRuns.map((run, runIndex) => {
-    const rowOffset = runIndex * 18;
-    return run.achieved_milestones.map((milestone) => {
-      const score = milestoneScoreAt(run, milestone.first_cycle);
-      const markerX = x(milestone.first_cycle) - 12;
-      const markerY = Math.max(8, y(score) - 36 - rowOffset);
-      return `<g>
-        <image href="${escapeHtml(milestone.icon_src)}" x="${markerX.toFixed(1)}" y="${markerY.toFixed(1)}" width="24" height="24" style="image-rendering: pixelated"/>
-        <title>${escapeHtml(`${run.short_model_name}: ${milestone.label}, cycle ${milestone.first_cycle}, +${milestone.weight}`)}</title>
-      </g>`;
-    }).join("");
+  let cumulativeScore = 0;
+  const axisMilestones = scoringPlan.map((milestone) => {
+    cumulativeScore += milestone.weight;
+    const markerY = y(cumulativeScore);
+    return `<g>
+      <line x1="${padLeft - 8}" y1="${markerY.toFixed(1)}" x2="${padLeft}" y2="${markerY.toFixed(1)}" stroke="#b8b5aa"/>
+      <text x="${padLeft - 102}" y="${(markerY + 4).toFixed(1)}" font-size="11" fill="#6b7280" text-anchor="end">${escapeHtml(cumulativeScore)}</text>
+      <image href="${escapeHtml(milestone.icon_src)}" x="${padLeft - 92}" y="${(markerY - 10).toFixed(1)}" width="20" height="20" style="image-rendering: pixelated"/>
+      <title>${escapeHtml(`${cumulativeScore} pts: ${milestone.label} (+${milestone.weight})`)}</title>
+    </g>`;
   }).join("");
   const labels = scoredRuns.map((run, index) => {
     const color = colors[index % colors.length];
@@ -392,16 +390,14 @@ function progressChart(scoredRuns: BenchmarkScoredRun[]) {
   }).join("");
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="goal progress score by cycle">
     <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
-    <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#d8d6ce"/>
-    <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#d8d6ce"/>
-    <text x="8" y="24" font-size="12" fill="#6b7280">score</text>
-    <text x="${width - 82}" y="${height - 10}" font-size="12" fill="#6b7280">cycle</text>
-    <text x="${pad - 32}" y="${y(100) + 4}" font-size="11" fill="#6b7280">100</text>
-    <text x="${pad - 24}" y="${y(50) + 4}" font-size="11" fill="#6b7280">50</text>
-    <text x="${pad - 18}" y="${y(0) + 4}" font-size="11" fill="#6b7280">0</text>
+    <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${height - padBottom}" stroke="#9ca3af" stroke-width="1.5"/>
+    <line x1="${padLeft}" y1="${height - padBottom}" x2="${width - padRight}" y2="${height - padBottom}" stroke="#d8d6ce"/>
+    <text x="${padLeft - 112}" y="20" font-size="12" fill="#6b7280">score / milestone</text>
+    <text x="${width - 82}" y="${height - 12}" font-size="12" fill="#6b7280">cycle</text>
+    <text x="${padLeft - 18}" y="${y(0) + 4}" font-size="11" fill="#6b7280" text-anchor="end">0</text>
+    ${axisMilestones}
     ${lines}
-    ${markers}
-  </svg><div class="legend">${labels}<span><i class="icon-dot"></i>milestone first observation</span></div>`;
+  </svg><div class="legend">${labels}<span><i class="icon-dot"></i>y-axis milestone scale</span></div>`;
 }
 
 function scatterChart(scoredRuns: BenchmarkScoredRun[]) {
@@ -495,7 +491,7 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
     .icon-dot { background: #facc15; border: 1px solid #a16207; }
     .ok { color: #126b4f; font-weight: 700; }
     .missing { color: #9f3a38; font-weight: 700; }
-    .two { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr); }
+    .chart-stack { display: grid; gap: 14px; grid-template-columns: 1fr; }
     .item-label { display: inline-flex; align-items: center; gap: 8px; min-width: 220px; }
     .item-label img { width: 24px; height: 24px; image-rendering: pixelated; object-fit: contain; }
     .milestone-matrix { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
@@ -511,7 +507,7 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
     code { background: #ecebe6; padding: 2px 5px; border-radius: 4px; }
     ul { margin: 8px 0 0; padding-left: 20px; }
     li { margin: 6px 0; }
-    @media (max-width: 800px) { .two, .milestone-matrix { grid-template-columns: 1fr; } .icons-row { grid-template-columns: repeat(5, minmax(58px, 1fr)); } }
+    @media (max-width: 800px) { .milestone-matrix { grid-template-columns: 1fr; } .icons-row { grid-template-columns: repeat(5, minmax(58px, 1fr)); } }
   </style>
 </head>
 <body>
@@ -534,10 +530,10 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
     </section>
 
     <h2>Goal Progress</h2>
-    <div class="two">
+    <div class="chart-stack">
       <section class="panel">
         <h3>Score by Cycle</h3>
-        ${progressChart(bundle.scored_runs)}
+        ${progressChart(bundle.scored_runs, bundle.scoring_plan)}
       </section>
       <section class="panel">
         <h3>Score by Token Spend</h3>
