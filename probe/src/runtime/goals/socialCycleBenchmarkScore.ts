@@ -8,6 +8,10 @@ export type BenchmarkMilestoneScoringRule = {
   label: string;
   weight: number;
   expected_order: number;
+  scoring_method: "binary_observation";
+  evidence_rule: string;
+  icon_src: string;
+  icon_alt: string;
 };
 
 export type BenchmarkScoredRun = {
@@ -74,16 +78,106 @@ export type BenchmarkScoreBundle = {
 };
 
 export const FURNACE_BLOCK_SCORING_PLAN: BenchmarkMilestoneScoringRule[] = [
-  { milestone_id: "log_inventory_observed", label: "Log acquired", weight: 8, expected_order: 1 },
-  { milestone_id: "planks_inventory_observed", label: "Planks crafted", weight: 8, expected_order: 2 },
-  { milestone_id: "crafting_table_item_observed", label: "Crafting table item crafted", weight: 8, expected_order: 3 },
-  { milestone_id: "crafting_table_block_observed", label: "Crafting table placed", weight: 8, expected_order: 4 },
-  { milestone_id: "sticks_inventory_observed", label: "Sticks crafted", weight: 8, expected_order: 5 },
-  { milestone_id: "wooden_pickaxe_inventory_observed", label: "Wooden pickaxe crafted", weight: 14, expected_order: 6 },
-  { milestone_id: "cobblestone_inventory_observed", label: "Cobblestone acquired", weight: 10, expected_order: 7 },
-  { milestone_id: "cobblestone_8_observed", label: "Eight cobblestone acquired", weight: 14, expected_order: 8 },
-  { milestone_id: "furnace_item_observed", label: "Furnace item crafted", weight: 10, expected_order: 9 },
-  { milestone_id: "furnace_block_observed", label: "Furnace placed", weight: 12, expected_order: 10 }
+  {
+    milestone_id: "log_inventory_observed",
+    label: "Log acquired",
+    weight: 8,
+    expected_order: 1,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if collect_logs evidence returned status=collected at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/oak_log.png",
+    icon_alt: "log"
+  },
+  {
+    milestone_id: "planks_inventory_observed",
+    label: "Planks crafted",
+    weight: 8,
+    expected_order: 2,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if craft evidence produced an item or block ending in _planks at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/oak_planks.png",
+    icon_alt: "planks"
+  },
+  {
+    milestone_id: "crafting_table_item_observed",
+    label: "Crafting table item crafted",
+    weight: 8,
+    expected_order: 3,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if craft evidence produced crafting_table at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/crafting_table_top.png",
+    icon_alt: "crafting table item"
+  },
+  {
+    milestone_id: "crafting_table_block_observed",
+    label: "Crafting table placed",
+    weight: 8,
+    expected_order: 4,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if place_block evidence placed crafting_table at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/crafting_table_top.png",
+    icon_alt: "placed crafting table"
+  },
+  {
+    milestone_id: "sticks_inventory_observed",
+    label: "Sticks crafted",
+    weight: 8,
+    expected_order: 5,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if craft evidence produced stick at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/items/stick.png",
+    icon_alt: "stick"
+  },
+  {
+    milestone_id: "wooden_pickaxe_inventory_observed",
+    label: "Wooden pickaxe crafted",
+    weight: 14,
+    expected_order: 6,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if craft evidence produced wooden_pickaxe at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/items/wooden_pickaxe.png",
+    icon_alt: "wooden pickaxe"
+  },
+  {
+    milestone_id: "cobblestone_inventory_observed",
+    label: "Cobblestone acquired",
+    weight: 10,
+    expected_order: 7,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if mining or collection evidence observed cobblestone inventory at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/cobblestone.png",
+    icon_alt: "cobblestone"
+  },
+  {
+    milestone_id: "cobblestone_8_observed",
+    label: "Eight cobblestone acquired",
+    weight: 14,
+    expected_order: 8,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if observed inventory count reached at least 8 cobblestone at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/cobblestone.png",
+    icon_alt: "eight cobblestone"
+  },
+  {
+    milestone_id: "furnace_item_observed",
+    label: "Furnace item crafted",
+    weight: 10,
+    expected_order: 9,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if craft evidence produced furnace at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/furnace_front.png",
+    icon_alt: "furnace item"
+  },
+  {
+    milestone_id: "furnace_block_observed",
+    label: "Furnace placed",
+    weight: 12,
+    expected_order: 10,
+    scoring_method: "binary_observation",
+    evidence_rule: "1 if place_block evidence placed furnace at least once; otherwise 0.",
+    icon_src: "../../../../probe/node_modules/prismarine-viewer/public/textures/1.21.4/blocks/furnace_front.png",
+    icon_alt: "placed furnace"
+  }
 ];
 
 function escapeHtml(value: unknown) {
@@ -261,6 +355,10 @@ function metricCard(label: string, value: unknown, sub = "") {
   return `<section class="metric"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="sub">${escapeHtml(sub)}</div></section>`;
 }
 
+function milestoneScoreAt(run: BenchmarkScoredRun, cycleIndex: number) {
+  return run.progress_curve.find((point) => point.cycle_index === cycleIndex)?.progress_score_100 ?? 0;
+}
+
 function progressChart(scoredRuns: BenchmarkScoredRun[]) {
   const width = 900;
   const height = 280;
@@ -276,6 +374,18 @@ function progressChart(scoredRuns: BenchmarkScoredRun[]) {
     const color = colors[index % colors.length];
     return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="4"/>`;
   }).join("");
+  const markers = scoredRuns.map((run, runIndex) => {
+    const rowOffset = runIndex * 18;
+    return run.achieved_milestones.map((milestone) => {
+      const score = milestoneScoreAt(run, milestone.first_cycle);
+      const markerX = x(milestone.first_cycle) - 12;
+      const markerY = Math.max(8, y(score) - 36 - rowOffset);
+      return `<g>
+        <image href="${escapeHtml(milestone.icon_src)}" x="${markerX.toFixed(1)}" y="${markerY.toFixed(1)}" width="24" height="24" style="image-rendering: pixelated"/>
+        <title>${escapeHtml(`${run.short_model_name}: ${milestone.label}, cycle ${milestone.first_cycle}, +${milestone.weight}`)}</title>
+      </g>`;
+    }).join("");
+  }).join("");
   const labels = scoredRuns.map((run, index) => {
     const color = colors[index % colors.length];
     return `<span><i style="background:${color}"></i>${escapeHtml(run.short_model_name)}</span>`;
@@ -290,7 +400,8 @@ function progressChart(scoredRuns: BenchmarkScoredRun[]) {
     <text x="${pad - 24}" y="${y(50) + 4}" font-size="11" fill="#6b7280">50</text>
     <text x="${pad - 18}" y="${y(0) + 4}" font-size="11" fill="#6b7280">0</text>
     ${lines}
-  </svg><div class="legend">${labels}</div>`;
+    ${markers}
+  </svg><div class="legend">${labels}<span><i class="icon-dot"></i>milestone first observation</span></div>`;
 }
 
 function scatterChart(scoredRuns: BenchmarkScoredRun[]) {
@@ -322,16 +433,33 @@ function scatterChart(scoredRuns: BenchmarkScoredRun[]) {
 
 function ladder(bundle: BenchmarkScoreBundle) {
   const runs = bundle.scored_runs;
-  return `<table><thead><tr><th>Milestone</th><th>Weight</th>${runs.map((run) => `<th>${escapeHtml(run.short_model_name)}</th>`).join("")}</tr></thead><tbody>
+  return `<table><thead><tr><th>Milestone</th><th>Rule</th><th>Weight</th>${runs.map((run) => `<th>${escapeHtml(run.short_model_name)}</th>`).join("")}</tr></thead><tbody>
     ${bundle.scoring_plan.map((rule) => `<tr>
-      <td>${escapeHtml(rule.expected_order)}. ${escapeHtml(rule.label)}</td>
+      <td><span class="item-label"><img src="${escapeHtml(rule.icon_src)}" alt="${escapeHtml(rule.icon_alt)}">${escapeHtml(rule.expected_order)}. ${escapeHtml(rule.label)}</span></td>
+      <td><code>observed ? ${escapeHtml(rule.weight)} : 0</code><br><span class="muted">${escapeHtml(rule.evidence_rule)}</span></td>
       <td>${escapeHtml(rule.weight)}</td>
       ${runs.map((run) => {
         const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === rule.milestone_id);
-        return `<td>${achieved ? `<span class="ok">cycle ${escapeHtml(achieved.first_cycle)}</span>` : `<span class="missing">missing</span>`}</td>`;
+        return `<td>${achieved ? `<span class="ok">1 x ${escapeHtml(rule.weight)} = ${escapeHtml(rule.weight)}<br>cycle ${escapeHtml(achieved.first_cycle)}</span>` : `<span class="missing">0 x ${escapeHtml(rule.weight)} = 0</span>`}</td>`;
       }).join("")}
     </tr>`).join("")}
   </tbody></table>`;
+}
+
+function iconMatrix(bundle: BenchmarkScoreBundle) {
+  return `<div class="milestone-matrix">${bundle.scored_runs.map((run) => `<section class="run-strip">
+    <h3>${escapeHtml(run.short_model_name)} · ${escapeHtml(run.progress_score_100)}/100</h3>
+    <div class="icons-row">
+      ${bundle.scoring_plan.map((rule) => {
+        const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === rule.milestone_id);
+        return `<div class="milestone-icon ${achieved ? "achieved" : "missed"}">
+          <img src="${escapeHtml(rule.icon_src)}" alt="${escapeHtml(rule.icon_alt)}">
+          <div class="points">${achieved ? `+${escapeHtml(rule.weight)}` : "0"}</div>
+          <div class="cycle">${achieved ? `C${escapeHtml(achieved.first_cycle)}` : "miss"}</div>
+        </div>`;
+      }).join("")}
+    </div>
+  </section>`).join("")}</div>`;
 }
 
 export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
@@ -364,13 +492,26 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
     svg { width: 100%; height: auto; border: 1px solid #d8d6ce; border-radius: 8px; }
     .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; color: #4b5563; font-size: 13px; }
     .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+    .icon-dot { background: #facc15; border: 1px solid #a16207; }
     .ok { color: #126b4f; font-weight: 700; }
     .missing { color: #9f3a38; font-weight: 700; }
     .two { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr); }
+    .item-label { display: inline-flex; align-items: center; gap: 8px; min-width: 220px; }
+    .item-label img { width: 24px; height: 24px; image-rendering: pixelated; object-fit: contain; }
+    .milestone-matrix { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+    .run-strip { background: #fff; border: 1px solid #d8d6ce; border-radius: 8px; padding: 14px; }
+    .run-strip h3 { margin-top: 0; }
+    .icons-row { display: grid; gap: 8px; grid-template-columns: repeat(10, minmax(58px, 1fr)); }
+    .milestone-icon { min-height: 86px; border: 1px solid #d8d6ce; border-radius: 8px; padding: 8px 4px; text-align: center; background: #f8fafc; }
+    .milestone-icon img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
+    .milestone-icon.achieved { background: #ecfdf3; border-color: #72c596; }
+    .milestone-icon.missed { opacity: 0.55; filter: grayscale(1); }
+    .milestone-icon .points { margin-top: 4px; font-size: 12px; font-weight: 750; }
+    .milestone-icon .cycle { margin-top: 2px; color: #6b7280; font-size: 11px; }
     code { background: #ecebe6; padding: 2px 5px; border-radius: 4px; }
     ul { margin: 8px 0 0; padding-left: 20px; }
     li { margin: 6px 0; }
-    @media (max-width: 800px) { .two { grid-template-columns: 1fr; } }
+    @media (max-width: 800px) { .two, .milestone-matrix { grid-template-columns: 1fr; } .icons-row { grid-template-columns: repeat(5, minmax(58px, 1fr)); } }
   </style>
 </head>
 <body>
@@ -386,6 +527,12 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
       ${metricCard("Scoring scope", "objective progress", "schema/tool-call behavior excluded")}
     </section>
 
+    <h2>Scoring Formula</h2>
+    <section class="note">
+      <p>Each milestone is binary: <code>milestone points = observed ? weight : 0</code>. The final score is the sum of those binary milestone points. For example, <code>Log acquired</code> is worth 8 points only after runtime evidence observes log collection at least once; otherwise it contributes 0 points.</p>
+      <p>This does not grant partial credit inside a milestone. A model with one log and a model with ten logs both get the same 8 points for <code>Log acquired</code>; resource quantity only matters when a separate milestone encodes it, such as <code>Eight cobblestone acquired</code>.</p>
+    </section>
+
     <h2>Goal Progress</h2>
     <div class="two">
       <section class="panel">
@@ -397,6 +544,9 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
         ${scatterChart(bundle.scored_runs)}
       </section>
     </div>
+
+    <h2>Minecraft Milestone Icons</h2>
+    ${iconMatrix(bundle)}
 
     <h2>Milestone Ladder</h2>
     ${ladder(bundle)}
