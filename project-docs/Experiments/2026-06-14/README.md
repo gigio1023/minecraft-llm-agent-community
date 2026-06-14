@@ -21,6 +21,9 @@ Status: active dated experiment record.
   score report with milestone ladder, progress/cost charts, and benchmark
   readiness notes.
 - `placed-furnace-natural-60/README.md` - run setup, quota summary, and review.
+- `provider-quota-preflight-gpt55/README.md` - provider/model quota preflight
+  showing that `gpt-5.5` remains blocked for the 60-cycle benchmark while Qwen
+  Max/Plus remain under monthly API-call caps.
 - `natural-stone-tool-world-smoke/README.md` - rejected dense bamboo-jungle
   seed smoke kept for audit history.
 
