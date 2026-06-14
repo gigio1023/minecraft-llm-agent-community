@@ -355,12 +355,23 @@ function metricCard(label: string, value: unknown, sub = "") {
   return `<section class="metric"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="sub">${escapeHtml(sub)}</div></section>`;
 }
 
+function formatTokenTick(value: number) {
+  if (value === 0) {
+    return "0";
+  }
+  return `${round(value / 1_000_000, 1)}M`;
+}
+
+function ceilToStep(value: number, step: number) {
+  return Math.max(step, Math.ceil(value / step) * step);
+}
+
 function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkMilestoneScoringRule[]) {
-  const width = 980;
-  const height = 360;
-  const padLeft = 136;
+  const width = 1100;
+  const height = 430;
+  const padLeft = 236;
   const padRight = 42;
-  const padTop = 30;
+  const padTop = 34;
   const padBottom = 48;
   const innerW = width - padLeft - padRight;
   const innerH = height - padTop - padBottom;
@@ -373,14 +384,25 @@ function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkM
     const color = colors[index % colors.length];
     return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="4"/>`;
   }).join("");
+  const eventMarkers = scoredRuns.map((run, index) => {
+    const color = colors[index % colors.length];
+    return run.achieved_milestones.map((milestone) => {
+      const score = run.progress_curve.find((point) => point.cycle_index === milestone.first_cycle)?.progress_score_100 ?? 0;
+      return `<circle cx="${x(milestone.first_cycle).toFixed(1)}" cy="${y(score).toFixed(1)}" r="4.5" fill="#fff" stroke="${color}" stroke-width="3">
+        <title>${escapeHtml(`${run.short_model_name}: ${milestone.label}, cycle ${milestone.first_cycle}, score ${score}`)}</title>
+      </circle>`;
+    }).join("");
+  }).join("");
   let cumulativeScore = 0;
   const axisMilestones = scoringPlan.map((milestone) => {
     cumulativeScore += milestone.weight;
     const markerY = y(cumulativeScore);
     return `<g>
-      <line x1="${padLeft - 8}" y1="${markerY.toFixed(1)}" x2="${padLeft}" y2="${markerY.toFixed(1)}" stroke="#b8b5aa"/>
-      <text x="${padLeft - 102}" y="${(markerY + 4).toFixed(1)}" font-size="11" fill="#6b7280" text-anchor="end">${escapeHtml(cumulativeScore)}</text>
-      <image href="${escapeHtml(milestone.icon_src)}" x="${padLeft - 92}" y="${(markerY - 10).toFixed(1)}" width="20" height="20" style="image-rendering: pixelated"/>
+      <line x1="${padLeft}" y1="${markerY.toFixed(1)}" x2="${width - padRight}" y2="${markerY.toFixed(1)}" stroke="#e3e0d8" stroke-dasharray="4 5"/>
+      <line x1="${padLeft - 10}" y1="${markerY.toFixed(1)}" x2="${padLeft}" y2="${markerY.toFixed(1)}" stroke="#9ca3af"/>
+      <text x="${padLeft - 186}" y="${(markerY + 4).toFixed(1)}" font-size="11" fill="#4b5563" text-anchor="start">${escapeHtml(cumulativeScore)}</text>
+      <image href="${escapeHtml(milestone.icon_src)}" x="${padLeft - 158}" y="${(markerY - 11).toFixed(1)}" width="22" height="22" style="image-rendering: pixelated"/>
+      <text x="${padLeft - 128}" y="${(markerY + 4).toFixed(1)}" font-size="10.5" fill="#4b5563">${escapeHtml(milestone.label)}</text>
       <title>${escapeHtml(`${cumulativeScore} pts: ${milestone.label} (+${milestone.weight})`)}</title>
     </g>`;
   }).join("");
@@ -397,32 +419,52 @@ function progressChart(scoredRuns: BenchmarkScoredRun[], scoringPlan: BenchmarkM
     <text x="${padLeft - 18}" y="${y(0) + 4}" font-size="11" fill="#6b7280" text-anchor="end">0</text>
     ${axisMilestones}
     ${lines}
-  </svg><div class="legend">${labels}<span><i class="icon-dot"></i>y-axis milestone scale</span></div>`;
+    ${eventMarkers}
+  </svg><div class="legend">${labels}<span><i class="icon-dot"></i>milestone gridline</span><span><i class="event-dot"></i>first observed milestone</span></div>`;
 }
 
 function scatterChart(scoredRuns: BenchmarkScoredRun[]) {
-  const width = 640;
-  const height = 260;
-  const pad = 42;
-  const innerW = width - pad * 2;
-  const innerH = height - pad * 2;
+  const width = 980;
+  const height = 360;
+  const padLeft = 70;
+  const padRight = 48;
+  const padTop = 30;
+  const padBottom = 58;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBottom;
   const maxTokens = Math.max(1, ...scoredRuns.map((run) => run.provider_usage.total_tokens));
-  const x = (tokens: number) => pad + (tokens / maxTokens) * innerW;
-  const y = (score: number) => pad + innerH - (score / 100) * innerH;
+  const xMax = ceilToStep(maxTokens, 500_000);
+  const x = (tokens: number) => padLeft + (tokens / xMax) * innerW;
+  const y = (score: number) => padTop + innerH - (score / 100) * innerH;
   const colors = ["#126b4f", "#9f3a38", "#2f5f98", "#7a4f01"];
+  const xTicks = Array.from({ length: Math.floor(xMax / 500_000) + 1 }, (_, index) => index * 500_000)
+    .filter((tick, index, ticks) => ticks.length <= 8 || index % 2 === 0 || index === ticks.length - 1);
+  const yTicks = [0, 20, 40, 60, 80, 100];
+  const grid = [
+    ...xTicks.map((tick) => `<g>
+      <line x1="${x(tick).toFixed(1)}" y1="${padTop}" x2="${x(tick).toFixed(1)}" y2="${height - padBottom}" stroke="#ecebe6"/>
+      <text x="${x(tick).toFixed(1)}" y="${height - 24}" font-size="11" fill="#6b7280" text-anchor="middle">${escapeHtml(formatTokenTick(tick))}</text>
+    </g>`),
+    ...yTicks.map((tick) => `<g>
+      <line x1="${padLeft}" y1="${y(tick).toFixed(1)}" x2="${width - padRight}" y2="${y(tick).toFixed(1)}" stroke="#ecebe6"/>
+      <text x="${padLeft - 12}" y="${(y(tick) + 4).toFixed(1)}" font-size="11" fill="#6b7280" text-anchor="end">${escapeHtml(tick)}</text>
+    </g>`)
+  ].join("");
   const points = scoredRuns.map((run, index) => {
     const color = colors[index % colors.length];
     return `<g>
       <circle cx="${x(run.provider_usage.total_tokens).toFixed(1)}" cy="${y(run.progress_score_100).toFixed(1)}" r="7" fill="${color}"/>
-      <text x="${x(run.provider_usage.total_tokens) + 10}" y="${y(run.progress_score_100) + 4}" font-size="12" fill="#1f2937">${escapeHtml(run.short_model_name)}</text>
+      <text x="${x(run.provider_usage.total_tokens) + 12}" y="${y(run.progress_score_100) + 4}" font-size="12" fill="#1f2937">${escapeHtml(run.short_model_name)}</text>
+      <title>${escapeHtml(`${run.short_model_name}: ${run.progress_score_100}/100 at ${formatNumber(run.provider_usage.total_tokens)} tokens`)}</title>
     </g>`;
   }).join("");
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="progress score by total tokens">
     <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
-    <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#d8d6ce"/>
-    <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#d8d6ce"/>
-    <text x="8" y="24" font-size="12" fill="#6b7280">score</text>
-    <text x="${width - 118}" y="${height - 10}" font-size="12" fill="#6b7280">total tokens</text>
+    ${grid}
+    <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${height - padBottom}" stroke="#9ca3af" stroke-width="1.5"/>
+    <line x1="${padLeft}" y1="${height - padBottom}" x2="${width - padRight}" y2="${height - padBottom}" stroke="#9ca3af" stroke-width="1.5"/>
+    <text x="12" y="20" font-size="12" fill="#6b7280">score</text>
+    <text x="${width - 134}" y="${height - 10}" font-size="12" fill="#6b7280">total tokens</text>
     ${points}
   </svg>`;
 }
@@ -450,6 +492,7 @@ function iconMatrix(bundle: BenchmarkScoreBundle) {
         const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === rule.milestone_id);
         return `<div class="milestone-icon ${achieved ? "achieved" : "missed"}">
           <img src="${escapeHtml(rule.icon_src)}" alt="${escapeHtml(rule.icon_alt)}">
+          <div class="milestone-name">${escapeHtml(rule.label)}</div>
           <div class="points">${achieved ? `+${escapeHtml(rule.weight)}` : "0"}</div>
           <div class="cycle">${achieved ? `C${escapeHtml(achieved.first_cycle)}` : "miss"}</div>
         </div>`;
@@ -489,25 +532,27 @@ export function formatBenchmarkScoreHtml(bundle: BenchmarkScoreBundle) {
     .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; color: #4b5563; font-size: 13px; }
     .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
     .icon-dot { background: #facc15; border: 1px solid #a16207; }
+    .event-dot { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #126b4f; }
     .ok { color: #126b4f; font-weight: 700; }
     .missing { color: #9f3a38; font-weight: 700; }
     .chart-stack { display: grid; gap: 14px; grid-template-columns: 1fr; }
     .item-label { display: inline-flex; align-items: center; gap: 8px; min-width: 220px; }
     .item-label img { width: 24px; height: 24px; image-rendering: pixelated; object-fit: contain; }
-    .milestone-matrix { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+    .milestone-matrix { display: grid; gap: 14px; grid-template-columns: 1fr; }
     .run-strip { background: #fff; border: 1px solid #d8d6ce; border-radius: 8px; padding: 14px; }
     .run-strip h3 { margin-top: 0; }
-    .icons-row { display: grid; gap: 8px; grid-template-columns: repeat(10, minmax(58px, 1fr)); }
-    .milestone-icon { min-height: 86px; border: 1px solid #d8d6ce; border-radius: 8px; padding: 8px 4px; text-align: center; background: #f8fafc; }
+    .icons-row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+    .milestone-icon { min-height: 118px; border: 1px solid #d8d6ce; border-radius: 8px; padding: 9px 6px; text-align: center; background: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
     .milestone-icon img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
     .milestone-icon.achieved { background: #ecfdf3; border-color: #72c596; }
     .milestone-icon.missed { opacity: 0.55; filter: grayscale(1); }
+    .milestone-icon .milestone-name { margin-top: 6px; min-height: 28px; font-size: 11px; line-height: 1.25; color: #374151; }
     .milestone-icon .points { margin-top: 4px; font-size: 12px; font-weight: 750; }
     .milestone-icon .cycle { margin-top: 2px; color: #6b7280; font-size: 11px; }
     code { background: #ecebe6; padding: 2px 5px; border-radius: 4px; }
     ul { margin: 8px 0 0; padding-left: 20px; }
     li { margin: 6px 0; }
-    @media (max-width: 800px) { .milestone-matrix { grid-template-columns: 1fr; } .icons-row { grid-template-columns: repeat(5, minmax(58px, 1fr)); } }
+    @media (max-width: 800px) { .icons-row { grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)); } }
   </style>
 </head>
 <body>
