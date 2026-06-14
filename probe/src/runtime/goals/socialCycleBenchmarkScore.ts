@@ -451,20 +451,47 @@ function axisModelLabel(shortModelNameValue: string) {
 
 function itemStateTimeline(scoredRuns: BenchmarkScoredRun[]) {
   const width = 1160;
-  const rowHeight = 62;
-  const padLeft = 186;
+  const rowHeight = 104;
+  const padLeft = 226;
   const padRight = 42;
-  const padTop = 46;
-  const padBottom = 52;
+  const padTop = 74;
+  const padBottom = 72;
   const height = padTop + FURNACE_ITEM_STATE_ROWS.length * rowHeight + padBottom;
   const innerW = width - padLeft - padRight;
   const colors = ["#126b4f", "#9f3a38", "#2f5f98", "#7a4f01"];
   const maxCycle = Math.max(1, ...scoredRuns.flatMap((run) => run.progress_curve.map((point) => point.cycle_index)));
   const x = (cycle: number) => padLeft + (cycle / maxCycle) * innerW;
   const cycleTicks = [0, 10, 20, 30, 40, 50, 60].filter((tick) => tick <= maxCycle);
-  const modelOffset = (index: number) => {
-    const offsets = scoredRuns.length === 1 ? [0] : scoredRuns.length === 2 ? [-9, 9] : [-14, 0, 14, 28];
-    return offsets[index] ?? 0;
+  const laneGap = Math.min(20, Math.floor((rowHeight - 38) / Math.max(1, scoredRuns.length - 1)));
+  const laneStartOffset = -((scoredRuns.length - 1) * laneGap) / 2;
+  const laneY = (rowY: number, index: number) => rowY + laneStartOffset + index * laneGap;
+  const eventShape = (step: ItemStateFigureStep, markerX: number, markerY: number, color: string) => {
+    const title = `${step.state_label}`;
+    if (step.state_code === "place") {
+      const points = [
+        `${markerX.toFixed(1)},${(markerY - 7).toFixed(1)}`,
+        `${(markerX - 7).toFixed(1)},${(markerY + 7).toFixed(1)}`,
+        `${(markerX + 7).toFixed(1)},${(markerY + 7).toFixed(1)}`
+      ].join(" ");
+      return `<polygon points="${points}" fill="#fff" stroke="${color}" stroke-width="3"><title>${escapeHtml(title)}</title></polygon>`;
+    }
+    if (step.state_code === "craft") {
+      return `<rect x="${(markerX - 6.5).toFixed(1)}" y="${(markerY - 6.5).toFixed(1)}" width="13" height="13" rx="2" fill="#fff" stroke="${color}" stroke-width="3"><title>${escapeHtml(title)}</title></rect>`;
+    }
+    if (step.state_code === "1+" || step.state_code === "8+") {
+      const points = [
+        `${markerX.toFixed(1)},${(markerY - 8).toFixed(1)}`,
+        `${(markerX + 8).toFixed(1)},${markerY.toFixed(1)}`,
+        `${markerX.toFixed(1)},${(markerY + 8).toFixed(1)}`,
+        `${(markerX - 8).toFixed(1)},${markerY.toFixed(1)}`
+      ].join(" ");
+      return `<g>
+        <polygon points="${points}" fill="#fff" stroke="${color}" stroke-width="3"/>
+        <text x="${markerX.toFixed(1)}" y="${(markerY + 3.2).toFixed(1)}" font-size="7.5" font-weight="800" fill="${color}" text-anchor="middle">${escapeHtml(step.state_code)}</text>
+        <title>${escapeHtml(title)}</title>
+      </g>`;
+    }
+    return `<circle cx="${markerX.toFixed(1)}" cy="${markerY.toFixed(1)}" r="6.5" fill="#fff" stroke="${color}" stroke-width="3"><title>${escapeHtml(title)}</title></circle>`;
   };
   const grid = cycleTicks.map((tick) => `<g>
     <line x1="${x(tick).toFixed(1)}" y1="${padTop - 12}" x2="${x(tick).toFixed(1)}" y2="${height - padBottom + 12}" stroke="#ecebe6"/>
@@ -472,31 +499,33 @@ function itemStateTimeline(scoredRuns: BenchmarkScoredRun[]) {
   </g>`).join("");
   const rows = FURNACE_ITEM_STATE_ROWS.map((row, rowIndex) => {
     const rowY = padTop + rowIndex * rowHeight + rowHeight / 2;
-    const stateMarkers = scoredRuns.map((run, runIndex) => {
+    const lanes = scoredRuns.map((run, runIndex) => {
       const color = colors[runIndex % colors.length];
-      const runY = rowY + modelOffset(runIndex);
-      return row.steps.map((step, stepIndex) => {
+      const runY = laneY(rowY, runIndex);
+      const markers = row.steps.map((step) => {
         const achieved = run.achieved_milestones.find((milestone) => milestone.milestone_id === step.milestone_id);
         if (!achieved) {
           return "";
         }
         const markerX = x(achieved.first_cycle);
-        const labelY = runY + (stepIndex % 2 === 0 ? -10 : 18);
         return `<g>
-          <line x1="${markerX.toFixed(1)}" y1="${runY.toFixed(1)}" x2="${markerX.toFixed(1)}" y2="${labelY.toFixed(1)}" stroke="${color}" stroke-width="1.2"/>
-          <circle cx="${markerX.toFixed(1)}" cy="${runY.toFixed(1)}" r="6" fill="#fff" stroke="${color}" stroke-width="3"/>
-          <text x="${(markerX + 9).toFixed(1)}" y="${(labelY + 4).toFixed(1)}" font-size="10.5" fill="${color}">${escapeHtml(`${axisModelLabel(run.short_model_name)} ${step.state_code} C${achieved.first_cycle}`)}</text>
+          ${eventShape(step, markerX, runY, color)}
           <title>${escapeHtml(`${run.short_model_name}: ${row.item_label} ${step.state_label}, cycle ${achieved.first_cycle}`)}</title>
         </g>`;
       }).join("");
+      return `<g>
+        <line x1="${padLeft}" y1="${runY.toFixed(1)}" x2="${width - padRight}" y2="${runY.toFixed(1)}" stroke="${color}" stroke-opacity="0.22" stroke-width="3"/>
+        <text x="${padLeft - 14}" y="${(runY + 3.5).toFixed(1)}" font-size="10.5" fill="${color}" text-anchor="end">${escapeHtml(axisModelLabel(run.short_model_name))}</text>
+        ${markers}
+      </g>`;
     }).join("");
     return `<g>
       <rect x="0" y="${(rowY - rowHeight / 2 + 1).toFixed(1)}" width="${width}" height="${rowHeight - 2}" fill="${rowIndex % 2 === 0 ? "#ffffff" : "#fafafa"}"/>
-      <line x1="${padLeft}" y1="${rowY.toFixed(1)}" x2="${width - padRight}" y2="${rowY.toFixed(1)}" stroke="#d8d6ce"/>
+      <line x1="0" y1="${(rowY + rowHeight / 2 - 1).toFixed(1)}" x2="${width}" y2="${(rowY + rowHeight / 2 - 1).toFixed(1)}" stroke="#ecebe6"/>
       <image href="${escapeHtml(row.icon_src)}" x="22" y="${(rowY - 17).toFixed(1)}" width="34" height="34" style="image-rendering: pixelated"/>
-      <text x="66" y="${(rowY - 2).toFixed(1)}" font-size="13" font-weight="700" fill="#1f2937">${escapeHtml(row.item_label)}</text>
-      <text x="66" y="${(rowY + 14).toFixed(1)}" font-size="10.5" fill="#6b7280">${escapeHtml(row.steps.map((step) => step.state_label).join(" -> "))}</text>
-      ${stateMarkers}
+      <text x="66" y="${(rowY - 5).toFixed(1)}" font-size="13" font-weight="700" fill="#1f2937">${escapeHtml(row.item_label)}</text>
+      <text x="66" y="${(rowY + 12).toFixed(1)}" font-size="10.5" fill="#6b7280">${escapeHtml(row.steps.map((step) => step.state_label).join(" -> "))}</text>
+      ${lanes}
     </g>`;
   }).join("");
   const labels = scoredRuns.map((run, index) => {
@@ -506,6 +535,17 @@ function itemStateTimeline(scoredRuns: BenchmarkScoredRun[]) {
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="item grouped milestone timeline">
     <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
     <text x="20" y="22" font-size="13" font-weight="700" fill="#1f2937">Figure A. Item-state timeline</text>
+    <text x="20" y="44" font-size="11" fill="#6b7280">Rows are Minecraft items; each colored lane is one model. Marker shape encodes the state, while the table below gives exact cycle labels.</text>
+    <g transform="translate(${padLeft}, 32)">
+      <circle cx="0" cy="0" r="5.5" fill="#fff" stroke="#4b5563" stroke-width="2"/>
+      <text x="12" y="4" font-size="10.5" fill="#4b5563">acquired</text>
+      <rect x="82" y="-5.5" width="11" height="11" rx="2" fill="#fff" stroke="#4b5563" stroke-width="2"/>
+      <text x="101" y="4" font-size="10.5" fill="#4b5563">crafted</text>
+      <polygon points="180,-6 174,6 186,6" fill="#fff" stroke="#4b5563" stroke-width="2"/>
+      <text x="196" y="4" font-size="10.5" fill="#4b5563">placed</text>
+      <polygon points="270,-7 277,0 270,7 263,0" fill="#fff" stroke="#4b5563" stroke-width="2"/>
+      <text x="286" y="4" font-size="10.5" fill="#4b5563">quantity threshold</text>
+    </g>
     <text x="${width - 118}" y="${height - 10}" font-size="12" fill="#6b7280">cycle</text>
     ${grid}
     ${rows}
