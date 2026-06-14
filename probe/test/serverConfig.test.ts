@@ -96,6 +96,34 @@ test("parses fixed Minecraft host port option", () => {
   }
 });
 
+test("allows scoped Minecraft server version override", () => {
+  const originalProbeServerVersion = process.env.PROBE_SERVER_VERSION;
+  const originalMcVersion = process.env.MC_VERSION;
+
+  try {
+    process.env.PROBE_SERVER_VERSION = "1.21.4";
+    delete process.env.MC_VERSION;
+
+    const config = loadProbeConfig();
+    const env = buildServerEnv(config);
+
+    assert.equal(config.server.version, "1.21.4");
+    assert.equal(env.VERSION, "1.21.4");
+  } finally {
+    if (originalProbeServerVersion === undefined) {
+      delete process.env.PROBE_SERVER_VERSION;
+    } else {
+      process.env.PROBE_SERVER_VERSION = originalProbeServerVersion;
+    }
+
+    if (originalMcVersion === undefined) {
+      delete process.env.MC_VERSION;
+    } else {
+      process.env.MC_VERSION = originalMcVersion;
+    }
+  }
+});
+
 test("uses a longer timeout for docker compose up while keeping compose port and down bounded", () => {
   const config = loadProbeConfig();
   const timeouts = getComposeCommandTimeouts(config);

@@ -28,6 +28,7 @@ function parseArgs(argv: string[]) {
     isolateWorkspace?: boolean;
     freshWorld?: boolean;
     worldScenario?: WorldScenarioId;
+    benchmarkTask?: string;
     worldSeed?: string;
     levelType?: string;
     prepareSpawnAccess?: boolean;
@@ -35,6 +36,7 @@ function parseArgs(argv: string[]) {
     geminiModelRotation?: string[];
     visualEvidence?: boolean;
     visualEvidenceIntervalCycles?: number;
+    visualEvidenceCameraMode?: "first_person" | "third_person" | "both";
     visualEvidencePort?: number;
     visualEvidenceWidth?: number;
     visualEvidenceHeight?: number;
@@ -81,6 +83,9 @@ function parseArgs(argv: string[]) {
     } else if (arg === "--world-scenario" && next) {
       options.worldScenario = parseWorldScenarioId(next);
       index++;
+    } else if (arg === "--benchmark-task" && next) {
+      options.benchmarkTask = next;
+      index++;
     } else if (arg === "--world-seed" && next) {
       options.worldSeed = next;
       index++;
@@ -99,6 +104,9 @@ function parseArgs(argv: string[]) {
     } else if (arg === "--visual-evidence-interval" && next) {
       options.visualEvidenceIntervalCycles = Number(next);
       index++;
+    } else if (arg === "--visual-evidence-camera" && next) {
+      options.visualEvidenceCameraMode = parseVisualEvidenceCameraMode(next);
+      index++;
     } else if (arg === "--visual-evidence-port" && next) {
       options.visualEvidencePort = Number(next);
       index++;
@@ -114,6 +122,20 @@ function parseArgs(argv: string[]) {
   return options;
 }
 
+function parseVisualEvidenceCameraMode(value: string | undefined): "first_person" | "third_person" | "both" | undefined {
+  const normalized = value?.trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "first_person" || normalized === "first") {
+    return "first_person";
+  }
+  if (normalized === "third_person" || normalized === "third") {
+    return "third_person";
+  }
+  if (normalized === "both" || normalized === "dual") {
+    return "both";
+  }
+  return undefined;
+}
+
 function parseCsvList(value: string | undefined) {
   return (value ?? "")
     .split(",")
@@ -122,7 +144,12 @@ function parseCsvList(value: string | undefined) {
 }
 
 function normalizeSocialCycleProvider(value: string | undefined): SocialCycleProviderId | undefined {
-  if (value === "openai-api" || value === "gemini-api" || value === "deterministic-social") {
+  if (
+    value === "openai-api" ||
+    value === "gemini-api" ||
+    value === "modelscope-api" ||
+    value === "deterministic-social"
+  ) {
     return value;
   }
   return undefined;
@@ -140,16 +167,23 @@ function optionalPositiveInteger(value: number | string | undefined) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function defaultModelForProvider(providerId: SocialCycleProviderId) {
-  if (providerId === "gemini-api") {
-    return process.env.GEMINI_MODEL ?? "gemma-4-31b-it";
-  }
-  if (providerId === "openai-api") {
-    const openAiModel = process.env.OPENAI_MODEL?.trim();
-    if (!openAiModel) {
-      throw new Error("--model or OPENAI_MODEL is required for --provider openai-api");
+function resolveModelForProvider(input: {
+  providerId: SocialCycleProviderId;
+  model: string | undefined;
+}) {
+  const explicitModel = input.model?.trim();
+  if (
+    input.providerId === "openai-api" ||
+    input.providerId === "gemini-api" ||
+    input.providerId === "modelscope-api"
+  ) {
+    if (!explicitModel) {
+      throw new Error(
+        `--model is required for --provider ${input.providerId}. ` +
+          "Do not rely on OPENAI_MODEL, GEMINI_MODEL, or SOCIAL_CYCLE_MODEL for benchmark runs."
+      );
     }
-    return openAiModel;
+    return explicitModel;
   }
   return "deterministic-social";
 }
@@ -158,7 +192,7 @@ async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../..");
   loadRepoDotEnv(repoRoot, {
-    overrideKeys: ["OPENAI_API_KEY", "OPENAI_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL"]
+    overrideKeys: ["OPENAI_API_KEY", "GEMINI_API_KEY", "MODELSCOPE_API_KEY", "MODELSCOPE_BASE_URL"]
   });
 
   const parsed = parseArgs(process.argv.slice(2));
@@ -169,10 +203,8 @@ async function main() {
     parsed.provider ??
     normalizeSocialCycleProvider(process.env.SOCIAL_CYCLE_PROVIDER) ??
     "deterministic-social";
-  const model = parsed.model ?? process.env.SOCIAL_CYCLE_MODEL ?? defaultModelForProvider(providerId);
-  const geminiModelRotation =
-    parsed.geminiModelRotation ??
-    parseCsvList(process.env.SOCIAL_CYCLE_GEMINI_MODEL_ROTATION || process.env.GEMINI_MODEL_ROTATION);
+  const model = resolveModelForProvider({ providerId, model: parsed.model });
+  const geminiModelRotation = parsed.geminiModelRotation;
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const visualEvidenceEnabled =
@@ -195,6 +227,7 @@ async function main() {
     isolateWorkspace: parsed.isolateWorkspace,
     freshWorld: parsed.freshWorld,
     worldScenario,
+    benchmarkTask: parsed.benchmarkTask,
     worldSeed: parsed.worldSeed,
     levelType: parsed.levelType,
     prepareSpawnAccess: parsed.prepareSpawnAccess,
@@ -206,6 +239,9 @@ async function main() {
           intervalCycles: optionalPositiveInteger(
             parsed.visualEvidenceIntervalCycles ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_INTERVAL
           ),
+          cameraMode:
+            parsed.visualEvidenceCameraMode ??
+            parseVisualEvidenceCameraMode(process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_CAMERA),
           port: optionalPositiveInteger(
             parsed.visualEvidencePort ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_PORT
           ),

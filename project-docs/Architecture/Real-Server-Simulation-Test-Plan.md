@@ -48,7 +48,6 @@ Gemini social-cycle provider for cost-sensitive live checks:
 ```text
 # repo-root .env
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemma-4-31b-it
 ```
 
 OpenAI social-cycle provider is explicit opt-in only:
@@ -56,7 +55,6 @@ OpenAI social-cycle provider is explicit opt-in only:
 ```text
 # repo-root .env
 OPENAI_API_KEY=...
-OPENAI_MODEL=...
 ```
 
 Before long free-tier runs, encode current dashboard usage in

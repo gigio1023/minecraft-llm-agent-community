@@ -15,6 +15,10 @@ import {
 } from "../skills/generated/authoringSchemas.js";
 import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import type { JsonValue } from "./inputSnapshot.js";
+import {
+  callModelScopeJsonSchema,
+  type ModelScopeApiProviderConfig
+} from "./modelscopeApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
@@ -194,7 +198,7 @@ async function writeFailureOutput(input: {
 }
 
 export async function runMineflayerCodegenProvider(input: {
-  providerId: Extract<SocialCycleProviderId, "openai-api" | "gemini-api">;
+  providerId: Extract<SocialCycleProviderId, "openai-api" | "gemini-api" | "modelscope-api">;
   actorWorkspaceRootDir: string;
   actorId: string;
   actorTurnInput: ActorTurnInput;
@@ -202,6 +206,7 @@ export async function runMineflayerCodegenProvider(input: {
   parsedAuthorToolArgs: ActorTurnAuthorMineflayerActionArgs;
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
+  modelScope?: ModelScopeApiProviderConfig;
   runId?: string;
   snapshotId: string;
 }): Promise<MineflayerCodegenProviderResult> {
@@ -236,7 +241,13 @@ export async function runMineflayerCodegenProvider(input: {
       actor_id: input.actorId,
       turn_id: input.actorTurnInput.turn_id,
       provider_id: input.providerId,
-      model: (input.providerId === "openai-api" ? input.openAi?.model : input.gemini?.model) ?? "unknown",
+      model: (
+        input.providerId === "openai-api"
+          ? input.openAi?.model
+          : input.providerId === "modelscope-api"
+            ? input.modelScope?.model
+            : input.gemini?.model
+      ) ?? "unknown",
       created_at: new Date().toISOString(),
       input: request as unknown as JsonValue
     });
@@ -245,6 +256,11 @@ export async function runMineflayerCodegenProvider(input: {
           config: input.openAi!,
           ...payload
         })
+      : input.providerId === "modelscope-api"
+        ? await callModelScopeJsonSchema<{ mineflayer_codegen: unknown }>({
+            config: input.modelScope!,
+            ...payload
+          })
       : await callGeminiJsonSchema<{ mineflayer_codegen: unknown }>({
           config: input.gemini!,
           ...payload

@@ -191,7 +191,7 @@ Start in these files:
 
 Success criteria for the next implementation slice:
 
-- `bun test test/worldScenarios.test.ts` fails before the RCON-output fix and
+- `bun test ./test/worldScenarios.test.ts` fails before the RCON-output fix and
   passes after it.
 - A required RCON setup command that returns `That position is not loaded`
   blocks the scenario with `setup_status=failed`.

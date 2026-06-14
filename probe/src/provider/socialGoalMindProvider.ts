@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
-import type { ActorCycleGoal, StrategicGoal } from "../runtime/goals/types.js";
+import type {
+  ActorCycleGoal,
+  SocialCycleProviderId,
+  StrategicGoal
+} from "../runtime/goals/types.js";
 import { validateActorCycleGoal } from "../runtime/goals/types.js";
 import {
   buildDeterministicCycleGoal,
@@ -14,6 +18,10 @@ import {
 import { soulRef } from "../runtime/goals/actorSoulStore.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
 import { callGeminiJsonSchema, type GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
+import {
+  callModelScopeJsonSchema,
+  type ModelScopeApiProviderConfig
+} from "./modelscopeApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
@@ -171,13 +179,14 @@ function cycleGoalFromLlm(input: {
  * and the current action surface.
  */
 export async function runSocialCycleGoalProvider(input: {
-  providerId: "openai-api" | "gemini-api" | "deterministic-social";
+  providerId: SocialCycleProviderId;
   actorWorkspaceRootDir: string;
   actorId: string;
   cycleId: string;
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
+  modelScope?: ModelScopeApiProviderConfig;
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
   runId?: string;
@@ -192,7 +201,7 @@ export async function runSocialCycleGoalProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? input.gemini?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? "deterministic-social",
     created_at: new Date().toISOString(),
     input: providerInput
   });
@@ -302,6 +311,25 @@ If observation or previous judgments include blocked evidence, use that context 
     };
   }>({
     config: input.gemini!,
+    ...providerCall
+  }) : input.providerId === "modelscope-api" ? await callModelScopeJsonSchema<{
+    strategic_goal_updates: Array<{
+      summary: string;
+      rationale: string;
+      success_direction: string;
+      current_blockers: string[];
+    }>;
+    cycle_goal: {
+      summary: string;
+      rationale: string;
+      success_verifier: string;
+      evidence_required: string[];
+      stop_conditions: string[];
+      allowed_action_skill_ids: string[];
+      allowed_primitive_ids: string[];
+    };
+  }>({
+    config: input.modelScope!,
     ...providerCall
   }) : await callOpenAiJsonSchema<{
     strategic_goal_updates: Array<{

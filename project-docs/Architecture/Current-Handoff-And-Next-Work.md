@@ -1533,12 +1533,6 @@ Current documentation rule:
 
 The next implementation slice should start from
 `project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
-That file is now the index for split plan docs rather than a growing monolith:
-
-- `project-docs/Architecture/World-Scenario-RCON-Truthfulness-Plan.md`
-- `project-docs/Architecture/Natural-Safe-Spawn-Scenario-Contract.md`
-- `project-docs/Architecture/Natural-Spawn-Validation-Artifact-Contract.md`
-- `project-docs/Architecture/World-Scenario-Smoke-Gates.md`
 
 Current conclusion:
 
@@ -1546,17 +1540,72 @@ Current conclusion:
   that the worksite and oak-log rack were prepared.
 - Required RCON setup commands were stored as `passed` even when command output
   contained failure text such as `Incomplete` and `That position is not loaded`.
-- `natural-safe-spawn-v1` must force a fresh default world by default, then
-  validate the chosen start from post-bot Mineflayer loaded-world evidence.
 - This makes setup truthfulness the blocker before another provider-heavy
   Actor Turn behavior verdict.
 
 Next order:
 
 1. harden `runWorldScenarioCommands` so failure-like RCON output marks commands
-   failed and aggregate `setup_status` covers all required setup phases;
+   failed and blocks required setup;
 2. repair or reframe the flat fixture after setup failure detection is truthful;
 3. add `natural-safe-spawn-v1` as a natural-world run lane with spawn validation
    artifacts and no terrain/resource fixture mutation;
-4. link manifest and validation refs from reports/audits;
-5. run a short smoke before spending 40/60-cycle provider budget.
+4. run a short smoke before spending 40/60-cycle provider budget.
+
+## 2026-06-13 World Scenario Truthfulness Implementation
+
+Implemented the first setup-truthfulness slice from
+`World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
+
+Changed runtime behavior:
+
+- `runWorldScenarioCommands` now treats known failure-like RCON output as failed
+  command evidence even when the RCON call itself resolves.
+- Required failure-like output blocks setup with `required_failure: true`.
+- Optional failure-like output is preserved as failed command evidence without
+  blocking the remaining setup commands.
+- `natural-safe-spawn-v1` is now a natural `survival_social_run` lane with
+  default terrain generation, no `GENERATOR_SETTINGS`, no terrain mutation
+  command surface, and no resource fixture.
+- Natural safe-spawn validation runs after the Mineflayer bot joins and before
+  Actor Turn cycles begin. It writes a `natural-spawn-validation/v1` artifact
+  with `credited_as_actor_progress: false`, nearest loaded logs, block checks,
+  candidate rejections, loaded-world limitations, and an embedded
+  `world-state-scan/v1`.
+- A passed natural validation may pin the actor spawn and teleport to the
+  selected start. This remains setup evidence only and is not inserted into
+  cycle evidence, PlanBeads, memory, or progress claims.
+
+Implementation files:
+
+- `probe/src/server/worldScenarioRcon.ts`
+- `probe/src/server/naturalSpawnValidation.ts`
+- `probe/src/server/worldScenarios.ts`
+- `probe/src/runtime/socialCycleRunner.ts`
+- `probe/src/runtime/goals/types.ts`
+- `probe/test/worldScenarios.test.ts`
+
+Verification so far:
+
+- `cd probe && bun test ./test/worldScenarios.test.ts`: passed
+- `cd probe && bun run typecheck`: passed
+- Sequential full test sweep with `for f in test/*.test.ts; do bun test "./$f"; done`:
+  passed. Direct `bun test` discovery still hit a local fd quota / `EMFILE`
+  issue before tests ran.
+- `cd docs && npm run build`: passed
+- `git diff --check`: passed
+- Deterministic `natural-safe-spawn-v1` setup smoke:
+  `tmp/social-cycle-natural-safe-spawn-deterministic-1-20260613.json`.
+  The CLI exited `1` because the one-cycle deterministic runtime was
+  `blocked`, but setup evidence passed: manifest `setup_status: "passed"`,
+  `natural_spawn_validation_status: "passed"`, provider usage records `0`, and
+  setup refs were not inserted into cycle evidence.
+
+Remaining work before another provider-heavy behavior verdict:
+
+1. run a low-cost provider experiment with `natural-safe-spawn-v1` and
+   screenshots;
+2. inspect the scenario manifest and natural spawn artifact before judging
+   Actor Turn behavior;
+3. classify any future spawn-validation failure as setup/environment failure,
+   not model behavior.

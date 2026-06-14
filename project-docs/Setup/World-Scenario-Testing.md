@@ -25,6 +25,13 @@ Fixture setup commands are evidence about the test environment. They are not
 actor progress. A granted item, cleared work pad, placed resource rack, or fixed
 spawn must never satisfy a CycleGoal by itself.
 
+RCON transport success is not the same thing as setup success. Some Minecraft
+commands return failure text through a successful RCON call. Known failure-like
+output such as `That position is not loaded`, `Incomplete`, `Incorrect argument
+for command`, `Unknown or incomplete command`, or `No player was found` is
+recorded as command failure. Required command failure blocks setup; optional
+command failure is preserved in the manifest without blocking the run.
+
 ## Current Scenarios
 
 ### `natural-survival`
@@ -37,20 +44,36 @@ water, caves, and animals are useful environment pressure rather than noise.
 
 ### `natural-safe-spawn-v1`
 
-Fresh natural survival/social lane for ordinary terrain with a validated start
-near loaded-world tree evidence. It uses:
+Natural survival/social run lane with setup validation before Actor Turn cycles
+begin.
+
+Server setup:
 
 - `LEVEL_TYPE=default`
 - no `GENERATOR_SETTINGS`
-- `requiresFreshWorld=true`
+- ordinary generated terrain, trees, structures, animals, and resources
 - no `fill`, `setblock`, resource rack, cleared pad, or starter structure
+- peaceful starting policy and hostile spawns disabled for early runtime review
 
-After the Mineflayer bot joins and chunks settle, the runtime writes a
-`natural-spawn-validation/v1` artifact. Passing validation means the candidate
-had passable feet/head cells, solid natural support, no dense canopy/tree-top
-support, no loaded hazard, and at least one nearby loaded natural log observed
-within the bounded scan. It does not prove unloaded chunks, and it is not actor
-progress.
+After the bot joins, the runtime writes a `natural-spawn-validation/v1` artifact
+from Mineflayer loaded-world evidence. The validation checks that the selected
+start has passable standing/head cells, ordinary natural support below, no dense
+leaf/log trap in the immediate area, and at least one loaded `*_log` block within
+the bounded scan radius. It also embeds a `world-state-scan/v1` snapshot so
+reviewers can inspect raw observed block names and loaded-world limitations.
+
+If validation passes, the runtime may pin the actor's player spawn and teleport
+the actor to the validated start. That placement is setup evidence only:
+
+```json
+{
+  "schema": "natural-spawn-validation/v1",
+  "credited_as_actor_progress": false
+}
+```
+
+If validation fails, the run is an environment/setup failure rather than an
+Actor Turn behavior failure.
 
 ### `roofless-hut-flat-survival-v1`
 
@@ -80,12 +103,31 @@ container, transcript, and evidence artifacts.
 
 ## CLI
 
+Run a provider-free natural safe-spawn setup smoke:
+
+```bash
+cd probe
+SOCIAL_CYCLE_REASONING=low \
+bun run probe:social-cycle \
+  --provider deterministic-social \
+  --model deterministic-social \
+  --actor npc_b \
+  --cycles 1 \
+  --max-actions-per-cycle 1 \
+  --world-scenario natural-safe-spawn-v1 \
+  --report ../tmp/social-cycle-natural-safe-spawn-deterministic-1.json
+```
+
+This command may exit non-zero if the one-cycle deterministic runtime is
+`blocked`. For setup smoke review, inspect `server.world_scenario.setup_status`,
+`natural_spawn_validation_status`, and the manifest/artifact refs before judging
+Actor Turn behavior.
+
 Run a controlled 40-cycle construction probe:
 
 ```bash
 cd probe
 SOCIAL_CYCLE_PROVIDER=openai-api \
-SOCIAL_CYCLE_MODEL=gpt-5.4-mini \
 SOCIAL_CYCLE_REASONING=medium \
 bun run probe:social-cycle \
   --provider openai-api \
@@ -120,10 +162,10 @@ The manifest records:
 - actor start;
 - build area;
 - fixture resources;
+- natural spawn validation status and artifact ref when applicable;
 - pre-bot and post-bot RCON command results;
 - optional command failures that were recorded but did not block setup;
 - required command failures that blocked the run.
-- validation artifact refs for scenarios that require setup validation.
 
 The social-cycle report links this manifest under:
 
@@ -133,10 +175,7 @@ The social-cycle report links this manifest under:
     "world_scenario": {
       "scenario_id": "roofless-hut-flat-survival-v1",
       "lane": "fixture_probe",
-      "manifest_ref": "evidence/world-scenarios/...",
-      "validation_ref": "evidence/world-scenarios/...",
-      "validation_status": "passed",
-      "setup_status": "passed"
+      "manifest_ref": "evidence/world-scenarios/..."
     }
   }
 }

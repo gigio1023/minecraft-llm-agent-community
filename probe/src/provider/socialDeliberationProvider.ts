@@ -12,6 +12,10 @@ import type { OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
 import { callOpenAiJsonSchema } from "./openaiApiJsonProvider.js";
 import type { GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { callGeminiJsonSchema } from "./geminiApiJsonProvider.js";
+import {
+  callModelScopeJsonSchema,
+  type ModelScopeApiProviderConfig
+} from "./modelscopeApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
@@ -793,11 +797,12 @@ export async function runSocialDeliberationProvider(input: {
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
+  modelScope?: ModelScopeApiProviderConfig;
   runId?: string;
 }): Promise<DeliberationProviderResult> {
   const turnId = `${input.cycleId}-deliberation`;
   const snapshotId = `deliberation-${turnId}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? "deterministic-social";
+  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? "deterministic-social";
   const providerInput = buildDeliberationProviderInput({
     branch: input.branch,
     currentEpisode: input.currentEpisode,
@@ -846,6 +851,11 @@ export async function runSocialDeliberationProvider(input: {
           config: input.gemini!,
           ...providerCall
         })
+      : input.providerId === "modelscope-api"
+        ? await callModelScopeJsonSchema<{ deliberation: unknown }>({
+            config: input.modelScope!,
+            ...providerCall
+          })
       : await callOpenAiJsonSchema<{ deliberation: unknown }>({
           config: input.openAi!,
           ...providerCall

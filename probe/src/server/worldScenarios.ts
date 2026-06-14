@@ -1,11 +1,13 @@
 import type { Bot } from "mineflayer";
 
 import type { ProbeConfig } from "../config.js";
+import { classifyRconOutputFailure } from "./worldScenarioRcon.js";
 
 export const worldScenarioIds = [
   "natural-survival",
   "natural-safe-spawn-v1",
-  "roofless-hut-flat-survival-v1"
+  "roofless-hut-flat-survival-v1",
+  "wooden-pickaxe-flat-benchmark-v1"
 ] as const;
 
 export type WorldScenarioId = typeof worldScenarioIds[number];
@@ -21,18 +23,12 @@ export type WorldScenarioCommand = {
   purpose: string;
 };
 
-export type WorldScenarioCommandFailureKind =
-  | "unloaded_position"
-  | "incomplete_command"
-  | "incorrect_argument"
-  | "unknown_command"
-  | "missing_player";
-
 export type WorldScenarioCommandResult = WorldScenarioCommand & {
   status: "passed" | "failed";
   output?: string;
   error?: string;
-  failure_kind?: WorldScenarioCommandFailureKind;
+  failure_reason?: string;
+  failure_pattern?: string;
 };
 
 export type WorldScenarioCommandRun = {
@@ -79,10 +75,14 @@ export type WorldScenarioManifest = {
     description: string;
     credited_as_actor_progress: false;
   };
+  natural_spawn_validation?: {
+    status: "not_applicable" | "passed" | "failed";
+    artifact_ref?: string;
+    credited_as_actor_progress: false;
+  };
   world_event_summary?: string;
   notes: string[];
   command_runs: WorldScenarioCommandRun[];
-  validation_refs: string[];
 };
 
 export type WorldScenario = {
@@ -115,6 +115,7 @@ export type WorldScenario = {
   };
   buildArea?: WorldScenarioManifest["build_area"];
   resourceFixture?: WorldScenarioManifest["resource_fixture"];
+  naturalSpawnValidation?: WorldScenarioManifest["natural_spawn_validation"];
   worldEventSummary?: string;
   notes: string[];
 };
@@ -161,9 +162,9 @@ const scenarios: Record<WorldScenarioId, WorldScenario> = {
   "natural-safe-spawn-v1": {
     id: "natural-safe-spawn-v1",
     lane: "survival_social_run",
-    title: "Natural Safe Spawn Survival World",
+    title: "Natural Safe Spawn Survival Run",
     description:
-      "A normal fresh survival world for validating an ordinary playable natural spawn without terrain or resource fixtures.",
+      "A normal seeded survival world with post-join spawn validation so dense-canopy and tree-top starts are classified as setup failures rather than actor behavior.",
     fixtureDependency: false,
     requiresFreshWorld: true,
     world: {
@@ -177,10 +178,16 @@ const scenarios: Record<WorldScenarioId, WorldScenario> = {
       viewDistance: 10,
       simulationDistance: 10
     },
+    naturalSpawnValidation: {
+      status: "not_applicable",
+      credited_as_actor_progress: false
+    },
+    worldEventSummary:
+      "Current local task: begin from the verified natural spawn area, use nearby natural resources, and make physical early-survival progress from runtime evidence. Spawn validation proves starting conditions only; it is not actor progress.",
     notes: [
-      "This scenario configures ordinary natural generation; a later spawn-validation slice must prove the concrete start position.",
-      "Setup must not use fill, setblock, resource racks, cleared pads, or starter structures.",
-      "Spawn validation and pinning evidence is setup context only and must not be credited as actor progress."
+      "This scenario keeps default terrain generation and does not place resources, clear pads, or build starter structures.",
+      "Post-join spawn validation records loaded-world evidence before Actor Turn cycles begin.",
+      "A failed safe-spawn validation is environment/setup failure, not an Actor Turn behavior failure."
     ]
   },
   "roofless-hut-flat-survival-v1": {
@@ -223,6 +230,47 @@ const scenarios: Record<WorldScenarioId, WorldScenario> = {
       "RCON setup artifacts are fixture evidence only; they must not be credited as actor progress.",
       "Screenshots help human review, but block, inventory, position, and verifier artifacts remain runtime authority."
     ]
+  },
+  "wooden-pickaxe-flat-benchmark-v1": {
+    id: "wooden-pickaxe-flat-benchmark-v1",
+    lane: "fixture_probe",
+    title: "Wooden Pickaxe Flat Benchmark Fixture",
+    description:
+      "A flat survival fixture for comparing model ability to chain early survival actions into a verified wooden_pickaxe.",
+    fixtureDependency: true,
+    requiresFreshWorld: true,
+    world: {
+      seed: "wooden-pickaxe-flat-benchmark-v1",
+      levelType: "FLAT",
+      generatorSettings: flatPlainsGeneratorSettings,
+      generateStructures: false,
+      spawnNpcs: false,
+      spawnAnimals: false,
+      spawnMonsters: false,
+      difficulty: "peaceful",
+      viewDistance: 6,
+      simulationDistance: 6
+    },
+    actorStart: { x: 0, y: 64, z: 0, yaw: 0, pitch: 0 },
+    buildArea: {
+      center: { x: 0, y: 64, z: 0 },
+      half_extent: 5,
+      purpose:
+        "A clear flat work pad for crafting a basic tool from actor-collected materials."
+    },
+    resourceFixture: {
+      type: "oak_log_rack",
+      description:
+        "A nearby oak_log rack is placed as the only starter resource source. The actor must mine it before crafted items can count as progress.",
+      credited_as_actor_progress: false
+    },
+    worldEventSummary:
+      "Benchmark task: from empty inventory, collect oak logs from the nearby rack and physically craft one wooden_pickaxe. Useful milestone evidence includes oak_log inventory, oak_planks and stick crafting, a crafting_table item or placed crafting_table, and final wooden_pickaxe inventory or held-item evidence. Setup blocks and RCON commands are fixture evidence only, not actor progress.",
+    notes: [
+      "This fixture is for model comparison, not a general product goal.",
+      "The target is reached only when runtime evidence shows a wooden_pickaxe in inventory or held item state.",
+      "Tool-call schema compliance is not a benchmark score; runtime world and inventory evidence are the score authority."
+    ]
   }
 };
 
@@ -243,22 +291,26 @@ export function getWorldScenario(id: WorldScenarioId | undefined) {
   return scenarios[id ?? "natural-survival"];
 }
 
-export function applyWorldScenarioToConfig(config: ProbeConfig, scenario: WorldScenario): ProbeConfig {
+export function applyWorldScenarioToConfig(
+  config: ProbeConfig,
+  scenario: WorldScenario,
+  options?: { worldSeed?: string }
+): ProbeConfig {
   if (scenario.id === "natural-survival") {
     return config;
   }
-
-  const scenarioWorld = {
-    ...config.world,
-    ...scenario.world
-  };
-  if (scenario.world.generatorSettings === undefined) {
-    delete scenarioWorld.generatorSettings;
-  }
+  const explicitSurvivalSeed =
+    scenario.lane === "survival_social_run" && options?.worldSeed?.trim()
+      ? { seed: options.worldSeed.trim() }
+      : {};
 
   return {
     ...config,
-    world: scenarioWorld,
+    world: {
+      ...config.world,
+      ...scenario.world,
+      ...explicitSurvivalSeed
+    },
     ...(scenario.actorStart
       ? {
           spawn: {
@@ -271,7 +323,14 @@ export function applyWorldScenarioToConfig(config: ProbeConfig, scenario: WorldS
   };
 }
 
-export function createWorldScenarioManifest(scenario: WorldScenario): WorldScenarioManifest {
+export function createWorldScenarioManifest(
+  scenario: WorldScenario,
+  options?: { world?: Partial<ProbeConfig["world"]> }
+): WorldScenarioManifest {
+  const world = {
+    ...scenario.world,
+    ...options?.world
+  };
   return {
     schema: "world-scenario-manifest/v1",
     scenario_id: scenario.id,
@@ -281,26 +340,28 @@ export function createWorldScenarioManifest(scenario: WorldScenario): WorldScena
     fixture_dependency: scenario.fixtureDependency,
     requires_fresh_world: scenario.requiresFreshWorld,
     server: {
-      level_type: scenario.world.levelType,
-      seed: scenario.world.seed,
-      ...(scenario.world.generatorSettings
-        ? { generator_settings: scenario.world.generatorSettings }
+      level_type: world.levelType,
+      seed: world.seed,
+      ...(world.generatorSettings
+        ? { generator_settings: world.generatorSettings }
         : {}),
-      generate_structures: scenario.world.generateStructures,
-      spawn_npcs: scenario.world.spawnNpcs,
-      spawn_animals: scenario.world.spawnAnimals,
-      spawn_monsters: scenario.world.spawnMonsters,
-      difficulty: scenario.world.difficulty,
-      view_distance: scenario.world.viewDistance,
-      simulation_distance: scenario.world.simulationDistance
+      generate_structures: world.generateStructures,
+      spawn_npcs: world.spawnNpcs,
+      spawn_animals: world.spawnAnimals,
+      spawn_monsters: world.spawnMonsters,
+      difficulty: world.difficulty,
+      view_distance: world.viewDistance,
+      simulation_distance: world.simulationDistance
     },
     ...(scenario.actorStart ? { actor_start: { ...scenario.actorStart } } : {}),
     ...(scenario.buildArea ? { build_area: scenario.buildArea } : {}),
     ...(scenario.resourceFixture ? { resource_fixture: scenario.resourceFixture } : {}),
+    ...(scenario.naturalSpawnValidation
+      ? { natural_spawn_validation: scenario.naturalSpawnValidation }
+      : {}),
     ...(scenario.worldEventSummary ? { world_event_summary: scenario.worldEventSummary } : {}),
     notes: [...scenario.notes],
-    command_runs: [],
-    validation_refs: []
+    command_runs: []
   };
 }
 
@@ -351,80 +412,16 @@ function stableFixtureGamerules(version: string): WorldScenarioCommand[] {
   }));
 }
 
-export function buildNaturalSpawnPinningCommands(input: {
-  username: string;
-  position: { x: number; y: number; z: number };
-  serverVersion: string;
-}): WorldScenarioCommand[] {
-  const x = Math.floor(input.position.x);
-  const y = Math.floor(input.position.y);
-  const z = Math.floor(input.position.z);
-  const tpX = String(x + 0.5);
-  const tpZ = String(z + 0.5);
-  const respawnRadiusRule = supportsNamespacedGamerules(input.serverVersion)
-    ? "minecraft:respawn_radius"
-    : "spawnRadius";
-
-  return [
-    {
-      phase: "post_bot",
-      args: ["setworldspawn", String(x), String(y), String(z), "0"],
-      required: true,
-      purpose: "pin the validated natural world spawn after loaded-world validation"
-    },
-    {
-      phase: "post_bot",
-      args: ["gamerule", respawnRadiusRule, "0"],
-      required: true,
-      purpose: "avoid random spawn spreading around the validated natural start"
-    },
-    {
-      phase: "post_bot",
-      args: ["spawnpoint", input.username, String(x), String(y), String(z), "0"],
-      required: true,
-      purpose: "pin the actor-specific respawn to the validated natural start"
-    },
-    {
-      phase: "post_bot",
-      args: ["tp", input.username, tpX, String(y), tpZ, "0", "0"],
-      required: true,
-      purpose: "place the actor at the validated natural start before provider cycles"
-    }
-  ];
-}
-
-const rconOutputFailureSignatures: Array<{
-  text: string;
-  failure_kind: WorldScenarioCommandFailureKind;
-}> = [
-  { text: "That position is not loaded", failure_kind: "unloaded_position" },
-  { text: "Unknown or incomplete command", failure_kind: "unknown_command" },
-  { text: "Incorrect argument for command", failure_kind: "incorrect_argument" },
-  { text: "No player was found", failure_kind: "missing_player" },
-  { text: "Incomplete", failure_kind: "incomplete_command" }
-];
-
-function classifyRconCommandOutput(output: string):
-  | { status: "passed" }
-  | { status: "failed"; failure_kind: WorldScenarioCommandFailureKind } {
-  for (const signature of rconOutputFailureSignatures) {
-    if (output.includes(signature.text)) {
-      return {
-        status: "failed",
-        failure_kind: signature.failure_kind
-      };
-    }
-  }
-  return { status: "passed" };
-}
-
 export function buildWorldScenarioCommands(input: {
   scenario: WorldScenario;
   phase: WorldScenarioCommandPhase;
   serverVersion: string;
   bot?: Bot;
 }): WorldScenarioCommand[] {
-  if (input.scenario.id !== "roofless-hut-flat-survival-v1") {
+  if (
+    input.scenario.id !== "roofless-hut-flat-survival-v1" &&
+    input.scenario.id !== "wooden-pickaxe-flat-benchmark-v1"
+  ) {
     return [];
   }
 
@@ -439,8 +436,7 @@ export function buildWorldScenarioCommands(input: {
           "setworldspawn",
           String(actorStart.x),
           String(actorStart.y),
-          String(actorStart.z),
-          String(actorStart.yaw)
+          String(actorStart.z)
         ],
         required: true,
         purpose: "anchor the fixture spawn before the actor joins"
@@ -456,6 +452,12 @@ export function buildWorldScenarioCommands(input: {
         args: ["worldborder", "set", "128"],
         required: false,
         purpose: "keep the test run near the fixture"
+      },
+      {
+        phase: "pre_bot",
+        args: ["forceload", "add", "-16", "-16", "16", "16"],
+        required: true,
+        purpose: "load the fixture work pad before block setup commands run"
       },
       {
         phase: "pre_bot",
@@ -542,16 +544,19 @@ export async function runWorldScenarioCommands(input: {
   for (const command of input.commands) {
     try {
       const output = await input.runRcon(command.args);
-      const classification = classifyRconCommandOutput(output);
+      const failure = classifyRconOutputFailure(output);
       results.push({
         ...command,
-        status: classification.status,
+        status: failure ? "failed" : "passed",
         ...(output ? { output } : {}),
-        ...(classification.status === "failed"
-          ? { failure_kind: classification.failure_kind }
+        ...(failure
+          ? {
+              failure_reason: failure.reason,
+              failure_pattern: failure.pattern
+            }
           : {})
       });
-      if (command.required && classification.status === "failed") {
+      if (failure && command.required) {
         requiredFailure = true;
         break;
       }

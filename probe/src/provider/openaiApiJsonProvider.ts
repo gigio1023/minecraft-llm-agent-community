@@ -131,11 +131,66 @@ function isPendingResponseStatus(status: ResponseStatus | undefined) {
   return status === "queued" || status === "in_progress";
 }
 
+function requestCountOnlyUsage() {
+  return {
+    requests: 1,
+    input_tokens: 0,
+    output_tokens: 0,
+    thinking_tokens: 0,
+    total_tokens: 0
+  };
+}
+
+async function retrieveOpenAiResponseWithUsageGuard(input: {
+  client: OpenAI;
+  responseId: string;
+  model: string;
+  usageContext: ProviderUsageCallContext;
+  startedAt: number;
+}) {
+  const usage = requestCountOnlyUsage();
+  const budgetDecision = await guardProviderUsageRequest({
+    providerId: "openai-api",
+    model: input.model,
+    estimatedUsage: usage,
+    context: input.usageContext
+  });
+  try {
+    const response = await input.client.responses.retrieve(input.responseId);
+    await appendProviderUsageRecord({
+      providerId: "openai-api",
+      model: input.model,
+      status: "succeeded",
+      usage,
+      usageSource: "estimated",
+      context: input.usageContext,
+      elapsedMs: Date.now() - input.startedAt,
+      budgetDecision
+    });
+    return response;
+  } catch (error) {
+    await appendProviderUsageRecord({
+      providerId: "openai-api",
+      model: input.model,
+      status: "failed",
+      usage,
+      usageSource: "estimated",
+      context: input.usageContext,
+      elapsedMs: Date.now() - input.startedAt,
+      budgetDecision
+    });
+    throw error;
+  }
+}
+
 async function awaitOpenAiResponse(input: {
   client: OpenAI;
   response: Response;
+  model: string;
+  usageContext: ProviderUsageCallContext;
   pollIntervalMs: number;
   timeoutMs: number;
+  startedAt: number;
 }) {
   let response = input.response;
   const started = Date.now();
@@ -144,7 +199,13 @@ async function awaitOpenAiResponse(input: {
       throw new Error(`OpenAI Responses API polling timed out for ${response.id}`);
     }
     await delay(input.pollIntervalMs);
-    response = await input.client.responses.retrieve(response.id);
+    response = await retrieveOpenAiResponseWithUsageGuard({
+      client: input.client,
+      responseId: response.id,
+      model: input.model,
+      usageContext: input.usageContext,
+      startedAt: input.startedAt
+    });
   }
   return response;
 }
@@ -363,8 +424,11 @@ export async function callOpenAiJsonSchema<T>(input: {
       const response = await awaitOpenAiResponse({
         client,
         response: initialResponse,
+        model,
+        usageContext,
         pollIntervalMs: responsePollIntervalMs,
-        timeoutMs: responsePollTimeoutMs
+        timeoutMs: responsePollTimeoutMs,
+        startedAt: started
       });
       const normalizedUsage = normalizeOpenAiUsage(response.usage, estimatedUsage);
       const usageRecord = await appendProviderUsageRecord({
@@ -440,6 +504,27 @@ export async function callOpenAiJsonSchema<T>(input: {
         break;
       }
     } catch (error) {
+      if (error instanceof ProviderUsageBudgetError) {
+        const usageRecord = await appendProviderUsageRecord({
+          providerId: "openai-api",
+          model,
+          status: "failed",
+          usage: estimatedUsage,
+          usageSource: "estimated",
+          context: usageContext,
+          elapsedMs: Date.now() - started,
+          budgetDecision
+        });
+        return {
+          ok: false,
+          errorKind: "usage_budget_exceeded",
+          message: error.message,
+          elapsedMs: Date.now() - started,
+          model,
+          usageRecord,
+          budgetDecision: error.decision
+        };
+      }
       const errorKind = classifyOpenAiError(error);
       const usageRecord = await appendProviderUsageRecord({
         providerId: "openai-api",

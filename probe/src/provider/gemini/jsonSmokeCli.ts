@@ -34,10 +34,13 @@ function parseArgs(argv: string[]) {
 async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../../../..");
-  loadRepoDotEnv(repoRoot, { overrideKeys: ["GEMINI_API_KEY", "GEMINI_MODEL"] });
+  loadRepoDotEnv(repoRoot, { overrideKeys: ["GEMINI_API_KEY"] });
 
   const parsed = parseArgs(process.argv.slice(2));
-  const model = parsed.model ?? process.env.GEMINI_MODEL ?? "gemma-4-31b-it";
+  const model = parsed.model?.trim();
+  if (!model) {
+    throw new Error("--model is required for probe:gemini-json-smoke.");
+  }
   const runId = `gemini-json-smoke-${Date.now()}`;
   const prompt =
     parsed.prompt ??

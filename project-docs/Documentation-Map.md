@@ -51,7 +51,8 @@ instead of making `README.md` or the public docs landing page noisy.
 ## Internal Project Documents
 
 Internal specs, architecture notes, setup notes, handoffs, provider-access
-notes, implementation campaigns, terminology, and routing indexes live under:
+notes, implementation campaigns, terminology, experiment records, and routing
+indexes live under:
 
 ```text
 project-docs/
@@ -138,6 +139,7 @@ Current state and operations:
 - `project-docs/Architecture/Natural-Safe-Spawn-Scenario-Contract.md`
 - `project-docs/Architecture/Natural-Spawn-Validation-Artifact-Contract.md`
 - `project-docs/Architecture/World-Scenario-Smoke-Gates.md`
+- `project-docs/Architecture/Natural-Safe-Spawn-Smoke-Run-2026-06-13.md`
 - `project-docs/Architecture/Future-Works.md`
 - `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `project-docs/Setup/Headless-Server.md`
@@ -146,6 +148,9 @@ Current state and operations:
 - `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 - `project-docs/Setup/OpenAI-Tier3-Free-Usage.md`
 - `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+- `project-docs/Experiments/README.md`
+- `project-docs/Experiments/INDEX.md`
+- `project-docs/Experiments/2026-06-13/README.md`
 
 Knowledge:
 

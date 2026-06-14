@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Bot } from "mineflayer";
-import { Vec3 } from "vec3";
 
 import { loadProbeConfig, type ProbeConfig } from "../config.js";
 import { assignSeedActionSkillOwnership } from "../skills/ownership.js";
@@ -10,7 +9,7 @@ import {
   listActiveActorActionSkillRecords
 } from "./actorWorkspace.js";
 import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "./actorWorkspacePaths.js";
-import { ensureActorSoul } from "./goals/actorSoulStore.js";
+import { ensureActorSoul, soulRef } from "./goals/actorSoulStore.js";
 import { bumpLifeGoalCounters, ensureActiveLifeGoal } from "./goals/lifeGoalStore.js";
 import { writeCycleGoal } from "./goals/cycleGoalStore.js";
 import { writeActorGoalArtifact } from "./goals/goalJsonStore.js";
@@ -36,6 +35,7 @@ import {
 import { runSocialDeliberationProvider } from "../provider/socialDeliberationProvider.js";
 import type { OpenAiJsonProviderConfig } from "../provider/openaiApiJsonProvider.js";
 import type { GeminiJsonProviderConfig } from "../provider/geminiApiJsonProvider.js";
+import type { ModelScopeApiProviderConfig } from "../provider/modelscopeApiProvider.js";
 import { summarizeProviderUsage } from "../provider/providerUsageTracker.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import {
@@ -68,7 +68,6 @@ import { readManualMinecraftPort } from "../server/manualMinecraftPort.js";
 import { startDockerServer } from "../server/dockerServer.js";
 import {
   applyWorldScenarioToConfig,
-  buildNaturalSpawnPinningCommands,
   buildWorldScenarioCommands,
   createWorldScenarioManifest,
   getWorldScenario,
@@ -77,9 +76,8 @@ import {
   type WorldScenarioManifest
 } from "../server/worldScenarios.js";
 import {
-  buildNaturalSpawnValidationArtifact,
-  type NaturalSpawnValidationArtifact,
-  type NaturalSpawnValidationPosition
+  buildNaturalSpawnPlacementCommands,
+  createNaturalSpawnValidation
 } from "../server/naturalSpawnValidation.js";
 import {
   buildSettlementState,
@@ -573,6 +571,7 @@ export type SocialCycleRunOptions = {
    * still owns action selection and runtime verifiers still own progress truth.
    */
   worldScenario?: WorldScenarioId;
+  benchmarkTask?: string;
   worldSeed?: string;
   levelType?: string;
   /** Prepare a small, live-world spawn access point for long survival/settlement runs. */
@@ -621,6 +620,14 @@ export function selectGeminiFallbackModelsForCall(input: {
 
 type ReportedRuntimeAction = ActorTurnResolvedAction;
 
+export function benchmarkTaskEvidenceRequirements() {
+  return [
+    "Runtime action evidence must show physical progress toward the benchmark target; provider prose is not enough.",
+    "Final success must be scored by explicit benchmark target evidence such as inventory, held item, block, position, container, or transcript artifacts.",
+    "Intermediate milestones count as partial credit only when runtime evidence proves the milestone and the scoring report names it as partial credit."
+  ];
+}
+
 function runtimeActionParameters(action: ReportedRuntimeAction): Record<string, unknown> {
   return action.parameters as Record<string, unknown>;
 }
@@ -630,6 +637,48 @@ function runtimeActionSkillIds(action: ReportedRuntimeAction) {
     ...(action.kind === "use_action_skill" ? [action.action_skill_id] : []),
     ...(action.kind === "use_primitive" ? [action.primitive_id] : [])
   ].filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+function buildBenchmarkTaskCycleGoal(input: {
+  actorId: string;
+  cycleId: string;
+  context: SocialCycleContextPacket;
+  task: string;
+  allowedActionSkillIds: readonly string[];
+  allowedPrimitiveIds: readonly string[];
+}): ActorCycleGoal {
+  return {
+    schema: "actor-cycle-goal/v1",
+    actor_id: input.actorId,
+    goal_id: `cycle-goal-${randomUUID()}`,
+    life_goal_id: input.context.ActorLifeGoal.goal_id,
+    cycle_id: input.cycleId,
+    status: "active",
+    source: "world_event_context",
+    summary: input.task,
+    rationale:
+      "Operator benchmark target for a model-comparison run. This fixes the target outcome while leaving action choice, parameter choice, execution, and verification under the normal Actor Turn and runtime evidence path.",
+    derived_from: {
+      soul_ref: soulRef(input.actorId),
+      observation_refs: [],
+      world_event_refs: input.context.world_events.map((event) => `world-events/${event.event_id}.json`),
+      memory_refs: listActorMemoryRefs(input.context.memory_packet).map((ref) => ref.memory_id),
+      relationship_refs: [],
+      previous_cycle_judgment_refs: input.context.previous_cycle_judgments.map((judgment) => judgment.ref)
+    },
+    success_condition: {
+      verifier: "benchmark_target_runtime_evidence",
+      evidence_required: benchmarkTaskEvidenceRequirements()
+    },
+    allowed_action_skill_ids: [...input.allowedActionSkillIds],
+    allowed_primitive_ids: [...input.allowedPrimitiveIds],
+    stop_conditions: [
+      "benchmark target reached with runtime evidence",
+      "max cycles reached",
+      "runtime gate blocked",
+      "environment setup failed"
+    ]
+  };
 }
 
 function memoryKindForJudgmentWrite(input: {
@@ -725,64 +774,6 @@ function floorBotPosition(bot: Bot) {
   };
 }
 
-type WorldScenarioSetupTracker = {
-  started: boolean;
-  requiredFailure: boolean;
-  validationRequired: boolean;
-  validationStatus: "not_applicable" | "passed" | "failed";
-};
-
-function computeWorldScenarioSetupStatus(
-  tracker: WorldScenarioSetupTracker
-): "not_applicable" | "passed" | "failed" {
-  if (!tracker.started) {
-    return "not_applicable";
-  }
-  if (tracker.requiredFailure || tracker.validationStatus === "failed") {
-    return "failed";
-  }
-  if (tracker.validationRequired && tracker.validationStatus !== "passed") {
-    return "not_applicable";
-  }
-  return "passed";
-}
-
-function refreshWorldScenarioSetupStatus(
-  report: SocialCycleRunReport,
-  tracker: WorldScenarioSetupTracker
-) {
-  if (!report.server?.world_scenario) {
-    return;
-  }
-  report.server.world_scenario.setup_status = computeWorldScenarioSetupStatus(tracker);
-  report.server.world_scenario.validation_status = tracker.validationStatus;
-}
-
-function createNaturalSpawnBlockLookup(bot: Bot) {
-  return {
-    blockAt(position: NaturalSpawnValidationPosition) {
-      let block: ReturnType<Bot["blockAt"]>;
-      try {
-        block = bot.blockAt(new Vec3(position.x, position.y, position.z), true);
-      } catch {
-        return null;
-      }
-      if (!block) {
-        return null;
-      }
-      return {
-        name: block.name,
-        position: {
-          x: Math.floor(block.position.x),
-          y: Math.floor(block.position.y),
-          z: Math.floor(block.position.z)
-        },
-        ...(typeof block.boundingBox === "string" ? { boundingBox: block.boundingBox } : {})
-      };
-    }
-  };
-}
-
 async function prepareSpawnAccessPoint(input: {
   bot: Bot;
   runRcon: (args: string[]) => Promise<string>;
@@ -861,7 +852,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       levelType: input.levelType ?? loadedConfig.world.levelType
     }
   };
-  const config = applyWorldScenarioToConfig(requestedConfig, worldScenario);
+  const config = applyWorldScenarioToConfig(requestedConfig, worldScenario, {
+    worldSeed: input.worldSeed
+  });
   const useFreshWorld = input.freshWorld === true || worldScenario.requiresFreshWorld;
   const runId = `social-cycle-${randomUUID()}`;
   const workspaceBaseDir = input.actorWorkspaceRootDir ?? config.actorWorkspace.rootDir;
@@ -918,6 +911,17 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           repoRoot
         }
       : undefined;
+  const modelScope: ModelScopeApiProviderConfig | undefined =
+    input.providerId === "modelscope-api"
+      ? {
+          apiKey: process.env.MODELSCOPE_API_KEY ?? "",
+          baseUrl: process.env.MODELSCOPE_BASE_URL,
+          model: input.model,
+          requestTimeoutMs: Number(process.env.MODELSCOPE_REQUEST_TIMEOUT_MS ?? 180_000),
+          maxRetries: Number(process.env.MODELSCOPE_JSON_MAX_RETRIES ?? 1),
+          repoRoot
+        }
+      : undefined;
   let geminiProviderCallIndex = 0;
   const geminiForProviderCall = () => {
     if (!gemini) {
@@ -952,26 +956,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   report.agency_status.used_soul = true;
   report.agency_status.used_life_goal = true;
 
-  const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
   let worldScenarioManifest: WorldScenarioManifest | undefined;
   let worldScenarioManifestRef: string | undefined;
-  const worldScenarioSetupTracker: WorldScenarioSetupTracker = {
-    started: false,
-    requiredFailure: false,
-    validationRequired: worldScenario.id === "natural-safe-spawn-v1",
-    validationStatus: "not_applicable"
-  };
   if (worldScenario.id !== "natural-survival") {
+    const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
     worldScenarioManifestRef = path.join(
       "evidence",
       "world-scenarios",
       `${sanitizeWorkspaceFileId(runId)}-${sanitizeWorkspaceFileId(worldScenario.id)}.json`
     );
-    worldScenarioManifest = createWorldScenarioManifest(worldScenario);
+    worldScenarioManifest = createWorldScenarioManifest(worldScenario, { world: config.world });
     await writeJson(path.join(actorDir, worldScenarioManifestRef), worldScenarioManifest);
     if (report.server?.world_scenario) {
       report.server.world_scenario.manifest_ref = worldScenarioManifestRef;
-      report.server.world_scenario.validation_status = worldScenarioSetupTracker.validationStatus;
     }
     report.agency_status.fixture_dependency = report.agency_status.fixture_dependency ||
       worldScenario.fixtureDependency;
@@ -983,6 +980,17 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       kind: "scenario_event",
       actorRefs: [input.actorId],
       authority: "context_only",
+      runId
+    });
+    await writeWorldEvent(rootDir, input.actorId, event);
+  }
+
+  if (input.benchmarkTask?.trim()) {
+    const event = createWorldEvent({
+      summary: `Operator benchmark task: ${input.benchmarkTask.trim()}`,
+      kind: "scenario_event",
+      actorRefs: [input.actorId],
+      authority: "scenario_rule",
       runId
     });
     await writeWorldEvent(rootDir, input.actorId, event);
@@ -1042,18 +1050,14 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           serverVersion: config.server.version
         });
         if (preBotCommands.length > 0) {
-          worldScenarioSetupTracker.started = true;
           const preBotRun = await runWorldScenarioCommands({
             phase: "pre_bot",
             commands: preBotCommands,
             runRcon: serverRunRcon
           });
           worldScenarioManifest.command_runs.push(preBotRun);
-          worldScenarioSetupTracker.requiredFailure =
-            worldScenarioSetupTracker.requiredFailure || preBotRun.required_failure;
-          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
           await writeJson(
-            path.join(actorDir, worldScenarioManifestRef),
+            path.join(getActorWorkspacePaths(rootDir, input.actorId).actorDir, worldScenarioManifestRef),
             worldScenarioManifest
           );
           if (preBotRun.required_failure) {
@@ -1071,66 +1075,57 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         });
       }
       if (worldScenarioManifest && worldScenarioManifestRef && bot && serverRunRcon) {
+        const actorDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
         if (worldScenario.id === "natural-safe-spawn-v1") {
-          worldScenarioSetupTracker.started = true;
           const validationRef = path.join(
             "evidence",
             "world-scenarios",
             `${sanitizeWorkspaceFileId(runId)}-${sanitizeWorkspaceFileId(worldScenario.id)}-natural-spawn-validation.json`
           );
-          const validationArtifact: NaturalSpawnValidationArtifact =
-            await buildNaturalSpawnValidationArtifact({
-              scenarioId: worldScenario.id,
-              runId,
-              actorId: input.actorId,
-              center: floorBotPosition(bot),
-              blockLookup: createNaturalSpawnBlockLookup(bot),
-              world: {
-                seed: config.world.seed,
-                dimension: "overworld",
-                server_version: config.server.version,
-                level_type: config.world.levelType
-              }
-            });
-
-          worldScenarioSetupTracker.validationStatus = validationArtifact.status;
-          if (report.server?.world_scenario) {
-            report.server.world_scenario.validation_ref = validationRef;
-            report.server.world_scenario.validation_status = validationArtifact.status;
-          }
-          worldScenarioManifest.validation_refs.push(validationRef);
-
-          if (validationArtifact.status === "passed" && validationArtifact.selected_candidate) {
-            const pinningCommands = buildNaturalSpawnPinningCommands({
-              username: bot.username,
-              position: validationArtifact.selected_candidate.position,
-              serverVersion: config.server.version
-            });
-            validationArtifact.post_validation_commands = pinningCommands.map((command) => command.args);
-            const pinningRun = await runWorldScenarioCommands({
-              phase: "post_bot",
-              commands: pinningCommands,
-              runRcon: serverRunRcon
-            });
-            worldScenarioManifest.command_runs.push(pinningRun);
-            worldScenarioSetupTracker.requiredFailure =
-              worldScenarioSetupTracker.requiredFailure || pinningRun.required_failure;
-          }
-
-          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
-          await writeJson(path.join(actorDir, validationRef), validationArtifact);
+          const validation = createNaturalSpawnValidation({
+            bot,
+            actorId: input.actorId,
+            seed: config.world.seed
+          });
+          worldScenarioManifest.natural_spawn_validation = {
+            status: validation.status,
+            artifact_ref: validationRef,
+            credited_as_actor_progress: false
+          };
+          await writeJson(path.join(actorDir, validationRef), validation);
           await writeJson(
             path.join(actorDir, worldScenarioManifestRef),
             worldScenarioManifest
           );
-          if (validationArtifact.status === "failed") {
-            throw new Error(`World scenario ${worldScenario.id} natural spawn validation failed`);
+          if (report.server?.world_scenario) {
+            report.server.world_scenario.natural_spawn_validation_status = validation.status;
+            report.server.world_scenario.natural_spawn_validation_ref = validationRef;
           }
-          if (worldScenarioSetupTracker.requiredFailure) {
-            throw new Error(`World scenario ${worldScenario.id} post-validation spawn pinning failed`);
+          if (validation.status === "failed" || !validation.selected_player_position) {
+            throw new Error(
+              `World scenario ${worldScenario.id} safe-spawn validation failed: ${validation.failure_reasons.join(", ")}`
+            );
+          }
+          const placementRun = await runWorldScenarioCommands({
+            phase: "post_bot",
+            commands: buildNaturalSpawnPlacementCommands({
+              username: bot.username,
+              selectedPlayerPosition: validation.selected_player_position
+            }),
+            runRcon: serverRunRcon
+          });
+          worldScenarioManifest.command_runs.push(placementRun);
+          await writeJson(
+            path.join(actorDir, worldScenarioManifestRef),
+            worldScenarioManifest
+          );
+          if (placementRun.required_failure) {
+            throw new Error(`World scenario ${worldScenario.id} safe-spawn placement failed`);
+          }
+          if (report.server?.world_scenario) {
+            report.server.world_scenario.setup_status = "passed";
           }
         }
-
         const postBotCommands = buildWorldScenarioCommands({
           scenario: worldScenario,
           phase: "post_bot",
@@ -1138,25 +1133,22 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           bot
         });
         if (postBotCommands.length > 0) {
-          worldScenarioSetupTracker.started = true;
           const postBotRun = await runWorldScenarioCommands({
             phase: "post_bot",
             commands: postBotCommands,
             runRcon: serverRunRcon
           });
           worldScenarioManifest.command_runs.push(postBotRun);
-          worldScenarioSetupTracker.requiredFailure =
-            worldScenarioSetupTracker.requiredFailure || postBotRun.required_failure;
-          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
           await writeJson(
             path.join(actorDir, worldScenarioManifestRef),
             worldScenarioManifest
           );
+          if (report.server?.world_scenario) {
+            report.server.world_scenario.setup_status = postBotRun.required_failure ? "failed" : "passed";
+          }
           if (postBotRun.required_failure) {
             throw new Error(`World scenario ${worldScenario.id} post-bot setup failed`);
           }
-        } else {
-          refreshWorldScenarioSetupStatus(report, worldScenarioSetupTracker);
         }
       }
       if ((input.prepareSpawnAccess || input.sharedStorageSocialSmoke) && bot && serverRunRcon) {
@@ -1213,6 +1205,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           runId,
           reason: `Visual evidence startup failed: ${errorMessage(error)}`,
           intervalCycles: input.visualEvidence.intervalCycles,
+          cameraMode: input.visualEvidence.cameraMode,
           width: input.visualEvidence.width,
           height: input.visualEvidence.height
         });
@@ -1223,6 +1216,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         runId,
         reason: "Visual evidence requested but the Minecraft bot was not connected",
         intervalCycles: input.visualEvidence.intervalCycles,
+        cameraMode: input.visualEvidence.cameraMode,
         width: input.visualEvidence.width,
         height: input.visualEvidence.height
       });
@@ -1456,6 +1450,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           context,
           openAi,
           gemini: geminiForProviderCall(),
+          modelScope,
           runId
         });
         if (!deliberation.ok) {
@@ -1516,6 +1511,40 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.agency_status.strategic_goal_source = "runtime_rule";
         report.agency_status.cycle_goal_source = cycleGoal.source;
         report.agency_status.builtin_goal_authority = input.providerId === "deterministic-social";
+      } else if (input.benchmarkTask?.trim()) {
+        cycleGoal = buildBenchmarkTaskCycleGoal({
+          actorId: input.actorId,
+          cycleId,
+          context,
+          task: input.benchmarkTask.trim(),
+          allowedActionSkillIds: allowedSkillIds,
+          allowedPrimitiveIds: allowedPrimitives
+        });
+        const writtenCycleGoal = await writeCycleGoal(rootDir, input.actorId, cycleGoal);
+        cycleGoalRef = writtenCycleGoal.ref;
+        activeEpisodeForCycle = buildActiveEpisodeFromCycleGoal({
+          episodeId: `episode-${cycleId}`,
+          context,
+          cycleGoal,
+          selectedPlanBeadRefs: cycleGoal.derived_from.plan_bead_refs ?? [],
+          startedAtTurnRef: `${cycleId}-action-01`
+        });
+        const activeEpisodeWritten = await writeActiveEpisode(
+          rootDir,
+          input.actorId,
+          activeEpisodeForCycle
+        );
+        activeEpisodeRefForCycle = activeEpisodeWritten.ref;
+        activeEpisodeState = {
+          episode: activeEpisodeForCycle,
+          ref: activeEpisodeRefForCycle,
+          openedCycleId: cycleId
+        };
+        pendingDeliberationBranch = null;
+        report.active_episode_refs = pushUniqueRef(report.active_episode_refs, activeEpisodeRefForCycle);
+        report.agency_status.strategic_goal_source = "runtime_rule";
+        report.agency_status.cycle_goal_source = cycleGoal.source;
+        report.agency_status.builtin_goal_authority = false;
       } else {
         const cycleGoalProvider = await runSocialCycleGoalProvider({
           providerId: input.providerId,
@@ -1525,6 +1554,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           context,
           openAi,
           gemini: geminiForProviderCall(),
+          modelScope,
           allowedActionSkillIds: allowedSkillIds,
           allowedPrimitiveIds: allowedPrimitives,
           runId
@@ -1665,6 +1695,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             actionCardProjection,
             openAi,
             gemini: geminiForProviderCall(),
+            modelScope,
             defaultPrimitive: actorTurnDefaultPrimitive({
               configured: input.deterministicActorTurnPrimitives,
               cycleIndex,

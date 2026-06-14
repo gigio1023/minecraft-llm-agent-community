@@ -184,7 +184,7 @@ export function loadProbeConfig(): ProbeConfig {
     },
     server: {
       image: "itzg/minecraft-server:java21",
-      version: "1.21.11",
+      version: process.env.PROBE_SERVER_VERSION ?? process.env.MC_VERSION ?? "1.21.11",
       host: "127.0.0.1",
       hostPort: parsePortEnv(process.env.MC_HOST_PORT, 25565),
       containerPort: 25565,

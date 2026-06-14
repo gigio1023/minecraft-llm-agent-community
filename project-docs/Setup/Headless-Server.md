@@ -50,6 +50,12 @@ Use the `minecraft_direct_connect` value in the Minecraft Java client Direct
 Connect dialog. By default the managed server uses fixed local port `25565`.
 Override `MC_HOST_PORT` only when that port is already occupied.
 
+The default runtime server version comes from `probe/src/config.ts`. For visual
+seed scouting with `prismarine-viewer`, set `PROBE_SERVER_VERSION=1.21.4` so the
+server version matches a viewer-supported version exactly. Keep this as a
+scoped visual-capture override unless the benchmark runtime itself is being
+deliberately migrated.
+
 To inspect or stop the managed server:
 
 ```bash
@@ -121,12 +127,16 @@ bun run --cwd probe probe:social-cycle -- \
   --fresh-world \
   --cycles 5 \
   --visual-evidence \
-  --visual-evidence-interval 2
+  --visual-evidence-interval 1 \
+  --visual-evidence-camera both
 ```
 
-The runtime starts a local `prismarine-viewer` first-person web view, uses
-system Chrome/Chromium through `playwright-core`, and writes screenshots under
-the actor workspace:
+The runtime starts local `prismarine-viewer` web views, uses system
+Chrome/Chromium through `playwright-core`, and writes screenshots under the
+actor workspace. The default camera mode is `both`: each captured cycle records
+one first-person image and one third-person image. Third-person screenshots are
+center-cropped so the NPC remains visible instead of becoming a tiny overhead
+marker.
 
 ```text
 data/actors/social-runs/<run_id>/<actor_id>/visual-evidence/
@@ -139,9 +149,11 @@ Useful options and environment variables:
 
 - `--visual-evidence`
 - `--visual-evidence-interval <cycles>`
+- `--visual-evidence-camera first-person|third-person|both`
 - `--visual-evidence-port <port>`
 - `--visual-evidence-width <px>`
 - `--visual-evidence-height <px>`
+- `SOCIAL_CYCLE_VISUAL_EVIDENCE_CAMERA=both`
 - `SOCIAL_CYCLE_VISUAL_CHROME_PATH=/path/to/Chrome`
 
 If Chrome, the viewer, or screenshot capture fails, the run records a visual

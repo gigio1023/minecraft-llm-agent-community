@@ -250,7 +250,11 @@ export type CycleJudgment = {
   bead_op_proposals?: unknown[];
 };
 
-export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
+export type SocialCycleProviderId =
+  | "openai-api"
+  | "gemini-api"
+  | "modelscope-api"
+  | "deterministic-social";
 
 export type SocialCycleVisualEvidenceCapture = {
   schema: "visual-evidence-capture/v1";
@@ -266,6 +270,7 @@ export type SocialCycleVisualEvidenceCapture = {
   image_path?: string;
   viewer_url?: string;
   bot_position?: { x: number; y: number; z: number; yaw: number; pitch: number };
+  camera_mode?: "first_person" | "third_person";
   error?: string;
 };
 
@@ -273,7 +278,9 @@ export type SocialCycleVisualEvidence = {
   schema: "social-cycle-visual-evidence/v1";
   enabled: true;
   method: "prismarine-viewer-web-screenshot";
-  first_person: true;
+  first_person: boolean;
+  camera_mode: "first_person" | "third_person" | "both";
+  camera_modes?: Array<"first_person" | "third_person">;
   interval_cycles: number;
   viewport: { width: number; height: number };
   viewer_url?: string;
@@ -314,6 +321,8 @@ export type SocialCycleRunReport = {
 	      validation_ref?: string;
 	      validation_status?: "not_applicable" | "passed" | "failed";
 	      setup_status?: "not_applicable" | "passed" | "failed";
+	      natural_spawn_validation_status?: "not_applicable" | "passed" | "failed";
+	      natural_spawn_validation_ref?: string;
 	      build_area?: {
 	        center: { x: number; y: number; z: number };
 	        half_extent: number;
