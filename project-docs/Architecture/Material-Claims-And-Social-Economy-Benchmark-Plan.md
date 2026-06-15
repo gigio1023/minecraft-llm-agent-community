@@ -26,6 +26,41 @@ under natural Minecraft constraints, without the runtime secretly planning the
 society for them?
 ```
 
+## Minecraft Social Issue Framing
+
+The benchmark unit should be a Minecraft social issue, not a generic task.
+
+```text
+A Minecraft social issue is a world-grounded situation where one actor's need,
+claim, knowledge, risk, or action affects another actor's options,
+obligations, trust, or future behavior.
+```
+
+This framing translates the literature into Minecraft:
+
+| Literature pattern | Minecraft issue shape | What to measure |
+| --- | --- | --- |
+| SOTOPIA / AgentSense social goal | Request, refusal, persuasion, apology, negotiation, or private-stake issue. | Goal resolution, role/private-stake handling, relationship-sensitive action. |
+| M3-BENCH / mixed-motive games | Cooperation is useful but costly; selfish or deceptive choices are possible. | Communication-action coherence, mutual gain, cost, conflict, repair. |
+| Generative Agents / Lifelong SOTOPIA | Earlier promise, help, refusal, or conflict should affect a later cycle. | Memory continuity, obligation closure, relationship change. |
+| VillagerBench / TeamCraft | Spatial, causal, temporal, role, or material dependency across actors. | Dependency resolution, handoff quality, synchronization, action efficiency. |
+| Concordia / Project Sid | Rules, roles, claims, duties, sanctions, or public-good pressure. | Norm following, governance signal, collective consequence. |
+
+Each issue should declare:
+
+- `issue_id`;
+- world trigger;
+- actors involved;
+- each actor's stake;
+- valid resolution space, including refusal or conflict when appropriate;
+- required Minecraft evidence;
+- required social-state evidence;
+- score dimensions.
+
+The benchmark should not reward automatic cooperation. A grounded refusal,
+conditional loan, warning, or unresolved debt can be a better social result than
+ungrounded generosity.
+
 ## Non-Goals
 
 - Do not benchmark tool schema compliance or structured-argument formatting.
@@ -223,47 +258,55 @@ type PublicAffordanceLedgerEntry = {
 These records are not hidden planner authority. They are post-action evidence
 and compact context for later Actor Turn decisions.
 
-## First Recommended Live Benchmark
+## First Recommended Issue Smoke
 
-Start with `public_crafting_table_social_use_v1`.
+Start with `borrowed_tool_with_return_or_debt_v1`.
 
 Scenario:
 
 ```text
-natural-safe-spawn world
 two actors
-40-60 cycles
-same seed and reset per model
-no central shared chest requirement
-provider quota preflight and approval
+one actor has a useful tool as personal possession
+another actor needs that tool for a bounded Minecraft action
+the borrower requests access
+the owner lends, conditionally lends, refuses, or asks for clarification
+the borrower uses, returns, adapts, or leaves a debt/repair obligation
+provider quota preflight and approval for provider-backed smoke
 ```
 
 Target trajectory:
 
-1. Actor A identifies a need for a crafting table or requests access.
-2. Actor B gathers or uses personal wood, then crafts or places a table.
-3. The table becomes a public affordance or a clearly claimed station.
-4. Actor A uses it, requests access, refuses to use it, or records a blocker.
-5. Memory, relationship, or obligation state cites the physical evidence.
-6. The run continues for at least several cycles after the local success or
-   blocker.
+1. Borrower identifies the need and asks the tool holder.
+2. Owner recognizes personal possession and chooses lend, conditional lend,
+   refusal, or clarification.
+3. If access is granted, borrower uses the tool and either returns it or creates
+   an explicit debt/repair obligation.
+4. If access is refused, borrower adapts without laundering the refusal into
+   success.
+5. Memory, relationship, material claim, or obligation state cites the evidence.
+6. A later turn can use the open/fulfilled/refused obligation.
 
 Why this first:
 
-- it is more social than "collect wood";
-- it is less arbitrary than "build a house";
-- it tests possession, crafting, placement, public affordance, access, and
-  memory;
-- it can pass through cooperation, refusal, or blocker recovery;
-- it is still small enough to verify in 40-60 cycles.
+- it directly tests personal possession, access, request, refusal, trust,
+  obligation, and memory;
+- it does not require a central shared chest or public-good premise;
+- it can pass through cooperation, conditional access, refusal, debt, or repair;
+- it is small enough for a provider-backed decision smoke before live
+  Mineflayer transfer/use actions exist.
+
+`public_crafting_table_social_use_v1` remains useful only as a public-affordance
+plumbing smoke. It is not the main social benchmark.
 
 ## Later Scenario Candidates
 
-- `borrowed_tool_with_return_or_debt_v1`
 - `food_request_under_scarcity_v1`
 - `claimed_cache_access_conflict_v1`
 - `hazard_marker_public_safety_v1`
 - `weak_commons_surplus_use_and_dispute_v1`
+- `broken_promise_repair_v1`
+- `role_dependency_work_order_v1`
+- `public_crafting_table_social_use_v1`
 - `open_loop_settlement_continuity_v1`
 
 ## Report Requirements

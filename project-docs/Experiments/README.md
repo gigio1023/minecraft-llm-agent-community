@@ -53,6 +53,7 @@ Current curated reports:
 - `2026-06-14/placed-furnace-natural-60/index.html`
 - `2026-06-14/placed-furnace-natural-60/README.md`
 - `2026-06-15/grounded-social-trajectory-smoke/index.html`
+- `2026-06-15/borrowed-tool-qwen-plus-smoke/index.html`
 
 ## Required Run Metadata
 
