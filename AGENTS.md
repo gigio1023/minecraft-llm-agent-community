@@ -82,6 +82,10 @@ viral civilization framing by scaling actor counts, adding religions, laws,
 taxes, or dramatic society labels before the runtime can show why those
 phenomena naturally matter in the world. Treat sensational society claims as
 hypotheses requiring grounded investigation, not as proof or as a target style.
+Do not discard useful Project Sid material: extract case designs, metrics,
+failure modes, and prompt/config patterns with exact citation, while labeling
+them as unverified report claims until runnable code, raw logs, scoring scripts,
+or independent replication exist.
 
 ## PlanBeads Intent Rule
 

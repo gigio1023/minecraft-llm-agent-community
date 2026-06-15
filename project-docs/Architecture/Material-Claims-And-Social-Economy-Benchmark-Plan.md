@@ -54,6 +54,32 @@ refusal, repair, relationship continuity, and world-shaped dependence. Auditable
 Mineflayer artifacts are required so those social claims can be checked, but
 they are not the main research contribution.
 
+## Project Sid Case Adaptation
+
+Project Sid should be mined for case designs, not copied as a target style. The
+LaTeX source audit in `PROJECT_SID_2411_00114_REVIEW` found useful prompts,
+configs, metrics, and caveats, but no runnable public runtime, raw logs, world
+seeds, scoring scripts, or replay bundle. Therefore, use the report as a
+reference catalog:
+
+| Project Sid pattern | Adaptation here |
+| --- | --- |
+| Unique-item progression | Use as a single-actor competence calibration gate before social runs. |
+| Action awareness | Require expected outcome, runtime action, post-observation, verifier output, and artifact refs. |
+| Chat/action coherence failure | Treat chat as social evidence only; inventory/world truth still comes from Mineflayer artifacts. |
+| Sentiment tracking | Track relationship state only when tied to concrete requests, help, refusal, harm, repair, or future behavior. |
+| Chef food distribution | Convert into vanilla Minecraft scarcity/allocation cases: food, tools, fuel, station use, shelter access. |
+| 50-agent relationship graph | Start with 2-3 actors and plot relationship/obligation edges over cycles before scaling. |
+| Role specialization | Infer roles from repeated evidence-backed actions and obligations, not from profile labels alone. |
+| Tax constitution | Treat as a late-stage norm/rule experiment after smaller claim/obligation cases work. |
+| Cultural memes | Track repeated place names, routines, warnings, rituals, and work practices only when co-present behavior supports them. |
+| Religion spread | Keep as a controlled-diffusion stress test, not an early benchmark or proof of society. |
+
+This ordering avoids the failure mode where the project imitates the dramatic
+surface of civilization, such as laws or religion, before actors can sustain
+ordinary Minecraft social life around need, possession, access, refusal, and
+repair.
+
 ## Minecraft Social Issue Framing
 
 The benchmark unit should be a Minecraft social issue, not a generic task.
