@@ -16,6 +16,8 @@ Primary archive:
 
 - `REFERENCE_SWEEP_BEYOND_PROJECT_SID_2026_06_16`:
   `project-docs/research-archive/2026-06-16/reference-sweep-beyond-project-sid.md`
+- `NITROGEN_2601_02427_ANALYSIS`:
+  `project-docs/research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`
 
 Related active docs:
 
@@ -100,6 +102,40 @@ over-optimizes, collapses diversity, or launders weak evidence into progress.
 | Concordia, AgentSociety, SocioVerse, social simulation surveys | Scenario simulation, interventions, game-master style loops, population-scale studies. | Borrow experimental design, but keep the local game master as runtime validators and artifacts, not an LLM narrator. |
 | MAgIC, GLEE, MultiAgentBench, Concordia Contest | Mixed motives, cooperation, fairness, rationality, economic games, milestone KPIs, unfamiliar partners. | Add lightweight Minecraft economy through personal possession, claims, obligations, scarcity, and weak public affordances. |
 | SimBench, Sim2Real gap, social-simulation boundary work, solver-sampler mismatch | Plausibility is not validity; model strength may not imply faithful behavior; claims need boundaries. | Report social behavior as behavior, with cost and failure traces. Keep human-fidelity claims for a later validation layer. |
+| NitroGen, VPT, SIMA, GATO, Game-TARS | Generalist visual game-action policies, action-labeled gameplay data, unified action spaces, and cross-game transfer evaluation. | Treat as a future low-level policy substrate and contrast class. Do not make visual motor-control performance the current social benchmark target. |
+
+## NitroGen Boundary
+
+NitroGen strengthens this repo's direction by contrast. It shows that generalist
+gaming research is moving toward large video-action datasets, unified gamepad
+action spaces, behavior cloning, and cross-game transfer. That is valuable, but
+it addresses a different layer than this repo's current research claim.
+
+Local interpretation:
+
+```text
+NitroGen-style models may eventually become a low-level motor substrate.
+They do not replace the need to evaluate social consequences, material claims,
+obligations, memory continuity, and post-goal continuation.
+```
+
+Current boundary:
+
+- do not pivot to visual policy training;
+- do not evaluate NitroGen/VPT/SIMA as primary social baselines yet;
+- do not replace Mineflayer/action skills with a raw gamepad policy in the
+  current harness;
+- do borrow the benchmark discipline: unified interface, provenance of action
+  labels, transfer splits, and negative controls.
+
+Useful future architecture lane:
+
+```text
+Actor Turn chooses social/action intent.
+Mineflayer/action skill executes today.
+Future vision-action policy may execute low-level control.
+Runtime evidence remains authoritative either way.
+```
 
 ## Operational Definition Of Society For This Repo
 

@@ -176,6 +176,8 @@ shape active implementation or public docs navigation:
   `research-archive/2026-06-15/llm-social-behavior-benchmark-survey.md`.
 - direction-setting literature sweeps such as
   `research-archive/2026-06-16/reference-sweep-beyond-project-sid.md`.
+- single-paper direction analyses such as
+  `research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
