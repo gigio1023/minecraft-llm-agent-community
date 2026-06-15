@@ -117,6 +117,7 @@ Architecture:
 - `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
 - `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
 - `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+- `project-docs/Architecture/Research-Direction-Reference-Synthesis.md`
 - `project-docs/Architecture/Project-Sid-Harness-Absorption-Plan.md`
 - `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
 - `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
@@ -173,6 +174,8 @@ shape active implementation or public docs navigation:
 - dated run reports that are no longer current handoff material.
 - dated literature sweeps such as
   `research-archive/2026-06-15/llm-social-behavior-benchmark-survey.md`.
+- direction-setting literature sweeps such as
+  `research-archive/2026-06-16/reference-sweep-beyond-project-sid.md`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
