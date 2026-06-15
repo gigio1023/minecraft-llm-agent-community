@@ -39,13 +39,16 @@ natural Minecraft world, move as separate Mineflayer bots, create chat and
 world consequences, and leave evidence that one actor's action changed another
 actor's options, obligations, trust, or future behavior.
 
-Project Sid already demonstrates a broad version of the open-world Minecraft
+Project Sid already claims a broad version of the open-world Minecraft
 agent-society direction, including many-agent societies, role specialization,
-collective rules, and cultural/religious transmission. This benchmark plan
-therefore must not claim that Minecraft agent society is untouched. The tighter
-gap for this repo is evidence-grounded social microeconomy: possession,
-material claims, obligations, refusal, repair, relationship continuity, and
-auditable Mineflayer artifacts for each social claim.
+collective rules, and cultural/religious transmission. However, the public
+artifact is an arXiv technical report plus a thin GitHub wrapper, not a
+reproducible benchmark release. This benchmark plan therefore must not claim
+that Minecraft agent society is untouched, but it should also not treat Project
+Sid as a verified public baseline. The tighter gap for this repo is
+evidence-grounded social microeconomy: possession, material claims, obligations,
+refusal, repair, relationship continuity, and auditable Mineflayer artifacts for
+each social claim.
 
 ## Minecraft Social Issue Framing
 
