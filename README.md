@@ -1,13 +1,14 @@
 # minecraft-llm-agent-community
 
-Headless Minecraft runtime-loop research for a Soul-grounded social simulation
-seed.
+Headless Minecraft runtime-loop research for an evidence-grounded,
+Soul-grounded social simulation seed.
 
 This repository is not a Voyager clone, a race-to-diamond benchmark, or a
-house-building planner. The current target is smaller and stricter: one
-Mineflayer-backed actor should perform boring Minecraft tasks end to end while
-the runtime records truthful evidence for success, failure, stalls, retries, and
-state continuity.
+house-building planner. Minecraft task completion is a competence gate, not the
+final research target. The target is to test whether LLM-controlled embodied
+actors can sustain socially meaningful behavior in a natural Minecraft world,
+where social claims are constrained by verifiable movement, inventory, crafting,
+storage, communication, memory, and shared-world consequences.
 
 [Documentation & Web Portal](https://naem1023.github.io/minecraft-llm-agent-community/)
 
@@ -23,12 +24,24 @@ Near-term proof:
   `author_mineflayer_action`;
 - PlanBeads preserve passive open work, blockers, obligations, and followups;
 - Minecraft progress requires runtime execution and verifier-backed artifacts.
+- simple target-state benchmarks remain useful only as calibration gates before
+  social trajectory evaluation.
 
 Long-term north star:
 
-- a Soul-grounded Minecraft social simulation seed where actors have role
-  context, memory, relationships, action skill ownership, obligations, and
-  visible consequences.
+- an evidence-grounded Minecraft social simulation seed where actors have role
+  context, memory, relationships, action skill ownership, obligations, shared
+  resources, and visible consequences that persist after one immediate task is
+  completed.
+
+Research framing:
+
+- existing Minecraft LLM-agent benchmarks mostly evaluate bounded task
+  completion or task-oriented collaboration;
+- existing LLM social simulations often lack a verifiable physical substrate;
+- this project aims to evaluate persistent, evidence-backed social behavior in
+  natural open-world Minecraft seeds, including obligations, resource exchange,
+  memory continuity, recovery from blockers, and post-goal continuation.
 
 ## Runtime Shape
 
@@ -99,9 +112,10 @@ Read in this order:
 7. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
 8. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
 9. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-10. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-11. `project-docs/Setup/Headless-Server.md`
-12. `project-docs/Setup/Provider-Setup.md`
+10. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+11. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+12. `project-docs/Setup/Headless-Server.md`
+13. `project-docs/Setup/Provider-Setup.md`
 
 ## Running Checks
 

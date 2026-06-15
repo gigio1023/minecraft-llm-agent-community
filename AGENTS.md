@@ -8,8 +8,14 @@ loop.
 Do not revive the old Voyager-style architecture as the active path.
 
 The current implementation goal is not a full village simulator.
-It is a small, bounded, observable runtime that can later grow into a social
-simulation seed.
+It is a small, bounded, observable runtime that can later grow into an
+evidence-grounded social simulation seed.
+
+Minecraft task completion is a competence gate, not the final research target.
+The project goal is to evaluate whether LLM-controlled embodied actors can
+sustain socially meaningful behavior in natural Minecraft worlds, where social
+claims are constrained by verifiable movement, inventory, crafting, storage,
+communication, memory, and shared-world consequences.
 
 Immediate target:
 
@@ -23,13 +29,17 @@ Immediate target:
 North star:
 
 - actors, represented by Mineflayer bots, with role context, action skill
-  ownership, memory, and later human-in-the-loop social play.
+  ownership, memory, relationships, obligations, shared resources, and visible
+  consequences that persist after one immediate task is completed.
+- benchmark and experiment reports that distinguish physical competence from
+  social consequence, continuity, robustness, and efficiency.
 
 Not current delivery targets:
 
 - persona richness as a content goal;
 - long-run autonomy as a product goal;
 - large multi-actor society behavior before single-actor competence is trustworthy.
+- benchmark-maximization as the top-level research objective.
 
 ## PlanBeads Intent Rule
 
@@ -252,18 +262,19 @@ Read these first:
 18. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
 19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
 20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-21. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-22. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-23. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-24. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
-25. `project-docs/Architecture/Implementation-Workstreams.md`
-26. `project-docs/Architecture/Action-Skill-Verification.md`
-27. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-28. `project-docs/Architecture/Minimal-Probe.md`
-29. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-30. `project-docs/Setup/Headless-Server.md`
-31. `project-docs/Setup/Provider-Setup.md`
-32. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+21. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+22. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+23. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+24. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+25. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
+26. `project-docs/Architecture/Implementation-Workstreams.md`
+27. `project-docs/Architecture/Action-Skill-Verification.md`
+28. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+29. `project-docs/Architecture/Minimal-Probe.md`
+30. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+31. `project-docs/Setup/Headless-Server.md`
+32. `project-docs/Setup/Provider-Setup.md`
+33. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
