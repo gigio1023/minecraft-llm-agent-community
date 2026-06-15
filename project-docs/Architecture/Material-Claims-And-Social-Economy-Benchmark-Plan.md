@@ -10,6 +10,11 @@ Status: active benchmark direction.
 
 Recorded: 2026-06-15 (`Asia/Seoul`).
 
+Primary overlap reference:
+
+- `PROJECT_SID_2411_00114_REVIEW`:
+  `project-docs/research-archive/Project-Sid-2411-00114-Review-2026-06-15.md`
+
 ## Purpose
 
 This document resets the benchmark plan around the current society definition:
@@ -33,6 +38,14 @@ benchmark target must be live-world behavior: actors should observe the same
 natural Minecraft world, move as separate Mineflayer bots, create chat and
 world consequences, and leave evidence that one actor's action changed another
 actor's options, obligations, trust, or future behavior.
+
+Project Sid already demonstrates a broad version of the open-world Minecraft
+agent-society direction, including many-agent societies, role specialization,
+collective rules, and cultural/religious transmission. This benchmark plan
+therefore must not claim that Minecraft agent society is untouched. The tighter
+gap for this repo is evidence-grounded social microeconomy: possession,
+material claims, obligations, refusal, repair, relationship continuity, and
+auditable Mineflayer artifacts for each social claim.
 
 ## Minecraft Social Issue Framing
 
