@@ -10,6 +10,13 @@ Status: active campaign spec and implementation plan.
 
 Recorded: 2026-06-03 (`Asia/Seoul`).
 
+Material-economy update, recorded 2026-06-15: shared-storage examples in this
+campaign are evidence surfaces, not the definition of social economy. Interpret
+new benchmark work through personal possession, material claims, public
+affordances, weak commons, and obligation-backed exchange. Use
+`Material-Claims-And-Social-Economy-Benchmark-Plan.md` for current benchmark
+design.
+
 ## Purpose
 
 This document defines how the Actor Episode and Actor Turn campaign should be

@@ -506,12 +506,45 @@ personality floats when an enum or typed relationship event is available.
 by chest access and ledger artifacts. Shared storage is social state because it
 changes what other actors can observe and use.
 
+Shared storage is not the default definition of society or economy. In active
+social-economy docs, classify it more precisely as a claimed cache, weak
+commons, public affordance, or implementation-specific container.
+
+## Material Economy Terms
+
+**Personal possession** is material controlled by one actor's body: carried
+inventory, equipped tools, armor, food, and picked-up items. It is the strongest
+default ownership signal in vanilla Minecraft.
+
+**Material claim** is an evidence-backed assertion that an actor, role, or group
+controls access to an item stack, container, station, crop, worksite, route, or
+cache. Claims may be respected, disputed, transferred, borrowed against, or
+violated.
+
+**Public affordance** is a placed or modified world feature that changes what
+other actors can do, such as a crafting table, furnace, path, bridge, light,
+hazard marker, farm row, worksite, or shelter opening.
+
+**Weak commons** is deliberately available or low-cost shared material. It is a
+lightweight social category, not the center of the society lifecycle. Use it
+for surplus or public-use material only when evidence makes availability clear.
+
+**Unclaimed world resource** is natural terrain, blocks, animals, crops, or loot
+that has not yet become a personal possession or material claim.
+
+**Obligation-backed exchange** is a social exchange where request, offer,
+promise, refusal, handoff, loan, debt, repair, or credit persists beyond one
+physical action and can affect later decisions.
+
+Avoid bare **shared resource** in new active guidance. Prefer the more specific
+terms above unless describing a legacy artifact or a deliberately weak commons.
+
 ## Settlement State
 
 **Settlement state** is a compatibility term for structured world/social
-diagnostic context such as shared storage contents, known world positions,
-current blocker history, pending obligations, and evidence-linked status from
-prior runtime work.
+diagnostic context such as material claims, public affordances, weak commons,
+known world positions, current blocker history, pending obligations, and
+evidence-linked status from prior runtime work.
 
 Settlement state is not a provider-facing strategy taxonomy and not a hidden
 single-domain checklist. If a field mentions a concrete Minecraft activity, it

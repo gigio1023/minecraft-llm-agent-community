@@ -25,9 +25,9 @@ An evidence-grounded Minecraft society is:
 
 ```text
 a persistent multi-actor social system in a shared Minecraft world where
-actors with Soul/LifeGoal continuity coordinate, conflict, remember, exchange
-resources, maintain obligations, and alter shared world state in ways that are
-observable through runtime evidence.
+actors with Soul/LifeGoal continuity coordinate, conflict, remember, make
+material claims, exchange goods or access, maintain obligations, and alter
+public world state in ways that are observable through runtime evidence.
 ```
 
 This definition has three important consequences:
@@ -49,8 +49,8 @@ Society gives actors:
 - continuity, by preserving who did what, who promised what, and what remains
   unresolved;
 - coordination, by reducing duplicated work and enabling handoffs;
-- resource order, by turning private inventory, shared storage, stations, and
-  scarcity into social facts;
+- material order, by distinguishing personal possession, material claims,
+  public affordances, weak commons, and unclaimed world resources;
 - role meaning, by letting an actor's Soul/LifeGoal become useful or contested
   in a shared world;
 - conflict handling, by making refusal, hoarding, blame, repair, and trust
@@ -67,13 +67,35 @@ to keep acting together after any one local goal is finished.
 | --- | --- | --- |
 | `proto-social runtime` | One actor or scripted actors interacting with shared social state. Useful for smoke tests, but not a society claim. | Evidence-linked request, shared-state action, and memory or relationship update. |
 | `organization` | Two or more actors with differentiated roles or obligations around recurring work. | Role/obligation records, actor-specific actions, and at least one cross-actor dependency. |
-| `settlement` | A place-anchored organization with shared resources, stations, and local world improvements. | Shared location, shared container or station, world-state evidence, and recurring actor use. |
-| `village` | A settlement with enough durable infrastructure and social routines to be readable as a local community. | Repeated shared use, safety/resource routines, relationship continuity, and multiple episodes. |
-| `society` | A persistent social system whose roles, norms, obligations, conflicts, resources, and memory continue across episodes. | Multi-actor continuity, social-state reproduction, and post-goal continuation under new pressure. |
+| `settlement` | A place-anchored organization with public affordances, material claims, obligations, and local world improvements. | Shared location, usable station or route, claim/access evidence, and recurring actor use. |
+| `village` | A settlement with enough durable infrastructure and social routines to be readable as a local community. | Repeated public-affordance use, safety/material routines, relationship continuity, and multiple episodes. |
+| `society` | A persistent social system whose roles, norms, obligations, conflicts, material claims, and memory continue across episodes. | Multi-actor continuity, social-state reproduction, and post-goal continuation under new pressure. |
 
 These are maturity levels, not product milestones. The current runtime may
 start with proto-social and organization slices while preserving the north star
 of society.
+
+## Material Economy Model
+
+Vanilla Minecraft does not need a separate currency mod to support a useful
+economy. The local economy is the evidence-backed management of possession,
+access, claims, use, debt, and trust.
+
+This repo should use these categories instead of treating `shared resources` as
+the default social center:
+
+| Category | Meaning | Typical evidence |
+| --- | --- | --- |
+| `personal possession` | Items, tools, armor, food, and carried materials controlled by one actor's body. This is the strongest default ownership signal. | Inventory snapshots, equipment state, pickup/drop records, craft/use evidence. |
+| `material claim` | An evidence-backed assertion that an actor, role, or group controls access to an item stack, container, worksite, station, crop, or cache. | Claim ledger entry, container snapshot, sign/marker, chat request, memory record with evidence refs. |
+| `public affordance` | A world change that can help other actors act: crafting table, furnace, path, safe marker, bridge, lit area, farm row, worksite, shelter opening. | Block placement/use records, world scans, another actor using the affordance. |
+| `weak commons` | Lightly shared or unclaimed surplus that actors may use with low social cost. It is not the core lifecycle objective. | Public chest section, surplus marker, explicit "available" event, repeated unchallenged use. |
+| `unclaimed world resource` | Natural wood, stone, animals, crops, terrain, or loot that has not yet become a personal possession or material claim. | World-state scans, harvest evidence, absence of claim records. |
+| `obligation or credit` | A social debt, credit, promise, or expected repair caused by help, borrowing, refusal, damage, or contribution. | Request/promise/refusal/handoff events, relationship update, PlanBead or memory evidence. |
+
+Shared storage can still exist, but it is only one implementation of a weak
+commons, claimed cache, or public affordance. It should not be treated as the
+definition of economy or society.
 
 ## Necessary Conditions
 
@@ -84,7 +106,8 @@ present.
 
 The strong form requires two or more actors. A single actor can exercise
 proto-social machinery only when it acts against durable shared state such as a
-settlement obligation, shared storage, or a remembered request.
+settlement obligation, material claim, public affordance, or a remembered
+request.
 
 ### 2. Actor Identity And Direction
 
@@ -93,27 +116,37 @@ the actor notices, values, remembers, and treats as socially costly or useful.
 
 Identity is not decorative role-play text. It is continuity pressure.
 
-### 3. Shared Physical Substrate
+### 3. Common Physical Substrate
 
 The society needs a common world surface:
 
 - territory or worksite;
-- shared storage;
-- stations such as crafting table, furnace, farm, bed, or path;
+- public affordances such as crafting table, furnace, farm, bed, route, marker,
+  or path;
+- material claims over caches, stations, crops, work areas, or carried goods;
+- weak commons when surplus is explicitly available;
 - hazards and safety state;
 - visible world improvements or damage.
 
 The substrate matters because it lets social claims be verified.
 
-### 4. Resource Flow
+### 4. Material Claims And Exchange
 
-Society becomes measurable when resources move between private and shared
-states. Examples:
+Society becomes measurable when actors change possession, access, claims, or
+obligations in ways that affect another actor. Personal possession is the
+default ownership baseline; shared access must be made visible rather than
+assumed.
 
-- actor gathers wood and deposits it into shared storage;
-- another actor withdraws it for a role-specific purpose;
+Examples:
+
+- an actor gathers wood, keeps it, and later lends or trades part of it;
+- another actor asks to use a claimed crafting table or furnace;
+- an actor creates a public crafting table that later changes another actor's
+  options;
 - an actor hoards scarce food and creates conflict;
-- an actor conserves resources because of a remembered obligation.
+- an actor takes from a weak commons without social cost;
+- an actor borrows a tool, fails to return it, and creates an obligation;
+- an actor conserves resources because of a remembered promise or debt.
 
 ### 5. Communication Or Equivalent Social Signaling
 
@@ -127,7 +160,7 @@ Society needs expectations that persist beyond one action:
 
 - promises;
 - role duties;
-- shared-resource norms;
+- access, claim, borrowing, refusal, and repair norms;
 - conflict and repair rules;
 - trust updates;
 - unresolved blockers or debts.
@@ -143,7 +176,8 @@ use prior evidence:
 - who contributed;
 - who failed or refused;
 - which resource is scarce;
-- which station exists;
+- who holds or claims a useful item;
+- which public affordance exists and who can use it;
 - what promise remains open;
 - what relationship changed.
 
@@ -161,7 +195,8 @@ changing pressure:
 - night, hunger, damage, weather, or hostile mobs;
 - missing materials;
 - travel and pathfinding failures;
-- scarce shared resources;
+- scarcity in personal possessions, claimed caches, weak commons, or public
+  affordances;
 - incompatible role interests;
 - new requests after old work remains open.
 
@@ -174,7 +209,7 @@ Instead, its top-level purpose is:
 
 ```text
 to preserve and adapt shared life in the world by maintaining enough trust,
-memory, resource flow, role differentiation, and physical infrastructure for
+memory, material order, role differentiation, and physical infrastructure for
 actors to keep pursuing Soul/LifeGoal-grounded activity together.
 ```
 
@@ -183,11 +218,11 @@ Local goals can still exist:
 - collect food;
 - make tools;
 - mark a hazard;
-- place a shared station;
+- place a public station;
 - repair a broken promise;
-- settle a resource conflict;
+- settle a claim or borrowing conflict;
 - prepare for night;
-- expand storage;
+- improve a cache, route, farm, worksite, or other public affordance;
 - explore nearby terrain.
 
 These are context sources, not mandatory phases.
@@ -199,7 +234,10 @@ meaningful shared life.
 
 Examples:
 
-- a shared chest contains resources because one actor fulfilled a request;
+- one actor's personal possession enables a later exchange, loan, refusal, or
+  repair;
+- a material claim becomes clear enough that another actor can request access
+  instead of silently taking;
 - a crafting table is placed where another actor can use it;
 - a failed task produces a truthful blocker and a revised obligation;
 - an actor remembers that another actor helped and later adjusts trust or
@@ -214,12 +252,26 @@ Do not count these as society:
 
 - many agents independently completing private tasks;
 - chat role-play without physical or social-state consequences;
-- a single successful resource exchange with no later memory;
+- a single successful material exchange with no later memory;
 - a hidden central planner assigning all work while actors merely execute;
 - a fixed building script that always treats shelter as the social goal;
 - benchmark-optimized tech-tree progress that ignores relationships,
   obligations, or shared-world consequences;
 - memory text that claims social progress without evidence refs.
+
+## Shared Resource Demotion Rule
+
+Do not use `shared resource` as the default explanation for Minecraft society.
+When a run involves shared-looking material, classify it more precisely:
+
+- `personal possession` when the item is carried or controlled by one actor;
+- `material claim` when access is socially asserted or contested;
+- `public affordance` when a placed world object expands what others can do;
+- `weak commons` when surplus is deliberately available with low social cost;
+- `unclaimed world resource` when no actor or group has claimed it yet.
+
+This rule keeps economy lightweight while still allowing resource conflicts,
+borrowing, credit, debt, and public infrastructure to matter.
 
 ## Benchmark Implications
 
@@ -228,8 +280,10 @@ A society benchmark should report:
 - time and cycles to first verified social consequence;
 - number and type of social events;
 - physical evidence for each social claim;
-- private/shared inventory deltas;
-- shared station and world-state deltas;
+- personal possession deltas;
+- material claim and access changes;
+- public affordance and world-state deltas;
+- weak commons use when applicable;
 - open, fulfilled, blocked, and repaired obligations;
 - cross-actor dependencies;
 - memory and relationship continuity;
@@ -256,7 +310,8 @@ The runtime should provide:
 - action surface;
 - social event records;
 - memory and relationship state;
-- shared/private resource state;
+- personal possession, material claim, weak commons, public-affordance, and
+  obligation state;
 - quota and provider usage guards;
 - verification and artifacts.
 

@@ -51,9 +51,9 @@ Suggested initial profiles:
 
 | Actor | Profile |
 |-------|---------|
-| `npc_a` / Mara | `quartermaster`, storage auditor, wants reliable shared state, trusts evidence more than claims |
-| `npc_b` / Jun | `gatherer`, field worker, wants to prove usefulness through real resource delivery |
-| `npc_c` / Iris | `crafter`, workstation maker, wants predictable inputs and dislikes broken material promises |
+| `npc_a` / Mara | `quartermaster`, material-state auditor, wants reliable claims and access records, trusts evidence more than claims |
+| `npc_b` / Jun | `gatherer`, field worker, wants to prove usefulness through real material contribution |
+| `npc_c` / Iris | `crafter`, workstation maker, wants predictable inputs, public affordances, and honored material promises |
 
 ## Relationship Axes
 

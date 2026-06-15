@@ -27,7 +27,7 @@ guidance.
 | Search Token | Meaning | Primary References |
 |--------------|---------|--------------------|
 | `SOUL_GROUNDED_SOCIAL_SIMULATION` | Minecraft is observation and evidence for Soul/LifeGoal-grounded social simulation, not a generic benchmark | `SPEC.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
-| `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational definition of society, organization, settlement, and village for this repo's Minecraft social simulation target | `Specification/Evidence-Grounded-Minecraft-Society.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md` |
+| `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational definition of society, organization, settlement, and village for this repo's Minecraft social simulation target | `Specification/Evidence-Grounded-Minecraft-Society.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md` |
 | `AUTONOMY_SUBSTRATE_NOT_DOMAIN_STRATEGY` | Improve context, action surface, gates, hooks, verification, artifacts, and memory without encoding one domain goal as architecture | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md` |
 | `REFERENCE_ADAPTATION_GUIDE` | External references are mechanisms to adapt, not product specs to copy | `Specification/Reference-Adaptation-Guide.md`, `AGENTS.md` |
 | `NO_VOYAGER_EVAL_LOOP` | Do not revive loose generated-code gameplay execution as the active path | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Action-Skill-Verification.md` |
@@ -43,7 +43,8 @@ guidance.
 | `ACTION_SURFACE` | Provider-visible direct/deferred affordance packet for the current actor body | `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md`, `probe/src/runtime/actionSurface.ts` |
 | `ACTOR_EPISODE_ACTOR_TURN` | Target replacement for the per-cycle goal/action/judgment hot path: Active Episode, Actor Turn, Action Cards, Evidence Trace, branch-only Deliberation | `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Terminology.md` |
 | `LOW_COST_SOCIAL_SIMULATION_CAMPAIGN` | Campaign-level spec, gates, social proof scenarios, and implementation sequence for proving cheap-model Actor Turn behavior | `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md` |
-| `GROUNDED_SOCIAL_TRAJECTORY_BENCHMARK` | Provider-free and future live benchmark contract for evidence-backed social trajectories: request, shared contribution, cross-actor use, continuity, and auditability | `Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`, `Experiments/2026-06-15/grounded-social-trajectory-smoke/README.md`, `probe/src/objectives/socialTrajectory/` |
+| `GROUNDED_SOCIAL_TRAJECTORY_BENCHMARK` | Legacy provider-free smoke contract for evidence-backed social trajectories; useful for ledger/report sanity, not the main social-economy target | `Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`, `Experiments/2026-06-15/grounded-social-trajectory-smoke/README.md`, `probe/src/objectives/socialTrajectory/` |
+| `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK` | Active benchmark direction for personal possession, material claims, public affordances, weak commons, obligations, continuity, and cost-aware model comparison | `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`, `Specification/Evidence-Grounded-Minecraft-Society.md`, `Terminology.md` |
 | `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL` | Compact `/goal` companion for the current pivot: Actor Turn as hot path, PlanBeads as passive issue-like state, branch-only Deliberation | `Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`, `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing compressed planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `CONTEXT_PROJECTION_SOURCE_EVIDENCE` | Actor Turn context rule: bounded facts may be compacted, but observation/action/social/work history must carry source evidence cards and refs beside summaries | `Architecture/Context-Projection-And-Source-Evidence.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `AGENTS.md` |
@@ -120,18 +121,20 @@ For any onboarding developer or agent, read in this order:
 18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
 19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
 20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-21. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-22. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-23. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-24. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-25. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-26. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-27. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
-28. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-29. `project-docs/Setup/Headless-Server.md`
-30. `project-docs/Setup/Provider-Setup.md`
-31. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
-32. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+21. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+22. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+23. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+24. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+25. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+26. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+27. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+28. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+29. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+31. `project-docs/Setup/Headless-Server.md`
+32. `project-docs/Setup/Provider-Setup.md`
+33. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+34. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
 
 ## Active vs Archived
 

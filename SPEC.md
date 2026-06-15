@@ -44,8 +44,8 @@ The actor is not just an LLM controller attached to Mineflayer.
 When `soul.md` or an ActorSoul artifact defines an actor, it is the actor's
 identity seed. Short-, mid-, and long-term goals are derived under the
 Soul/LifeGoal frame and informed by observed world state, role context, memory,
-relationships, obligations, trust, conflict, shared/private inventory, and
-settlement state.
+relationships, obligations, trust, conflict, personal possession, material
+claims, public affordances, weak commons, and settlement state.
 
 Gameplay progress matters because it creates observations, evidence, and social
 consequences. It is not the top-level objective by itself.

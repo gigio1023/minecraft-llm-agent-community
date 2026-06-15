@@ -9,6 +9,13 @@ Search token: `SOCIAL_SIMULATION_NEXT_GOAL_HANDOFF`.
 Status: future multi-actor expansion handoff under the active Soul/LifeGoal
 direction.
 
+Material-economy update, recorded 2026-06-15: this handoff predates the
+personal-possession/material-claim/public-affordance benchmark framing. Treat
+the shared-chest loop below as a legacy first exchange surface, not as the
+definition of society or the required next benchmark. Use
+`Material-Claims-And-Social-Economy-Benchmark-Plan.md` for current benchmark
+direction.
+
 This page is not gated on the long-term diamond harness. Use it after the
 single-actor Soul/LifeGoal social cycle can reliably produce current-run
 Minecraft evidence, write CycleJudgment/memory, and reuse that judgment in a

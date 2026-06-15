@@ -24,7 +24,11 @@ Soul / ActorSoul
 + role context
 + relationship context
 + memory
-+ shared/private inventory
++ personal possession
++ material claims
++ public affordances
++ weak commons
++ obligations
 + settlement state
 + runtime affordances
 ```
@@ -49,7 +53,8 @@ seed. It should influence:
 - how obligations and conflict are interpreted;
 - which memories are salient;
 - how short-, mid-, and long-term goals are framed;
-- how the actor weighs private benefit, shared survival, trust, and role duty.
+- how the actor weighs personal possession, public affordances, trust,
+  obligations, and role duty.
 
 Soul is not a text costume. It is not a decorative persona prompt. It is a
 continuity layer that constrains the actor across cycles.
@@ -78,7 +83,8 @@ ready front is context, not executable authority or proof of progress.
 
 The implementation may start with one actor, but the structure must not erase
 future social dynamics. A single actor can still have obligations, shared
-storage context, role duty, remembered conflict, and settlement commitments.
+world/social context, role duty, remembered conflict, material claims, public
+affordances, and settlement commitments.
 
 ## What Counts As Progress
 
@@ -87,11 +93,12 @@ Progress requires both runtime evidence and social interpretation.
 Examples:
 
 - Placing a crafting table is gameplay progress.
-- Placing a crafting table because the settlement lacks a shared station is
+- Placing a crafting table because another actor needs a public affordance is
   social-simulation progress.
-- Moving an item into shared storage is gameplay progress.
-- Moving an item into shared storage against a remembered obligation or shared
-  scarcity is social-simulation progress.
+- Keeping, lending, refusing, or handing off an item is gameplay progress only
+  when backed by physical evidence.
+- Doing that because of a remembered obligation, material claim, scarcity, or
+  relationship cost is social-simulation progress.
 - Placing blocks is gameplay progress.
 - Placing blocks while updating memory about a shared safety concern is
   social-simulation progress.
@@ -122,8 +129,10 @@ The spec expects these context sources to become first-class model-visible input
 over time:
 
 - role duty;
-- shared storage shortage;
-- private inventory need;
+- personal possession need;
+- material claim or access state;
+- weak commons availability;
+- public affordance availability;
 - station availability;
 - shelter/safety state;
 - remembered blocker;

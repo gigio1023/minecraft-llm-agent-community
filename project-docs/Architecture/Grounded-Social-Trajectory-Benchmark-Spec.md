@@ -6,7 +6,7 @@ sidebar_position: 44
 
 Search token: `GROUNDED_SOCIAL_TRAJECTORY_BENCHMARK`.
 
-Status: initial provider-free smoke spec.
+Status: initial provider-free smoke spec; retained as a legacy sanity check.
 
 Recorded: 2026-06-15 (`Asia/Seoul`).
 
@@ -14,6 +14,20 @@ Recorded: 2026-06-15 (`Asia/Seoul`).
 
 This benchmark asks whether the runtime can evaluate social simulation as
 evidence-backed behavior, not as persona text or generic Minecraft progress.
+
+The original smoke uses shared storage because deposit/inspect/withdraw events
+are cheap to verify without a live provider. That shape is still useful as a
+sanity check for event ledgers and reports, but it is not the primary social
+economy model. The active benchmark direction is now:
+
+- personal possession;
+- material claims;
+- public affordances;
+- weak commons;
+- obligation-backed exchange.
+
+Use `Material-Claims-And-Social-Economy-Benchmark-Plan.md` for the current
+benchmark ladder.
 
 The immediate smoke does not call an LLM provider and does not require a live
 Minecraft server. It verifies the scoring contract, event ledger, evidence
@@ -24,8 +38,9 @@ The long-term benchmark question is:
 ```text
 Can LLM-controlled Minecraft actors sustain evidence-grounded social behavior
 in natural open-world seeds, where progress is measured not only by task
-completion but by durable obligations, resource exchange, memory continuity,
-recovery from blockers, and observable changes to a shared world?
+completion but by durable obligations, material claims, public affordance use,
+memory continuity, recovery from blockers, and observable changes to a common
+world?
 ```
 
 ## Research Gap
@@ -52,9 +67,10 @@ The repo's primary research framing is an application and methodological gap:
 - Do not start provider-backed experiments without provider-specific quota
   preflight and operator approval.
 
-## Minimum Social Trajectory
+## Legacy Minimum Social Trajectory
 
-The smallest useful trajectory is a shared-resource exchange:
+The first provider-free smoke used this deliberately narrow shared-storage
+trajectory:
 
 ```text
 request
@@ -64,7 +80,7 @@ request
 -> relationship or obligation state updates with evidence refs
 ```
 
-Initial smoke scenario:
+Legacy smoke scenario:
 
 ```text
 grounded_social_sticks_from_deposited_logs_v1
@@ -73,8 +89,8 @@ grounded_social_sticks_from_deposited_logs_v1
 Actors:
 
 - `npc_b`: gatherer, responsible for contributing useful wood.
-- `npc_c`: crafter, responsible for using shared resources to craft a useful
-  intermediate item.
+- `npc_c`: crafter, responsible for using the legacy shared-storage input to
+  craft a useful intermediate item.
 - `npc_a`: quartermaster, responsible for recording shared value and social
   consequence.
 
@@ -89,8 +105,12 @@ Expected trajectory:
 6. `npc_a` records a relationship or settlement event that cites the deposit,
    withdrawal, or craft evidence.
 
-Private-only success is not enough. The social claim requires shared visibility
-or handoff evidence before the crafter's success.
+Private-only success is not enough. This legacy social claim requires shared
+visibility or handoff evidence before the crafter's success.
+
+For new benchmark design, do not require central shared storage. Prefer a
+material-claim or public-affordance trajectory where possession, access,
+borrowing, refusal, and later use can be recorded explicitly.
 
 ## Event Schema
 
@@ -161,7 +181,10 @@ Provider-free smoke artifacts:
 Future live artifacts:
 
 - runtime action records;
-- inventory and shared storage deltas;
+- personal possession deltas;
+- material claim and access ledgers;
+- weak commons use when applicable;
+- public affordance creation and use;
 - block placement/crafting evidence;
 - chat/request/promise/handoff events;
 - actor memory writes with evidence refs;
@@ -183,13 +206,15 @@ The smoke passes if:
 
 ## Next Live Step
 
-Only after the provider-free smoke passes, define a small live run:
+Only after the provider-free smoke passes, define a small live run under the
+current material-claims benchmark plan:
 
 ```text
 natural seed
 two or three Mineflayer actors
-shared chest near spawn
-8-12 turns per actor
+no mandatory central shared chest
+one public-affordance or material-claim objective
+8-20 turns per actor
 provider quota preflight
 operator approval
 first-person and third-person screenshots
@@ -197,5 +222,5 @@ same event ledger and score dimensions
 ```
 
 The live run should be treated as exploratory until the runtime can prove
-shared storage, actor identity, social events, and memory continuity from
-current-run artifacts.
+personal possession, material claims, public affordance use, actor identity,
+social events, and memory continuity from current-run artifacts.

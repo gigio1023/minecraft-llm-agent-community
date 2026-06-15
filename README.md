@@ -8,7 +8,8 @@ house-building planner. Minecraft task completion is a competence gate, not the
 final research target. The target is to test whether LLM-controlled embodied
 actors can sustain socially meaningful behavior in a natural Minecraft world,
 where social claims are constrained by verifiable movement, inventory, crafting,
-storage, communication, memory, and shared-world consequences.
+storage, material claims, public affordances, communication, memory, and
+shared-world consequences.
 
 [Documentation & Web Portal](https://naem1023.github.io/minecraft-llm-agent-community/)
 
@@ -30,9 +31,9 @@ Near-term proof:
 Long-term north star:
 
 - an evidence-grounded Minecraft social simulation seed where actors have role
-  context, memory, relationships, action skill ownership, obligations, shared
-  resources, and visible consequences that persist after one immediate task is
-  completed.
+  context, memory, relationships, action skill ownership, obligations, material
+  claims, public affordances, weak commons, and visible consequences that
+  persist after one immediate task is completed.
 
 Research framing:
 
@@ -40,8 +41,9 @@ Research framing:
   completion or task-oriented collaboration;
 - existing LLM social simulations often lack a verifiable physical substrate;
 - this project aims to evaluate persistent, evidence-backed social behavior in
-  natural open-world Minecraft seeds, including obligations, resource exchange,
-  memory continuity, recovery from blockers, and post-goal continuation.
+  natural open-world Minecraft seeds, including obligations, material claims,
+  public-affordance use, memory continuity, recovery from blockers, and
+  post-goal continuation.
 
 ## Runtime Shape
 
@@ -113,9 +115,10 @@ Read in this order:
 8. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
 9. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
 10. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-11. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-12. `project-docs/Setup/Headless-Server.md`
-13. `project-docs/Setup/Provider-Setup.md`
+11. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+12. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+13. `project-docs/Setup/Headless-Server.md`
+14. `project-docs/Setup/Provider-Setup.md`
 
 ## Running Checks
 

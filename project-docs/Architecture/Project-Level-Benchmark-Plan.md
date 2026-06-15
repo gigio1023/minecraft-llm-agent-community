@@ -6,6 +6,13 @@ Status: planning document.
 
 Recorded: 2026-06-13 (`Asia/Seoul`).
 
+Material-economy update, recorded 2026-06-15: target-state Minecraft goals
+remain useful calibration gates, but the current social benchmark direction is
+defined by personal possession, material claims, public affordances, weak
+commons, obligations, and cross-actor continuity. Use
+`Material-Claims-And-Social-Economy-Benchmark-Plan.md` for the active social
+economy benchmark ladder.
+
 ## Purpose
 
 This document defines a benchmark direction for evaluating the whole Minecraft

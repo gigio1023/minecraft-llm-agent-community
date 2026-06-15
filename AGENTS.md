@@ -29,8 +29,9 @@ Immediate target:
 North star:
 
 - actors, represented by Mineflayer bots, with role context, action skill
-  ownership, memory, relationships, obligations, shared resources, and visible
-  consequences that persist after one immediate task is completed.
+  ownership, memory, relationships, obligations, material claims, public
+  affordances, weak commons, and visible consequences that persist after one
+  immediate task is completed.
 - benchmark and experiment reports that distinguish physical competence from
   social consequence, continuity, robustness, and efficiency.
 
@@ -198,10 +199,10 @@ the product direction is a Soul-grounded social simulation seed.
 When `soul.md` or an ActorSoul artifact defines an actor, treat it as the actor's
 identity seed. Short-, mid-, and long-term goals should be derived under that
 Soul/LifeGoal frame, with social context, memory, relationships, role context,
-shared/private inventory, obligations, trust, conflict, and settlement state in
-view. Gameplay progress matters because it creates observations, consequences, and evidence
-for social life, not because the top-level objective is to optimize a Minecraft
-benchmark.
+personal possession, material claims, public affordances, weak commons,
+obligations, trust, conflict, and settlement state in view. Gameplay progress
+matters because it creates observations, consequences, and evidence for social
+life, not because the top-level objective is to optimize a Minecraft benchmark.
 
 Use external references by translating their mechanisms into this project:
 
@@ -248,33 +249,35 @@ Read these first:
 4. `GEMINI.md`
 5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 6. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-7. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-8. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-9. `project-docs/Specification/Reference-Adaptation-Guide.md`
-10. `project-docs/Documentation-Map.md`
-11. `project-docs/Agent-Search-Index.md`
-12. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-13. `project-docs/Terminology.md`
-14. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-15. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-16. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-17. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-18. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-21. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-22. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-23. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-24. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-25. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
-26. `project-docs/Architecture/Implementation-Workstreams.md`
-27. `project-docs/Architecture/Action-Skill-Verification.md`
-28. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-29. `project-docs/Architecture/Minimal-Probe.md`
-30. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-31. `project-docs/Setup/Headless-Server.md`
-32. `project-docs/Setup/Provider-Setup.md`
-33. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+7. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+8. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+9. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+10. `project-docs/Specification/Reference-Adaptation-Guide.md`
+11. `project-docs/Documentation-Map.md`
+12. `project-docs/Agent-Search-Index.md`
+13. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+14. `project-docs/Terminology.md`
+15. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+16. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+17. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+18. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+19. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+20. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+21. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+22. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+23. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+24. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+25. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+26. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+27. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
+28. `project-docs/Architecture/Implementation-Workstreams.md`
+29. `project-docs/Architecture/Action-Skill-Verification.md`
+30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+31. `project-docs/Architecture/Minimal-Probe.md`
+32. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+33. `project-docs/Setup/Headless-Server.md`
+34. `project-docs/Setup/Provider-Setup.md`
+35. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -496,7 +499,8 @@ Important search tokens:
 - Do not let quick probes become permanent monoliths.
 - Do not expect social simulation from persona text alone.
 - Add concrete Minecraft observations and consequences first: resource gathering, crafting, storage,
-  movement, scarcity, and shared/private inventory.
+  movement, scarcity, personal possession, material claims, public affordances,
+  weak commons, and obligations.
 - Mineflayer provides the game client API.
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
   eval.
