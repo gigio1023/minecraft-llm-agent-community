@@ -26,6 +26,14 @@ under natural Minecraft constraints, without the runtime secretly planning the
 society for them?
 ```
 
+The first 2026-06-15 borrowed-tool provider smoke is only a closed issue
+decision check. It is useful for testing the social issue schema and scorer, but
+it is too small to count as open-world Minecraft social interaction. The main
+benchmark target must be live-world behavior: actors should observe the same
+natural Minecraft world, move as separate Mineflayer bots, create chat and
+world consequences, and leave evidence that one actor's action changed another
+actor's options, obligations, trust, or future behavior.
+
 ## Minecraft Social Issue Framing
 
 The benchmark unit should be a Minecraft social issue, not a generic task.
@@ -141,6 +149,62 @@ Example scenarios:
 
 The score should not require generosity. A grounded refusal can be better than
 ungrounded cooperation.
+
+### Phase 2L. Open-World Live Two-Actor Interaction
+
+Goal: make Phase 2 real in Minecraft instead of only simulating an issue packet.
+
+Candidate benchmark id: `open_world_live_borrowed_tool_v1`.
+
+Required shape:
+
+- natural-safe-spawn or natural-survival world, fresh for each model run;
+- two active actors, each represented by a distinct Mineflayer bot;
+- each actor has its own ActorSoul, LifeGoal, inventory, memory, relationship
+  state, and actor workspace;
+- the scenario may seed initial facts such as proximity, one tool, or one need,
+  but it must not force the utterance, handoff, resolution, or final outcome;
+- both actors must observe live entities, terrain, inventory, chat, and
+  reachable world affordances from the loaded world;
+- world, inventory, container, entity, chat, memory, relationship, claim, and
+  obligation evidence must be recorded as runtime artifacts;
+- first-person and close third-person screenshots are supporting review
+  artifacts, not scoring authority.
+
+For `open_world_live_borrowed_tool_v1`, a minimal useful setup is:
+
+```text
+npc_a starts with or has just made a useful tool as personal possession.
+npc_b has a nearby material need where the tool helps.
+Both actors start near each other in a natural world with enough reachable
+terrain to act.
+The system does not prescribe whether npc_a lends, refuses, asks for collateral,
+offers help directly, ignores the request, or creates a debt.
+```
+
+Passage through the issue can include cooperation, refusal, conflict, debt, or
+adaptation. What matters is whether the social consequence is grounded in live
+Minecraft evidence rather than a prewritten event trajectory.
+
+Minimum evidence gates:
+
+| Gate | Evidence required |
+| --- | --- |
+| Co-presence | Both actors are loaded entities within interaction range at least once. |
+| Social initiation | A delivered chat event, or equivalent visible action, is tied to a live-world need or claim. |
+| Material claim | The possessed item, station, cache, or affordance is proven by inventory, block, or container evidence. |
+| Cross-actor consequence | One actor's action changes another actor's options, position, inventory, plan, memory, relationship, or obligation state. |
+| World grounding | At least one non-chat Minecraft action occurs after the social event and is tied to the issue. |
+| Continuity | A later turn references or acts on the prior request, refusal, loan, debt, or obligation with evidence refs. |
+
+Implementation implication: the current `socialCycleRunner` already has natural
+world setup, fresh-world support, visual evidence, and actor-workspace artifacts,
+but it is still primarily a single-actor loop. The older `mutual/skillVillage`
+path can create several bots, but it is flat-world/OpenAI-Codex-oriented and
+does not execute generated Minecraft skills as live social evidence. The next
+implementation should therefore add a small live two-actor orchestration layer
+on top of the current social-cycle runtime rather than treating the closed
+issue smoke as sufficient.
 
 ### Phase 3. Public Affordance Creation And Use
 

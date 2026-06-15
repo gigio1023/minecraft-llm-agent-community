@@ -71,6 +71,16 @@ Every new benchmark run should record:
 - provider usage ledger path;
 - visual evidence status and screenshot count.
 
+For open-world social interaction runs, also record:
+
+- active actor ids and whether each actor had a separate Mineflayer bot;
+- whether actors co-occupied the loaded world and could observe each other;
+- seeded scenario facts versus events produced by the actors during the run;
+- material claim, obligation, relationship, memory, and cross-actor consequence
+  refs;
+- which evidence comes from live Minecraft runtime artifacts and which evidence
+  is only provider-authored interpretation.
+
 ## Scoring Boundary
 
 Do not create benchmark sets that score tool schema compliance, structured

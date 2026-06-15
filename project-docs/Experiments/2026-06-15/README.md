@@ -19,3 +19,10 @@ The borrowed-tool smoke does call ModelScope Qwen Plus, after quota preflight,
 but still does not start a Minecraft server. Treat it as provider decision
 evidence for the new Minecraft social issue framing, not as physical Mineflayer
 competence.
+
+Follow-up interpretation after report review: this smoke is too simple for the
+core open-world social simulation goal. The next meaningful benchmark should be
+a live two-actor natural-world run where separate Mineflayer bots observe each
+other, speak or otherwise signal, move, transfer or refuse material access, use
+the world, and leave evidence-backed claim, obligation, relationship, and memory
+state. Provider-authored event trajectories alone are not enough.

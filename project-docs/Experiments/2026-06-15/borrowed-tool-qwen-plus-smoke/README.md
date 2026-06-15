@@ -90,10 +90,25 @@ This smoke is deliberately small. It shows that the new issue framing is more
 socially meaningful than the earlier public crafting-table smoke, but it still
 does not test embodiment.
 
+User review after reading the report: the experiment is too simple for the real
+research goal. It is a closed provider-decision issue packet, not open-world
+Minecraft social interaction. It should not be used as evidence that actors can
+socially coordinate inside a natural Minecraft world.
+
+Interpretation boundary:
+
+- it proves Qwen Plus can preserve request, conditional access, obligation, and
+  return semantics over a short fixed packet;
+- it does not prove live co-presence, physical handoff, tool use, refusal
+  handling in a world, multi-actor continuity, or emergent social behavior;
+- the next benchmark must use separate Mineflayer bots in a fresh natural world
+  and score runtime evidence, not only model-authored events.
+
 Required next step before claiming Minecraft runtime competence:
 
 - add or reuse runtime actions for physical item handoff, pickup/drop, tool
   use, return, and obligation evidence;
-- run the same issue with a fresh Minecraft world and actor workspace;
+- run a live two-actor version with a fresh natural Minecraft world and
+  separate actor workspaces;
 - record first-person/third-person screenshots only as supporting evidence;
 - score physical evidence separately from provider decision quality.
