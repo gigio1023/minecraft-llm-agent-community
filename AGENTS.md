@@ -42,6 +42,47 @@ Not current delivery targets:
 - large multi-actor society behavior before single-actor competence is trustworthy.
 - benchmark-maximization as the top-level research objective.
 
+## Research Value Boundary
+
+Evidence-first benchmarking is not the research goal and must not be presented
+as the core contribution. Runtime evidence, transcripts, screenshots, ledgers,
+seed/reset records, cost traces, and scoring scripts are support infrastructure:
+they make claims checkable, prevent fake progress, and let runs be reviewed.
+They are necessary hygiene, not the thing being studied.
+
+The research value must come from a more substantive question:
+
+```text
+What counts as a Minecraft society, organization, settlement, or social life
+when embodied actors inhabit a natural world with needs, constraints, memory,
+relationships, material stakes, conflict, cooperation, repair, and continuation
+beyond one scripted task?
+```
+
+Benchmark design should therefore measure lived social behavior, not the
+existence of benchmark artifacts. A good benchmark is a lens for seeing whether
+actors form and maintain meaningful social patterns under Minecraft constraints.
+It is not valuable merely because it records evidence cleanly.
+
+Do not let the project drift into a "reproducibility-only" or
+"evidence-first benchmark" paper. Reproducibility and evidence are the audit
+surface. The main work is defining and testing realistic social dynamics:
+
+- why actors stay near each other or separate;
+- how needs create dependence, exchange, refusal, conflict, or repair;
+- how possession, access, and place become socially meaningful;
+- how roles, norms, obligations, trust, and reputation arise or fail to arise;
+- how social state changes after the immediate goal is done;
+- how the world itself, not just dialogue, shapes collective behavior.
+
+Project Sid is a cautionary reference here. It claims broad Minecraft
+civilization-scale behavior, but the public artifact is a technical report plus
+a thin GitHub wrapper, not a reproducible code/data/log release. Do not imitate
+viral civilization framing by scaling actor counts, adding religions, laws,
+taxes, or dramatic society labels before the runtime can show why those
+phenomena naturally matter in the world. Treat sensational society claims as
+hypotheses requiring grounded investigation, not as proof or as a target style.
+
 ## PlanBeads Intent Rule
 
 PlanBeads exist because free-form strings are too weak to manage what an actor is

@@ -19,9 +19,12 @@ Primary overlap reference:
 
 This document resets the benchmark plan around the current society definition:
 Minecraft society is not primarily a shared chest or a central pool of
-resources. It is an evidence-grounded social system where actors maintain
-personal possessions, material claims, public affordances, weak commons,
-obligations, memory, and relationships in a common world.
+resources. The research object is lived social behavior in a shared Minecraft
+world: actors face needs and constraints, remember each other, depend on or
+avoid each other, negotiate access to things and places, create obligations,
+repair or ignore harms, and continue after one scripted task is complete.
+Evidence is required to audit those claims, but evidence collection is a support
+condition, not the research value.
 
 The benchmark should compare LLM providers and models by asking:
 
@@ -45,10 +48,11 @@ collective rules, and cultural/religious transmission. However, the public
 artifact is an arXiv technical report plus a thin GitHub wrapper, not a
 reproducible benchmark release. This benchmark plan therefore must not claim
 that Minecraft agent society is untouched, but it should also not treat Project
-Sid as a verified public baseline. The tighter gap for this repo is
-evidence-grounded social microeconomy: possession, material claims, obligations,
-refusal, repair, relationship continuity, and auditable Mineflayer artifacts for
-each social claim.
+Sid as a verified public baseline. The tighter gap for this repo is realistic
+social microeconomy in Minecraft: possession, material claims, obligations,
+refusal, repair, relationship continuity, and world-shaped dependence. Auditable
+Mineflayer artifacts are required so those social claims can be checked, but
+they are not the main research contribution.
 
 ## Minecraft Social Issue Framing
 
