@@ -1,10 +1,15 @@
 export type GroundedSocialEventType =
   | "request"
   | "promise"
+  | "refusal"
+  | "loan"
+  | "handoff"
+  | "return"
   | "shared_deposit"
   | "shared_inspect"
   | "shared_withdraw"
   | "craft"
+  | "obligation_update"
   | "relationship_update"
   | "memory_write"
   | "blocker";
@@ -24,6 +29,8 @@ export type GroundedSocialEvent = {
   item_id?: string;
   count?: number;
   container_id?: string;
+  expected_minecraft_action?: string;
+  observed_minecraft_result?: string;
   evidence_refs: string[];
   notes?: string;
 };
@@ -65,6 +72,35 @@ export type GroundedSocialDimensionScore = {
   findings: string[];
 };
 
+export type GroundedSocialHarnessDimensionId =
+  | "event_integrity"
+  | "chat_action_coherence"
+  | "action_awareness_trace"
+  | "cross_actor_causality"
+  | "continuity_state";
+
+export type GroundedSocialHarnessDimensionScore = {
+  id: GroundedSocialHarnessDimensionId;
+  label: string;
+  weight: number;
+  score: number;
+  passed: boolean;
+  evidence_event_ids: string[];
+  findings: string[];
+};
+
+export type GroundedSocialHarnessAuditReport = {
+  schema: "grounded-social-harness-audit/v1";
+  summary: {
+    score: number;
+    max_score: number;
+    status: "passed" | "partial" | "failed";
+    blocking_findings: string[];
+  };
+  dimensions: GroundedSocialHarnessDimensionScore[];
+  notes: string[];
+};
+
 export type GroundedSocialTrajectoryReport = {
   schema: "grounded-social-trajectory-report/v1";
   run_id: string;
@@ -84,6 +120,7 @@ export type GroundedSocialTrajectoryReport = {
     first_cross_actor_consumption_cycle?: number;
   };
   dimensions: GroundedSocialDimensionScore[];
+  harness_audit: GroundedSocialHarnessAuditReport;
   events: GroundedSocialEvent[];
   notes: string[];
 };

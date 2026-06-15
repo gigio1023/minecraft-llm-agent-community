@@ -117,6 +117,7 @@ Architecture:
 - `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
 - `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
 - `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+- `project-docs/Architecture/Project-Sid-Harness-Absorption-Plan.md`
 - `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
 - `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
 - `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`

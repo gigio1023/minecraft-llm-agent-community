@@ -36,6 +36,20 @@ function dimensionRows(report: GroundedSocialTrajectoryReport) {
     .join("");
 }
 
+function harnessRows(report: GroundedSocialTrajectoryReport) {
+  return report.harness_audit.dimensions
+    .map(
+      (dimension) => `<tr>
+        <td>${escapeHtml(dimension.label)}</td>
+        <td>${escapeHtml(`${dimension.score}/${dimension.weight}`)}</td>
+        <td>${dimension.passed ? "pass" : "partial/fail"}</td>
+        <td>${escapeHtml(dimension.evidence_event_ids.join(", ") || "none")}</td>
+        <td>${escapeHtml(dimension.findings.join(" "))}</td>
+      </tr>`
+    )
+    .join("");
+}
+
 function actorCards(report: GroundedSocialTrajectoryReport) {
   return report.actors
     .map(
@@ -258,6 +272,7 @@ export function formatGroundedSocialTrajectoryHtml(report: GroundedSocialTraject
       <h1>Grounded Social Trajectory Smoke</h1>
       <p class="muted">Provider-free evidence-ledger smoke for social simulation scoring.</p>
       <span class="pill status ${statusClass(report.summary.status)}">${escapeHtml(report.summary.status)}</span>
+      <span class="pill status ${statusClass(report.harness_audit.summary.status)}">harness ${escapeHtml(report.harness_audit.summary.status)}</span>
       <span class="pill">scenario: ${escapeHtml(report.scenario_id)}</span>
       <span class="pill">provider calls: ${escapeHtml(report.provider.live_provider_calls)}</span>
       <span class="pill">live server: ${escapeHtml(report.environment.live_minecraft_server)}</span>
@@ -265,6 +280,7 @@ export function formatGroundedSocialTrajectoryHtml(report: GroundedSocialTraject
 
     <section class="metrics">
       ${metric("Score", `${report.summary.score}/${report.summary.max_score}`, "80+ passes the smoke")}
+      ${metric("Harness", `${report.harness_audit.summary.score}/${report.harness_audit.summary.max_score}`, "Project Sid absorption audit")}
       ${metric("Events", report.summary.event_count, "ordered social ledger")}
       ${metric("Evidence Refs", report.summary.evidence_ref_count, "refs attached to claims")}
       ${metric("First Shared Contribution", report.summary.first_shared_contribution_cycle ?? "none", "cycle")}
@@ -285,6 +301,12 @@ export function formatGroundedSocialTrajectoryHtml(report: GroundedSocialTraject
     <table>
       <thead><tr><th>Dimension</th><th>Score</th><th>Status</th><th>Evidence Events</th><th>Finding</th></tr></thead>
       <tbody>${dimensionRows(report)}</tbody>
+    </table>
+
+    <h2>Harness Audit</h2>
+    <table>
+      <thead><tr><th>Dimension</th><th>Score</th><th>Status</th><th>Evidence Events</th><th>Finding</th></tr></thead>
+      <tbody>${harnessRows(report)}</tbody>
     </table>
 
     <h2>Event Ledger</h2>

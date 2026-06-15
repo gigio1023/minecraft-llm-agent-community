@@ -4,6 +4,7 @@ import type {
   GroundedSocialTrajectoryInput,
   GroundedSocialTrajectoryReport
 } from "./types.js";
+import { auditGroundedSocialHarness } from "./harnessAudit.js";
 
 const DIMENSION_WEIGHT = 20;
 
@@ -251,6 +252,7 @@ function firstCycle(events: GroundedSocialEvent[], types: GroundedSocialEvent["t
 export function scoreGroundedSocialTrajectory(
   input: GroundedSocialTrajectoryInput
 ): GroundedSocialTrajectoryReport {
+  const harnessAudit = auditGroundedSocialHarness(input);
   const dimensions = [
     scorePhysicalContribution(input.events),
     scoreSocialExchange(input.events),
@@ -285,6 +287,7 @@ export function scoreGroundedSocialTrajectory(
       ])
     },
     dimensions,
+    harness_audit: harnessAudit,
     events: sortedEvents(input.events),
     notes: [
       "This provider-free smoke validates social event scoring only.",
