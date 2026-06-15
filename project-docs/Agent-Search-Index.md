@@ -27,6 +27,7 @@ guidance.
 | Search Token | Meaning | Primary References |
 |--------------|---------|--------------------|
 | `SOUL_GROUNDED_SOCIAL_SIMULATION` | Minecraft is observation and evidence for Soul/LifeGoal-grounded social simulation, not a generic benchmark | `SPEC.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
+| `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational definition of society, organization, settlement, and village for this repo's Minecraft social simulation target | `Specification/Evidence-Grounded-Minecraft-Society.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md` |
 | `AUTONOMY_SUBSTRATE_NOT_DOMAIN_STRATEGY` | Improve context, action surface, gates, hooks, verification, artifacts, and memory without encoding one domain goal as architecture | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md` |
 | `REFERENCE_ADAPTATION_GUIDE` | External references are mechanisms to adapt, not product specs to copy | `Specification/Reference-Adaptation-Guide.md`, `AGENTS.md` |
 | `NO_VOYAGER_EVAL_LOOP` | Do not revive loose generated-code gameplay execution as the active path | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Action-Skill-Verification.md` |
@@ -107,29 +108,30 @@ For any onboarding developer or agent, read in this order:
 6. `project-docs/Documentation-Map.md`
 7. `project-docs/Terminology.md`
 8. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-9. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-10. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-11. `project-docs/Specification/Reference-Adaptation-Guide.md`
-12. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-13. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-14. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-15. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-16. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
-17. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-19. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-20. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-21. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-22. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-23. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-24. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-25. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-26. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
-27. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-28. `project-docs/Setup/Headless-Server.md`
-29. `project-docs/Setup/Provider-Setup.md`
-30. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
-31. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+9. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+10. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+11. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+12. `project-docs/Specification/Reference-Adaptation-Guide.md`
+13. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+14. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+15. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+16. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+17. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+21. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+22. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+23. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+24. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+25. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+26. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+27. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+28. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+29. `project-docs/Setup/Headless-Server.md`
+30. `project-docs/Setup/Provider-Setup.md`
+31. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+32. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
 
 ## Active vs Archived
 

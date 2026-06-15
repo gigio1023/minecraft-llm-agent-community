@@ -156,6 +156,13 @@ It is one actor that can:
 6. persist memory;
 7. use that memory or prior judgment in a later cycle.
 
+For the active definition of `society`, `organization`, `settlement`, and
+`village` in this repo, use
+[`Evidence-Grounded Minecraft Society`](Evidence-Grounded-Minecraft-Society.md).
+That document defines society as a maturity target for evidence-backed
+multi-actor continuity, not as a permission to skip single-actor competence or
+to add a hidden central planner.
+
 ## References
 
 - [Generative Agents](https://arxiv.org/abs/2304.03442) supports memory,

@@ -102,6 +102,7 @@ Orientation:
 Long-term spec:
 
 - `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+- `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
 - `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
 - `project-docs/Specification/Engineering-Governance-And-Testing.md`
 - `project-docs/Specification/Reference-Adaptation-Guide.md`
@@ -167,6 +168,8 @@ shape active implementation or public docs navigation:
 - old public `Plans/` pages;
 - deep-dive literature notes;
 - dated run reports that are no longer current handoff material.
+- dated literature sweeps such as
+  `research-archive/2026-06-15/llm-social-behavior-benchmark-survey.md`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
