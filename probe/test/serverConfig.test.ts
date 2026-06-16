@@ -40,9 +40,10 @@ test("loads probe config and builds vanilla server env", () => {
   assert.equal(env.TYPE, "VANILLA");
   assert.equal(env.ONLINE_MODE, "FALSE");
   assert.equal(env.MODE, "survival");
-  assert.equal(env.DIFFICULTY, "peaceful");
-  assert.equal(env.LEVEL_TYPE, "default");
-  assert.equal(env.GENERATE_STRUCTURES, "true");
+	  assert.equal(env.DIFFICULTY, "peaceful");
+	  assert.equal(env.LEVEL_TYPE, "default");
+	  assert.equal(env.GENERATOR_SETTINGS, "");
+	  assert.equal(env.GENERATE_STRUCTURES, "true");
   assert.equal(env.SPAWN_NPCS, "true");
   assert.equal(env.SPAWN_ANIMALS, "true");
   assert.equal(env.SPAWN_MONSTERS, "false");
@@ -91,6 +92,34 @@ test("parses fixed Minecraft host port option", () => {
       delete process.env.MC_HOST_PORT;
     } else {
       process.env.MC_HOST_PORT = originalHostPort;
+    }
+  }
+});
+
+test("allows scoped Minecraft server version override", () => {
+  const originalProbeServerVersion = process.env.PROBE_SERVER_VERSION;
+  const originalMcVersion = process.env.MC_VERSION;
+
+  try {
+    process.env.PROBE_SERVER_VERSION = "1.21.4";
+    delete process.env.MC_VERSION;
+
+    const config = loadProbeConfig();
+    const env = buildServerEnv(config);
+
+    assert.equal(config.server.version, "1.21.4");
+    assert.equal(env.VERSION, "1.21.4");
+  } finally {
+    if (originalProbeServerVersion === undefined) {
+      delete process.env.PROBE_SERVER_VERSION;
+    } else {
+      process.env.PROBE_SERVER_VERSION = originalProbeServerVersion;
+    }
+
+    if (originalMcVersion === undefined) {
+      delete process.env.MC_VERSION;
+    } else {
+      process.env.MC_VERSION = originalMcVersion;
     }
   }
 });

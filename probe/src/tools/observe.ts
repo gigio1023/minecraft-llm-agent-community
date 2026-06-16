@@ -61,7 +61,7 @@ export type ObserveResult = {
       saturation?: number;
     }>;
   };
-  nearbyBlocks?: Array<{ name: string; distance: number }>;
+  nearbyBlocks?: Array<{ name: string; position: { x: number; y: number; z: number }; distance: number }>;
   sharedChest?: {
     chestId: string;
     items: Array<{ name: string; count: number }>;
@@ -185,7 +185,7 @@ function scanNearbyBlocks(actor: PositionedActor) {
     return undefined;
   }
 
-  // This legacy hint is nearest-first only. Strategic or station-like priority
+  // This compact hint is nearest-first only. Strategic or station-like priority
   // belongs in runtime-owned action skills or verifiers, not provider context.
   return actor
     .findBlocks({
@@ -195,6 +195,11 @@ function scanNearbyBlocks(actor: PositionedActor) {
     })
     .map((position) => ({
       name: actor.blockAt?.(position)?.name ?? "unknown",
+      position: {
+        x: Math.floor(position.x),
+        y: Math.floor(position.y),
+        z: Math.floor(position.z)
+      },
       distance: roundDistance(actor.entity.position.distanceTo(position))
     }))
     .sort((left, right) => left.distance - right.distance)

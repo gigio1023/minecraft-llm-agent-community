@@ -165,92 +165,6 @@ export type GeneratedActionSkillCandidate = {
   known_failure_modes: string[];
 };
 
-export type LegacyPlannerActionKind =
-  | "use_primitive"
-  | "use_action_skill"
-  | "author_and_trial_action_skill"
-  | "wait"
-  | "remember";
-
-/**
- * Legacy planner-only action record.
- *
- * @remarks Actor Turn must not use this as a provider-facing or codegen-facing
- * boundary. It remains only so the explicit `action_hot_path=legacy` path and
- * old artifacts can compile while the ordinary runtime moves through
- * `ActorTurnResolvedAction`.
- */
-export type LegacyPlannerAction = {
-  schema: "legacy-planner-action/v1" | "action-intent/v1";
-  actor_id: string;
-  cycle_id: string;
-  cycle_goal_id: string;
-  kind: LegacyPlannerActionKind;
-  primitive_id?: string;
-  action_skill_id?: string;
-  args?: Record<string, unknown>;
-  parameters?: Record<string, unknown>;
-  parameters_schema?: Record<string, unknown>;
-  candidate?: GeneratedActionSkillCandidate;
-  why_this_action: string;
-  expected_evidence: string[];
-  fallback_if_blocked: string;
-};
-
-export function legacyPlannerActionParameters(
-  action: LegacyPlannerAction
-): Record<string, unknown> {
-  return action.parameters ?? action.args ?? {};
-}
-
-export function validateLegacyPlannerAction(
-  value: unknown
-): { ok: true; action: LegacyPlannerAction } | { ok: false; errors: string[] } {
-  const errors: string[] = [];
-  if (!isRecord(value)) {
-    return { ok: false, errors: ["LegacyPlannerAction must be an object"] };
-  }
-  if (value.schema !== "legacy-planner-action/v1" && value.schema !== "action-intent/v1") {
-    errors.push("schema must be legacy-planner-action/v1");
-  }
-  assertString(value, "actor_id", errors);
-  assertString(value, "cycle_id", errors);
-  assertString(value, "cycle_goal_id", errors);
-  if (!includesString([
-    "use_primitive",
-    "use_action_skill",
-    "author_and_trial_action_skill",
-    "wait",
-    "remember"
-  ] as const, value.kind)) {
-    errors.push("kind must be a known legacy planner action kind");
-  }
-  if (value.kind === "use_primitive" && typeof value.primitive_id !== "string") {
-    errors.push("primitive_id must be present for use_primitive");
-  }
-  if (value.kind === "use_action_skill" && typeof value.action_skill_id !== "string") {
-    errors.push("action_skill_id must be present for use_action_skill");
-  }
-  if (value.kind === "author_and_trial_action_skill" && !isRecord(value.candidate)) {
-    errors.push("candidate must be present for author_and_trial_action_skill");
-  }
-  if (value.kind === "wait" || value.kind === "remember") {
-    if (value.primitive_id !== undefined || value.action_skill_id !== undefined) {
-      errors.push("wait/remember legacy planner actions must not carry primitive_id or action_skill_id");
-    }
-  }
-  if (!isRecord(value.parameters) && !isRecord(value.args)) {
-    errors.push("parameters must be an object");
-  }
-  assertString(value, "why_this_action", errors);
-  assertStringArray(value, "expected_evidence", errors);
-  assertString(value, "fallback_if_blocked", errors);
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-  return { ok: true, action: value as LegacyPlannerAction };
-}
-
 /** Cycle outcomes distinguish final success from useful current-run mutation that still failed a verifier. */
 export type CycleJudgmentOutcome =
   | "verified_progress"
@@ -336,7 +250,11 @@ export type CycleJudgment = {
   bead_op_proposals?: unknown[];
 };
 
-export type SocialCycleProviderId = "openai-api" | "gemini-api" | "deterministic-social";
+export type SocialCycleProviderId =
+  | "openai-api"
+  | "gemini-api"
+  | "modelscope-api"
+  | "deterministic-social";
 
 export type SocialCycleVisualEvidenceCapture = {
   schema: "visual-evidence-capture/v1";
@@ -352,6 +270,7 @@ export type SocialCycleVisualEvidenceCapture = {
   image_path?: string;
   viewer_url?: string;
   bot_position?: { x: number; y: number; z: number; yaw: number; pitch: number };
+  camera_mode?: "first_person" | "third_person";
   error?: string;
 };
 
@@ -359,7 +278,9 @@ export type SocialCycleVisualEvidence = {
   schema: "social-cycle-visual-evidence/v1";
   enabled: true;
   method: "prismarine-viewer-web-screenshot";
-  first_person: true;
+  first_person: boolean;
+  camera_mode: "first_person" | "third_person" | "both";
+  camera_modes?: Array<"first_person" | "third_person">;
   interval_cycles: number;
   viewport: { width: number; height: number };
   viewer_url?: string;
@@ -379,19 +300,38 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
-  action_hot_path?: "legacy" | "actor_turn";
+  action_hot_path?: "actor_turn";
   provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";
   active_episode_refs?: string[];
   deliberation_branch_refs?: string[];
-  server?: {
-    mode: "manual" | "live_smoke" | "fresh_world";
-    seed: string;
-    level_type: string;
-    version: string;
-	    endpoint?: string;
-	    spawn_access_prepared?: boolean;
-	    spawn_access_position?: { x: number; y: number; z: number };
+	  server?: {
+	    mode: "manual" | "live_smoke" | "fresh_world";
+	    seed: string;
+	    level_type: string;
+	    version: string;
+	    generator_settings?: string;
+	    generate_structures?: boolean;
+	    world_scenario?: {
+	      scenario_id: string;
+	      lane: "survival_social_run" | "fixture_probe";
+	      fixture_dependency: boolean;
+	      requires_fresh_world: boolean;
+	      manifest_ref?: string;
+	      validation_ref?: string;
+	      validation_status?: "not_applicable" | "passed" | "failed";
+	      setup_status?: "not_applicable" | "passed" | "failed";
+	      natural_spawn_validation_status?: "not_applicable" | "passed" | "failed";
+	      natural_spawn_validation_ref?: string;
+	      build_area?: {
+	        center: { x: number; y: number; z: number };
+	        half_extent: number;
+	        purpose: string;
+	      };
+	    };
+		    endpoint?: string;
+		    spawn_access_prepared?: boolean;
+		    spawn_access_position?: { x: number; y: number; z: number };
 	    shared_storage_social_smoke?: boolean;
 	    starter_inventory_seeded?: boolean;
 	    error_kind?: "environment_blocked";

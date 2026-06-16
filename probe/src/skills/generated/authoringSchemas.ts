@@ -7,10 +7,7 @@
  * and verifier-backed before trial or promotion can happen.
  */
 import { assertDirectGeneratedActionSkillSource } from "../../generatedActionSkills/directExecutor.js";
-import type {
-  GeneratedActionSkillCandidate,
-  LegacyPlannerAction
-} from "../../runtime/goals/types.js";
+import type { GeneratedActionSkillCandidate } from "../../runtime/goals/types.js";
 import { mineflayerActionSkillHelperNames } from "../../runtime/goals/actorEpisode/mineflayerCodegenSkill.js";
 import { validateGeneratedSourceContracts } from "./sourceContracts.js";
 
@@ -308,15 +305,6 @@ export function validateGeneratedActionSkillTrialRequest(input: {
   if (!candidateResult.ok) {
     return candidateResult;
   }
-  if (candidateResult.candidate.promotion_policy !== "promote_after_passed_trial") {
-    return {
-      ok: false,
-      errors: [
-        "author_and_trial_action_skill requires candidate.promotion_policy promote_after_passed_trial"
-      ]
-    };
-  }
-
   const schemaResult = validateJsonObjectAgainstSimpleSchema({
     schema: candidateResult.candidate.input_schema,
     parameters: input.parameters
@@ -330,15 +318,6 @@ export function validateGeneratedActionSkillTrialRequest(input: {
     candidate: candidateResult.candidate,
     parameters: input.parameters
   };
-}
-
-export function validateAuthorAndTrialActionSkillRequest(
-  action: LegacyPlannerAction
-) {
-  return validateGeneratedActionSkillTrialRequest({
-    candidate: action.candidate,
-    parameters: action.parameters ?? action.args ?? {}
-  });
 }
 
 export function generatedCandidateRequiredPrimitives(

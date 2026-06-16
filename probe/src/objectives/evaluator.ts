@@ -1,5 +1,5 @@
 /**
- * Legacy objective evaluator for direct-generated gameplay runs.
+ * Objective evaluator for direct-generated gameplay runs.
  *
  * @remarks Objective scoring is useful probe evidence, but it is not the social
  * runtime's north-star architecture. Keep evaluator claims tied to artifacts so

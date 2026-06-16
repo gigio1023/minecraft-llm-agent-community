@@ -62,8 +62,8 @@ context.
 
 An active Actor Turn tool selection is the provider's structured proposal for
 one bounded actor turn. Physical runtime action parameters are a contract.
-Legacy `ActionIntent` artifacts follow the same rule when the explicit legacy
-planner path is under review.
+Archived `ActionIntent` artifacts are review-only historical evidence and must
+not shape new runtime contracts.
 
 Runtime rules:
 
@@ -77,7 +77,7 @@ Runtime rules:
 - Hidden physical defaults are not valid success paths. A fallback such as
   "move east 8 blocks" may be useful only when it is an explicit action in the
   structured args or a documented repair path that records the repair.
-- Direct `use_primitive` legacy actions must not carry `action_skill_id` or
+- Direct `use_primitive` actions must not carry `action_skill_id` or
   `args.actionSkillId`. Actor-owned action skill fallback authority exists only
   after the runtime resolves a `use_action_skill` action or an Action Card
   mapped to an action skill into its primitive bundle.
@@ -99,7 +99,7 @@ needed to prove success or truthful failure.
 
 World-state scan evidence is explicit schema evidence. Reviews and audits should
 count `world-state-summary/v1` or `world-state-scan/v1` artifacts, not loose
-keys such as legacy `nearbyBlocks`. Sampled loaded-coverage metadata is
+keys such as archived `nearbyBlocks`. Sampled loaded-coverage metadata is
 non-exhaustive unless a future scanner can prove otherwise.
 
 ## Actor Workspace
@@ -145,7 +145,7 @@ Action skill requirements:
 - promotion/retirement/supersession rules.
 
 Generated or candidate action skills may exist, but they must not bypass
-runtime gates. `build/generated-skills` remains legacy exploratory output, not
+runtime gates. `build/generated-skills` remains archived exploratory output, not
 actor-owned action skill memory.
 
 ## Verification

@@ -3,12 +3,15 @@ import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-import * as mc from "minecraft-protocol";
-
 import { buildServerEnv, type ProbeConfig } from "../config.js";
 import { shouldRetryWithStandaloneCompose } from "./composeCommand.js";
+import {
+  parsePublishedEndpoint,
+  waitForReachableServerEndpoint,
+  type ServerEndpointCandidate
+} from "./serverEndpointProbe.js";
+export { parsePublishedEndpoint, waitForServerReady } from "./serverEndpointProbe.js";
 
-const SERVER_READY_POLL_MS = 1_000;
 const COMPOSE_MANAGEMENT_TIMEOUT_MS = 30_000;
 const MIN_COMPOSE_STARTUP_TIMEOUT_MS = 60_000;
 
@@ -184,122 +187,38 @@ async function runComposeCommand(
   }
 }
 
-function parsePublishedPort(value: string, line: string) {
-  if (!/^\d+$/.test(value)) {
-    throw new Error(`Unable to parse published port: ${line}`);
-  }
-
-  const port = Number(value);
-
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`Unable to parse published port: ${line}`);
-  }
-
-  return port;
-}
-
-export function parsePublishedEndpoint(output: string, fallbackHost: string) {
-  const line = output
+async function inspectComposeServiceContainerIp(input: {
+  composeFile: string;
+  composeDir: string;
+  env: NodeJS.ProcessEnv;
+  timeoutMs: number;
+}) {
+  const containerId = await runComposeCommand(["-f", input.composeFile, "ps", "-q", "mc"], {
+    cwd: input.composeDir,
+    env: input.env,
+    timeoutMs: input.timeoutMs
+  });
+  const firstContainerId = containerId
     .split(/\r?\n/)
     .map((entry) => entry.trim())
     .find(Boolean);
 
-  if (!line) {
-    throw new Error("docker compose port returned no published endpoint");
+  if (!firstContainerId) {
+    return undefined;
   }
 
-  if (line.startsWith("[")) {
-    const bracketIndex = line.indexOf("]");
-    const separatorIndex = line.lastIndexOf(":");
-
-    if (bracketIndex === -1 || separatorIndex <= bracketIndex) {
-      throw new Error(`Unable to parse published endpoint: ${line}`);
-    }
-
-    const rawHost = line.slice(1, bracketIndex);
-    const port = parsePublishedPort(line.slice(separatorIndex + 1), line);
-
-    return {
-      host: normalizePublishedHost(rawHost, fallbackHost),
-      port
-    };
-  }
-
-  const separatorIndex = line.lastIndexOf(":");
-
-  if (separatorIndex === -1) {
-    throw new Error(`Unable to parse published endpoint: ${line}`);
-  }
-
-  const rawHost = line.slice(0, separatorIndex);
-  const port = parsePublishedPort(line.slice(separatorIndex + 1), line);
-
-  return {
-    host: normalizePublishedHost(rawHost, fallbackHost),
-    port
-  };
-}
-
-function normalizePublishedHost(host: string, fallbackHost: string) {
-  // Docker may publish on a wildcard address; Mineflayer needs a concrete host.
-  if (!host || host === "0.0.0.0" || host === "::" || host === "*") {
-    return fallbackHost;
-  }
-
-  return host;
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-export async function waitForServerReady(
-  host: string,
-  port: number,
-  version: string,
-  timeoutMs: number
-) {
-  const deadline = Date.now() + timeoutMs;
-  let lastError: unknown;
-
-  while (true) {
-    const remainingMs = deadline - Date.now();
-
-    if (remainingMs <= 0) {
-      break;
-    }
-
-    try {
-      const pingTimeoutMs = Math.min(COMPOSE_MANAGEMENT_TIMEOUT_MS, remainingMs);
-
-      await mc.ping({
-        host,
-        port,
-        version,
-        closeTimeout: pingTimeoutMs,
-        noPongTimeout: Math.min(5_000, pingTimeoutMs)
-      });
-      return;
-    } catch (error) {
-      // Compose can report the port before the Java server has accepted login
-      // traffic, so readiness is a protocol ping rather than container status.
-      lastError = error;
-      const retryDelayMs = Math.min(SERVER_READY_POLL_MS, deadline - Date.now());
-
-      if (retryDelayMs <= 0) {
-        break;
-      }
-
-      await delay(retryDelayMs);
-    }
-  }
-
-  const reason =
-    lastError instanceof Error ? lastError.message : "timed out waiting for ping";
-
-  throw new Error(`Minecraft server was not ready before timeout: ${reason}`);
+  const ip = await runCommand(
+    "docker",
+    [
+      "inspect",
+      "--format",
+      "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+      firstContainerId
+    ],
+    { timeoutMs: input.timeoutMs }
+  );
+  const trimmed = ip.trim();
+  return trimmed || undefined;
 }
 
 async function stopComposeProject(composeFile: string, env: NodeJS.ProcessEnv) {
@@ -405,13 +324,42 @@ export async function startDockerServer(
       }
     );
 
-    const { host, port } = parsePublishedEndpoint(portOutput, config.server.host);
+    const publishedEndpoint = parsePublishedEndpoint(portOutput, config.server.host);
+    const containerIp = await inspectComposeServiceContainerIp({
+      composeFile: config.composeFile,
+      composeDir,
+      env,
+      timeoutMs: commandTimeouts.managementMs
+    });
+    const reachableEndpoint = await waitForReachableServerEndpoint({
+      candidates: [
+        {
+          ...publishedEndpoint,
+          source: "published_port"
+        },
+        ...(containerIp
+          ? [
+              {
+                host: containerIp,
+                port: config.server.containerPort,
+                source: "container_ip" as const
+              }
+            ]
+          : [])
+      ],
+      version: config.server.version,
+      timeoutMs: config.server.pingTimeoutMs
+    });
 
-    await waitForServerReady(host, port, config.server.version, config.server.pingTimeoutMs);
+    // Docker Desktop/OrbStack host port forwarding can accept TCP while not
+    // returning a Minecraft protocol ping after host sleep/resume. Mineflayer
+    // needs the endpoint that actually answers the protocol, so fresh-world
+    // runs keep the published port as the first candidate but may use the
+    // run-scoped container IP when it is the only truthful endpoint.
 
     return {
-      host,
-      port,
+      host: reachableEndpoint.host,
+      port: reachableEndpoint.port,
       runRcon,
       stop
     };

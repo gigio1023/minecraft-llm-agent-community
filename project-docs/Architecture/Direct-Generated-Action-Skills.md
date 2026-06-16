@@ -178,7 +178,7 @@ reviewable representation that can be produced after direct generated code has
 shown value.
 
 The repo should avoid going back to a world where `build/generated-skills` is a
-loose legacy dump. Direct generated action skills belong under actor workspace
+loose archived dump. Direct generated action skills belong under actor workspace
 artifacts and objective reports, with source and trial evidence tied together.
 
 ## Relationship To Typed Memory

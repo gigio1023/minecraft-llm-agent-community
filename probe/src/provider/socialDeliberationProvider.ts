@@ -12,6 +12,10 @@ import type { OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
 import { callOpenAiJsonSchema } from "./openaiApiJsonProvider.js";
 import type { GeminiJsonProviderConfig } from "./geminiApiJsonProvider.js";
 import { callGeminiJsonSchema } from "./geminiApiJsonProvider.js";
+import {
+  callModelScopeJsonSchema,
+  type ModelScopeApiProviderConfig
+} from "./modelscopeApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
@@ -60,7 +64,7 @@ export const deliberationProviderSchema = {
 
 export const deliberationSystemPrompt = `You are the branch-time Deliberation provider for a Minecraft social simulation actor.
 You may reframe the Active Episode and propose guarded PlanBead operations.
-You must not choose an action, select an Action Card, emit primitive_id, action_skill_id, legacy_planner_action, generated source, helper settings, args, or executable parameters.
+You must not choose an action, select an Action Card, emit primitive_id, action_skill_id, planner_action, generated source, helper settings, args, or executable parameters.
 PlanBeads are durable work-state context only. They never supply physical args or prove Minecraft progress.
 Use runtime evidence, branch reason, ActorSoul/LifeGoal context, memory refs, relationships, world events, and Minecraft Basic Guide.
 Use current_state before older current_episode or PlanBead wording. If current_state.shared_storage is contributed and no deposit candidate is socially_requested, the shared-storage request is already satisfied; do not re-open chest/deposit/openability work unless a new unsatisfied request appears.
@@ -394,8 +398,7 @@ function sharedStorageSatisfiedByCurrentState(
 ) {
   return Boolean(
     currentState?.shared_storage.status === "contributed" &&
-      currentState.shared_storage.evidence_refs.length > 0 &&
-      !currentState.deposit_candidates.some((candidate) => candidate.socially_requested)
+      currentState.shared_storage.evidence_refs.length > 0
   );
 }
 
@@ -794,11 +797,12 @@ export async function runSocialDeliberationProvider(input: {
   context: SocialCycleContextPacket;
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
+  modelScope?: ModelScopeApiProviderConfig;
   runId?: string;
 }): Promise<DeliberationProviderResult> {
   const turnId = `${input.cycleId}-deliberation`;
   const snapshotId = `deliberation-${turnId}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? "deterministic-social";
+  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? "deterministic-social";
   const providerInput = buildDeliberationProviderInput({
     branch: input.branch,
     currentEpisode: input.currentEpisode,
@@ -847,6 +851,11 @@ export async function runSocialDeliberationProvider(input: {
           config: input.gemini!,
           ...providerCall
         })
+      : input.providerId === "modelscope-api"
+        ? await callModelScopeJsonSchema<{ deliberation: unknown }>({
+            config: input.modelScope!,
+            ...providerCall
+          })
       : await callOpenAiJsonSchema<{ deliberation: unknown }>({
           config: input.openAi!,
           ...providerCall

@@ -1,6 +1,6 @@
 import type { ActorId } from "./types.js";
 
-// Skill-village actors are a legacy exploratory scenario. Keep persona text
+// Skill-village actors are an archived exploratory scenario. Keep persona text
 // concise and Korean-facing, but do not treat it as runtime competence.
 export const actors: ActorId[] = ["npc_a", "npc_b", "npc_c"];
 

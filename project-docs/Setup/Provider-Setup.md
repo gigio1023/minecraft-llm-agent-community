@@ -35,14 +35,14 @@ Provider-backed paths are useful for:
 - later trace inspection.
 
 The social-cycle provider path is separate from the `openai-codex` gameplay and
-reviewer providers. It can use Gemini API (`gemini-api`) or OpenAI API
-(`openai-api`) from the repo-root `.env`.
+reviewer providers. It can use Gemini API (`gemini-api`), OpenAI API
+(`openai-api`), or ModelScope API-Inference (`modelscope-api`) from the
+repo-root `.env`.
 
 Private Qwen models exposed through ModelScope API-Inference are documented in
-`project-docs/Setup/ModelScope-Qwen-API-Access.md`. The current runtime does
-not yet ship a `modelscope-api` social-cycle provider; use that note for manual
-smoke calls, response-header quota checks, and future provider adapter guardrail
-shape.
+`project-docs/Setup/ModelScope-Qwen-API-Access.md`. The `modelscope-api`
+adapter uses OpenAI-compatible Chat Completions transport, not the OpenAI
+Responses API path used by `openai-api`.
 
 ## Provider Usage Guard
 
@@ -50,8 +50,10 @@ Search token: `PROVIDER_USAGE_GUARD`.
 
 Provider-backed calls must be auditable before and after a run:
 
-- before the request, the runtime checks a local free-tier budget when one
-  matches the provider/model;
+- before the request, the runtime checks all matching provider/model quota
+  policies and local brakes;
+- if no budget matches, the guard fails closed by default and refuses the live
+  provider request;
 - after the request, the provider output snapshot stores the usage record;
 - the ignored global ledger appends one JSONL row per provider request;
 - the social-cycle report includes `provider_usage` totals for the run.
@@ -76,6 +78,38 @@ PROVIDER_USAGE_BUDGETS_JSON='{"budgets":[...]}'
 PROVIDER_USAGE_ENFORCEMENT=enforce
 ```
 
+Do not start a live benchmark with a paid or quota-limited provider/model until
+that exact model has a local budget entry. `unbudgeted` is not an allowed
+benchmark state. To run a deliberate smoke test without a budget, the operator
+must explicitly set both `PROVIDER_USAGE_ENFORCEMENT=track` and
+`PROVIDER_USAGE_ALLOW_UNBUDGETED=1` for that process and record why the run is
+not protected by the local brake. Long or comparison benchmarks must not use
+those overrides.
+
+Every live provider HTTP request must pass the guard immediately before the
+request is sent. Generation calls include estimated input/output token usage.
+Non-generating provider calls, such as OpenAI Responses background polling, are
+tracked as `requests: 1` with zero tokens so request-count budgets still apply.
+
+The guard has a built-in provider/model quota policy matrix in
+`probe/src/provider/providerQuotaPolicies.ts`. Local JSON budgets are additional
+brakes or overrides; they do not replace the need for the built-in policy unless
+`PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS=1` is deliberately set for a focused
+test. A request is allowed only if every matching enforced policy remains under
+limit. This matters for shared pools such as OpenAI's complimentary mini/nano
+token group, where `gpt-5.4-mini` and `gpt-5.4-nano` draw from the same daily
+pool rather than isolated per-model counters.
+
+Current built-in quota policy types:
+
+| Provider | Models | Metric | Window | Active guard |
+| --- | --- | --- | --- | --- |
+| `openai-api` | documented large-model data-sharing group | total tokens | UTC day | 1M/day shared pool |
+| `openai-api` | documented mini/nano data-sharing group | total tokens | UTC day | 10M/day shared pool |
+| `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Max` | API calls | calendar month | 2500 calls/month |
+| `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Plus` | API calls | calendar month | 10000 calls/month |
+| `gemini-api` | configured Gemini/Gemma free-tier references | requests/tokens | Pacific day/minute | operator-observed RPM/RPD/TPM brakes |
+
 Budget JSON shape:
 
 ```json
@@ -87,7 +121,9 @@ Budget JSON shape:
       "model": "gemma-4-31b-it",
       "request_limit_per_minute": 15,
       "request_limit_per_day": 1500,
+      "request_limit_per_month": 30000,
       "already_used": { "requests": 0 },
+      "already_used_this_month": { "requests": 0 },
       "mode": "enforce"
     }
   ]
@@ -99,21 +135,56 @@ run. Use it when AI Studio or another provider dashboard says the project has
 already consumed part of the free-tier pool. This is intentionally local and
 ignored; do not commit personal usage state.
 
+Monthly limits use the same local ledger and are keyed by UTC `YYYY-MM`.
+`request_limit_per_month`, `input_token_limit_per_month`,
+`output_token_limit_per_month`, and `total_token_limit_per_month` are local
+operator brakes. `already_used_this_month` is only for usage that happened
+outside this repo's ledger. For ModelScope Qwen Ambassador access, the
+operator-provided quota is API-call based, not token based:
+`Qwen-Ambassador/Qwen3.7-Max` has 2500 API calls/month and
+`Qwen-Ambassador/Qwen3.7-Plus` has 10000 API calls/month. The monthly allowance
+resets at the end of each calendar month. Future flagship model ids may replace
+the current Qwen 3.7 ids; update the policy matrix and local budget file before
+using a new id.
+
 Daily provider budget windows are provider-specific. `openai-api` uses
 `quota_day_utc`, because OpenAI's complimentary-token counter refreshes at
 00:00 UTC. `gemini-api` uses `pacific_day`, because Gemini API daily RPD resets
 at midnight Pacific time.
 
+OpenAI API calls need an additional operator approval step before any live
+benchmark. The data-sharing complimentary tokens apply only when the org is
+eligible, the relevant project is sharing API inputs/outputs with OpenAI, the
+account has positive balance, and the actual model is in the documented offer.
+If one request would cross the daily token pool, that entire request is billed
+at normal rates. Therefore, before any `openai-api` benchmark, report the
+ledger's current UTC-day usage, estimate the requested batch's tokens, state
+whether the model appears in the eligible pool, and ask the operator for
+approval. Do not infer that a request is free merely because the repo ledger is
+under the local cap.
+
 The built-in `gemma-4-31b-it` budget is an operator guardrail, not an official
 quota guarantee. Google documents that Gemini API limits vary by project, tier,
 and model, and that active limits should be checked in AI Studio.
 
-The repo also carries a conservative `gemini-2.5-flash-lite` guard at 20
-requests per Pacific day. This is based on a live Gemini API error observed on
-2026-06-02 during an Actor Turn social-cycle run:
-`GenerateRequestsPerDayPerProjectPerModel-FreeTier` returned `quotaValue: 20`
-for `gemini-2.5-flash-lite`. Treat this as a project/model safety cap, not a
-universal Gemini quota.
+The repo also carries Gemini Flash Lite-like request/token window guards based
+on operator free-tier references. Treat these as project/model safety caps, not
+universal Gemini quota guarantees. If a live Gemini API error reports a lower
+`quotaValue`, encode the stricter value in the ignored local budget file before
+continuing a run.
+
+## Social-Cycle Model Selection
+
+`probe:social-cycle` does not choose live provider models from environment
+fallbacks. For `openai-api`, `gemini-api`, and `modelscope-api`, pass the exact
+model id with `--model` on every run. The CLI intentionally ignores
+`OPENAI_MODEL`, `GEMINI_MODEL`, `MODELSCOPE_MODEL`, and `SOCIAL_CYCLE_MODEL`
+for social-cycle model selection so benchmark reports cannot hide which model
+was evaluated.
+
+`deterministic-social` remains the local baseline and uses
+`model: "deterministic-social"` as a harness label, not as an external model
+default.
 
 ## Social-Cycle Gemini API
 
@@ -121,7 +192,6 @@ Gemini API is the current lightweight path for social-cycle provider tests:
 
 ```text
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemma-4-31b-it
 ```
 
 Small provider-only smoke:
@@ -187,7 +257,8 @@ bun run probe:social-cycle -- \
 ```
 
 The CLI default provider is `deterministic-social`; pass `--provider gemini-api`
-or `SOCIAL_CYCLE_PROVIDER=gemini-api` to make live calls explicit.
+or `SOCIAL_CYCLE_PROVIDER=gemini-api` to make live calls explicit. Live provider
+runs must also pass `--model`.
 
 ## Gameplay Provider Switch
 
@@ -334,7 +405,6 @@ repo-root `.env`.
 ```text
 # repo-root .env
 OPENAI_API_KEY=...
-OPENAI_MODEL=...
 SOCIAL_CYCLE_REASONING=low
 ```
 
@@ -355,7 +425,7 @@ cd probe
 bun run probe:social-cycle -- \
   --actor npc_b \
   --provider openai-api \
-  --model "$OPENAI_MODEL" \
+  --model gpt-5.4-mini \
   --cycles 2 \
   --max-actions-per-cycle 3 \
   --report ../tmp/social-cycle-openai-real-action.json \

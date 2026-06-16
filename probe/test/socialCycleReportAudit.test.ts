@@ -45,7 +45,7 @@ function baseReport(): SocialCycleRunReport {
       {
         cycle_id: "cycle-0001",
         cycle_goal_ref: "goals/cycle/cycle-0001-goal.json",
-        action_ref: "goals/cycle/legacy-planner-actions/cycle-0001-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/cycle-0001-actor-turn-action.json",
         provider_input_refs: ["provider-inputs/cycle-0001-input.json"],
         provider_output_refs: ["provider-outputs/cycle-0001-output.json"],
         evidence_refs: ["evidence/cycle-0001-observe.json"],
@@ -55,7 +55,7 @@ function baseReport(): SocialCycleRunReport {
       {
         cycle_id: "cycle-0002",
         cycle_goal_ref: "goals/cycle/cycle-0002-goal.json",
-        action_ref: "goals/cycle/legacy-planner-actions/cycle-0002-legacy-planner-action.json",
+        action_ref: "goals/cycle/actor-turn-actions/cycle-0002-actor-turn-action.json",
         provider_input_refs: ["provider-inputs/cycle-0002-input.json"],
         provider_output_refs: ["provider-outputs/cycle-0002-output.json"],
         evidence_refs: ["evidence/cycle-0002-observe.json"],
@@ -109,13 +109,13 @@ async function writeActorWorkspaceFixture(
       summary: "Observe settlement state"
     });
     await writeJson(path.join(actorDir, cycle.action_ref), {
-      schema: "legacy-planner-action/v1",
+      schema: "actor-turn-resolved-action/v1",
       actor_id: actorId,
       cycle_id: cycle.cycle_id,
       cycle_goal_id: cycle.cycle_goal_ref,
       kind: "use_primitive",
       primitive_id: "observe",
-      args: {},
+      parameters: {},
       why_this_action: "Audit fixture",
       expected_evidence: ["observation"],
       fallback_if_blocked: "wait"
@@ -239,6 +239,77 @@ test("rejects synthetic passed reports without verifier-backed gameplay progress
   );
 });
 
+test("allows world scenario setup-blocked reports with setup artifact refs before cycles", async () => {
+  const workspaceRoot = await makeWorkspaceRoot("social-audit-world-scenario-setup-blocked");
+  const report = baseReport();
+  report.actor_workspace_root_dir = workspaceRoot;
+  report.runtime_status = "environment_blocked";
+  report.cycles = [];
+  report.server = {
+    mode: "fresh_world",
+    seed: "natural-safe-spawn-v1",
+    level_type: "default",
+    version: "1.21.11",
+    generate_structures: true,
+    world_scenario: {
+      scenario_id: "natural-safe-spawn-v1",
+      lane: "survival_social_run",
+      fixture_dependency: false,
+      requires_fresh_world: true,
+      manifest_ref: "evidence/world-scenarios/run-natural-safe-spawn-v1.json",
+      validation_ref: "evidence/world-scenarios/run-natural-safe-spawn-v1-natural-spawn-validation.json",
+      validation_status: "failed",
+      setup_status: "failed"
+    },
+    error_kind: "environment_blocked",
+    error: "World scenario natural-safe-spawn-v1 natural spawn validation failed"
+  };
+  const actorDir = path.join(workspaceRoot, actorId);
+  const reportPath = path.join(workspaceRoot, "report.json");
+  const worldScenario = report.server.world_scenario!;
+  await writeJson(path.join(actorDir, "actor.json"), {
+    schema: "actor-workspace/v1",
+    actor_id: actorId
+  });
+  await writeJson(path.join(actorDir, worldScenario.manifest_ref!), {
+    schema: "world-scenario-manifest/v1",
+    scenario_id: "natural-safe-spawn-v1",
+    validation_refs: [worldScenario.validation_ref],
+    command_runs: []
+  });
+  await writeJson(path.join(actorDir, worldScenario.validation_ref!), {
+    schema: "natural-spawn-validation/v1",
+    scenario_id: "natural-safe-spawn-v1",
+    run_id: report.run_id,
+    actor_id: actorId,
+    credited_as_actor_progress: false,
+    status: "failed",
+    world: {
+      seed: "natural-safe-spawn-v1",
+      dimension: "overworld",
+      server_version: "1.21.11",
+      level_type: "default"
+    },
+    scan: {
+      center: { x: 0, y: 64, z: 0 },
+      radius: 24,
+      vertical_range: { min_y: 58, max_y: 72 },
+      loaded_world_only: true,
+      null_or_unloaded_block_count: 1,
+      candidate_limit: 128
+    },
+    selected_candidate: null,
+    rejected_candidates: [],
+    post_validation_commands: [],
+    notes: ["setup failure fixture"]
+  });
+  await writeJson(reportPath, report);
+
+  const errors = await auditSocialCycleReport(reportPath);
+
+  assert.deepEqual(errors, []);
+});
+
 test("rejects satisfied settlement checklist items without evidence refs", async () => {
   const workspaceRoot = await makeWorkspaceRoot("social-audit-settlement-evidence");
   const report = baseReport();
@@ -308,25 +379,25 @@ test("rejects move_to actions with empty or invalid structured args", async () =
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_ref), {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
     kind: "use_primitive",
     primitive_id: "move_to",
-    args: {},
+    parameters: {},
     why_this_action: "Move using hidden defaults",
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
   });
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[1]!.action_ref), {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0002",
     cycle_goal_id: report.cycles[1]!.cycle_goal_ref,
     kind: "use_primitive",
     primitive_id: "move_to",
-    args: { target: "npc_a" },
+    parameters: { target: "npc_a" },
     why_this_action: "Move using prose-era target args",
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
@@ -403,7 +474,7 @@ test("rejects physical absence claims backed only by non-exhaustive scan evidenc
     category: "tool_attempt",
     tool_attempt: {
       tool: "observe",
-      args: {},
+      parameters: {},
       result: {
         worldStateSummary: {
           schema: "world-state-summary/v1",
@@ -708,13 +779,13 @@ test("review summary surfaces world scan counts and movement contract status", a
   const reportPath = path.join(workspaceRoot, "report.json");
   await writeActorWorkspaceFixture(workspaceRoot, report);
   await writeJson(path.join(workspaceRoot, actorId, report.cycles[0]!.action_ref), {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: report.cycles[0]!.cycle_goal_ref,
     kind: "use_primitive",
     primitive_id: "move_to",
-    args: { direction: "east", distance: 6 },
+    parameters: { direction: "east", distance: 6 },
     why_this_action: "Move toward an explicitly observed waypoint",
     expected_evidence: ["position_delta"],
     fallback_if_blocked: "remember"
@@ -726,7 +797,7 @@ test("review summary surfaces world scan counts and movement contract status", a
     category: "tool_attempt",
     tool_attempt: {
       tool: "observe",
-      args: {},
+      parameters: {},
       result: {
         worldStateSummary: {
           schema: "world-state-summary/v1",

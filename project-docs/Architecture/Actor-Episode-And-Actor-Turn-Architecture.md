@@ -33,7 +33,7 @@ for cycle goal, action planning, and cycle judgment all run on every cycle. It
 does not remove runtime evidence, PlanBeads, action skill ownership, or schema
 validation. For the ordinary hot path, read `Runtime Action Resolver` as direct
 Actor Turn function-tool selection into `ActorTurnResolvedAction`, not as a
-legacy planner action bridge. It narrows authority boundaries so the hot path is
+compressed planner action bridge. It narrows authority boundaries so the hot path is
 simpler and more actionful.
 
 Non-goals:
@@ -72,15 +72,15 @@ anecdotes, or a file-by-file task list.
 | `active-episode/v1`, `actor-turn-input/v1`, `actor-turn-output/v1`, Action Card, Evidence Trace, Deliberation, and PlanBead authority rules | Current implementation checkpoint, temporary bridge status, commands, live-run paths, and worker lane status |
 | What counts as executable authority, current-state contract, provider repair boundary, and generated Mineflayer authoring gate | Which files were touched in a phase and which focused tests were just run |
 | Evidence classifications such as verified mutation, position-only context, container inspection context, and no-progress observation | Specific 30/60-cycle run results and their review notes |
-| Compatibility and migration invariants for legacy `cycle-judgment/v1` and `actor-cycle-goal/v1` artifacts | Cleanup order for removing legacy hot-path calls |
+| Compatibility and cleanup invariants for old `cycle-judgment/v1` and `actor-cycle-goal/v1` artifacts | Cleanup order for removed hot-path calls |
 
 ## As-Is Social-Cycle Architecture
 
 ```mermaid
 flowchart TD
-  Obs["Observation, memory, PlanBeads, relationships, action surface"] --> Goal["Cycle goal provider, legacy goal_mind"]
+  Obs["Observation, memory, PlanBeads, relationships, action surface"] --> Goal["Cycle goal provider"]
   Goal --> Planner["Action planner provider"]
-  Planner --> Runtime["Runtime legacy planner action gate and Mineflayer execution"]
+  Planner --> Runtime["Runtime compressed planner action gate and Mineflayer execution"]
   Runtime --> Judgment["Cycle judgment provider"]
   Judgment --> PlanBeads["Guarded PlanBead operation applier"]
   Judgment --> Next["Next cycle context projection"]
@@ -131,11 +131,10 @@ The hot path is intentionally short. The Actor Turn provider should usually get
 one provider call per turn, choose one action, and let the runtime validate,
 execute, verify, and append evidence.
 
-An initial Deliberation or legacy `goal_mind` compatibility call may open the
-first Active Episode. After that, ordinary Actor Turn cycles should reuse the
-same Active Episode and write compatibility `actor-cycle-goal/v1` records
-without calling `goal_mind` again. A new Deliberation call is justified only
-when a typed branch condition is recorded.
+An initial Deliberation or cycle-goal call may open the first Active Episode.
+After that, ordinary Actor Turn cycles should reuse the same Active Episode. A
+new Deliberation call is justified only when a typed branch condition is
+recorded.
 
 ## State And Authority Boundaries
 
@@ -153,7 +152,7 @@ when a typed branch condition is recorded.
 
 Deliberation output is intentionally narrower than Actor Turn output. It can
 write a new `active-episode/v1` and raw PlanBead operation proposals for the
-guarded applier. It must not emit `legacy planner action`, `ActionCard`, `primitive_id`,
+guarded applier. It must not emit planner actions, `ActionCard`, `primitive_id`,
 `action_skill_id`, generated source, helper configuration, `args`, or
 executable parameters.
 
@@ -281,11 +280,8 @@ type ActorTurnInputV1 = {
   turn_id: string;
   active_episode: ActiveEpisodeV1;
   actor_context: ActorSoulAndLifeGoalProjection;
-  current_observation_refs: string[];
   current_state: ActorTurnCurrentStateV1;
-  recent_evidence_trace: EvidenceTraceEntryV1[];
-  compact_plan_bead_hints: PlanBeadHintV1[];
-  memory_refs: string[];
+  source_evidence_bundle: ActorTurnSourceEvidenceBundleV1;
   relationship_context: RelationshipContextProjection;
   runtime_retry_constraints: RuntimeRetryConstraintSummary[];
   action_cards: ActionCardV1[];
@@ -295,7 +291,9 @@ type ActorTurnInputV1 = {
 ```
 
 The input should be compact enough for cheap models. It should still preserve
-the evidence refs needed to audit claims.
+the evidence refs needed to audit claims. Current observations, recent action
+details, memory cards, and PlanBead cards live under `source_evidence_bundle`
+rather than duplicated as top-level Actor Turn fields.
 
 ### `plan-bead-hint/v1`
 
@@ -315,8 +313,8 @@ type PlanBeadHintV1 = {
 };
 ```
 
-`compact_plan_bead_hints` are a lossy read-only projection from the
-PlanBeadGraph. They must preserve the parts a cheap model needs to avoid
+`source_evidence_bundle.plan_bead_cards` are a bounded read-only projection from
+the PlanBeadGraph. They preserve the parts a cheap model needs to avoid
 forgetting durable work: priority, what remains open, blockers, dependency refs,
 checkpoint ref, and acceptance evidence. They must not expose executable args,
 primitive ids, action-skill ids, or physical success claims.
@@ -336,20 +334,57 @@ type ActorTurnCurrentStateV1 = {
     food_candidates: Array<{ name: string; count: number }>;
   };
   visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
-  nearby_block_hints: Array<{ name: string; distance?: number }>;
+  nearby_block_observations: Array<{
+    name: string;
+    position?: { x: number; y: number; z: number };
+    distance?: number;
+    source: "world_scan_nearest" | "observation_nearby_block";
+    evidence_refs: string[];
+  }>;
   world_scan?: {
     scan_id: string;
+    scan_ref?: string;
+    center?: { x: number; y: number; z: number };
+    radius?: number;
+    vertical_range?: { min_y: number; max_y: number; center_y: number };
     coverage_scope: string;
     absence_claims_exhaustive: boolean;
     total_verified_blocks: number;
     truncated: boolean;
     retained_block_counts: Array<{ name: string; count: number }>;
+    nearest_blocks: Array<{
+      name: string;
+      position: { x: number; y: number; z: number };
+      distance: number;
+    }>;
+    named_block_examples: Array<{
+      name: string;
+      count: number;
+      nearest: Array<{ position: { x: number; y: number; z: number }; distance: number }>;
+    }>;
     limitations: string[];
+  };
+  shared_storage: {
+    status: string;
+    chest_id?: string;
+    items: Array<{ name: string; count: number }>;
+    evidence_refs: string[];
   };
   settlement_progress: {
     inventory_counts: Record<string, number>;
     shared_storage_status: string;
-    known_position_summaries: string[];
+    known_positions: {
+      actor?: { position: { x: number; y: number; z: number }; evidence_refs: string[] };
+      crafting_table?: {
+        status: string;
+        position?: { x: number; y: number; z: number };
+        distance_from_actor?: number;
+        usable_now?: boolean;
+        evidence_refs: string[];
+      };
+      shared_chest?: { status: string; evidence_refs: string[] };
+      shelter?: { status: string; anchor?: { x: number; y: number; z: number }; evidence_refs: string[] };
+    };
     checklist: Array<{
       id: string;
       status: string;
@@ -365,6 +400,59 @@ This projection is the cheap-model state surface. It prevents the Actor Turn
 provider from reasoning only from old episode wording or opaque evidence refs.
 It is still context, not proof; verifier and runtime artifacts decide what
 changed.
+
+### `actor-turn-source-evidence-bundle/v1`
+
+`current_state` is not the only context surface. Actor Turn also receives a
+bounded source-evidence bundle so compact facts do not erase the raw evidence
+needed for interpretation.
+
+```ts
+type ActorTurnSourceEvidenceBundleV1 = {
+  schema: "actor-turn-source-evidence-bundle/v1";
+  observation: {
+    observation_refs: string[];
+    position?: { x: number; y: number; z: number };
+    inventory_items: Array<{ name: string; count: number }>;
+    visible_actors: Array<{ id: string; distance?: number; busy?: boolean }>;
+    nearby_blocks: ActorTurnCurrentStateV1["nearby_block_observations"];
+    world_scan?: ActorTurnCurrentStateV1["world_scan"];
+  };
+  world_event_cards: Array<{
+    event_id: string;
+    kind: string;
+    authority: string;
+    summary: string;
+    actor_refs: string[];
+    evidence_refs: string[];
+    created_at: string;
+  }>;
+  memory_cards: Array<{
+    memory_id: string;
+    kind: string;
+    layer: string;
+    confidence: string;
+    summary: string;
+    evidence_refs: string[];
+    reason: string;
+  }>;
+  recent_action_details: Array<{
+    turn_id: string;
+    outcome: EvidenceTraceOutcome;
+    compact_summary: string;
+    selected_action?: { kind: string; id: string; title: string };
+    parameters?: Record<string, unknown>;
+    tool_statuses?: Array<{ tool: string; status: string }>;
+    blocker_reason?: string;
+    evidence_refs: string[];
+  }>;
+  plan_bead_cards: PlanBeadHintV1[];
+};
+```
+
+Use `Context-Projection-And-Source-Evidence.md` for the compression rule:
+bounded facts may be compacted, but observation, action, social, and work-state
+summaries must travel with source evidence cards or refs.
 
 ### `actor-turn-output/v1`
 
@@ -479,9 +567,9 @@ these branch conditions is met:
   stale action assumptions.
 
 Deliberation must not run only because a cycle ended.
-In migration reports, a repeated `goal_mind` provider input without a matching
+In current reports, a repeated cycle-goal provider input without a matching
 `deliberation-branch/v1` artifact is evidence that the actor_turn hot path has
-regressed toward the legacy social-cycle loop.
+regressed toward the old per-cycle provider loop.
 
 Scenario examples:
 
@@ -532,15 +620,15 @@ Scenario examples:
   single-actor settlement competence but must not be accepted as a social
   simulation proof.
 
-## Migration From Legacy Social Cycle
+## Cleanup From The Old Social Cycle
 
-| Legacy surface | Target surface | Migration rule |
+| Old surface | Current surface | Cleanup rule |
 |----------------|----------------|----------------|
 | `goal_mind` provider | Deliberation provider | Run only on branch conditions, not every turn |
 | `CycleGoal` | Field inside Active Episode and Actor Turn context | Keep compatibility records while the new episode contract lands |
 | `action_planner` provider | Actor Turn provider | Collapse action choice into one visible Action Card function tool or `author_mineflayer_action` |
 | `use_primitive` vs `use_action_skill` provider choice | Runtime Action Resolver mapping | Provider chooses Action Card, runtime chooses primitive or action skill mapping |
-| `author_and_trial_action_skill` | `author_mineflayer_action` provider choice plus full-context codegen/trial | Keep candidate validation, source guard, trial, verifier, and promotion mechanics as implementation authority |
+| Old author-and-trial planner mode | `author_mineflayer_action` provider choice plus full-context codegen/trial | Keep candidate validation, source guard, trial, verifier, and promotion mechanics as implementation authority |
 | `CycleJudgment` every cycle | Runtime Classifier plus optional boundary review | Runtime computes ordinary turn outcome; provider review is reserved for branch or learning-worthy events |
 | StrategicGoal live accumulation | PlanBeadGraph plus compact episode hints | Do not create another persistent middle layer |
 | Social-cycle report pass | Episode review summary | Pass/fail must cite episode-specific evidence, not generic movement |
@@ -553,7 +641,7 @@ PlanBeads are not removed. They move behind the hot path:
 PlanBeadGraph
 -> Deliberation branch context
 -> Active Episode selected/related bead refs
--> compact hints for Actor Turn
+-> source_evidence_bundle.plan_bead_cards for Actor Turn
 -> guarded operation results on branch-time mutation
 ```
 
@@ -569,7 +657,7 @@ Observable PlanBead presence in Actor Turn mode is this artifact chain:
 actor workspace plan-beads/*
 -> plan_bead_ready_fronts[] in the report
 -> cycle.plan_bead_packet_ref
--> provider input compact_plan_bead_hints
+-> provider input source_evidence_bundle.plan_bead_cards
 -> plan_bead_graph_summary.last_ready_front_ref
 ```
 
@@ -577,14 +665,13 @@ An ordinary Actor Turn may have `bead_op_proposals: []`. That is not evidence
 that PlanBeads disappeared. It means the actor continued the current episode
 without a justified branch-time work-graph mutation. Mutation authority in the
 Actor Turn path belongs to branch-time Deliberation plus the guarded PlanBead
-applier. The legacy CycleJudgment provider may still carry proposal candidates
-only on the legacy path during migration.
+applier.
 
 However, an empty graph for an entire long run is still a behavior gap. If a
 report has ready-front snapshots every cycle but zero selected bead refs, zero
-operation results, and empty `compact_plan_bead_hints`, reviewers should record
-"PlanBeads wired but not substantively used" rather than treating packet
-presence as planning continuity.
+operation results, and empty `source_evidence_bundle.plan_bead_cards`, reviewers
+should record "PlanBeads wired but not substantively used" rather than treating
+packet presence as planning continuity.
 
 Deliberation may emit either valid `plan-bead-operation/v1` objects or looser
 work-state proposals. The runtime may adapt looser branch-time proposals into
@@ -657,10 +744,10 @@ Architecture acceptance requires:
 - Generic branch-only PlanBead creates and duplicate open creates are rejected
   or dropped before they can dominate the ready front.
 - Actor Turn mode records PlanBead ready-front/context artifacts every cycle;
-  empty `compact_plan_bead_hints` is interpreted as "no current graph hints",
-  not as PlanBeads removal.
-- Actor Turn `compact_plan_bead_hints` preserve priority, next hints, blockers,
-  dependency refs, checkpoint ref, and evidence refs.
+  empty `source_evidence_bundle.plan_bead_cards` is interpreted as "no current
+  graph cards", not as PlanBeads removal.
+- Actor Turn `source_evidence_bundle.plan_bead_cards` preserve priority, next
+  hints, blockers, dependency refs, checkpoint ref, and evidence refs.
 - Settlement state consolidates shared chest inspect/deposit evidence into both
   `shared_storage` and `known_positions.shared_chest`.
 - Branch-time Deliberation carries current Active Episode fields forward when a

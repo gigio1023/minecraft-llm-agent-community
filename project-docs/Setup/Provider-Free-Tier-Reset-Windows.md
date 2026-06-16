@@ -80,6 +80,28 @@ Examples:
 | `00:00 PDT` | `07:00 UTC` | `16:00 KST` |
 | `00:00 PST` | `08:00 UTC` | `17:00 KST` |
 
+## ModelScope Qwen Ambassador Monthly Calls
+
+Source:
+
+- User-provided Qwen Ambassador monthly quota note, recorded on 2026-06-14.
+
+Reset rule:
+
+- `Qwen-Ambassador/Qwen3.7-Max` has 2500 API calls/month.
+- `Qwen-Ambassador/Qwen3.7-Plus` has 10000 API calls/month.
+- Usage resets at the end of each calendar month.
+
+Operational rule:
+
+- Treat this as an API-call quota, not a token quota.
+- The repo ledger keys monthly checks by UTC `YYYY-MM`.
+- Before a Qwen benchmark batch, sum the current month from
+  `build/provider-usage/provider-usage-ledger.jsonl` and compare the projected
+  request count against the model-specific monthly cap.
+- Daily ModelScope API-Inference headers remain useful rate-limit evidence, but
+  they do not replace the monthly Qwen Ambassador call guard.
+
 ## Before Long Live Runs
 
 1. Identify provider/model and the applicable pool.
@@ -87,6 +109,8 @@ Examples:
    - OpenAI API complimentary-token pool: UTC day, reset `09:00 KST`.
    - Gemini API RPD: Pacific day, reset `16:00 KST` during PDT or `17:00 KST`
      during PST.
+   - ModelScope Qwen Ambassador: calendar month, tracked as UTC `YYYY-MM` in
+     the local ledger.
 3. Check local ledger totals:
 
    ```bash
@@ -102,5 +126,6 @@ Examples:
 
 - `project-docs/Setup/Provider-Setup.md`
 - `project-docs/Setup/OpenAI-Tier3-Free-Usage.md`
+- `project-docs/Setup/ModelScope-Qwen-API-Access.md`
 - `probe/src/provider/providerUsageTracker.ts`
 - `build/provider-usage/free-tier-budgets.json` (ignored local state)

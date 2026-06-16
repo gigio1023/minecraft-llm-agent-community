@@ -10,6 +10,13 @@ Status: active campaign spec and implementation plan.
 
 Recorded: 2026-06-03 (`Asia/Seoul`).
 
+Material-economy update, recorded 2026-06-15: shared-storage examples in this
+campaign are evidence surfaces, not the definition of social economy. Interpret
+new benchmark work through personal possession, material claims, public
+affordances, weak commons, and obligation-backed exchange. Use
+`Material-Claims-And-Social-Economy-Benchmark-Plan.md` for current benchmark
+design.
+
 ## Purpose
 
 This document defines how the Actor Episode and Actor Turn campaign should be
@@ -283,7 +290,7 @@ live behavior gate remains `PARTIAL`.
 
 | Gate | Pass condition | Common failure class |
 |------|----------------|----------------------|
-| `actor-turn-cadence-gate` | Ordinary turns use Actor Turn; Deliberation runs only on branch conditions. | `legacy-hot-path-regression` |
+| `actor-turn-cadence-gate` | Ordinary turns use Actor Turn; Deliberation runs only on branch conditions. | `archived-hot-path-regression` |
 | `actionfulness-gate` | The actor attempts meaningful world, inventory, container, chat, relationship, or shared-storage mutations. | `action-timidness` |
 | `current-state-consumption-gate` | Current state hides or rejects already-satisfied station/action choices and points the actor toward the next useful action. | `state-consolidation-gap` |
 | `recipe-contract-gate` | Inventory-grid and table-bound recipes expose and enforce exact item counts before execution. | `minecraft-mechanics-gap` |
@@ -382,8 +389,8 @@ Given:
   relationship event exists in current state;
 - the Active Episode includes that social pressure.
 - for the first shared-storage handoff smoke, Actor Turn current state includes
-  `shared_storage` and at least one `deposit_candidates[]` entry with
-  `socially_requested=true`, `itemName`, `inventoryCount`, and `suggestedCount`.
+  `shared_storage` and inventory counts, while `source_evidence_bundle` carries
+  the original world-event card and observation inventory items.
 
 When:
 
@@ -550,8 +557,9 @@ Initial implementation status, 2026-06-03:
   storage. In live runs it also reuses spawn-access setup and seeds a small
   `oak_log` inventory stack for the active bot.
 - Actor Turn input now projects `shared_storage` details and
-  `deposit_candidates`, and Action Card hints tell the provider how to fill
-  `deposit_shared` `itemName`/`count` from a socially requested candidate.
+  source evidence beside inventory counts. Action Card hints tell the provider to
+  fill `deposit_shared` `itemName`/`count` itself from the visible evidence, not
+  from a precomputed social-request candidate.
 - the remaining live-smoke work is provider-driven selection and real Mineflayer
   deposit execution, not proof that deposit evidence can be evaluated or that
   the request reaches provider input.
@@ -697,7 +705,7 @@ Primary artifacts:
 
 ## Failure Classes
 
-- `legacy-hot-path-regression`: the run reintroduced ordinary goal/action/judgment provider cadence.
+- `archived-hot-path-regression`: the run reintroduced ordinary goal/action/judgment provider cadence.
 - `action-timidness`: observe, wait, remember, or movement-only actions dominate.
 - `state-consolidation-gap`: verified state is not consumed by the next Actor Turn.
 - `minecraft-mechanics-gap`: basic Minecraft prerequisite or station rules are missing from contracts.

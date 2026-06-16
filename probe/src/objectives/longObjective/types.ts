@@ -1,5 +1,5 @@
 /**
- * Data contracts for legacy long-objective planner, execution, and review
+ * Data contracts for direct long-objective planner, execution, and review
  * reports.
  *
  * @remarks These types document the direct-generated objective path without

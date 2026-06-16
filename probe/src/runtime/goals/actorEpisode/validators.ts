@@ -26,10 +26,9 @@ import {
   type EvidenceTraceEntry
 } from "./types.js";
 import {
-  boundedMineflayerMethodNames,
-  mineflayerActionSkillHelperNames,
-  mineflayerCodegenSkillRef
+  mineflayerActionSkillHelperNames
 } from "./mineflayerCodegenSkill.js";
+import { validateSourceEvidenceBundle } from "./sourceEvidenceBundleValidator.js";
 
 type ValidationFailure = { ok: false; errors: string[] };
 
@@ -251,9 +250,6 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
   assertString(value, "observer_id", path, errors);
   assertRecord(value, "inventory_counts", path, errors);
   assertArray(value, "visible_actors", path, errors);
-  if (value.obligation_summaries !== undefined) {
-    assertStringArray(value, "obligation_summaries", path, errors);
-  }
   if (value.session_lifecycle !== undefined) {
     const lifecycle = isRecord(value.session_lifecycle) ? value.session_lifecycle : null;
     if (!lifecycle) {
@@ -274,30 +270,21 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
       assertStringArray(lifecycle, "notes", `${path}.session_lifecycle`, errors);
     }
   }
-  assertArray(value, "nearby_block_hints", path, errors);
+  for (const [index, block] of assertArray(value, "nearby_block_observations", path, errors).entries()) {
+    if (!isRecord(block)) {
+      errors.push(`${path}.nearby_block_observations[${index}] must be an object`);
+      continue;
+    }
+    assertString(block, "name", `${path}.nearby_block_observations[${index}]`, errors);
+    assertString(block, "source", `${path}.nearby_block_observations[${index}]`, errors);
+    assertStringArray(block, "evidence_refs", `${path}.nearby_block_observations[${index}]`, errors);
+  }
   const sharedStorage = assertRecord(value, "shared_storage", path, errors);
   if (sharedStorage) {
     assertString(sharedStorage, "status", `${path}.shared_storage`, errors);
     assertOptionalString(sharedStorage, "chest_id", `${path}.shared_storage`, errors);
     assertArray(sharedStorage, "items", `${path}.shared_storage`, errors);
     assertStringArray(sharedStorage, "evidence_refs", `${path}.shared_storage`, errors);
-  }
-  for (const [index, candidate] of assertArray(value, "deposit_candidates", path, errors).entries()) {
-    const candidateRecord = isRecord(candidate) ? candidate : null;
-    if (!candidateRecord) {
-      errors.push(`${path}.deposit_candidates[${index}] must be an object`);
-      continue;
-    }
-    assertString(candidateRecord, "itemName", `${path}.deposit_candidates[${index}]`, errors);
-    assertNonNegativeInteger(candidateRecord, "inventoryCount", `${path}.deposit_candidates[${index}]`, errors);
-    assertNonNegativeInteger(candidateRecord, "suggestedCount", `${path}.deposit_candidates[${index}]`, errors);
-    assertNonNegativeInteger(candidateRecord, "maxDepositableCount", `${path}.deposit_candidates[${index}]`, errors);
-    if (typeof candidateRecord.socially_requested !== "boolean") {
-      errors.push(`${path}.deposit_candidates[${index}].socially_requested must be boolean`);
-    }
-    assertStringArray(candidateRecord, "requested_by_actor_ids", `${path}.deposit_candidates[${index}]`, errors);
-    assertStringArray(candidateRecord, "request_summaries", `${path}.deposit_candidates[${index}]`, errors);
-    assertStringArray(candidateRecord, "evidence_refs", `${path}.deposit_candidates[${index}]`, errors);
   }
   if (value.structure_progress !== undefined) {
     const structureProgress = isRecord(value.structure_progress) ? value.structure_progress : null;
@@ -317,7 +304,7 @@ function validateCurrentStateProjection(value: unknown, path: string, errors: st
   if (settlement) {
     assertRecord(settlement, "inventory_counts", `${path}.settlement_progress`, errors);
     assertString(settlement, "shared_storage_status", `${path}.settlement_progress`, errors);
-    assertStringArray(settlement, "known_position_summaries", `${path}.settlement_progress`, errors);
+    assertRecord(settlement, "known_positions", `${path}.settlement_progress`, errors);
     assertArray(settlement, "checklist", `${path}.settlement_progress`, errors);
     assertArray(settlement, "recent_blockers", `${path}.settlement_progress`, errors);
   }
@@ -351,19 +338,6 @@ function validateDecisionFrame(value: unknown, path: string, errors: string[]) {
     assertString(focusStatus, "focus", `${path}.episode_focus_status`, errors);
     assertStringArray(focusStatus, "evidence_refs", `${path}.episode_focus_status`, errors);
     assertString(focusStatus, "next", `${path}.episode_focus_status`, errors);
-  }
-
-  for (const [index, request] of assertArray(value, "open_social_requests", path, errors).entries()) {
-    if (!isRecord(request)) {
-      errors.push(`${path}.open_social_requests[${index}] must be an object`);
-      continue;
-    }
-    assertOptionalString(request, "itemName", `${path}.open_social_requests[${index}]`, errors);
-    if (request.suggestedCount !== undefined) {
-      assertNonNegativeInteger(request, "suggestedCount", `${path}.open_social_requests[${index}]`, errors);
-    }
-    assertString(request, "summary", `${path}.open_social_requests[${index}]`, errors);
-    assertStringArray(request, "evidence_refs", `${path}.open_social_requests[${index}]`, errors);
   }
 
   for (const [index, verdict] of assertArray(value, "recent_action_verdicts", path, errors).entries()) {
@@ -423,81 +397,6 @@ function validateKnownStringArray(
     if (typeof entry === "string" && !allowed.has(entry)) {
       errors.push(`${path}.${key} contains unsupported value ${entry}`);
     }
-  }
-}
-
-function validateArrayContainsAll(input: {
-  record: Record<string, unknown>;
-  key: string;
-  path: string;
-  expected: readonly string[];
-  errors: string[];
-}) {
-  assertNonEmptyStringArray(input.record, input.key, input.path, input.errors);
-  const value = input.record[input.key];
-  if (!Array.isArray(value)) {
-    return;
-  }
-  const actual = new Set(value.filter((entry): entry is string => typeof entry === "string"));
-  for (const expected of input.expected) {
-    if (!actual.has(expected)) {
-      input.errors.push(`${input.path}.${input.key} must include ${expected}`);
-    }
-  }
-}
-
-function validateMineflayerCodegenSkillProjection(
-  value: unknown,
-  path: string,
-  errors: string[]
-) {
-  if (!isRecord(value)) {
-    errors.push(`${path} must be an object`);
-    return;
-  }
-  if (value.schema !== "mineflayer-codegen-skill/v1") {
-    errors.push(`${path}.schema must be mineflayer-codegen-skill/v1`);
-  }
-  if (value.skill_ref !== mineflayerCodegenSkillRef) {
-    errors.push(`${path}.skill_ref must be ${mineflayerCodegenSkillRef}`);
-  }
-  assertString(value, "skill_markdown", path, errors);
-  if (
-    typeof value.skill_markdown === "string" &&
-    !/\bMineflayer Code Generation\b/.test(value.skill_markdown)
-  ) {
-    errors.push(`${path}.skill_markdown must contain the Mineflayer Code Generation agent skill body`);
-  }
-  assertString(value, "upstream_ref", path, errors);
-  if (value.applies_when !== "outer Actor Turn selected author_mineflayer_action") {
-    errors.push(`${path}.applies_when must be outer Actor Turn selected author_mineflayer_action`);
-  }
-  if (value.helper_api_version !== "mineflayer-action-skill-helper/v1") {
-    errors.push(`${path}.helper_api_version must be mineflayer-action-skill-helper/v1`);
-  }
-  validateArrayContainsAll({
-    record: value,
-    key: "allowed_ctx_helpers",
-    path,
-    expected: mineflayerActionSkillHelperNames,
-    errors
-  });
-  validateArrayContainsAll({
-    record: value,
-    key: "bounded_mineflayer_methods",
-    path,
-    expected: boundedMineflayerMethodNames,
-    errors
-  });
-  for (const key of [
-    "output_schema_rules",
-    "helper_call_contracts",
-    "mineflayer_api_notes",
-    "forbidden_source_patterns",
-    "verifier_and_evidence_rules",
-    "common_failure_modes"
-  ] as const) {
-    assertNonEmptyStringArray(value, key, path, errors);
   }
 }
 
@@ -709,19 +608,8 @@ export function validateActorTurnInput(
     assertString(actorContext, "life_goal_ref", "ActorTurnInput.actor_context", errors);
     assertString(actorContext, "life_goal_summary", "ActorTurnInput.actor_context", errors);
   }
-  assertStringArray(value, "current_observation_refs", "ActorTurnInput", errors);
   validateCurrentStateProjection(value.current_state, "ActorTurnInput.current_state", errors);
-  assertStringArray(value, "memory_refs", "ActorTurnInput", errors);
-
-  for (const [index, entry] of assertArray(value, "recent_evidence_trace", "ActorTurnInput", errors).entries()) {
-    const result = validateEvidenceTraceEntry(entry);
-    if (!result.ok) {
-      errors.push(...result.errors.map((error) => `ActorTurnInput.recent_evidence_trace[${index}]: ${error}`));
-    }
-  }
-  for (const [index, hint] of assertArray(value, "compact_plan_bead_hints", "ActorTurnInput", errors).entries()) {
-    validatePlanBeadHint(hint, `ActorTurnInput.compact_plan_bead_hints[${index}]`, errors);
-  }
+  validateSourceEvidenceBundle(value.source_evidence_bundle, "ActorTurnInput.source_evidence_bundle", errors);
   for (const [index, constraint] of assertArray(value, "runtime_retry_constraints", "ActorTurnInput", errors).entries()) {
     validateRetryConstraint(constraint, `ActorTurnInput.runtime_retry_constraints[${index}]`, errors);
   }
@@ -736,7 +624,7 @@ export function validateActorTurnInput(
   if (relationships) {
     assertStringArray(relationships, "relationship_refs", "ActorTurnInput.relationship_context", errors);
     assertStringArray(relationships, "visible_actor_ids", "ActorTurnInput.relationship_context", errors);
-    assertStringArray(relationships, "obligations", "ActorTurnInput.relationship_context", errors);
+    assertArray(relationships, "relationship_cards", "ActorTurnInput.relationship_context", errors);
   }
   const guide = assertRecord(value, "minecraft_basic_guide", "ActorTurnInput", errors);
   if (guide) {
@@ -749,11 +637,6 @@ export function validateActorTurnInput(
     assertStringArray(guide, "blocker_recovery_guides", "ActorTurnInput.minecraft_basic_guide", errors);
     assertStringArray(guide, "observe_stop_guides", "ActorTurnInput.minecraft_basic_guide", errors);
   }
-  validateMineflayerCodegenSkillProjection(
-    value.mineflayer_codegen_skill,
-    "ActorTurnInput.mineflayer_codegen_skill",
-    errors
-  );
   const budget = assertRecord(value, "provider_budget_hint", "ActorTurnInput", errors);
   if (budget) {
     assertString(budget, "provider_id", "ActorTurnInput.provider_budget_hint", errors);

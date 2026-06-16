@@ -12,7 +12,6 @@ export function createEmptySocialCycleReport(input: {
   providerId: SocialCycleRunReport["provider"]["provider_id"];
   model: string;
   reasoning: string;
-  actionHotPath?: SocialCycleRunReport["action_hot_path"];
 }): SocialCycleRunReport {
   return {
     schema: "social-cycle-run-report/v1",
@@ -23,7 +22,7 @@ export function createEmptySocialCycleReport(input: {
       model: input.model,
       reasoning: input.reasoning
     },
-    action_hot_path: input.actionHotPath,
+    action_hot_path: "actor_turn",
     runtime_status: "blocked",
     agency_status: {
       life_goal_source: "actor_soul",

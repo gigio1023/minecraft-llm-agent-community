@@ -1,7 +1,6 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { pathToFileURL } from "node:url";
 
 import * as mineflayer from "mineflayer";
 import * as mc from "minecraft-protocol";
@@ -22,8 +21,7 @@ import {
 import { diffObservations, observeActor } from "./skillVillage/observation.js";
 import { summarizeResult } from "./skillVillage/result.js";
 import { flushTracing, startTracing, traceGeneration } from "./skillVillage/tracing.js";
-import type { ActorId, BotRecord, CodexInputMessage, HelperEvent, SeedActionSkill, ActionSkillContext, ActionSkillProposal } from "./skillVillage/types.js";
-import { shouldExecuteLegacyGeneratedActionSkills } from "../skills/generatedLegacyPolicy.js";
+import type { ActorId, BotRecord, CodexInputMessage, SeedActionSkill, ActionSkillProposal } from "./skillVillage/types.js";
 import { writeActionSkillProposal } from "../skills/proposals/proposalStore.js";
 
 const config = loadMutualProbeConfig();
@@ -31,8 +29,8 @@ const projectName = "skill-village-manual";
 const composeFile = config.composeFile;
 const composeDir = path.dirname(composeFile);
 const dataDir = path.resolve(composeDir, "tmp/skill-village-server");
-// Legacy debug output only. Default runtime behavior stores proposals in actor
-// workspace and does not auto-import generated TypeScript.
+// Archived debug output only. Runtime behavior stores proposals in actor
+// workspace and never auto-imports generated TypeScript from this directory.
 const actionSkillDir = path.resolve(composeDir, "../build/generated-skills");
 const memoryDir = path.resolve(composeDir, "../build/agent-memory");
 
@@ -459,180 +457,21 @@ function readStreamText(payload: string) {
   return text.trim();
 }
 
-function assertActionSkillCodeSafe(code: string) {
-  const blocked = /\b(import|require|process|Bun|Deno|eval|Function|while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)|child_process|fs|net|http)\b/;
-  if (blocked.test(code)) {
-    throw new Error("Generated action skill contains a blocked API or unbounded loop");
-  }
-  if (!code.includes("export async function run")) {
-    throw new Error("Generated action skill must export async function run(ctx)");
-  }
-}
-
 async function executeActionSkill(actorId: ActorId, bots: BotRecord, proposal: ActionSkillProposal) {
   const candidatePath = await persistGeneratedActionSkillProposal(actorId, proposal);
   const preObservation = observeActor(actorId, bots);
 
-  if (!shouldExecuteLegacyGeneratedActionSkills()) {
-    return {
-      filePath: candidatePath,
-      result: {
-        status: "candidate_recorded",
-        message:
-          "Generated TypeScript action skills are stored as actor workspace candidates and are not auto-executed by default."
-      },
-      helperEvents: [],
-      preObservation,
-      postObservation: preObservation,
-      diff: diffObservations(preObservation, preObservation)
-    };
-  }
-
-  assertActionSkillCodeSafe(proposal.skillCode);
-  await mkdir(actionSkillDir, { recursive: true });
-  const filePath = path.join(actionSkillDir, `${Date.now()}-${actorId}-${proposal.skillName.replace(/[^a-zA-Z0-9_-]/g, "_")}.ts`);
-  await writeFile(filePath, proposal.skillCode);
-
-  const moduleUrl = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
-  const actionSkill = (await import(moduleUrl)) as { run(ctx: unknown): Promise<unknown> };
-  const bot = bots[actorId];
-  const helperEvents: HelperEvent[] = [];
-  let ctx: ActionSkillContext;
-  const runSeedActionSkill = async (name: string): Promise<unknown> => {
-    const seed = seedActionSkills.find((actionSkill) => actionSkill.name === name);
-    if (!seed) {
-      throw new Error(`Unknown seed action skill: ${name}`);
-    }
-
-    return seed.run(ctx);
-  };
-
-  ctx = withHelperLogging({
-    bot,
-    bots,
-    say(text: string) {
-      bot.chat(text);
-    },
-    wait,
-    async moveForward(ms = 800) {
-      bot.setControlState("forward", true);
-      await wait(Math.min(Math.max(ms, 100), 6_000));
-      bot.setControlState("forward", false);
-    },
-    stop() {
-      bot.clearControlStates();
-    },
-    async lookAtNearestEntity() {
-      const nearest = bot.nearestEntity((entity) => entity !== bot.entity);
-      if (nearest) await bot.lookAt(nearest.position.offset(0, 1, 0));
-    },
-    async faceActor(targetActorId: ActorId) {
-      const target = bots[targetActorId];
-      if (!target) return;
-      await bot.lookAt(target.entity.position.offset(0, 1, 0));
-    },
-    async moveTowardActor(targetActorId: ActorId, ms = 800) {
-      await this.faceActor(targetActorId);
-      await this.moveForward(ms);
-    },
-    inspectInventory() {
-      return bot.inventory.items().map((item) => ({
-        name: item.name,
-        count: item.count
-      }));
-    },
-    scanNearbyEntities() {
-      return Object.values(bot.entities)
-        .filter((entity) => entity !== bot.entity)
-        .map((entity) => ({
-          name: entity.name ?? "unknown",
-          ...(entity.username ? { username: entity.username } : {}),
-          type: entity.type,
-          distance: Number(bot.entity.position.distanceTo(entity.position).toFixed(1))
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 12);
-    },
-    scanNearbyBlocks() {
-      const blocks = bot.findBlocks({
-        matching: (block) => block.name !== "air" && block.name !== "void_air",
-        maxDistance: 16,
-        count: 24
-      });
-      return blocks
-        .map((position) => {
-          const block = bot.blockAt(position);
-          return {
-            name: block?.name ?? "unknown",
-            distance: Number(bot.entity.position.distanceTo(position).toFixed(1))
-          };
-        })
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 12);
-    },
-    findNearestBlock(names: string[]) {
-      const block = bot.findBlock({
-        matching: (candidate) => names.includes(candidate.name),
-        maxDistance: 24
-      });
-
-      if (!block) {
-        return null;
-      }
-
-      return {
-        name: block.name,
-        distance: Number(bot.entity.position.distanceTo(block.position).toFixed(1))
-      };
-    },
-    async digNearestBlock(names: string[]) {
-      const block = bot.findBlock({
-        matching: (candidate) => names.includes(candidate.name),
-        maxDistance: 5
-      });
-
-      if (!block) {
-        return { status: "no_block", names };
-      }
-
-      await bot.dig(block);
-      return { status: "dug", block: block.name };
-    },
-    async approachNearestEntityByName(name: string, ms = 1_200) {
-      const entity = bot.nearestEntity((candidate) => candidate.name === name);
-      if (!entity) {
-        return { status: "no_entity", name };
-      }
-
-      await bot.lookAt(entity.position.offset(0, 1, 0));
-      await this.moveForward(ms);
-      return { status: "approached_entity", name };
-    },
-    async collectNearbyDroppedItem(ms = 1_200) {
-      const entity = bot.nearestEntity((candidate) => candidate.name === "item");
-      if (!entity) {
-        return { status: "no_dropped_item" };
-      }
-
-      await bot.lookAt(entity.position.offset(0, 0.5, 0));
-      await this.moveForward(ms);
-      return { status: "approached_dropped_item" };
-    },
-    async runSkill(name: string) {
-      return runSeedActionSkill(name);
-    }
-  }, helperEvents);
-
-  const result = await runGeneratedActionSkillSafely(actionSkill, ctx);
-  bot.clearControlStates();
-  const postObservation = observeActor(actorId, bots);
   return {
-    filePath,
-    result,
-    helperEvents,
+    filePath: candidatePath,
+    result: {
+      status: "candidate_recorded",
+      message:
+        "Generated TypeScript action skills are stored as actor workspace candidates and are not auto-executed by this manual probe."
+    },
+    helperEvents: [],
     preObservation,
-    postObservation,
-    diff: diffObservations(preObservation, postObservation)
+    postObservation: preObservation,
+    diff: diffObservations(preObservation, preObservation)
   };
 }
 
@@ -654,66 +493,15 @@ async function persistGeneratedActionSkillProposal(
     evidence_refs: [],
     preconditions: [],
     required_primitives: [],
-    proposed_recipe_id: `legacy-generated-code:${proposalId}`,
-    success_verifier: "not_validated_generated_code_requires_recipe_conversion",
-    known_failure_modes: ["legacy_generated_code_not_runtime_verified"],
+    proposed_recipe_id: `generated-source-import:${proposalId}`,
+    success_verifier: "not_validated_generated_source_requires_recipe_conversion",
+    known_failure_modes: ["generated_source_not_runtime_verified"],
     created_at: now,
     updated_at: now,
-    legacy_generated_code: proposal.skillCode,
-    legacy_generated_code_language: "typescript",
+    generated_source: proposal.skillCode,
+    generated_source_language: "typescript",
     notes: proposal.utterance
   });
-}
-
-function withHelperLogging(ctx: ActionSkillContext, helperEvents: HelperEvent[]): ActionSkillContext {
-  return new Proxy(ctx, {
-    get(target, property, receiver) {
-      const value = Reflect.get(target, property, receiver);
-      if (typeof property !== "string" || typeof value !== "function" || property === "constructor") {
-        return value;
-      }
-
-      return (...args: unknown[]) => {
-        try {
-          const result = value.apply(target, args);
-          if (result && typeof (result as Promise<unknown>).then === "function") {
-            return (result as Promise<unknown>).then(
-              (resolved) => {
-                helperEvents.push({ name: property, args, result: resolved });
-                return resolved;
-              },
-              (error) => {
-                const message = error instanceof Error ? error.message : String(error);
-                helperEvents.push({ name: property, args, error: message });
-                throw error;
-              }
-            );
-          }
-
-          helperEvents.push({ name: property, args, result });
-          return result;
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          helperEvents.push({ name: property, args, error: message });
-          throw error;
-        }
-      };
-    }
-  });
-}
-
-async function runGeneratedActionSkillSafely(actionSkill: { run(ctx: unknown): Promise<unknown> }, ctx: ActionSkillContext) {
-  try {
-    return await Promise.race([
-      actionSkill.run(ctx),
-      wait(14_000).then(() => ({ status: "timeout" }))
-    ]);
-  } catch (error) {
-    return {
-      status: "skill_error",
-      message: error instanceof Error ? error.message : String(error)
-    };
-  }
 }
 
 async function main() {

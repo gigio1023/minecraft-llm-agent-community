@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  validateAuthorAndTrialActionSkillRequest,
+  validateGeneratedActionSkillTrialRequest,
   validateGeneratedActionSkillCandidate
 } from "../src/skills/generated/authoringSchemas.js";
 import { evaluateGeneratedActionSkillTrialVerifier } from "../src/skills/generated/verifierEvaluation.js";
-import type { LegacyPlannerAction, GeneratedActionSkillCandidate } from "../src/runtime/goals/types.js";
+import type { GeneratedActionSkillCandidate } from "../src/runtime/goals/types.js";
 
 function candidate(overrides: Partial<GeneratedActionSkillCandidate> = {}): GeneratedActionSkillCandidate {
   return {
@@ -85,14 +85,8 @@ test("generated candidate rejects dummy input_schema parameters not read by sour
   );
 });
 
-test("author-and-trial intent rejects source reads for undeclared params", () => {
-  const intent: LegacyPlannerAction = {
-    schema: "legacy-planner-action/v1",
-    actor_id: "npc_b",
-    cycle_id: "cycle-0001",
-    cycle_goal_id: "cycle-goal-1",
-    kind: "author_and_trial_action_skill",
-    args: { text: "done" },
+test("generated trial request rejects source reads for undeclared params", () => {
+  const result = validateGeneratedActionSkillTrialRequest({
     parameters: { text: "done" },
     candidate: candidate({
       input_schema: {
@@ -101,13 +95,8 @@ test("author-and-trial intent rejects source reads for undeclared params", () =>
         additionalProperties: false,
         properties: {}
       }
-    }),
-    why_this_action: "Trial bounded chat helper.",
-    expected_evidence: ["say helper event"],
-    fallback_if_blocked: "record chat blocker"
-  };
-
-  const result = validateAuthorAndTrialActionSkillRequest(intent);
+    })
+  });
 
   assert.equal(result.ok, false);
   assert.ok(

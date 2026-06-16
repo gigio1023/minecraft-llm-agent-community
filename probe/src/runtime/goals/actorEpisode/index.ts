@@ -9,6 +9,7 @@ export * from "./actionCardSelection.js";
 export * from "./currentStateProjection.js";
 export * from "./decisionFrame.js";
 export * from "./episodeContextProjection.js";
+export * from "./sourceEvidenceBundle.js";
 export * from "./minecraftBasicGuide.js";
 export * from "./mineflayerCodegenSkill.js";
 export * from "./turnInput.js";

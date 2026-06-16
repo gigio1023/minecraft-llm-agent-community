@@ -27,6 +27,39 @@ is reliable.
 
 ## Latest Live Evidence
 
+Recorded 2026-06-10 (`UTC`).
+
+Natural-world spawn research and handoff are recorded in
+`project-docs/Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`.
+The main conclusion is that `server.properties` can select a natural world and a
+seed, but it cannot prove a safe, tree-nearby, non-canopy spawn. The next
+implementation should add a `natural-safe-spawn-v1` scenario that validates a
+natural spawn from runtime evidence without placing resources or flattening
+terrain.
+
+The latest roofless-hut flat run also exposed a setup truthfulness bug: required
+RCON fixture commands returned failure-like output such as `That position is not
+loaded`, but `runWorldScenarioCommands` recorded them as `passed`. Fix RCON
+output validation before spending another provider-heavy construction run.
+
+Recorded 2026-06-07 (`Asia/Seoul`).
+
+Current code baseline after the context-projection cleanup:
+
+- Actor Turn input now pairs bounded `current_state` facts with
+  `source_evidence_bundle` cards/refs.
+- Hidden provider-facing preselection fields for social requests, deposit
+  candidates, obligation summaries, and position summaries have been removed from
+  active code.
+- Action Cards remain visible unless structured readiness, permission, retry, or
+  validation gates prove otherwise.
+- Shared-storage smoke evidence is preserved as current truth and source
+  evidence, but the runtime no longer marks the request satisfied or hides
+  deposit/chest actions through a social-request parser.
+- Use `Context-Projection-And-Source-Evidence.md` for the compression rule:
+  bounded facts may be compacted; observation, action, social, and work-state
+  summaries must travel with source evidence.
+
 Recorded 2026-06-04 (`Asia/Seoul`).
 
 Fresh-world 60-cycle OpenAI `gpt-5.4-mini` Actor Turn run after removing
@@ -90,7 +123,7 @@ PlanBeads verdict:
   `selected_plan_bead_refs=0`,
   `plan_bead_operation_result_refs=0`,
   `plan_bead_operation_results=0`,
-  and Actor Turn `compact_plan_bead_hints=[]`.
+  and Actor Turn `source_evidence_bundle.plan_bead_cards=[]`.
 - The actor workspace for this run contained only
   `plan-beads/indexes/plan-bead-ready-front-cycle-*.json`; no PlanBead record,
   event, history, or operation-result artifact was created.
@@ -120,9 +153,8 @@ Actor Turn tool selection is now aligned with the full-context codegen spec:
   source, runtime parameters, input schema, verifier, helper allowlist, timeout,
   failure modes, and promotion policy are produced by the internal full-context
   codegen stage.
-- The social-cycle runner's ordinary `actor_turn` path executes
-  `ActorTurnResolvedAction` directly. The legacy planner path is explicit and
-  named `LegacyPlannerAction`; it is not the provider/codegen boundary.
+- The social-cycle runner executes Actor Turn actions directly. There is no
+  active archived planner execution path in the ordinary runtime.
 - Actor-owned generated action skill `generated_input_schema` now reaches the
   visible Action Card tool schema, so promoted/generated action skills with
   non-empty params do not collapse to `{}`.
@@ -191,8 +223,8 @@ Longer live runs under OpenAI `gpt-5.4-nano`:
 - `tmp/social-smoke-openai-nano-30cycle-passive-planbeads-v19.json`:
   `runtime_status=passed`, 68 provider records, 581,090 total tokens, 30 cycles.
   Provider usage guard projected 8,057,660 / 9,000,000 daily tokens. This run
-  exercised Actor Turn generated Mineflayer action authoring once through
-  `author_and_trial_action_skill`. It exposed two implementation issues: the
+  exercised generated Mineflayer action authoring once through the older
+  authoring path. It exposed two implementation issues: the
   runtime classifier still copied provider absence-like text into memory writes,
   and generated code called `ctx.wait({ durationMs })` while the helper accepted
   only a bare number, producing a Node `TimeoutNaNWarning`.
@@ -274,10 +306,11 @@ What improved in this slice:
 - Actor Turn runtime classifier writes neutral evidence-linked memory summaries
   instead of copying provider `why_this_action` prose into CycleJudgment memory
   writes.
-- Actor Turn provider input now injects the repo's
+- Mineflayer codegen request construction now injects the repo's
   `.agents/skills/mineflayer-code-generation/SKILL.md` body into
-  `mineflayer_codegen_skill.skill_markdown`, so every
-  `author_mineflayer_action` turn sees the bounded Mineflayer generation rules.
+  `mineflayer_codegen_skill_markdown`, so every `author_mineflayer_action`
+  codegen turn sees the bounded Mineflayer generation rules without bloating the
+  outer Actor Turn input.
 - Actor Turn decision-frame code has been split into responsibility-focused
   modules for current-state projection, episode context, Action Cards,
   selection hints, Minecraft basic guide injection, Mineflayer codegen skill
@@ -334,17 +367,17 @@ latest behavioral proof:
   `npc_a` request.
 - `tmp/social-smoke-openai-nano-3cycle-rerun7.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 5 provider records,
-  31,836 total tokens. The actor deposited `1 oak_log`, later Actor Turn inputs
-  showed `deposit_candidates[oak_log].socially_requested=false`. This is past
-  evidence from before the direct tool-calling/no-hidden-planner cleanup; do not
-  preserve its Action Card hiding behavior as current architecture.
+  31,836 total tokens. The actor deposited `1 oak_log`, and later inputs used an
+  older hidden request-satisfaction projection. This is past evidence from before
+  the direct tool-calling/source-evidence cleanup; do not preserve its Action
+  Card hiding behavior as current architecture.
 - `tmp/social-smoke-openai-nano-3cycle-decision-frame-v2.json`:
   `run_lifecycle=completed`, `runtime_status=passed`, 4 provider records,
   29,916 total tokens. The actor performed
   `deposit_shared(1 oak_log) -> craftPlanksAndSticks -> craftCraftingTable`.
-  Cycle 3 input showed `decision_frame.episode_focus_status.status=satisfied`,
-  `open_social_requests=[]`, and no `Inspect Chest` / `Inspect Shared Chest`
-  Action Cards, so the cheap model did not re-verify the completed handoff.
+  Cycle 3 used an older hidden request-satisfaction projection that prevented
+  repeated chest verification. The current architecture preserves the same
+  evidence but does not hide tools through that projection.
 
 Next work:
 
@@ -375,7 +408,7 @@ Implemented surfaces:
 - actor profile, memory, evidence, reviews, provider inputs, provider outputs,
   and relationship directories;
 - action skill lifecycle directories for active, candidate, retired, rejected,
-  and legacy proposal paths;
+  and archived proposal paths;
 - actor-owned active seed action skill materialization;
 - actor workspace active action skill reads for the runtime gate.
 
@@ -419,7 +452,7 @@ Implemented surfaces:
 - missing timeout and success-by-text rejection;
 - bounded primitive recipe trials with evidence;
 - promotion, supersession, retirement, and rejection helpers;
-- legacy `build/generated-skills` archival into actor workspace candidates.
+- archived `build/generated-skills` archival into actor workspace candidates.
 
 Important files:
 
@@ -1459,8 +1492,8 @@ This checkpoint aligns documentation with the current PR direction:
 - Actor Turn is the ordinary LLM hot path.
 - The provider chooses one visible function tool: an Action Card with strict
   `parameters`, or `author_mineflayer_action`.
-- `ActionIntent` is legacy/migration terminology only. It must not be described
-  as the current provider-facing or codegen-facing boundary.
+- `ActionIntent` is not an active runtime concept. Do not describe it as the
+  current provider-facing or codegen-facing boundary.
 - Generated Mineflayer authoring starts from `author_mineflayer_action`; the
   outer tool call carries detailed rationale and desired behavior, not source
   code and not a `context_to_preserve` summary.
@@ -1480,7 +1513,7 @@ Documentation changes in this pass:
 - Updated `README.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
   `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` to describe full-context codegen
   and current Actor Turn authority.
-- Moved dated or legacy plans into supporting-doc status in
+- Moved dated or archived plans into supporting-doc status in
   `Documentation-Map.md`.
 - Updated PlanBeads, memory/action-space, future-work, and live-test docs so
   they refer to Actor Turn tool selection rather than current `ActionIntent`
@@ -1493,5 +1526,86 @@ Current documentation rule:
   `Actor-Episode-And-Actor-Turn-Architecture.md`,
   `Actor-Persistent-State-And-PlanBeads.md`, and
   `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`.
-- Use legacy `ActionIntent` docs only for historical artifacts, report
-  compatibility, or explicit migration paths.
+- Use archived `ActionIntent` docs only when reading old artifacts. Do not route
+  new implementation through that boundary.
+
+## 2026-06-12 World Scenario Truthfulness Plan
+
+The next implementation slice should start from
+`project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
+
+Current conclusion:
+
+- The latest flat roofless-hut manifests are not trustworthy enough to prove
+  that the worksite and oak-log rack were prepared.
+- Required RCON setup commands were stored as `passed` even when command output
+  contained failure text such as `Incomplete` and `That position is not loaded`.
+- This makes setup truthfulness the blocker before another provider-heavy
+  Actor Turn behavior verdict.
+
+Next order:
+
+1. harden `runWorldScenarioCommands` so failure-like RCON output marks commands
+   failed and blocks required setup;
+2. repair or reframe the flat fixture after setup failure detection is truthful;
+3. add `natural-safe-spawn-v1` as a natural-world run lane with spawn validation
+   artifacts and no terrain/resource fixture mutation;
+4. run a short smoke before spending 40/60-cycle provider budget.
+
+## 2026-06-13 World Scenario Truthfulness Implementation
+
+Implemented the first setup-truthfulness slice from
+`World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`.
+
+Changed runtime behavior:
+
+- `runWorldScenarioCommands` now treats known failure-like RCON output as failed
+  command evidence even when the RCON call itself resolves.
+- Required failure-like output blocks setup with `required_failure: true`.
+- Optional failure-like output is preserved as failed command evidence without
+  blocking the remaining setup commands.
+- `natural-safe-spawn-v1` is now a natural `survival_social_run` lane with
+  default terrain generation, no `GENERATOR_SETTINGS`, no terrain mutation
+  command surface, and no resource fixture.
+- Natural safe-spawn validation runs after the Mineflayer bot joins and before
+  Actor Turn cycles begin. It writes a `natural-spawn-validation/v1` artifact
+  with `credited_as_actor_progress: false`, nearest loaded logs, block checks,
+  candidate rejections, loaded-world limitations, and an embedded
+  `world-state-scan/v1`.
+- A passed natural validation may pin the actor spawn and teleport to the
+  selected start. This remains setup evidence only and is not inserted into
+  cycle evidence, PlanBeads, memory, or progress claims.
+
+Implementation files:
+
+- `probe/src/server/worldScenarioRcon.ts`
+- `probe/src/server/naturalSpawnValidation.ts`
+- `probe/src/server/worldScenarios.ts`
+- `probe/src/runtime/socialCycleRunner.ts`
+- `probe/src/runtime/goals/types.ts`
+- `probe/test/worldScenarios.test.ts`
+
+Verification so far:
+
+- `cd probe && bun test ./test/worldScenarios.test.ts`: passed
+- `cd probe && bun run typecheck`: passed
+- Sequential full test sweep with `for f in test/*.test.ts; do bun test "./$f"; done`:
+  passed. Direct `bun test` discovery still hit a local fd quota / `EMFILE`
+  issue before tests ran.
+- `cd docs && npm run build`: passed
+- `git diff --check`: passed
+- Deterministic `natural-safe-spawn-v1` setup smoke:
+  `tmp/social-cycle-natural-safe-spawn-deterministic-1-20260613.json`.
+  The CLI exited `1` because the one-cycle deterministic runtime was
+  `blocked`, but setup evidence passed: manifest `setup_status: "passed"`,
+  `natural_spawn_validation_status: "passed"`, provider usage records `0`, and
+  setup refs were not inserted into cycle evidence.
+
+Remaining work before another provider-heavy behavior verdict:
+
+1. run a low-cost provider experiment with `natural-safe-spawn-v1` and
+   screenshots;
+2. inspect the scenario manifest and natural spawn artifact before judging
+   Actor Turn behavior;
+3. classify any future spawn-validation failure as setup/environment failure,
+   not model behavior.

@@ -44,8 +44,8 @@ The actor is not just an LLM controller attached to Mineflayer.
 When `soul.md` or an ActorSoul artifact defines an actor, it is the actor's
 identity seed. Short-, mid-, and long-term goals are derived under the
 Soul/LifeGoal frame and informed by observed world state, role context, memory,
-relationships, obligations, trust, conflict, shared/private inventory, and
-settlement state.
+relationships, obligations, trust, conflict, personal possession, material
+claims, public affordances, weak commons, and settlement state.
 
 Gameplay progress matters because it creates observations, evidence, and social
 consequences. It is not the top-level objective by itself.
@@ -114,6 +114,15 @@ substrate should expose raw Minecraft observations, query limits, positions,
 distances, and evidence refs; the provider chooses relevance under ActorSoul,
 LifeGoal, CycleGoal, action surface, and current evidence.
 
+Context compaction must distinguish bounded facts from evidence-rich state.
+Compact inventory counts, vitals, food candidates, retry constraints, and budget
+hints are acceptable because they are low-dimensional and easy to audit.
+Observation geometry, action/failure history, social pressure, PlanBead work
+state, and generated action trials must carry source evidence cards or refs
+beside any summary. Summary-only context for those surfaces is information loss.
+Use `project-docs/Architecture/Context-Projection-And-Source-Evidence.md` as the
+active rule for Actor Turn provider input.
+
 LLM-facing prose must never become hidden runtime policy. Do not parse
 `current_state_requirements`, `why_this_action`, Action Card descriptions,
 Minecraft Basic Guide text, memory notes, PlanBeads, or provider rationale with
@@ -124,6 +133,11 @@ strict schemas/enums enforce the flow; within a selected tool/action, the LLM
 keeps decision freedom with full context and schema-bound logical parameters.
 This side project does not need compatibility compromises that keep prose
 parsing or hidden Minecraft-planner behavior in the hot path.
+When replacing an active contract, update the producer, provider schema,
+validators, tests, docs, and report readers coherently. Do not carry old concept
+names into new active schemas as old aliases or source labels. Historical
+records can remain readable through explicit audit/import paths, but active
+runtime/provider surfaces should expose only current contract names.
 
 `decision_frame` is not a planner result. It must not carry
 `parameter_candidates`, `top_eligible_action_cards`,

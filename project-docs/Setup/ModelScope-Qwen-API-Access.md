@@ -32,9 +32,10 @@ Suggested experimental use:
 - `Qwen3.7-Max`: text, coding, and tool-use evaluation.
 - `Qwen3.7-Plus`: multimodal smoke tests that need image input.
 
-This repo does not yet have a `modelscope-api` social-cycle provider adapter.
-The current purpose is manual smoke testing, quota inspection, and fixing the
-auth/usage contract a future adapter should follow.
+This repo now has a `modelscope-api` social-cycle provider adapter for
+provider-backed benchmark and smoke runs. Keep manual smoke tests in this note
+because they are still the quickest way to isolate ModelScope account, quota,
+or request-shape failures from Minecraft runtime behavior.
 
 ## Auth
 
@@ -50,7 +51,6 @@ Store local credentials in the repo-local ignored `.env`:
 ```text
 MODELSCOPE_API_KEY=...
 MODELSCOPE_BASE_URL=https://api-inference.modelscope.ai/v1
-MODELSCOPE_MODEL=Qwen-Ambassador/Qwen3.7-Max
 ```
 
 Rules:
@@ -96,13 +96,15 @@ Operational rule:
 Use `curl -D` so response headers are preserved for quota inspection.
 
 ```bash
+MODEL_ID=Qwen-Ambassador/Qwen3.7-Max
+
 curl -sS -D /tmp/modelscope-qwen.headers \
   -o /tmp/modelscope-qwen.response.json \
   "$MODELSCOPE_BASE_URL/chat/completions" \
   -H "Authorization: Bearer $MODELSCOPE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "'"$MODELSCOPE_MODEL"'",
+    "model": "'"$MODEL_ID"'",
     "messages": [
       {
         "role": "user",
@@ -128,7 +130,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model=os.environ.get("MODELSCOPE_MODEL", "Qwen-Ambassador/Qwen3.7-Max"),
+    model="Qwen-Ambassador/Qwen3.7-Max",
     messages=[
         {
             "role": "user",
@@ -146,6 +148,27 @@ Streaming chunks from these examples may expose both `delta.reasoning_content`
 and `delta.content`. Treat reasoning text as provider diagnostics only. It must
 not become executable authority, primitive arguments, progress evidence, or
 public-facing transcript content unless a specific test explicitly needs it.
+
+## Tool Calling Smoke Findings
+
+Checked on 2026-06-13 with `Qwen-Ambassador/Qwen3.7-Max` and
+`Qwen-Ambassador/Qwen3.7-Plus`:
+
+- `tools` with `tool_choice: "auto"` returned OpenAI-compatible
+  `message.tool_calls` for both models.
+- multiple visible tools with `tool_choice: "auto"` selected the expected
+  function tool in a simple Minecraft action-selection smoke.
+- named tool choice returned usable `message.tool_calls` only when the request
+  included top-level `chat_template_kwargs: { "enable_thinking": false }`.
+- `tool_choice: "required"`, named tool choice without `chat_template_kwargs`,
+  and legacy `functions`/`function_call` shapes returned empty/zero-token
+  responses in this API-Inference path.
+
+Runtime implication: the `modelscope-api` social-cycle adapter uses Chat
+Completions `tools`, `tool_choice: "auto"`, `parallel_tool_calls: false`, and
+top-level `chat_template_kwargs.enable_thinking=false`. The Actor Turn prompt
+must still require exactly one visible function tool, and the runtime
+parser/validator remains the authority for accepted tool calls.
 
 ## Multimodal Smoke
 
@@ -185,7 +208,8 @@ print(response.usage)
 
 ## Usage And Rate Limits
 
-Official ModelScope API-Inference limits checked on 2026-06-07:
+Official ModelScope API-Inference limits checked on 2026-06-07 and
+re-checked on 2026-06-13:
 
 - API-Inference is a free evaluation interface, not a high-concurrency or SLA
   production service.
@@ -204,6 +228,120 @@ The official docs do not provide a confirmed reset timezone in the source
 checked here. Do not assume Korea midnight or UTC midnight for ModelScope.
 Record response headers and the exact time of `429` failures, then set local
 guardrails conservatively.
+
+Qwen Ambassador monthly quota recorded on 2026-06-14 from the user's supplied
+program rule:
+
+- `Qwen-Ambassador/Qwen3.7-Max`: 2500 API calls/month.
+- `Qwen-Ambassador/Qwen3.7-Plus`: 10000 API calls/month.
+- Usage resets and refreshes at the end of each calendar month.
+- The quota unit is API calls, not input/output tokens.
+- Available model ids may move to the latest flagship Qwen release, such as a
+  future Qwen 3.8. Update the repo policy matrix and local budget file before
+  running a new flagship id.
+
+Source:
+
+```text
+https://modelscope.cn/docs/model-service/API-Inference/limits
+user-provided Qwen Ambassador monthly quota note, recorded 2026-06-14
+```
+
+## Local Monthly Guard
+
+ModelScope's public API-Inference limit page describes daily request quotas and
+dynamic per-model daily quotas. The Qwen Ambassador quota used by this repo is
+the user-provided monthly API-call allowance above.
+
+Operational rule:
+
+- Treat the Qwen Ambassador monthly allowance as a provider/model policy:
+  `Qwen-Ambassador/Qwen3.7-Max` is capped at 2500 API calls/month and
+  `Qwen-Ambassador/Qwen3.7-Plus` is capped at 10000 API calls/month.
+- Track Qwen usage through the repo-local provider ledger:
+  `build/provider-usage/provider-usage-ledger.jsonl`.
+- Enforce the built-in policy matrix in
+  `probe/src/provider/providerQuotaPolicies.ts` on every live request.
+- Use the ignored budget file `build/provider-usage/free-tier-budgets.json` only
+  for stricter local brakes, emergency stops, or usage already consumed outside
+  this repo's ledger.
+- Use `request_limit_per_month` for this cap. Do not model this Qwen allowance
+  as a token budget.
+- Use `total_token_limit_per_month` only if the operator has a concrete token
+  budget to enforce.
+- Use `already_used_this_month` only for usage that happened outside this
+  repo's ledger. Normal repo runs should be counted from the ledger itself.
+
+The current Qwen policy entries are:
+
+```json
+[
+  {
+    "provider_id": "modelscope-api",
+    "model": "Qwen-Ambassador/Qwen3.7-Max",
+    "quota_metric": "api_calls",
+    "reset_window": "calendar_month_utc",
+    "request_limit_per_month": 2500,
+    "mode": "enforce"
+  },
+  {
+    "provider_id": "modelscope-api",
+    "model": "Qwen-Ambassador/Qwen3.7-Plus",
+    "quota_metric": "api_calls",
+    "reset_window": "calendar_month_utc",
+    "request_limit_per_month": 10000,
+    "mode": "enforce"
+  }
+]
+```
+
+If a provider dashboard, private account page, or Qwen Ambassador program update
+shows a different monthly allowance, update both the policy matrix and this
+document before running a new Qwen benchmark batch.
+
+## Reasoning Configuration
+
+OpenAI and Gemini expose explicit runtime reasoning controls in this repo's
+provider adapters. ModelScope Qwen access is different in the current
+OpenAI-compatible API-Inference path:
+
+- the working Qwen tool-call shape uses top-level
+  `chat_template_kwargs.enable_thinking=false`;
+- named tool choice without that setting returned empty/zero-token responses in
+  the 2026-06-13 smoke;
+- no OpenAI-style `reasoning.effort = "medium"` setting has been confirmed for
+  this ModelScope endpoint.
+
+Official Qwen documentation checked on 2026-06-13 says Qwen3 supports
+thinking/non-thinking modes, and OpenAI-compatible vLLM examples disable
+thinking with:
+
+```json
+{
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  }
+}
+```
+
+The same docs state that thinking budget is currently implemented by Alibaba
+Cloud Model Studio API, while open-source frameworks need custom generation
+logic for a budget-like effect. This is not equivalent to OpenAI
+`reasoning.effort`.
+
+Sources:
+
+```text
+https://qwen.readthedocs.io/en/latest/framework/function_call.html
+https://qwen.readthedocs.io/en/latest/getting_started/quickstart.html#thinking-budget
+https://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes
+https://qwen.readthedocs.io/en/latest/inference/transformers.html#thinking-non-thinking-mode
+```
+
+Benchmark rule: do not pretend Qwen has the same reasoning-effort knob as
+OpenAI. For Actor Turn tool-call runs, record the condition as
+`qwen-no-think` and keep Qwen thinking disabled unless a separate smoke proves
+a supported ModelScope API-Inference request field and records the result here.
 
 ## Header-Based Quota Check
 
@@ -239,10 +377,9 @@ Do not paste raw authorization headers or tokens into committed artifacts.
 
 ## Local Guardrail
 
-The repo's provider usage tracker is provider-id agnostic, but the current
-social-cycle provider union does not include ModelScope yet. When a
-`modelscope-api` adapter is added, use the same ledger/guard shape already used
-for Gemini/OpenAI:
+The repo's provider usage tracker is provider-id agnostic, and the
+`modelscope-api` social-cycle adapter uses the same ledger/guard shape already
+used for Gemini/OpenAI:
 
 ```text
 build/provider-usage/provider-usage-ledger.jsonl
@@ -258,26 +395,26 @@ Conservative local budget example:
     {
       "provider_id": "modelscope-api",
       "model": "Qwen-Ambassador/Qwen3.7-Max",
-      "request_limit_per_day": 20,
-      "already_used": { "requests": 0 },
+      "request_limit_per_month": 2500,
+      "already_used_this_month": { "requests": 0 },
       "mode": "enforce",
-      "source": "operator cap until ModelScope response headers confirm active remaining quota"
+      "source": "Qwen Ambassador Max monthly API-call quota"
     },
     {
       "provider_id": "modelscope-api",
       "model": "Qwen-Ambassador/Qwen3.7-Plus",
-      "request_limit_per_day": 10,
-      "already_used": { "requests": 0 },
+      "request_limit_per_month": 10000,
+      "already_used_this_month": { "requests": 0 },
       "mode": "enforce",
-      "source": "operator cap until ModelScope response headers confirm active remaining quota"
+      "source": "Qwen Ambassador Plus monthly API-call quota"
     }
   ]
 }
 ```
 
-After a successful header smoke, update `already_used` or the local limit based
-on observed remaining quota. The local guard is an operator safety brake, not an
-official quota guarantee.
+After a successful header smoke, preserve daily header evidence as a secondary
+rate-limit signal. The monthly Qwen guard remains API-call based and is checked
+against the local ledger before every request.
 
 ## External API Provider
 
@@ -295,11 +432,12 @@ API-Inference pool.
 
 ## Runtime Integration Notes
 
-If this repo later adds a ModelScope social-cycle provider:
+The ModelScope social-cycle provider should keep these runtime boundaries:
 
 - use provider id `modelscope-api`;
-- read `MODELSCOPE_API_KEY`, `MODELSCOPE_BASE_URL`, and requested model from
-  repo-local `.env` or CLI args;
+- read `MODELSCOPE_API_KEY` and `MODELSCOPE_BASE_URL` from repo-local `.env`;
+- require the requested model id as an explicit runtime input, such as
+  `--model Qwen-Ambassador/Qwen3.7-Max`;
 - append provider usage records before/after every provider request;
 - store raw usage from the OpenAI-compatible response when available;
 - store rate-limit headers as provider output metadata;

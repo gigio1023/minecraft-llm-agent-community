@@ -482,7 +482,8 @@ Coordinator-owned shared files:
 - `probe/src/runtime/socialCycleRunner.ts`;
 - `probe/src/runtime/socialCycleExecution.ts`;
 - `probe/src/provider/socialGoalMindProvider.ts`;
-- `probe/src/provider/socialCycleJudgmentProvider.ts`;
+- `probe/src/provider/socialActorTurnProvider.ts`;
+- `probe/src/provider/socialDeliberationProvider.ts`;
 - Docusaurus architecture/spec docs.
 
 Workers should not edit coordinator-owned files unless explicitly assigned.

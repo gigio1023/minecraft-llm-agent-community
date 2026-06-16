@@ -6,8 +6,7 @@
  * instead of laundering old prose into current-state claims.
  */
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
-import type { LegacyPlannerAction, ActorCycleGoal, StrategicGoal } from "../runtime/goals/types.js";
-import { buildActionCardProjection } from "../runtime/goals/actorEpisode/index.js";
+import type { StrategicGoal } from "../runtime/goals/types.js";
 import type { JsonValue } from "./inputSnapshot.js";
 
 const GOAL_MIND_STRATEGIC_GOAL_LIMIT = 6;
@@ -275,86 +274,6 @@ function buildActionSurfaceSummary(
   };
 }
 
-function buildActionSelectionModes(context: SocialCycleContextPacket) {
-  const canRunGeneratedProgram = context.action_surface.direct_primitives.some(
-    (primitive) => primitive.primitive_id === "run_mineflayer_program"
-  );
-  return {
-    schema: "action-selection-modes/v1",
-    modes: [
-      {
-        kind: "use_primitive",
-        origin_authority: "select_existing_runtime_affordance",
-        parameters_field: "parameters"
-      },
-      {
-        kind: "use_action_skill",
-        origin_authority: "select_existing_actor_owned_action_skill",
-        parameters_field: "parameters"
-      },
-      {
-        kind: "author_and_trial_action_skill",
-        enabled: canRunGeneratedProgram,
-        origin_authority: "create_new_actor_owned_candidate_only_here",
-        parameters_field: "parameters",
-        candidate_contract: {
-          schema: "generated-action-skill-candidate/v1",
-          source_language: "typescript",
-          helper_api_version: "mineflayer-action-skill-helper/v1",
-          source_signature: "export async function run(ctx, params)",
-          required_candidate_fields: [
-            "proposed_skill_id",
-            "purpose",
-            "input_schema",
-            "source",
-            "helper_allowlist",
-            "timeout_ms",
-            "verifier",
-            "promotion_policy",
-            "known_failure_modes"
-          ],
-          lifecycle:
-            "passed trial writes an active actor-owned action skill; failed trial remains candidate evidence"
-        }
-      }
-    ],
-    rules: {
-      action_selection_is_only_candidate_origin: true,
-      parameters_are_executable_authority: true,
-      prose_is_not_executable_authority: true,
-      generated_source_requires_helper_evidence: true
-    }
-  };
-}
-
-function buildActorTurnContract() {
-  return {
-    schema: "actor-turn-contract/v1",
-    target_output_schema: "actor-turn-execution-draft/v1",
-    choices: [
-      {
-        choice: "use_existing_action",
-        provider_selects: "action_card_id plus schema-valid parameters",
-        provider_must_not_select: ["primitive_id", "action_skill_id"],
-        runtime_resolves_to: "primitive or actor-owned action skill"
-      },
-      {
-        choice: "author_mineflayer_action",
-        provider_selects:
-          "a direct function tool with detailed rationale, existing-tool comparison, desired Minecraft behavior, success evidence, and failure handling; no source or context summary",
-        runtime_resolves_to:
-          "internal full-context Mineflayer codegen receives ActorTurnInput, raw outer tool call, parsed args, and injected SKILL markdown"
-      }
-    ],
-    rules: {
-      action_cards_hide_primitive_vs_action_skill_taxonomy: true,
-      parameters_are_executable_authority: true,
-      prose_is_not_executable_authority: true,
-      runtime_verifies_success: true
-    }
-  };
-}
-
 export function buildGoalMindProviderInput(context: SocialCycleContextPacket): JsonValue {
   const strategicGoals = selectStrategicGoalsForGoalMind(context.strategic_goals);
   return {
@@ -384,93 +303,5 @@ export function buildGoalMindProviderInput(context: SocialCycleContextPacket): J
     settlement_state: context.settlement_state,
     limits: context.limits,
     rules: context.rules
-  } as JsonValue;
-}
-
-export function buildActionPlannerProviderInput(input: {
-  context: SocialCycleContextPacket;
-  turnId: string;
-  actionIndex?: number;
-  cycleGoal: ActorCycleGoal;
-  plannerCycleGoal: ActorCycleGoal;
-  directActionSkills: JsonValue;
-  runtimeAffordances: JsonValue;
-  recentActionAttempts?: JsonValue;
-}): JsonValue {
-  const actionCardProjection = buildActionCardProjection(input.context.action_surface);
-  return {
-    stage: "action_planner",
-    schema: "social-action-planner-input/v1",
-    turn_id: input.turnId,
-    action_index: input.actionIndex,
-    ActorSoul: input.context.ActorSoul,
-    ActorLifeGoal: input.context.ActorLifeGoal,
-    cycle_goal: input.plannerCycleGoal,
-    observation: input.context.observation,
-    minecraft_basic_guide: minecraftBasicGuide,
-    action_surface_summary: buildActionSurfaceSummary(input.context, {
-      includeDirectActionSkills: true
-    }),
-    actor_turn_contract: buildActorTurnContract(),
-    action_cards: actionCardProjection.action_cards as unknown as JsonValue,
-    action_selection_modes: buildActionSelectionModes(input.context),
-    direct_action_skills: input.directActionSkills,
-    candidate_action_skill_search: input.context.candidate_action_skill_search,
-    allowed_primitive_ids: input.plannerCycleGoal.allowed_primitive_ids,
-    cycle_goal_allowed_primitive_ids_as_advisory: input.cycleGoal.allowed_primitive_ids,
-    cycle_goal_allowed_action_skill_ids_as_advisory: input.cycleGoal.allowed_action_skill_ids,
-    runtime_affordances: input.runtimeAffordances,
-    world_events: input.context.world_events,
-    relationship_context: input.context.relationship_context,
-    memory_packet: input.context.memory_packet,
-    plan_bead_packet: input.context.plan_bead_packet ?? null,
-    settlement_state: input.context.settlement_state,
-    blocker_histogram: input.context.settlement_state.blocker_histogram,
-    runtime_retry_constraints: input.context.runtime_retry_constraints,
-    previous_cycle_judgments: input.context.previous_cycle_judgments,
-    recent_action_attempts: input.recentActionAttempts ?? []
-  } as JsonValue;
-}
-
-export function buildCycleJudgmentProviderInput(input: {
-  context: SocialCycleContextPacket;
-  turnId: string;
-  actionIndex?: number;
-  cycleGoal: ActorCycleGoal;
-  legacyPlannerAction: LegacyPlannerAction;
-  runtimeResult: JsonValue;
-  evidenceRefs: string[];
-  executedTools: string[];
-  toolStatuses?: Array<{ tool: string; status: string }>;
-  verifierStatus: string;
-  planBeadOperationGuidance: JsonValue;
-  actionSkillFeedbackGuidance: JsonValue;
-}): JsonValue {
-  return {
-    stage: "cycle_judgment",
-    schema: "social-cycle-judgment-input/v1",
-    turn_id: input.turnId,
-    action_index: input.actionIndex,
-    ActorSoul: input.context.ActorSoul,
-    ActorLifeGoal: input.context.ActorLifeGoal,
-    cycle_goal: input.cycleGoal,
-    legacy_planner_action: input.legacyPlannerAction,
-    runtime_result: input.runtimeResult,
-    evidence_refs: input.evidenceRefs,
-    executed_tools: input.executedTools,
-    tool_statuses: input.toolStatuses ?? [],
-    verifier_status: input.verifierStatus,
-    minecraft_basic_guide: minecraftBasicGuide,
-    world_events: input.context.world_events,
-    relationship_context: input.context.relationship_context,
-    memory_packet: input.context.memory_packet,
-    plan_bead_packet: input.context.plan_bead_packet ?? null,
-    plan_bead_operation_guidance: input.planBeadOperationGuidance,
-    action_skill_feedback_guidance: input.actionSkillFeedbackGuidance,
-    action_surface_summary: buildActionSurfaceSummary(input.context, {
-      includeDirectActionSkills: false
-    }),
-    previous_cycle_judgments: input.context.previous_cycle_judgments,
-    settlement_state: input.context.settlement_state
   } as JsonValue;
 }

@@ -12,6 +12,7 @@ import fs from "node:fs/promises";
 import { loadRepoDotEnv } from "./config/loadRepoDotEnv.js";
 import { runSocialCycle, type SocialCycleRunOptions } from "./runtime/socialCycleRunner.js";
 import type { SocialCycleProviderId, WorldEventKind } from "./runtime/goals/types.js";
+import { parseWorldScenarioId, type WorldScenarioId } from "./server/worldScenarios.js";
 
 function parseArgs(argv: string[]) {
   const options: {
@@ -26,14 +27,16 @@ function parseArgs(argv: string[]) {
     connectToWorld?: boolean;
     isolateWorkspace?: boolean;
     freshWorld?: boolean;
+    worldScenario?: WorldScenarioId;
+    benchmarkTask?: string;
     worldSeed?: string;
     levelType?: string;
     prepareSpawnAccess?: boolean;
     sharedStorageSocialSmoke?: boolean;
     geminiModelRotation?: string[];
-    actionHotPath?: SocialCycleRunOptions["actionHotPath"];
     visualEvidence?: boolean;
     visualEvidenceIntervalCycles?: number;
+    visualEvidenceCameraMode?: "first_person" | "third_person" | "both";
     visualEvidencePort?: number;
     visualEvidenceWidth?: number;
     visualEvidenceHeight?: number;
@@ -77,6 +80,12 @@ function parseArgs(argv: string[]) {
       options.isolateWorkspace = true;
     } else if (arg === "--fresh-world") {
       options.freshWorld = true;
+    } else if (arg === "--world-scenario" && next) {
+      options.worldScenario = parseWorldScenarioId(next);
+      index++;
+    } else if (arg === "--benchmark-task" && next) {
+      options.benchmarkTask = next;
+      index++;
     } else if (arg === "--world-seed" && next) {
       options.worldSeed = next;
       index++;
@@ -90,13 +99,13 @@ function parseArgs(argv: string[]) {
     } else if ((arg === "--gemini-model-rotation" || arg === "--models") && next) {
       options.geminiModelRotation = parseCsvList(next);
       index++;
-    } else if (arg === "--action-hot-path" && next) {
-      options.actionHotPath = normalizeActionHotPath(next);
-      index++;
     } else if (arg === "--visual-evidence") {
       options.visualEvidence = true;
     } else if (arg === "--visual-evidence-interval" && next) {
       options.visualEvidenceIntervalCycles = Number(next);
+      index++;
+    } else if (arg === "--visual-evidence-camera" && next) {
+      options.visualEvidenceCameraMode = parseVisualEvidenceCameraMode(next);
       index++;
     } else if (arg === "--visual-evidence-port" && next) {
       options.visualEvidencePort = Number(next);
@@ -113,6 +122,20 @@ function parseArgs(argv: string[]) {
   return options;
 }
 
+function parseVisualEvidenceCameraMode(value: string | undefined): "first_person" | "third_person" | "both" | undefined {
+  const normalized = value?.trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "first_person" || normalized === "first") {
+    return "first_person";
+  }
+  if (normalized === "third_person" || normalized === "third") {
+    return "third_person";
+  }
+  if (normalized === "both" || normalized === "dual") {
+    return "both";
+  }
+  return undefined;
+}
+
 function parseCsvList(value: string | undefined) {
   return (value ?? "")
     .split(",")
@@ -121,20 +144,15 @@ function parseCsvList(value: string | undefined) {
 }
 
 function normalizeSocialCycleProvider(value: string | undefined): SocialCycleProviderId | undefined {
-  if (value === "openai-api" || value === "gemini-api" || value === "deterministic-social") {
+  if (
+    value === "openai-api" ||
+    value === "gemini-api" ||
+    value === "modelscope-api" ||
+    value === "deterministic-social"
+  ) {
     return value;
   }
   return undefined;
-}
-
-function normalizeActionHotPath(value: string | undefined): SocialCycleRunOptions["actionHotPath"] | undefined {
-  if (!value) {
-    return undefined;
-  }
-  if (value === "legacy" || value === "actor_turn") {
-    return value;
-  }
-  throw new Error("--action-hot-path must be legacy or actor_turn");
 }
 
 function envEnabled(value: string | undefined) {
@@ -149,16 +167,23 @@ function optionalPositiveInteger(value: number | string | undefined) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function defaultModelForProvider(providerId: SocialCycleProviderId) {
-  if (providerId === "gemini-api") {
-    return process.env.GEMINI_MODEL ?? "gemma-4-31b-it";
-  }
-  if (providerId === "openai-api") {
-    const openAiModel = process.env.OPENAI_MODEL?.trim();
-    if (!openAiModel) {
-      throw new Error("--model or OPENAI_MODEL is required for --provider openai-api");
+function resolveModelForProvider(input: {
+  providerId: SocialCycleProviderId;
+  model: string | undefined;
+}) {
+  const explicitModel = input.model?.trim();
+  if (
+    input.providerId === "openai-api" ||
+    input.providerId === "gemini-api" ||
+    input.providerId === "modelscope-api"
+  ) {
+    if (!explicitModel) {
+      throw new Error(
+        `--model is required for --provider ${input.providerId}. ` +
+          "Do not rely on OPENAI_MODEL, GEMINI_MODEL, or SOCIAL_CYCLE_MODEL for benchmark runs."
+      );
     }
-    return openAiModel;
+    return explicitModel;
   }
   return "deterministic-social";
 }
@@ -167,23 +192,19 @@ async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../..");
   loadRepoDotEnv(repoRoot, {
-    overrideKeys: ["OPENAI_API_KEY", "OPENAI_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL"]
+    overrideKeys: ["OPENAI_API_KEY", "GEMINI_API_KEY", "MODELSCOPE_API_KEY", "MODELSCOPE_BASE_URL"]
   });
 
   const parsed = parseArgs(process.argv.slice(2));
+  const worldScenario =
+    parsed.worldScenario ?? parseWorldScenarioId(process.env.SOCIAL_CYCLE_WORLD_SCENARIO);
   const actorId = parsed.actor ?? "npc_b";
   const providerId =
     parsed.provider ??
     normalizeSocialCycleProvider(process.env.SOCIAL_CYCLE_PROVIDER) ??
     "deterministic-social";
-  const model = parsed.model ?? process.env.SOCIAL_CYCLE_MODEL ?? defaultModelForProvider(providerId);
-  const geminiModelRotation =
-    parsed.geminiModelRotation ??
-    parseCsvList(process.env.SOCIAL_CYCLE_GEMINI_MODEL_ROTATION || process.env.GEMINI_MODEL_ROTATION);
-  const actionHotPath =
-    parsed.actionHotPath ??
-    normalizeActionHotPath(process.env.SOCIAL_CYCLE_ACTION_HOT_PATH) ??
-    "actor_turn";
+  const model = resolveModelForProvider({ providerId, model: parsed.model });
+  const geminiModelRotation = parsed.geminiModelRotation;
   const cycles = parsed.cycles ?? 2;
   const maxActionsPerCycle = parsed.maxActionsPerCycle ?? 3;
   const visualEvidenceEnabled =
@@ -205,18 +226,22 @@ async function main() {
     connectToWorld: parsed.connectToWorld,
     isolateWorkspace: parsed.isolateWorkspace,
     freshWorld: parsed.freshWorld,
+    worldScenario,
+    benchmarkTask: parsed.benchmarkTask,
     worldSeed: parsed.worldSeed,
     levelType: parsed.levelType,
     prepareSpawnAccess: parsed.prepareSpawnAccess,
     sharedStorageSocialSmoke: parsed.sharedStorageSocialSmoke,
     geminiModelRotation,
-    actionHotPath,
     visualEvidence: visualEvidenceEnabled
       ? {
           enabled: true,
           intervalCycles: optionalPositiveInteger(
             parsed.visualEvidenceIntervalCycles ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_INTERVAL
           ),
+          cameraMode:
+            parsed.visualEvidenceCameraMode ??
+            parseVisualEvidenceCameraMode(process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_CAMERA),
           port: optionalPositiveInteger(
             parsed.visualEvidencePort ?? process.env.SOCIAL_CYCLE_VISUAL_EVIDENCE_PORT
           ),

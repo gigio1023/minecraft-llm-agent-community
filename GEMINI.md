@@ -13,17 +13,21 @@ user has approved an operating-rule change.
 4. `project-docs/Documentation-Map.md`
 5. `project-docs/Agent-Search-Index.md`
 6. `project-docs/Terminology.md`
-7. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-8. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-9. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-10. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-11. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-12. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-13. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-14. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-15. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-16. `project-docs/Setup/Provider-Setup.md`
-17. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+7. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+8. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+9. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+10. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+11. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+12. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+13. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+14. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+15. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+16. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+17. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+18. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+19. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+20. `project-docs/Setup/Provider-Setup.md`
+21. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
@@ -48,14 +52,23 @@ timeouts, verifier/evidence, and artifacts.
 `parameter_candidates`, `top_eligible_action_cards`,
 `recommended_next_action_candidates`, generated chat text, coordinates, recipe
 decisions, or other pre-selected action payloads to it.
+Do not add provider-facing `deposit_candidates`, `open_social_requests`,
+`obligation_summaries`, `nearby_block_hints`, or `known_position_summaries`.
+Use bounded typed facts in `current_state` plus source cards/refs in
+`source_evidence_bundle` so the LLM sees evidence rather than hidden
+preselection.
 
 Do not hide Action Cards or tools through hardcoded Minecraft heuristics such as
 item-family, station-family, construction-readiness, survival-priority, or
 shelter-first filters. Tool visibility and rejection must be represented with
 typed readiness/eligibility contracts, structured state, schemas, gates, retry
 constraints, or evidence. The runtime must not become a hidden Minecraft
-planner. No compatibility or legacy compromise is required when removing prose
+planner. No compatibility compromise is required when removing prose
 parsing or hidden domain-planner behavior.
+When changing an active runtime/provider contract, update the producer, schema,
+tests, prompts, and docs together. Do not keep old aliases, source names, or
+shim fields inside the new contract. Normalize old-shaped input at the boundary
+into current concept names, or remove the old path outright.
 
 PlanBeads are structured actor-owned work state for concerns an LLM actor would
 otherwise forget or blur in free-form prose. They should make the NPC more
@@ -79,7 +92,7 @@ from the action-selection stage. In Actor Turn mode, that means
 `author_mineflayer_action`, which starts full-context generated Mineflayer
 authoring and trial. The outer tool call carries detailed rationale and desired
 behavior, not TypeScript source and not a lossy context summary. Background
-reviewers, PlanBeads, async sidecars, and legacy generated-code importers may
+reviewers, PlanBeads, async sidecars, and archived generated-source importers may
 review, patch, re-trial, reject, promote, retire, or supersede an existing
 candidate, but they must not originate a new NPC action skill candidate.
 
@@ -90,6 +103,23 @@ code-generation agent skill markdown. The generated candidate must include
 schema-bound parameters, generated TypeScript source, helper API version,
 timeout, verifier, failure modes, promotion policy, helper-event evidence, and
 post-observation. Prose never supplies missing executable parameters.
+
+## Commenting Expectations
+
+This repo needs comments where code carries architecture authority, not comments
+that restate TypeScript. Provider-facing Actor Turn code must explain whether a
+field is prompt context, strict tool-call input, runtime executable authority, or
+review-only evidence.
+
+For Action Card function schemas, document that primitive/action-skill parameter
+schemas are tool-calling contracts. They require the LLM to supply explicit
+logical parameters, but they must not pick item names, coordinates, strategy, or
+eligibility through hidden Minecraft heuristics.
+
+For `author_mineflayer_action`, document the two-call boundary: the outer Actor
+Turn function call is selection plus detailed rationale, while the internal
+Mineflayer codegen request receives the full original `ActorTurnInput`, raw outer
+tool call, parsed authoring args, and code-generation agent skill markdown.
 
 ## Change Discipline
 

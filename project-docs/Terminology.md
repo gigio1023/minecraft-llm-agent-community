@@ -24,9 +24,9 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
 5. Use **ActorSoul**, **LifeGoal**, **WorldEvent**, **CycleGoal**,
    **CycleJudgment**, **Active Episode**, **Actor Turn**, **Action Card**,
    **runtime action**, and **Evidence Trace** only for schema-backed runtime
-   records. Use **ActionIntent** only for legacy or migration artifacts.
+   records. Use **ActionIntent** only for archived or migration artifacts.
 6. If existing code, schemas, paths, or historical artifacts contain older
-   vocabulary, treat that wording as a legacy identifier. Do not copy it into
+   vocabulary, treat that wording as a archived identifier. Do not copy it into
    new prose unless you also name the canonical term.
 
 ## Platform-Sensitive Work
@@ -118,7 +118,7 @@ A **generated action skill bundle** is a generated code artifact. In this repo,
 generated bundles must be treated as trial or candidate material unless they are
 explicitly promoted through runtime-owned gates.
 
-Anything still emitted under `build/generated-skills` is legacy exploratory
+Anything still emitted under `build/generated-skills` is archived exploratory
 output, not active actor-owned action skill memory.
 
 ## Runtime Primitive
@@ -236,17 +236,17 @@ Preferred terms:
   `actor-turn-input/v1` packet;
 - **Deliberation provider** for the target branch-only component that reframes
   or updates Active Episode state and proposes guarded PlanBead operations;
-- **cycle goal provider** for the legacy/migration component that selects
-  PlanBead context and proposes CycleGoal records;
-- **action planner provider** for the legacy/migration component that proposes
-  ActionIntent or `LegacyPlannerAction` records;
+- **cycle goal provider** for the branch or initialization component that
+  proposes CycleGoal records when Active Episode state needs reframing;
+- **Action Card tool selection** for the ordinary Actor Turn component that
+  chooses one visible function tool or `author_mineflayer_action`;
 - **cycle judgment provider** for the component that summarizes evidence into a
   CycleJudgment.
 
-Legacy identifiers such as `goal_mind`, `GoalMind`, and
-`socialGoalMindProvider` may appear in existing schemas, file names, and
-compatibility code. New prose should say **cycle goal provider** and mention the
-legacy identifier only when needed for migration or file lookup.
+Archived identifiers such as `goal_mind`, `GoalMind`, and
+`socialGoalMindProvider` may appear in existing file names or historical
+artifacts. New prose should say **cycle goal provider** and mention the archived
+identifier only when needed for file lookup.
 
 ## Transcript
 
@@ -307,7 +307,7 @@ Do not use **persona** as the primary active architecture term. Persona is
 allowed only for:
 
 - external paper names or claims;
-- legacy mutual-dialogue files and tests that already use `persona`;
+- archived mutual-dialogue files and tests that already use `persona`;
 - explicit warnings such as "persona text alone is not social simulation".
 
 ## ActorSoul
@@ -334,7 +334,7 @@ can influence CycleGoal selection, but it is not the actor's LifeGoal.
 A **StrategicGoal** is a medium-horizon interpretation of ActorSoul, LifeGoal,
 memory, world state, and social context.
 
-`StrategicGoal` is retained as a legacy-adjacent compatibility term. New
+`StrategicGoal` is retained as a archived-adjacent compatibility term. New
 architecture work should not add new persistent StrategicGoal stores when the
 state being modeled is durable multi-cycle work; use PlanBeads and PlanBead
 dependencies instead.
@@ -364,7 +364,7 @@ not a single PlanBead, is the actor's durable multi-cycle work plan.
 Ready PlanBeads are open PlanBeads with no open blocking dependencies. The ready
 front is context for CycleGoal selection, not a script the actor must follow.
 
-`StrategicGoal` is the legacy-adjacent medium-horizon term. New architecture
+`StrategicGoal` is the archived-adjacent medium-horizon term. New architecture
 work should treat PlanBeads plus PlanBeadGraph as the checkpointed successor for
 living multi-cycle work state, while keeping compatibility with existing
 StrategicGoal records as projections or migration inputs rather than a second
@@ -449,19 +449,15 @@ close PlanBeads without guarded operation evidence.
 A **CycleGoal** is the bounded current-cycle objective. It must be specific
 enough for action selection and verification.
 
-## ActionIntent
+## Archived ActionIntent Artifacts
 
-An **ActionIntent** is the legacy/migration term for one proposed action for the
-current CycleGoal. It can target a runtime primitive or an owned action skill,
-subject to runtime gates.
+`ActionIntent` is not an active runtime concept. Current social-cycle code uses
+**Action Card**, **Actor Turn tool selection**, and **runtime action**.
 
-Active Actor Turn work should prefer **Action Card**, **Actor Turn tool
-selection**, and **runtime action** unless it is explicitly reading or writing a
-legacy artifact.
-
-Physical legacy ActionIntent args are an executable contract. A rationale field
-such as `why_this_action` can explain the intent, but it cannot supply missing
-coordinates, item names, counts, container ids, anchors, or block selectors.
+If a human is reading old artifacts named `ActionIntent`, treat their structured
+parameters as historical evidence only. Do not copy the identifier, `args`
+shape, or planner summary boundary into new provider inputs, schemas, tests, or
+docs.
 
 ## Runtime Retry Constraint
 
@@ -510,12 +506,45 @@ personality floats when an enum or typed relationship event is available.
 by chest access and ledger artifacts. Shared storage is social state because it
 changes what other actors can observe and use.
 
+Shared storage is not the default definition of society or economy. In active
+social-economy docs, classify it more precisely as a claimed cache, weak
+commons, public affordance, or implementation-specific container.
+
+## Material Economy Terms
+
+**Personal possession** is material controlled by one actor's body: carried
+inventory, equipped tools, armor, food, and picked-up items. It is the strongest
+default ownership signal in vanilla Minecraft.
+
+**Material claim** is an evidence-backed assertion that an actor, role, or group
+controls access to an item stack, container, station, crop, worksite, route, or
+cache. Claims may be respected, disputed, transferred, borrowed against, or
+violated.
+
+**Public affordance** is a placed or modified world feature that changes what
+other actors can do, such as a crafting table, furnace, path, bridge, light,
+hazard marker, farm row, worksite, or shelter opening.
+
+**Weak commons** is deliberately available or low-cost shared material. It is a
+lightweight social category, not the center of the society lifecycle. Use it
+for surplus or public-use material only when evidence makes availability clear.
+
+**Unclaimed world resource** is natural terrain, blocks, animals, crops, or loot
+that has not yet become a personal possession or material claim.
+
+**Obligation-backed exchange** is a social exchange where request, offer,
+promise, refusal, handoff, loan, debt, repair, or credit persists beyond one
+physical action and can affect later decisions.
+
+Avoid bare **shared resource** in new active guidance. Prefer the more specific
+terms above unless describing a legacy artifact or a deliberately weak commons.
+
 ## Settlement State
 
 **Settlement state** is a compatibility term for structured world/social
-diagnostic context such as shared storage contents, known world positions,
-current blocker history, pending obligations, and evidence-linked status from
-prior runtime work.
+diagnostic context such as material claims, public affordances, weak commons,
+known world positions, current blocker history, pending obligations, and
+evidence-linked status from prior runtime work.
 
 Settlement state is not a provider-facing strategy taxonomy and not a hidden
 single-domain checklist. If a field mentions a concrete Minecraft activity, it

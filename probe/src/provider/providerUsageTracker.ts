@@ -2,6 +2,7 @@ import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type { JsonValue } from "./inputSnapshot.js";
+import { defaultProviderQuotaPolicies } from "./providerQuotaPolicies.js";
 
 /**
  * Runtime-owned provider usage ledger and free-tier guard.
@@ -24,17 +25,43 @@ export type ProviderUsageBudget = {
   provider_id: string;
   model?: string;
   model_pattern?: string;
+  quota_policy_id?: string;
+  quota_metric?: "api_calls" | "tokens" | "mixed";
+  quota_authority?:
+    | "official_provider_doc"
+    | "operator_provided_doc"
+    | "operator_observed"
+    | "local_operator_override";
+  reset_window?: "utc_day" | "pacific_day" | "calendar_month_utc";
   request_limit_per_minute?: number;
   request_limit_per_day?: number;
+  request_limit_per_month?: number;
   input_token_limit_per_minute?: number;
   input_token_limit_per_day?: number;
+  input_token_limit_per_month?: number;
   output_token_limit_per_minute?: number;
   output_token_limit_per_day?: number;
+  output_token_limit_per_month?: number;
   total_token_limit_per_minute?: number;
   total_token_limit_per_day?: number;
+  total_token_limit_per_month?: number;
   already_used?: Partial<ProviderUsageCounts>;
+  already_used_this_month?: Partial<ProviderUsageCounts>;
   mode?: "enforce" | "track";
   source?: string;
+};
+
+export type ProviderUsageQuotaCheck = {
+  budget: ProviderUsageBudget;
+  projected: {
+    minute: ProviderUsageCounts;
+    day: ProviderUsageCounts;
+    month: ProviderUsageCounts;
+  };
+  status: "allowed" | "blocked" | "tracked";
+  enforcement_mode: "enforce" | "track";
+  reason?: string;
+  limit_name?: string;
 };
 
 export type ProviderUsageBudgetDecision = {
@@ -48,7 +75,9 @@ export type ProviderUsageBudgetDecision = {
   projected?: {
     minute: ProviderUsageCounts;
     day: ProviderUsageCounts;
+    month: ProviderUsageCounts;
   };
+  quota_checks?: ProviderUsageQuotaCheck[];
 };
 
 export type ProviderUsageRecord = {
@@ -113,26 +142,6 @@ const zeroCounts: ProviderUsageCounts = {
   total_tokens: 0
 };
 
-const defaultGeminiBudgets: ProviderUsageBudget[] = [
-  {
-    provider_id: "gemini-api",
-    model: "gemma-4-31b-it",
-    request_limit_per_minute: 15,
-    request_limit_per_day: 1500,
-    mode: "enforce",
-    source:
-      "operator_free_tier_reference; verify active project limits in Google AI Studio before long runs"
-  },
-  {
-    provider_id: "gemini-api",
-    model: "gemini-2.5-flash-lite",
-    request_limit_per_day: 20,
-    mode: "enforce",
-    source:
-      "observed Gemini API free-tier error on 2026-06-02: GenerateRequestsPerDayPerProjectPerModel-FreeTier limit 20 for gemini-2.5-flash-lite"
-  }
-];
-
 function cloneCounts(counts: ProviderUsageCounts = zeroCounts): ProviderUsageCounts {
   return {
     requests: counts.requests,
@@ -174,6 +183,11 @@ function toCounts(input: Partial<ProviderUsageCounts>): ProviderUsageCounts {
 
 function envFlag(name: string) {
   return /^(1|true|yes|on)$/i.test(process.env[name]?.trim() ?? "");
+}
+
+function providerUsageEnforcementMode(defaultMode?: ProviderUsageBudget["mode"]) {
+  const mode = process.env.PROVIDER_USAGE_ENFORCEMENT?.trim().toLowerCase() ?? defaultMode;
+  return mode === "track" ? "track" : "enforce";
 }
 
 function providerUsageDir(repoRoot?: string) {
@@ -227,7 +241,7 @@ function isBudget(value: unknown): value is ProviderUsageBudget {
 async function loadConfiguredBudgets(repoRoot?: string): Promise<ProviderUsageBudget[]> {
   const budgets: ProviderUsageBudget[] = [];
   if (!envFlag("PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS")) {
-    budgets.push(...defaultGeminiBudgets);
+    budgets.push(...defaultProviderQuotaPolicies());
   }
 
   const inline = process.env.PROVIDER_USAGE_BUDGETS_JSON?.trim();
@@ -254,21 +268,29 @@ function matchesBudget(budget: ProviderUsageBudget, providerId: string, model: s
     return true;
   }
   if (budget.model_pattern) {
-    return new RegExp(budget.model_pattern).test(model);
+    try {
+      return new RegExp(budget.model_pattern).test(model);
+    } catch {
+      return false;
+    }
   }
   return false;
 }
 
-function selectBudget(
+function selectBudgets(
   budgets: readonly ProviderUsageBudget[],
   providerId: string,
   model: string
-): ProviderUsageBudget | undefined {
-  return [...budgets].reverse().find((budget) => matchesBudget(budget, providerId, model));
+): ProviderUsageBudget[] {
+  return budgets.filter((budget) => matchesBudget(budget, providerId, model));
 }
 
 function utcDay(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function utcMonth(date: Date) {
+  return date.toISOString().slice(0, 7);
 }
 
 function pacificDay(date: Date) {
@@ -311,15 +333,33 @@ function recordDailyQuotaDay(record: ProviderUsageRecord) {
   return record.quota_day_utc ?? record.created_at.slice(0, 10) ?? record.pacific_day;
 }
 
+function recordMonthlyQuotaMonth(record: ProviderUsageRecord) {
+  return record.created_at.slice(0, 7);
+}
+
 function totalMatchingRecords(
   records: readonly ProviderUsageRecord[],
-  input: { providerId: string; model: string; quotaDay: string; utcMinute: string }
+  input: {
+    providerId: string;
+    model: string;
+    quotaDay: string;
+    quotaMonth: string;
+    utcMinute: string;
+    budget?: ProviderUsageBudget;
+  }
 ) {
   const minute = cloneCounts();
   const day = cloneCounts();
+  const month = cloneCounts();
   for (const record of records) {
-    if (record.provider_id !== input.providerId || record.model !== input.model) {
+    const matches = input.budget
+      ? matchesBudget(input.budget, record.provider_id, record.model)
+      : record.provider_id === input.providerId && record.model === input.model;
+    if (!matches) {
       continue;
+    }
+    if (recordMonthlyQuotaMonth(record) === input.quotaMonth) {
+      Object.assign(month, addCounts(month, record.usage));
     }
     if (recordDailyQuotaDay(record) === input.quotaDay) {
       Object.assign(day, addCounts(day, record.usage));
@@ -328,23 +368,34 @@ function totalMatchingRecords(
       Object.assign(minute, addCounts(minute, record.usage));
     }
   }
-  return { minute, day };
+  return { minute, day, month };
 }
 
 function exceeded(limit: number | undefined, value: number) {
   return typeof limit === "number" && limit >= 0 && value > limit;
 }
 
-function firstLimitFailure(budget: ProviderUsageBudget, projected: { minute: ProviderUsageCounts; day: ProviderUsageCounts }) {
+function firstLimitFailure(
+  budget: ProviderUsageBudget,
+  projected: {
+    minute: ProviderUsageCounts;
+    day: ProviderUsageCounts;
+    month: ProviderUsageCounts;
+  }
+) {
   const checks: Array<[string, number | undefined, number]> = [
     ["request_limit_per_minute", budget.request_limit_per_minute, projected.minute.requests],
     ["request_limit_per_day", budget.request_limit_per_day, projected.day.requests],
+    ["request_limit_per_month", budget.request_limit_per_month, projected.month.requests],
     ["input_token_limit_per_minute", budget.input_token_limit_per_minute, projected.minute.input_tokens],
     ["input_token_limit_per_day", budget.input_token_limit_per_day, projected.day.input_tokens],
+    ["input_token_limit_per_month", budget.input_token_limit_per_month, projected.month.input_tokens],
     ["output_token_limit_per_minute", budget.output_token_limit_per_minute, projected.minute.output_tokens],
     ["output_token_limit_per_day", budget.output_token_limit_per_day, projected.day.output_tokens],
+    ["output_token_limit_per_month", budget.output_token_limit_per_month, projected.month.output_tokens],
     ["total_token_limit_per_minute", budget.total_token_limit_per_minute, projected.minute.total_tokens],
-    ["total_token_limit_per_day", budget.total_token_limit_per_day, projected.day.total_tokens]
+    ["total_token_limit_per_day", budget.total_token_limit_per_day, projected.day.total_tokens],
+    ["total_token_limit_per_month", budget.total_token_limit_per_month, projected.month.total_tokens]
   ];
   return checks.find(([, limit, value]) => exceeded(limit, value));
 }
@@ -384,15 +435,25 @@ export async function guardProviderUsageRequest(input: {
   const now = input.now ?? new Date();
   const repoRoot = input.context?.repoRoot;
   const budgets = await loadConfiguredBudgets(repoRoot);
-  const budget = selectBudget(budgets, input.providerId, input.model);
-  if (!budget) {
-    return {
+  const matchingBudgets = selectBudgets(budgets, input.providerId, input.model);
+  if (matchingBudgets.length === 0) {
+    const decision: ProviderUsageBudgetDecision = {
       schema: "provider-usage-budget-decision/v1",
       status: "unbudgeted",
       provider_id: input.providerId,
       model: input.model,
       reason: "No provider usage budget matched this provider/model"
     };
+    if (providerUsageEnforcementMode() === "track" && envFlag("PROVIDER_USAGE_ALLOW_UNBUDGETED")) {
+      return decision;
+    }
+    throw new ProviderUsageBudgetError({
+      ...decision,
+      status: "blocked",
+      reason:
+        `${decision.reason}; refusing live provider request without a local budget. ` +
+        "Add an explicit provider/model budget before running paid or quota-limited calls."
+    });
   }
 
   const ledgerPath = resolveProviderUsageLedgerPath({
@@ -400,32 +461,75 @@ export async function guardProviderUsageRequest(input: {
     ledgerPath: input.context?.ledgerPath
   });
   const records = await readUsageRecords(ledgerPath);
-  const windows = totalMatchingRecords(records, {
-    providerId: input.providerId,
-    model: input.model,
-    quotaDay: dailyQuotaDay(input.providerId, now),
-    utcMinute: utcMinute(now)
-  });
-  const existingDay = addCounts(windows.day, budget.already_used ?? {});
-  const projected = {
-    minute: addCounts(windows.minute, input.estimatedUsage),
-    day: addCounts(existingDay, input.estimatedUsage)
-  };
-  const failure = firstLimitFailure(budget, projected);
-  const mode = process.env.PROVIDER_USAGE_ENFORCEMENT?.trim() || budget.mode || "enforce";
+  const quotaChecks: ProviderUsageQuotaCheck[] = [];
+  const enforcedFailures: Array<{
+    budget: ProviderUsageBudget;
+    projected: ProviderUsageQuotaCheck["projected"];
+    limitName: string;
+    mode: "enforce" | "track";
+  }> = [];
 
-  if (!failure || mode === "track" || mode === "off") {
+  for (const budget of matchingBudgets) {
+    const windows = totalMatchingRecords(records, {
+      providerId: input.providerId,
+      model: input.model,
+      quotaDay: dailyQuotaDay(input.providerId, now),
+      quotaMonth: utcMonth(now),
+      utcMinute: utcMinute(now),
+      budget
+    });
+    const existingDay = addCounts(windows.day, budget.already_used ?? {});
+    const existingMonth = addCounts(windows.month, budget.already_used_this_month ?? {});
+    const projected = {
+      minute: addCounts(windows.minute, input.estimatedUsage),
+      day: addCounts(existingDay, input.estimatedUsage),
+      month: addCounts(existingMonth, input.estimatedUsage)
+    };
+    const failure = firstLimitFailure(budget, projected);
+    const mode = providerUsageEnforcementMode(budget.mode);
+    const limitName = failure?.[0];
+
+    quotaChecks.push({
+      budget,
+      projected,
+      status: failure ? (mode === "track" ? "tracked" : "blocked") : "allowed",
+      enforcement_mode: mode,
+      ...(limitName ? { limit_name: limitName, reason: `Provider request would exceed ${limitName}` } : {})
+    });
+
+    if (limitName && mode !== "track") {
+      enforcedFailures.push({ budget, projected, limitName, mode });
+    }
+  }
+
+  const lastCheck = quotaChecks.at(-1);
+  if (enforcedFailures.length === 0 && lastCheck) {
     return {
       schema: "provider-usage-budget-decision/v1",
       status: "allowed",
       provider_id: input.providerId,
       model: input.model,
-      budget,
-      projected
+      budget: lastCheck.budget,
+      projected: lastCheck.projected,
+      quota_checks: quotaChecks
     };
   }
 
-  const [name] = failure;
+  const failure =
+    enforcedFailures.find((candidate) => !candidate.limitName.endsWith("_per_minute")) ??
+    enforcedFailures[0];
+  if (!failure) {
+    throw new ProviderUsageBudgetError({
+      schema: "provider-usage-budget-decision/v1",
+      status: "blocked",
+      provider_id: input.providerId,
+      model: input.model,
+      reason: "Provider usage budget failed without a matching quota check",
+      quota_checks: quotaChecks
+    });
+  }
+
+  const name = failure.limitName;
   const minuteLimited = name.endsWith("_per_minute");
   const delayMs = minuteLimited ? nextUtcMinuteDelayMs(now) : undefined;
   const maxDelayMs =
@@ -441,8 +545,9 @@ export async function guardProviderUsageRequest(input: {
       model: input.model,
       reason: `Delayed provider request to respect ${name}`,
       delay_ms: delayMs,
-      budget,
-      projected
+      budget: failure.budget,
+      projected: failure.projected,
+      quota_checks: quotaChecks
     };
   }
 
@@ -453,8 +558,9 @@ export async function guardProviderUsageRequest(input: {
     model: input.model,
     reason: `Provider request would exceed ${name}`,
     ...(delayMs !== undefined ? { delay_ms: delayMs } : {}),
-    budget,
-    projected
+    budget: failure.budget,
+    projected: failure.projected,
+    quota_checks: quotaChecks
   };
   throw new ProviderUsageBudgetError(decision);
 }
@@ -573,7 +679,6 @@ export async function summarizeProviderUsage(input: {
     totalsByKey.set(key, existing);
   }
 
-  const budgets = await loadConfiguredBudgets(input.repoRoot);
   const budget_status = await Promise.all(
     [...totalsByKey.values()].map((total) =>
       guardProviderUsageRequest({
@@ -603,6 +708,6 @@ export async function summarizeProviderUsage(input: {
     ledger_path: ledgerPath,
     records: records.length,
     totals: [...totalsByKey.values()],
-    budget_status: budgets.length > 0 ? budget_status : []
+    budget_status
   };
 }

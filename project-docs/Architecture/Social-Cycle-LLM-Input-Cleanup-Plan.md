@@ -6,7 +6,7 @@ sidebar_position: 42
 
 Search token: `SOCIAL_CYCLE_LLM_INPUT_CLEANUP`.
 
-Status: implemented legacy cleanup slice and migration input. This is not the
+Status: implemented archived cleanup slice and migration input. This is not the
 active hot-path provider contract. The active hot-path architecture is
 `Actor-Episode-And-Actor-Turn-Architecture.md` plus
 `Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`.
@@ -96,9 +96,9 @@ Must not receive:
 - unbounded strategic-goal history;
 - duplicate settlement checklist.
 
-### Legacy Action Planner
+### Archived Action Planner
 
-Purpose: choose one bounded legacy planner action during explicit migration or
+Purpose: choose one bounded archived planner action during explicit migration or
 historical report playback.
 
 Must receive:
@@ -126,7 +126,7 @@ Purpose: judge the executed action from runtime evidence.
 Must receive:
 
 - ActorSoul, ActorLifeGoal, CycleGoal, and the selected Actor Turn action or
-  legacy planner action when reading old reports;
+  archived planner action when reading old reports;
 - runtime result, evidence refs, executed tools, tool statuses, verifier status;
 - memory, relationship, PlanBead, and settlement-state context;
 - `minecraft_basic_guide` so blocker interpretation can distinguish missing
@@ -176,7 +176,7 @@ Must not receive:
 
 ## Handoff
 
-Do not add new active Actor Turn behavior to this legacy three-stage plan. Use
+Do not add new active Actor Turn behavior to this archived three-stage plan. Use
 the current Actor Turn documents for new work. Keep this page only as historical
 context for why provider packets were split by stage and why unbounded context,
 duplicate affordance catalogs, and domain-strategy scaffolding were removed.

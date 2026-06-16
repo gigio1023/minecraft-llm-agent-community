@@ -27,6 +27,16 @@ guidance.
 | Search Token | Meaning | Primary References |
 |--------------|---------|--------------------|
 | `SOUL_GROUNDED_SOCIAL_SIMULATION` | Minecraft is observation and evidence for Soul/LifeGoal-grounded social simulation, not a generic benchmark | `SPEC.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
+| `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational definition of society, organization, settlement, and village for this repo's Minecraft social simulation target | `Specification/Evidence-Grounded-Minecraft-Society.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md` |
+| `PROJECT_SID_2411_00114_REVIEW` | Primary overlap review for Project Sid's many-agent Minecraft civilization work and this repo's narrower evidence-grounded social microeconomy gap | `research-archive/Project-Sid-2411-00114-Review-2026-06-15.md`, `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md` |
+| `PROJECT_SID_HARNESS_ABSORPTION` | First-pass active plan for absorbing Project Sid as NPC harness robustness: action awareness, chat/action coherence, cross-actor causality, and continuity audit | `Architecture/Project-Sid-Harness-Absorption-Plan.md`, `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`, `probe/src/objectives/socialTrajectory/harnessAudit.ts` |
+| `RESEARCH_DIRECTION_REFERENCE_SYNTHESIS` | Active synthesis of Project Sid-adjacent and non-Sid references: grounded Minecraft dialogue, multi-agent Minecraft collaboration, LLM social intelligence, social simulation platforms, economic/mixed-motive benchmarks, and validation warnings | `Architecture/Research-Direction-Reference-Synthesis.md`, `research-archive/2026-06-16/reference-sweep-beyond-project-sid.md` |
+| `REFERENCE_SWEEP_BEYOND_PROJECT_SID_2026_06_16` | Dated literature sweep for research direction beyond Project Sid, including human-grounded Minecraft collaboration, MineCollab, SOTOPIA-style social evaluation, Concordia-style social simulation, and SimBench-style validation warnings | `research-archive/2026-06-16/reference-sweep-beyond-project-sid.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
+| `NITROGEN_2601_02427_ANALYSIS` | Dated analysis of NitroGen as a generalist visual game-action foundation model: useful as future low-level policy substrate and contrast class, not as the current Minecraft social benchmark target | `research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
+| `EXPANDED_RELATED_WORK_SWEEP_2026_06_16` | Expanded literature sweep for Minecraft social-trajectory research: MineExplorer, MCU, MineStudio, Plancraft, Odyssey, Echo, MineLand, ALEM, Craftax, Melting Pot, PARTNR, TEACh, GLEE, MultiAgentBench, and validation-boundary papers | `research-archive/2026-06-16/expanded-related-work-sweep.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
+| `MINESTUDIO_REFERENCE_CHECK_2026_06_16` | Dedicated CraftJarvis/MineStudio check: useful task manifests, callbacks, trajectory recording, visual-policy baselines, and VLM review criteria, but not a direct replacement for the TypeScript Mineflayer Actor Turn runtime | `research-archive/2026-06-16/minestudio-reference-check.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
+| `MINESTUDIO_IMPLEMENTATION_ANALYSIS_2026_06_16` | Parallel subagent implementation analysis of the cloned MineStudio repo: simulator, reset fairness, callbacks, benchmark assets, VPT/STEVE/GROOT/ROCKET models, data/training/inference, and local adaptation boundaries | `research-archive/2026-06-16/minestudio-implementation-analysis.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
+| `SOCIAL_WAM_RESEARCH_FRAME_2026_06_16` | Dated research frame for treating this repo as action-conditioned social transition modeling in Minecraft: WAM-like prediction of evidence-backed physical and social deltas, not dialogue plausibility or civilization spectacle | `research-archive/2026-06-16/social-wam-research-frame.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
 | `AUTONOMY_SUBSTRATE_NOT_DOMAIN_STRATEGY` | Improve context, action surface, gates, hooks, verification, artifacts, and memory without encoding one domain goal as architecture | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md` |
 | `REFERENCE_ADAPTATION_GUIDE` | External references are mechanisms to adapt, not product specs to copy | `Specification/Reference-Adaptation-Guide.md`, `AGENTS.md` |
 | `NO_VOYAGER_EVAL_LOOP` | Do not revive loose generated-code gameplay execution as the active path | `Architecture/Runtime-Loop-And-Verification.md`, `Architecture/Action-Skill-Verification.md` |
@@ -42,15 +52,18 @@ guidance.
 | `ACTION_SURFACE` | Provider-visible direct/deferred affordance packet for the current actor body | `Specification/Runtime-Evidence-And-Action-Skills.md`, `Architecture/Future-Works.md`, `probe/src/runtime/actionSurface.ts` |
 | `ACTOR_EPISODE_ACTOR_TURN` | Target replacement for the per-cycle goal/action/judgment hot path: Active Episode, Actor Turn, Action Cards, Evidence Trace, branch-only Deliberation | `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Terminology.md` |
 | `LOW_COST_SOCIAL_SIMULATION_CAMPAIGN` | Campaign-level spec, gates, social proof scenarios, and implementation sequence for proving cheap-model Actor Turn behavior | `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md` |
+| `GROUNDED_SOCIAL_TRAJECTORY_BENCHMARK` | Legacy provider-free smoke contract for evidence-backed social trajectories; useful for ledger/report sanity, not the main social-economy target | `Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`, `Experiments/2026-06-15/grounded-social-trajectory-smoke/README.md`, `probe/src/objectives/socialTrajectory/` |
+| `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK` | Active benchmark direction for personal possession, material claims, public affordances, weak commons, obligations, continuity, and cost-aware model comparison | `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`, `Specification/Evidence-Grounded-Minecraft-Society.md`, `Terminology.md` |
 | `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL` | Compact `/goal` companion for the current pivot: Actor Turn as hot path, PlanBeads as passive issue-like state, branch-only Deliberation | `Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`, `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
-| `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | New Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing legacy planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing compressed planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `CONTEXT_PROJECTION_SOURCE_EVIDENCE` | Actor Turn context rule: bounded facts may be compacted, but observation/action/social/work history must carry source evidence cards and refs beside summaries | `Architecture/Context-Projection-And-Source-Evidence.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `AGENTS.md` |
 | `ACTOR_MEMORY_OBSERVATION_ACTION_SPACE` | Memory IO, raw observation, and Mineflayer action-space expansion plan | `Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`, `project-docs/research-archive/hermes-memory-system/`, `probe/src/memory/actorMemory.ts`, `probe/src/runtime/actionSurface.ts` |
 | `ACTOR_PERSISTENT_STATE_PLAN_BEADS` | Restart-safe actor work graph: PlanBeads, dependency edges, and ready fronts under LifeGoal | `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Terminology.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
 | `PLANBEADS_IMPLEMENTATION_CAMPAIGN` | Long-running parallel implementation campaign contract for PlanBeads work | `Architecture/PlanBeads-Implementation-Campaign.md`, `Architecture/Actor-Persistent-State-And-PlanBeads.md`, `Architecture/Implementation-Workstreams.md` |
-| `SOCIAL_CYCLE_LLM_INPUT_CLEANUP` | Legacy three-stage input projection cleanup retained as migration context; do not use it as the active Actor Turn provider contract | `Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `probe/src/provider/socialCycleProviderInputs.ts`, `probe/test/socialCycleRunner.test.ts` |
+| `SOCIAL_CYCLE_LLM_INPUT_CLEANUP` | Input projection cleanup retained as supporting context; active Actor Turn provider input uses bounded `current_state` plus `source_evidence_bundle` | `Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `probe/src/provider/socialCycleProviderInputs.ts`, `probe/test/socialCycleRunner.test.ts` |
 | `ACTOR_EPISODE_IMPLEMENTATION_PLAN` | Detailed campaign plan and acceptance gates for making cheap-model Actor Turn behavior actionful, truthful, and socially visible | `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `.agents/skills/minecraft-agent-runtime-review/references/social-cycle-analysis-rubric.md` |
-| `RUNTIME_ACTION_CONTRACT` | Physical actions require structured executable parameters; prose is not executable authority | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/test/legacyPlannerActionContracts.test.ts` |
-| `ACTION_SELECTION_GATED_ACTION_SKILL_AUTHORING` | New action skill creation starts only from explicit Actor Turn `author_mineflayer_action` selection or explicit legacy planner migration, with schema-bound parameters, generated Mineflayer helper trials, and actor-workspace evidence | `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Bounded-Action-Skill-Creation.md`, `probe/src/provider/socialActorTurnProvider.ts`, `probe/src/runtime/goals/actorEpisode/resolver.ts`, `probe/src/skills/proposals/` |
+| `RUNTIME_ACTION_CONTRACT` | Physical actions require structured executable parameters; prose is not executable authority | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/test/socialCycleExecution.test.ts`, `probe/test/actorTurnProviderInput.test.ts` |
+| `ACTION_SELECTION_GATED_ACTION_SKILL_AUTHORING` | New action skill creation starts only from explicit Actor Turn `author_mineflayer_action` selection, with schema-bound parameters, generated Mineflayer helper trials, and actor-workspace evidence | `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Bounded-Action-Skill-Creation.md`, `probe/src/provider/socialActorTurnProvider.ts`, `probe/src/runtime/goals/actorEpisode/resolver.ts`, `probe/src/skills/proposals/` |
 | `MINECRAFT_BASIC_GUIDE` | Provider-visible compact Minecraft mechanics guide for prerequisite flows, station requirements, blocker recovery, and repeated-observe limits | `Architecture/Minecraft-Basic-Guide.md`, `Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`, `Knowledge/Minecraft-Encyclopedia/Index.md`, `probe/src/provider/socialCycleProviderInputs.ts` |
 | `RUNTIME_RETRY_CONSTRAINT` | Exact repeated target/args blockers become runtime gates before another Mineflayer call | `Terminology.md`, `Architecture/Future-Works.md`, `probe/src/runtime/retryConstraints.ts` |
 | `WORKSITE_SUPPORT_FUTURE_ITEM` | Future investigation item for making physical work locations explicit without adding a hidden shelter/building planner | `Architecture/Future-Works.md` |
@@ -66,8 +79,19 @@ guidance.
 | `CURRENT_HANDOFF_NEXT_WORK` | Landed work, verified commands, live evidence, and next improvement order | `Architecture/Current-Handoff-And-Next-Work.md`, `Architecture/Future-Works.md` |
 | `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT` | Dated architecture/implementation cross-check snapshot, superseded for Actor Turn hot-path authority by the current architecture review | `Architecture/Current-Architecture-And-Implementation-Audit.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
 | `OPENAI_GPT54MINI_NO_OUTPUT_CAP_RUN_2026_06_04` | Dated 60-cycle OpenAI `gpt-5.4-mini` run verifying provider output-cap removal and exposing stale Active Episode / empty PlanBeads behavior weakness | `Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `ROOFLESS_HUT_FLAT_SCENARIO_RUN_2026_06_08` | Dated 40-cycle OpenAI `gpt-5.4-mini` fixture run; later RCON-output review found setup manifests were not truthful enough to prove the worksite/resource fixture existed | `Architecture/Roofless-Hut-Flat-Scenario-Run-2026-06-08.md`, `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `Setup/World-Scenario-Testing.md`, `probe/src/server/worldScenarios.ts` |
+| `NATURAL_SAFE_SPAWN_WORLD_SCENARIO_RESEARCH_2026_06_10` | Dated research/handoff for replacing flat fixture assumptions with a natural safe-spawn scenario and fixing RCON-output setup truthfulness first | `Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`, `Architecture/Current-Handoff-And-Next-Work.md`, `Setup/World-Scenario-Testing.md`, `probe/src/server/worldScenarios.ts` |
+| `WORLD_SCENARIO_TRUTHFULNESS_NATURAL_SPAWN_PLAN` | Active implementation plan for RCON-output setup truthfulness, flat fixture revalidation, and `natural-safe-spawn-v1` spawn-validation artifacts | `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`, `Setup/World-Scenario-Testing.md`, `probe/src/server/worldScenarios.ts`, `probe/src/server/worldScenarioRcon.ts`, `probe/src/server/naturalSpawnValidation.ts` |
+| `WORLD_SCENARIO_RCON_TRUTHFULNESS_PLAN` | RCON output classification, required/optional command semantics, flat-fixture revalidation, and aggregate setup status | `Architecture/World-Scenario-RCON-Truthfulness-Plan.md`, `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `probe/src/server/worldScenarios.ts`, `probe/test/worldScenarios.test.ts` |
+| `NATURAL_SAFE_SPAWN_SCENARIO_CONTRACT` | Contract for the natural safe-spawn world scenario: fresh default world, no terrain/resource mutation, and bounded setup-only spawn policy | `Architecture/Natural-Safe-Spawn-Scenario-Contract.md`, `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `Setup/World-Scenario-Testing.md`, `probe/src/server/worldScenarios.ts` |
+| `NATURAL_SPAWN_VALIDATION_ARTIFACT_CONTRACT` | Artifact and linkage contract for post-bot Mineflayer loaded-world spawn validation before provider cycles | `Architecture/Natural-Spawn-Validation-Artifact-Contract.md`, `Architecture/Natural-Safe-Spawn-Scenario-Contract.md`, `probe/src/runtime/socialCycleRunner.ts`, `probe/src/runtime/goals/types.ts` |
+| `WORLD_SCENARIO_SMOKE_GATES` | Static and runtime smoke gates that must pass before provider-heavy Actor Turn behavior evaluation | `Architecture/World-Scenario-Smoke-Gates.md`, `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `Setup/World-Scenario-Testing.md` |
+| `NATURAL_SAFE_SPAWN_SMOKE_RUN_2026_06_13` | Dated deterministic setup smoke showing `natural-safe-spawn-v1` manifest and spawn-validation artifacts pass without provider usage | `Architecture/Natural-Safe-Spawn-Smoke-Run-2026-06-13.md`, `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `Setup/World-Scenario-Testing.md` |
 | `REAL_SERVER_SIMULATION_TEST_PLAN` | Live-server simulation protocol and readiness gates | `Architecture/Real-Server-Simulation-Test-Plan.md`, `Setup/Headless-Server.md`, `Setup/Provider-Setup.md` |
+| `WORLD_SCENARIO_TESTING` | Separates fixture probes from natural survival/social runs, with explicit world setup artifacts that never count as actor progress | `Setup/World-Scenario-Testing.md`, `Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`, `Setup/Headless-Server.md`, `probe/src/server/worldScenarios.ts`, `probe/src/server/naturalSpawnValidation.ts` |
 | `FUTURE_WORKS` | Substrate follow-ups from live runs and external references, not spec changes | `Architecture/Future-Works.md` |
+| `EXPERIMENT_ARCHIVE_INDEX` | Dated archive for benchmark, provider-smoke, and live-runtime experiment records imported from scratch space and curated into reports | `Experiments/README.md`, `Experiments/INDEX.md`, `Experiments/catalog.json` |
+| `EXPERIMENT_2026_06_13_BENCHMARKS` | 2026-06-13 ModelScope Qwen smokes and model-comparison benchmark review, including the 8-cycle limitations and 50-cycle rerun standard | `Experiments/2026-06-13/README.md`, `Experiments/raw/2026-06-13/benchmarks/` |
 
 ## Provider And Operations
 
@@ -94,28 +118,32 @@ For any onboarding developer or agent, read in this order:
 6. `project-docs/Documentation-Map.md`
 7. `project-docs/Terminology.md`
 8. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-9. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-10. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-11. `project-docs/Specification/Reference-Adaptation-Guide.md`
-12. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-13. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-14. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-15. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-16. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-17. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-18. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-19. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-20. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-21. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-22. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-23. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-24. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-25. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
-26. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-27. `project-docs/Setup/Headless-Server.md`
-28. `project-docs/Setup/Provider-Setup.md`
-29. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
-30. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+9. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+10. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+11. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+12. `project-docs/Specification/Reference-Adaptation-Guide.md`
+13. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+14. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+15. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+16. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+17. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+21. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+22. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+23. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+24. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+25. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+26. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+27. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+28. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+29. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+31. `project-docs/Setup/Headless-Server.md`
+32. `project-docs/Setup/Provider-Setup.md`
+33. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+34. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
 
 ## Active vs Archived
 

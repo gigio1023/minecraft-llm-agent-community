@@ -6,7 +6,7 @@ bot-view screenshots.
 
 ## Current Actor Turn Artifact Map
 
-Do not rely on legacy `action_intent_ref` for current reports. Current Actor
+Do not rely on archived `action_intent_ref` for current reports. Current Actor
 Turn records use:
 
 - `cycles[].action_ref`

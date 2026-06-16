@@ -1,4 +1,4 @@
-/** Regression coverage for legacy objective evaluation artifacts. */
+/** Regression coverage for direct objective evaluation artifacts. */
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";

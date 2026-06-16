@@ -178,9 +178,11 @@ Generated Mineflayer authoring also did not occur:
 - `author_mineflayer_action` selections: `0`
 - Generated action candidates: none in this run
 
-The visible `author_mineflayer_action` option and
-`mineflayer_codegen_skill.skill_markdown` were present in Actor Turn inputs, but
-the actor always selected existing Action Cards.
+Historical note: at the time of this run, the visible
+`author_mineflayer_action` option and `mineflayer_codegen_skill.skill_markdown`
+were present in Actor Turn inputs, but the actor always selected existing Action
+Cards. Current architecture keeps the generated-code skill markdown out of the
+outer Actor Turn input and injects it only into the internal codegen request.
 
 ## Runtime Review Conclusion
 

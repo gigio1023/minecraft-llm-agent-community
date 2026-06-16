@@ -455,7 +455,7 @@ test("agent loop writes actor evidence when collect_logs only pretends to progre
             observerId: "npc_b",
             visibleActors: [],
             inventory: [{ name: "oak_log", count: 0 }],
-            nearbyBlocks: [{ name: "oak_log", distance: 3 }],
+            nearbyBlocks: [{ name: "oak_log", position: { x: 3, y: 64, z: 0 }, distance: 3 }],
             memory: []
           };
         },

@@ -239,13 +239,12 @@ function resolutionBase() {
       observer_id: "npc_b",
       inventory_counts: { crafting_table: 1 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -339,13 +338,12 @@ test("Runtime Action Resolver treats crafting-table placement current-state requ
       observer_id: "npc_b",
       inventory_counts: { crafting_table: 1 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: ["crafting_table=placed at (37, 71, -13)"],
+        known_positions: { crafting_table: { status: "placed", position: { x: 37, y: 71, z: -13 }, evidence_refs: [] } },
         checklist: [
           {
             id: "crafting_table_known_or_placed",
@@ -384,15 +382,12 @@ test("Runtime Action Resolver does not turn crafting-table proximity requirement
       position: { x: 4.13, y: 85, z: -14.46 },
       inventory_counts: { acacia_planks: 8, stick: 4 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [
-          "crafting_table=placed at (-8, 104, 7) distance_from_actor=25.2 usable_now=false"
-        ],
+        known_positions: { crafting_table: { status: "placed", position: { x: -8, y: 104, z: 7 }, distance_from_actor: 25.2, usable_now: false, evidence_refs: [] } },
         checklist: [
           {
             id: "crafting_table_known_or_placed",
@@ -430,15 +425,12 @@ test("Runtime Action Resolver allows crafting a new table when the known table i
       position: { x: 4.13, y: 85, z: -14.46 },
       inventory_counts: { acacia_planks: 8, stick: 4 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [
-          "crafting_table=placed at (-8, 104, 7) distance_from_actor=25.2 usable_now=false"
-        ],
+        known_positions: { crafting_table: { status: "placed", position: { x: -8, y: 104, z: 7 }, distance_from_actor: 25.2, usable_now: false, evidence_refs: [] } },
         checklist: [
           {
             id: "crafting_table_known_or_placed",
@@ -541,13 +533,12 @@ test("Runtime Action Resolver treats broad planks-and-sticks current-state requi
         stick: 4
       },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -580,13 +571,12 @@ test("Runtime Action Resolver keeps planks-and-sticks crafting valid when sticks
         spruce_planks: 24
       },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -635,13 +625,12 @@ test("Runtime Action Resolver does not reject only because current_state require
       observer_id: "npc_b",
       inventory_counts: {},
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -675,13 +664,12 @@ test("Runtime Action Resolver leaves recipe count requirements advisory", () => 
       observer_id: "npc_b",
       inventory_counts: { spruce_planks: 2 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -711,13 +699,12 @@ test("Runtime Action Resolver leaves usable-table redundancy requirements adviso
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 4 },
       visible_actors: [],
-      nearby_block_hints: [{ name: "crafting_table", distance: 1 }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: ["crafting_table=nearby at (1, 64, 0)"],
+        known_positions: { crafting_table: { status: "nearby", position: { x: 1, y: 64, z: 0 }, distance_from_actor: 1, usable_now: true, evidence_refs: [] } },
         checklist: [],
         recent_blockers: []
       }
@@ -747,13 +734,12 @@ test("Runtime Action Resolver leaves carried crafting-table requirements advisor
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 4, crafting_table: 1 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -783,13 +769,12 @@ test("Runtime Action Resolver rejects inventory-grid recipes through table-bound
       observer_id: "npc_b",
       inventory_counts: { spruce_planks: 4, stick: 8 },
       visible_actors: [],
-      nearby_block_hints: [],
+      nearby_block_observations: [],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -823,13 +808,12 @@ test("Runtime Action Resolver leaves wooden-pickaxe redundancy requirements advi
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 3, stick: 2, wooden_pickaxe: 1 },
       visible_actors: [],
-      nearby_block_hints: [{ name: "crafting_table", distance: 1 }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -859,13 +843,12 @@ test("Runtime Action Resolver does not enforce table-bound inventory counts from
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 3, cobblestone: 33, wooden_pickaxe: 1 },
       visible_actors: [],
-      nearby_block_hints: [{ name: "crafting_table", distance: 1 }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -893,13 +876,12 @@ test("Runtime Action Resolver does not enforce table-bound inventory counts from
       observer_id: "npc_b",
       inventory_counts: { cobblestone: 8 },
       visible_actors: [],
-      nearby_block_hints: [{ name: "crafting_table", distance: 1 }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: [],
+        known_positions: {},
         checklist: [],
         recent_blockers: []
       }
@@ -927,13 +909,12 @@ test("Runtime Action Resolver requires craft_item itemName but leaves recipe ing
     observer_id: "npc_b",
     inventory_counts: { oak_planks: 1, stick: 4, cobblestone: 33, wooden_pickaxe: 1 },
     visible_actors: [],
-    nearby_block_hints: [],
+    nearby_block_observations: [],
     shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-    deposit_candidates: [],
     settlement_progress: {
       inventory_counts: {},
       shared_storage_status: "unknown",
-      known_position_summaries: [],
+      known_positions: {},
       checklist: [],
       recent_blockers: []
     }
@@ -1046,17 +1027,16 @@ test("Runtime Action Resolver allows generated shared chest probe when strict au
       observer_id: "npc_b",
       inventory_counts: {},
       visible_actors: [],
-      nearby_block_hints: [{ name: "chest", distance: 2 }],
+      nearby_block_observations: [{ name: "chest", distance: 2, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: {
         status: "known",
         items: [],
         evidence_refs: ["evidence/cycle-0001-inspect_chest.json"]
       },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "known",
-        known_position_summaries: ["shared_chest=inspected at (1, 64, 0)"],
+        known_positions: { shared_chest: { status: "known", evidence_refs: [] } },
         checklist: [],
         recent_blockers: []
       }
@@ -1097,13 +1077,12 @@ test("Runtime Action Resolver allows generated crafting-table reachability probe
       observer_id: "npc_b",
       inventory_counts: { oak_planks: 3, stick: 2 },
       visible_actors: [],
-      nearby_block_hints: [{ name: "crafting_table", distance: 1 }],
+      nearby_block_observations: [{ name: "crafting_table", distance: 1, source: "observation_nearby_block", evidence_refs: [] }],
       shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-      deposit_candidates: [],
       settlement_progress: {
         inventory_counts: {},
         shared_storage_status: "unknown",
-        known_position_summaries: ["crafting_table=nearby at (1, 64, 0)"],
+        known_positions: { crafting_table: { status: "nearby", position: { x: 1, y: 64, z: 0 }, distance_from_actor: 1, usable_now: true, evidence_refs: [] } },
         checklist: [],
         recent_blockers: []
       }

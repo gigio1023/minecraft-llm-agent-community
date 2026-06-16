@@ -275,7 +275,7 @@ Fix target:
 - keep counting `executed_tools` and `tool_statuses` from current report fields;
 - keep detecting previous judgment from provider input snapshots under `.input`;
 - surface runtime action contract failures and world-state diagnostics clearly,
-  including legacy `action_intent_contract_failure` artifacts when old reports
+  including archived `action_intent_contract_failure` artifacts when old reports
   are audited;
 - surface `partial_verified_progress` once that status exists.
 

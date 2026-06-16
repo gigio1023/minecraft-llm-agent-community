@@ -1,4 +1,4 @@
-/** Regression coverage for legacy long-objective probe reports. */
+/** Regression coverage for direct long-objective probe reports. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 

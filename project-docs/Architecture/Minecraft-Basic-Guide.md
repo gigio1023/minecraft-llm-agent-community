@@ -177,12 +177,9 @@ Implementation lives in:
 - `probe/src/provider/socialActorTurnProvider.ts`
 - `probe/src/provider/socialCycleProviderInputs.ts`
 - `probe/src/provider/socialGoalMindProvider.ts`
-- `probe/src/provider/socialActionPlannerProvider.ts`
-- `probe/src/provider/socialCycleJudgmentProvider.ts`
 - `probe/test/socialCycleRunner.test.ts`
 
 The Actor Turn provider input should include `minecraft_basic_guide` with schema
 `minecraft-basic-guide/v1` and concrete known item flows for at least
-`crafting_table` and `wooden_pickaxe`. Legacy social-cycle provider projection
-tests may still assert the same guide for migration paths, but new behavior
-should be reviewed through the Actor Turn input snapshot.
+`crafting_table` and `wooden_pickaxe`. New behavior should be reviewed through
+the Actor Turn input snapshot.

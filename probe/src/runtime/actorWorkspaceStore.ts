@@ -46,7 +46,6 @@ export type ActorActionSkillRecord = {
     reason: string;
     evidence_refs: string[];
   };
-  legacy_source_ref?: string;
   generated_source?: string;
   generated_source_language?: "typescript";
   generated_source_ref?: string;

@@ -12,11 +12,11 @@ import {
   type SocialCycleContextPacketLike
 } from "../src/runtime/goals/socialCycleContextCompaction.js";
 import type {
-  LegacyPlannerAction,
   ActorCycleGoal,
   ActorLifeGoal,
   CycleJudgment
 } from "../src/runtime/goals/types.js";
+import type { ActorTurnResolvedAction } from "../src/runtime/goals/actorEpisode/index.js";
 import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
 
 const createdAt = "2026-05-25T00:00:00.000Z";
@@ -69,15 +69,17 @@ function cycleGoal(): ActorCycleGoal {
   };
 }
 
-function legacyPlannerAction(): LegacyPlannerAction {
+function actorTurnAction(): ActorTurnResolvedAction {
   return {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: "npc_b",
     cycle_id: "cycle-0003",
     cycle_goal_id: "cycle-goal-1",
     kind: "use_primitive",
+    action_card_id: "primitive:observe",
     primitive_id: "observe",
-    args: {},
+    parameters: {},
+    expected_outcome: "diagnostic_unlock",
     why_this_action: "Refresh state before choosing another log action.",
     expected_evidence: ["observation"],
     fallback_if_blocked: "remember the blocker and wait"
@@ -324,15 +326,15 @@ test("social-cycle context checkpoint preserves authority names and compact refs
     createdAt,
     context: contextPacket(),
     currentCycleGoal: cycleGoal(),
-    currentLegacyPlannerAction: legacyPlannerAction(),
+    currentActorTurnAction: actorTurnAction(),
     trigger: "token_limit",
     reason: "Provider input exceeded local token budget after repeated observe/wait context.",
     refs: {
       inputContextRef: "provider-inputs/goal-mind-cycle-0003.json",
       latestObservationRef: "evidence/cycle-0003-observe.json",
       cycleGoalRef: "goals/cycle/cycle-goal-1.json",
-      legacyPlannerActionRef: "goals/cycle/legacy-planner-actions/cycle-0003-action-01-legacy-planner-action.json",
-      recentActionRefs: ["goals/cycle/legacy-planner-actions/cycle-0002-action-01-legacy-planner-action.json"],
+      actorTurnActionRef: "goals/cycle/actor-turn-actions/cycle-0003-action-01-actor-turn-action.json",
+      recentActionRefs: ["goals/cycle/actor-turn-actions/cycle-0002-action-01-actor-turn-action.json"],
       evidenceRefs: [
         "evidence/cycle-0002-collect_logs.json",
         "evidence/cycle-0003-observe.json"
@@ -389,14 +391,14 @@ test("compact summary facts are ref-backed and cannot claim physical progress", 
   const checkpoint = buildSocialCycleContextCheckpoint({
     context: contextPacket(),
     currentCycleGoal: cycleGoal(),
-    currentLegacyPlannerAction: legacyPlannerAction(),
+    currentActorTurnAction: actorTurnAction(),
     trigger: "cycle_boundary",
     reason: "Snapshot before the next cycle provider input.",
     refs: {
       inputContextRef: "provider-inputs/action-planner-cycle-0003.json",
       latestObservationRef: "evidence/cycle-0003-observe.json",
       cycleGoalRef: "goals/cycle/cycle-goal-1.json",
-      legacyPlannerActionRef: "goals/cycle/legacy-planner-actions/cycle-0003-action-01-legacy-planner-action.json",
+      actorTurnActionRef: "goals/cycle/actor-turn-actions/cycle-0003-action-01-actor-turn-action.json",
       evidenceRefs: ["evidence/cycle-0003-observe.json"],
       verifierRefs: ["verifier/cycle-0002-collect_logs.json"],
       judgmentRefs: ["judgments/cycle-0002-action-01-judgment.json"]
@@ -443,14 +445,14 @@ test("builder rejects compact summaries without required evidence refs", () => {
       buildSocialCycleContextCheckpoint({
         context: contextPacket(),
         currentCycleGoal: cycleGoal(),
-        currentLegacyPlannerAction: legacyPlannerAction(),
+        currentActorTurnAction: actorTurnAction(),
         trigger: "report_snapshot",
         reason: "bad checkpoint",
         refs: {
           inputContextRef: "provider-inputs/action-planner-cycle-0003.json",
           latestObservationRef: "",
           cycleGoalRef: "goals/cycle/cycle-goal-1.json",
-          legacyPlannerActionRef: "goals/cycle/legacy-planner-actions/cycle-0003-action-01-legacy-planner-action.json"
+          actorTurnActionRef: "goals/cycle/actor-turn-actions/cycle-0003-action-01-actor-turn-action.json"
         }
       }),
     /latestObservationRef/

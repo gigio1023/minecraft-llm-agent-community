@@ -51,7 +51,8 @@ instead of making `README.md` or the public docs landing page noisy.
 ## Internal Project Documents
 
 Internal specs, architecture notes, setup notes, handoffs, provider-access
-notes, implementation campaigns, terminology, and routing indexes live under:
+notes, implementation campaigns, terminology, experiment records, and routing
+indexes live under:
 
 ```text
 project-docs/
@@ -101,6 +102,7 @@ Orientation:
 Long-term spec:
 
 - `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+- `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
 - `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
 - `project-docs/Specification/Engineering-Governance-And-Testing.md`
 - `project-docs/Specification/Reference-Adaptation-Guide.md`
@@ -113,8 +115,13 @@ Architecture:
 - `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
 - `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
 - `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+- `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+- `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+- `project-docs/Architecture/Research-Direction-Reference-Synthesis.md`
+- `project-docs/Architecture/Project-Sid-Harness-Absorption-Plan.md`
 - `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
 - `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+- `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
 - `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
 - `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
 - `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
@@ -130,13 +137,25 @@ Current state and operations:
 
 - `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
 - `project-docs/Architecture/OpenAI-GPT54Mini-No-Output-Cap-Run-2026-06-04.md`
+- `project-docs/Architecture/Roofless-Hut-Flat-Scenario-Run-2026-06-08.md`
+- `project-docs/Architecture/Natural-Safe-Spawn-World-Scenario-Research-2026-06-10.md`
+- `project-docs/Architecture/World-Scenario-Truthfulness-And-Natural-Spawn-Implementation-Plan.md`
+- `project-docs/Architecture/World-Scenario-RCON-Truthfulness-Plan.md`
+- `project-docs/Architecture/Natural-Safe-Spawn-Scenario-Contract.md`
+- `project-docs/Architecture/Natural-Spawn-Validation-Artifact-Contract.md`
+- `project-docs/Architecture/World-Scenario-Smoke-Gates.md`
+- `project-docs/Architecture/Natural-Safe-Spawn-Smoke-Run-2026-06-13.md`
 - `project-docs/Architecture/Future-Works.md`
 - `project-docs/Architecture/Real-Server-Simulation-Test-Plan.md`
 - `project-docs/Setup/Headless-Server.md`
+- `project-docs/Setup/World-Scenario-Testing.md`
 - `project-docs/Setup/Provider-Setup.md`
 - `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 - `project-docs/Setup/OpenAI-Tier3-Free-Usage.md`
 - `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+- `project-docs/Experiments/README.md`
+- `project-docs/Experiments/INDEX.md`
+- `project-docs/Experiments/2026-06-13/README.md`
 
 Knowledge:
 
@@ -153,6 +172,20 @@ shape active implementation or public docs navigation:
 - old public `Plans/` pages;
 - deep-dive literature notes;
 - dated run reports that are no longer current handoff material.
+- dated literature sweeps such as
+  `research-archive/2026-06-15/llm-social-behavior-benchmark-survey.md`.
+- direction-setting literature sweeps such as
+  `research-archive/2026-06-16/reference-sweep-beyond-project-sid.md`.
+- expanded related-work sweeps such as
+  `research-archive/2026-06-16/expanded-related-work-sweep.md`.
+- single-paper direction analyses such as
+  `research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`.
+- single-project reference checks such as
+  `research-archive/2026-06-16/minestudio-reference-check.md`.
+- single-project implementation deep dives such as
+  `research-archive/2026-06-16/minestudio-implementation-analysis.md`.
+- research-frame notes such as
+  `research-archive/2026-06-16/social-wam-research-frame.md`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly

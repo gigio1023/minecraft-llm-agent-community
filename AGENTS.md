@@ -8,8 +8,14 @@ loop.
 Do not revive the old Voyager-style architecture as the active path.
 
 The current implementation goal is not a full village simulator.
-It is a small, bounded, observable runtime that can later grow into a social
-simulation seed.
+It is a small, bounded, observable runtime that can later grow into an
+evidence-grounded social simulation seed.
+
+Minecraft task completion is a competence gate, not the final research target.
+The project goal is to evaluate whether LLM-controlled embodied actors can
+sustain socially meaningful behavior in natural Minecraft worlds, where social
+claims are constrained by verifiable movement, inventory, crafting, storage,
+communication, memory, and shared-world consequences.
 
 Immediate target:
 
@@ -23,13 +29,63 @@ Immediate target:
 North star:
 
 - actors, represented by Mineflayer bots, with role context, action skill
-  ownership, memory, and later human-in-the-loop social play.
+  ownership, memory, relationships, obligations, material claims, public
+  affordances, weak commons, and visible consequences that persist after one
+  immediate task is completed.
+- benchmark and experiment reports that distinguish physical competence from
+  social consequence, continuity, robustness, and efficiency.
 
 Not current delivery targets:
 
 - persona richness as a content goal;
 - long-run autonomy as a product goal;
 - large multi-actor society behavior before single-actor competence is trustworthy.
+- benchmark-maximization as the top-level research objective.
+
+## Research Value Boundary
+
+Evidence-first benchmarking is not the research goal and must not be presented
+as the core contribution. Runtime evidence, transcripts, screenshots, ledgers,
+seed/reset records, cost traces, and scoring scripts are support infrastructure:
+they make claims checkable, prevent fake progress, and let runs be reviewed.
+They are necessary hygiene, not the thing being studied.
+
+The research value must come from a more substantive question:
+
+```text
+What counts as a Minecraft society, organization, settlement, or social life
+when embodied actors inhabit a natural world with needs, constraints, memory,
+relationships, material stakes, conflict, cooperation, repair, and continuation
+beyond one scripted task?
+```
+
+Benchmark design should therefore measure lived social behavior, not the
+existence of benchmark artifacts. A good benchmark is a lens for seeing whether
+actors form and maintain meaningful social patterns under Minecraft constraints.
+It is not valuable merely because it records evidence cleanly.
+
+Do not let the project drift into a "reproducibility-only" or
+"evidence-first benchmark" paper. Reproducibility and evidence are the audit
+surface. The main work is defining and testing realistic social dynamics:
+
+- why actors stay near each other or separate;
+- how needs create dependence, exchange, refusal, conflict, or repair;
+- how possession, access, and place become socially meaningful;
+- how roles, norms, obligations, trust, and reputation arise or fail to arise;
+- how social state changes after the immediate goal is done;
+- how the world itself, not just dialogue, shapes collective behavior.
+
+Project Sid is a cautionary reference here. It claims broad Minecraft
+civilization-scale behavior, but the public artifact is a technical report plus
+a thin GitHub wrapper, not a reproducible code/data/log release. Do not imitate
+viral civilization framing by scaling actor counts, adding religions, laws,
+taxes, or dramatic society labels before the runtime can show why those
+phenomena naturally matter in the world. Treat sensational society claims as
+hypotheses requiring grounded investigation, not as proof or as a target style.
+Do not discard useful Project Sid material: extract case designs, metrics,
+failure modes, and prompt/config patterns with exact citation, while labeling
+them as unverified report claims until runnable code, raw logs, scoring scripts,
+or independent replication exist.
 
 ## PlanBeads Intent Rule
 
@@ -91,21 +147,19 @@ what lands.
 ## Action Skill Authoring Gate
 
 New Minecraft action skill creation during social-cycle runtime must originate
-only from the action-selection stage. In Actor Turn mode, the provider may
-choose `author_mineflayer_action`, which the runtime resolves into full-context
-generated action authoring and trial. Legacy planner paths may still produce
-`author_and_trial_action_skill` while they remain in explicit migration scope.
-In either mode, current observation, CycleGoal or Active Episode, memory,
+only from the Actor Turn action-selection stage. The provider may choose
+`author_mineflayer_action`, which the runtime resolves into full-context
+generated action authoring and trial. Current observation, CycleGoal or Active Episode, memory,
 PlanBeads, relationship context, retry constraints, and the action surface must
 justify creating a new actor-owned behavior candidate.
 
-Background reviewers, async sidecars, PlanBead operations, legacy generated
-skill importers, and offline maintenance scripts must not originate new action
+Background reviewers, async sidecars, PlanBead operations, archived generated
+source importers, and offline maintenance scripts must not originate new action
 skill candidates for an NPC during runtime. They may review, patch, reject,
-retire, supersede, promote, or re-trial an existing action-selection candidate
-with evidence. They may also propose PlanBeads that say a new action skill is
-needed, but PlanBeads do not create source, parameters, permissions, or
-executable authority.
+retire, supersede, promote, or re-trial an existing Actor Turn candidate with
+evidence. They may also propose PlanBeads that say a new action skill is needed,
+but PlanBeads do not create source, parameters, permissions, or executable
+authority.
 
 Generated Mineflayer code should be used more actively through this explicit
 full-context authoring path. The outer Actor Turn function call is a selection
@@ -160,8 +214,22 @@ explicit schemas, permission gates, retry constraints, or verifier evidence.
 `parameter_candidates`, `top_eligible_action_cards`,
 `recommended_next_action_candidates`, generated chat text, coordinates, recipe
 decisions, or other pre-selected action payloads to it.
-No compatibility or legacy compromise is required for this side project when
+Do not add provider-facing candidate fields such as `deposit_candidates`,
+`open_social_requests`, `obligation_summaries`, `nearby_block_hints`, or
+`known_position_summaries`. These fields over-compress social, observation, and
+world-state context into hidden preselection. Use bounded typed facts in
+`current_state` plus `source_evidence_bundle` cards/refs so the Actor Turn LLM
+can reason from the original evidence.
+No compatibility compromise is required for this side project when
 removing prose parsing or hidden domain-planner behavior.
+When replacing an active runtime/provider contract, do the conversion in one
+coherent pass instead of preserving old aliases, source names, or shim fields
+inside the new contract. Historical artifacts may remain readable through
+explicit audit/import code, but active TypeScript types, provider inputs,
+schemas, prompts, tests, and docs should use the current concept names only. If
+old producer output still exists, normalize it at the boundary into the current
+schema and name that field for what it means now, not for the old implementation
+that happened to produce it.
 
 ## Project Identity vs External References
 
@@ -176,10 +244,10 @@ the product direction is a Soul-grounded social simulation seed.
 When `soul.md` or an ActorSoul artifact defines an actor, treat it as the actor's
 identity seed. Short-, mid-, and long-term goals should be derived under that
 Soul/LifeGoal frame, with social context, memory, relationships, role context,
-shared/private inventory, obligations, trust, conflict, and settlement state in
-view. Gameplay progress matters because it creates observations, consequences, and evidence
-for social life, not because the top-level objective is to optimize a Minecraft
-benchmark.
+personal possession, material claims, public affordances, weak commons,
+obligations, trust, conflict, and settlement state in view. Gameplay progress
+matters because it creates observations, consequences, and evidence for social
+life, not because the top-level objective is to optimize a Minecraft benchmark.
 
 Use external references by translating their mechanisms into this project:
 
@@ -226,32 +294,35 @@ Read these first:
 4. `GEMINI.md`
 5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 6. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-7. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-8. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-9. `project-docs/Specification/Reference-Adaptation-Guide.md`
-10. `project-docs/Documentation-Map.md`
-11. `project-docs/Agent-Search-Index.md`
-12. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-13. `project-docs/Terminology.md`
-14. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-15. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-16. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-17. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-18. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-20. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-21. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-22. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-23. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-24. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
-25. `project-docs/Architecture/Implementation-Workstreams.md`
-26. `project-docs/Architecture/Action-Skill-Verification.md`
-27. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-28. `project-docs/Architecture/Minimal-Probe.md`
-29. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-30. `project-docs/Setup/Headless-Server.md`
-31. `project-docs/Setup/Provider-Setup.md`
-32. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+7. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+8. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+9. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+10. `project-docs/Specification/Reference-Adaptation-Guide.md`
+11. `project-docs/Documentation-Map.md`
+12. `project-docs/Agent-Search-Index.md`
+13. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+14. `project-docs/Terminology.md`
+15. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+16. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+17. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+18. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+19. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+20. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+21. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+22. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+23. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+24. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+25. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+26. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+27. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
+28. `project-docs/Architecture/Implementation-Workstreams.md`
+29. `project-docs/Architecture/Action-Skill-Verification.md`
+30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+31. `project-docs/Architecture/Minimal-Probe.md`
+32. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+33. `project-docs/Setup/Headless-Server.md`
+34. `project-docs/Setup/Provider-Setup.md`
+35. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -275,7 +346,7 @@ command output, and volatile evidence in handoff or audit docs instead.
 - `project-docs/Terminology.md` is normative. New docs, code comments, prompts,
   report labels, and agent guides must follow it.
 - If existing code or docs conflict with `Terminology.md`, either update them or
-  add an explicit legacy-identifier mapping in `Terminology.md`. Do not spread
+  add an explicit old-identifier mapping in `Terminology.md`. Do not spread
   outdated wording into new surfaces.
 - Avoid AI-slop wording listed in `Terminology.md`, such as "AI brain",
   "magic", "vibes", "smart NPC", broad "autonomous" claims, ambiguous "skill",
@@ -439,7 +510,7 @@ Important search tokens:
 - `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
 - `ACTION_SKILL_VERIFICATION`
 - `CURRENT_HANDOFF_NEXT_WORK`
-- `GENERATED_ACTION_SKILL_LEGACY_STORE`
+- `GENERATED_ACTION_SKILL_ARCHIVE`
 - `PER_ACTOR_ASYNC_REVIEWER`
 - `IMPLEMENTATION_WORKSTREAMS`
 - `ACTION_SKILL`
@@ -473,7 +544,8 @@ Important search tokens:
 - Do not let quick probes become permanent monoliths.
 - Do not expect social simulation from persona text alone.
 - Add concrete Minecraft observations and consequences first: resource gathering, crafting, storage,
-  movement, scarcity, and shared/private inventory.
+  movement, scarcity, personal possession, material claims, public affordances,
+  weak commons, and obligations.
 - Mineflayer provides the game client API.
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
   eval.
@@ -489,7 +561,7 @@ Important search tokens:
   nearest examples, truncation policy, and evidence refs. Do not imply that
   unloaded chunks were inspected. Reviews and audits should count explicit
   `world-state-summary/v1` or `world-state-scan/v1` schema artifacts as scan
-  evidence, not loose legacy keys such as `nearbyBlocks`.
+  evidence, not loose old keys such as `nearbyBlocks`.
 - Do not expose provider-facing world summaries as fixed material-family,
   station-family, construction-readiness, or survival-priority categories.
   World context is evidence substrate: raw Minecraft names, positions,
@@ -554,7 +626,7 @@ Important search tokens:
 - Actor workspace should also become the source of truth for actor-owned
   PlanBead work graph state when that slice is implemented. The purpose is
   state continuity under changing circumstances, not more planning prose.
-- Treat `build/generated-skills` as legacy exploratory output, not as active or
+- Treat `build/generated-skills` as archived exploratory output, not as active or
   candidate actor-owned action skill memory.
 - Prefer structured domain models, typed records, discriminated unions, schemas,
   and validators over ad hoc dictionary blobs. Runtime state, action evidence,
@@ -597,6 +669,23 @@ practice.
   which fields may become executable authority after validation. Prose fields,
   memory, PlanBeads, and decision-frame hints should be explicitly described as
   non-authoritative wherever that distinction is easy to blur.
+- For Actor Turn function-tool code, comments should make the boundary obvious:
+  a visible Action Card function schema is a tool-calling contract, not a hidden
+  Minecraft planner. It may require logical parameters such as item names,
+  counts, directions, or coordinates, but it must not choose those values from
+  prose, heuristics, or domain strategy. The LLM supplies them in strict tool
+  args; runtime validation then accepts or rejects them.
+- For `author_mineflayer_action` and Mineflayer codegen code, comments should
+  distinguish the outer selection call from the internal codegen call. The outer
+  call carries detailed rationale and desired behavior; the internal request
+  carries the full original `ActorTurnInput`, raw outer tool call, parsed tool
+  args, and codegen agent skill markdown. Do not leave future readers guessing
+  whether `raw_outer_tool_call` is the Actor Turn output.
+- When a module intentionally keeps duplicated-looking context, such as compact
+  facts plus source evidence refs, comment the reason: bounded facts help the
+  model read quickly, while source evidence prevents lossy summary-only
+  decisions. When duplication is only accidental or compatibility-driven, remove
+  it instead of documenting it.
 - For persistence and artifact code, document what record is the source of truth,
   what evidence survives compaction, and which claims are only diagnostic context
   rather than proof of Minecraft progress.
@@ -715,7 +804,7 @@ PROBE_LONG_OBJECTIVE_PROVIDER_ORDER=text-genai
 Implementation:
 
 - `probe/src/provider/gemini/textGenai.ts`
-- `callGeminiLivePlanner()` is a legacy-named facade; active planner calls use
+- `callGeminiLivePlanner()` is an archived-name facade; active planner calls use
   only the structured REST `text-genai` path.
 - Long-objective planning goes through `ObjectivePhasePlannerPort`
   (`probe/src/provider/planner/`) — Gemini, OpenAI Codex, or explicit

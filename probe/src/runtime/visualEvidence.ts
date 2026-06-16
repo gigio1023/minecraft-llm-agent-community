@@ -34,9 +34,19 @@ type PrismarineViewerModule = {
   supportedVersions?: readonly string[];
 };
 
+type VisualEvidenceSession = {
+  cameraMode: "first_person" | "third_person";
+  viewerUrl: string;
+  viewerPort: number;
+  browser?: Browser;
+  page?: Page;
+  closeViewer?: () => void;
+};
+
 export type VisualEvidenceOptions = {
   enabled: true;
   intervalCycles?: number;
+  cameraMode?: "first_person" | "third_person" | "both";
   port?: number;
   width?: number;
   height?: number;
@@ -56,6 +66,16 @@ function nowIso() {
 
 function positiveInteger(value: number | undefined, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function normalizeCameraModes(value: VisualEvidenceOptions["cameraMode"]): Array<"first_person" | "third_person"> {
+  if (value === "first_person") {
+    return ["first_person"];
+  }
+  if (value === "third_person") {
+    return ["third_person"];
+  }
+  return ["first_person", "third_person"];
 }
 
 async function exists(filePath: string) {
@@ -100,6 +120,28 @@ async function waitForHttp(url: string, timeoutMs: number) {
   throw new Error(`Timed out waiting for visual evidence viewer: ${url}`);
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+async function zoomThirdPersonCloser(page: Page, width: number, height: number, amount = -4_800) {
+  await page.mouse.move(width / 2, height / 2);
+  await page.mouse.wheel(0, amount);
+  await page.waitForTimeout(500);
+}
+
 export async function resolveChromeExecutablePath(explicitPath?: string) {
   const candidates = [
     explicitPath,
@@ -139,14 +181,28 @@ function actorRelativeRef(actorDir: string, filePath: string) {
 function captureFileBase(input: {
   cycleId: string;
   phase: SocialCycleVisualEvidenceCapture["phase"];
+  cameraMode?: "first_person" | "third_person";
 }) {
-  return `${input.cycleId}-${input.phase.replace(/_/g, "-")}`;
+  const suffix = input.cameraMode ? `-${input.cameraMode.replace(/_/g, "-")}` : "";
+  return `${input.cycleId}-${input.phase.replace(/_/g, "-")}${suffix}`;
+}
+
+function thirdPersonScreenshotClip(width: number, height: number) {
+  const clipWidth = Math.floor(width * 0.62);
+  const clipHeight = Math.floor(height * 0.68);
+  return {
+    x: Math.floor((width - clipWidth) / 2),
+    y: Math.floor((height - clipHeight) / 2),
+    width: clipWidth,
+    height: clipHeight
+  };
 }
 
 function createManifest(input: {
   intervalCycles: number;
   width: number;
   height: number;
+  cameraModes: Array<"first_person" | "third_person">;
   viewerUrl?: string;
   viewerPort?: number;
   chromeExecutablePath?: string;
@@ -156,7 +212,9 @@ function createManifest(input: {
     schema: "social-cycle-visual-evidence/v1",
     enabled: true,
     method: "prismarine-viewer-web-screenshot",
-    first_person: true,
+    first_person: input.cameraModes.length === 1 && input.cameraModes[0] === "first_person",
+    camera_mode: input.cameraModes.length === 2 ? "both" : input.cameraModes[0] ?? "third_person",
+    camera_modes: input.cameraModes,
     interval_cycles: input.intervalCycles,
     viewport: { width: input.width, height: input.height },
     ...(input.viewerUrl ? { viewer_url: input.viewerUrl } : {}),
@@ -176,7 +234,11 @@ async function writeCaptureArtifact(input: {
   await fs.mkdir(artifactDir, { recursive: true });
   const filePath = path.join(
     artifactDir,
-    `${captureFileBase({ cycleId: input.record.cycle_id, phase: input.record.phase })}.json`
+    `${captureFileBase({
+      cycleId: input.record.cycle_id,
+      phase: input.record.phase,
+      cameraMode: input.record.camera_mode
+    })}.json`
   );
   const artifactRef = actorRelativeRef(input.actorDir, filePath);
   const record: SocialCycleVisualEvidenceCapture = {
@@ -192,15 +254,19 @@ export function createUnavailableVisualEvidence(input: {
   runId: string;
   reason: string;
   intervalCycles?: number;
+  cameraMode?: VisualEvidenceOptions["cameraMode"];
   width?: number;
   height?: number;
 }): SocialCycleVisualEvidence {
+  const cameraModes = normalizeCameraModes(input.cameraMode);
   return {
     schema: "social-cycle-visual-evidence/v1",
     enabled: true,
     method: "prismarine-viewer-web-screenshot",
-    first_person: true,
-    interval_cycles: positiveInteger(input.intervalCycles, 5),
+    first_person: cameraModes.length === 1 && cameraModes[0] === "first_person",
+    camera_mode: cameraModes.length === 2 ? "both" : cameraModes[0] ?? "third_person",
+    camera_modes: cameraModes,
+    interval_cycles: positiveInteger(input.intervalCycles, 1),
     viewport: {
       width: positiveInteger(input.width, 960),
       height: positiveInteger(input.height, 540)
@@ -223,10 +289,9 @@ export async function startVisualEvidenceRecorder(input: {
 }): Promise<VisualEvidenceRecorder> {
   const width = positiveInteger(input.options.width, 960);
   const height = positiveInteger(input.options.height, 540);
-  const intervalCycles = positiveInteger(input.options.intervalCycles, 5);
-  const viewDistance = positiveInteger(input.options.viewDistance, 4);
-  const port = positiveInteger(input.options.port, await findOpenPort());
-  const viewerUrl = `http://127.0.0.1:${port}`;
+  const intervalCycles = positiveInteger(input.options.intervalCycles, 1);
+  const cameraModes = normalizeCameraModes(input.options.cameraMode);
+  const viewDistance = positiveInteger(input.options.viewDistance, 8);
   const chromeExecutablePath = await resolveChromeExecutablePath(input.options.chromeExecutablePath);
   const notes = [
     "Screenshots are review evidence from prismarine-viewer, not runtime verifier authority.",
@@ -236,18 +301,18 @@ export async function startVisualEvidenceRecorder(input: {
     intervalCycles,
     width,
     height,
-    viewerUrl,
-    viewerPort: port,
+    cameraModes,
     chromeExecutablePath,
     notes
   });
-  let browser: Browser | undefined;
-  let page: Page | undefined;
+  const sessions: VisualEvidenceSession[] = [];
 
   const recordFailure = async (
     cycleId: string,
     phase: SocialCycleVisualEvidenceCapture["phase"],
-    error: string
+    error: string,
+    cameraMode?: "first_person" | "third_person",
+    viewerUrl?: string
   ) => {
     manifest.failures.push({ captured_at: nowIso(), error });
     const record = await writeCaptureArtifact({
@@ -261,8 +326,9 @@ export async function startVisualEvidenceRecorder(input: {
         status: "failed",
         captured_at: nowIso(),
         method: "prismarine-viewer-web-screenshot",
-        viewer_url: viewerUrl,
+        ...(viewerUrl ? { viewer_url: viewerUrl } : {}),
         bot_position: botPosition(input.bot),
+        ...(cameraMode ? { camera_mode: cameraMode } : {}),
         error
       }
     });
@@ -271,11 +337,6 @@ export async function startVisualEvidenceRecorder(input: {
 
   try {
     const prismarineViewer = require("prismarine-viewer") as PrismarineViewerModule;
-    prismarineViewer.mineflayer(input.bot, {
-      port,
-      firstPerson: true,
-      viewDistance
-    });
     if (
       Array.isArray(prismarineViewer.supportedVersions) &&
       !prismarineViewer.supportedVersions.includes(input.bot.version)
@@ -286,21 +347,49 @@ export async function startVisualEvidenceRecorder(input: {
     }
 
     if (!chromeExecutablePath) {
-      await recordFailure(
-        "startup",
-        "startup",
-        "No Chrome/Chromium executable found for visual evidence screenshots"
-      );
+      await recordFailure("startup", "startup", "No Chrome/Chromium executable found for visual evidence screenshots");
     } else {
-      await waitForHttp(viewerUrl, 5_000);
-      browser = await chromium.launch({
-        executablePath: chromeExecutablePath,
-        headless: true
-      });
-      page = await browser.newPage({ viewport: { width, height } });
-      await page.goto(viewerUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
-      await page.waitForSelector("canvas", { timeout: 15_000 });
-      await page.waitForTimeout(1_500);
+      for (const cameraMode of cameraModes) {
+        const port = positiveInteger(
+          cameraMode === cameraModes[0] ? input.options.port : undefined,
+          await findOpenPort()
+        );
+        const viewerUrl = `http://127.0.0.1:${port}`;
+        const session: VisualEvidenceSession = { cameraMode, viewerUrl, viewerPort: port };
+        sessions.push(session);
+        try {
+          prismarineViewer.mineflayer(input.bot, {
+            port,
+            firstPerson: cameraMode === "first_person",
+            viewDistance
+          });
+          session.closeViewer = (input.bot as Bot & { viewer?: { close?: () => void } }).viewer?.close;
+          if (!manifest.viewer_url) {
+            manifest.viewer_url = viewerUrl;
+            manifest.viewer_port = port;
+          }
+          await waitForHttp(viewerUrl, 5_000);
+          session.browser = await chromium.launch({
+            executablePath: chromeExecutablePath,
+            headless: true
+          });
+          session.page = await session.browser.newPage({ viewport: { width, height } });
+          await session.page.goto(viewerUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
+          await session.page.waitForSelector("canvas", { timeout: 15_000 });
+          await session.page.waitForTimeout(5_000);
+          if (cameraMode === "third_person") {
+            await zoomThirdPersonCloser(session.page, width, height);
+          }
+        } catch (error) {
+          await recordFailure(
+            "startup",
+            "startup",
+            error instanceof Error ? error.message : String(error),
+            cameraMode,
+            viewerUrl
+          );
+        }
+      }
     }
   } catch (error) {
     await recordFailure("startup", "startup", error instanceof Error ? error.message : String(error));
@@ -309,45 +398,77 @@ export async function startVisualEvidenceRecorder(input: {
   return {
     manifest,
     async capture({ cycleId, phase }) {
-      if (!page) {
-        return;
-      }
       const capturedAt = nowIso();
       const artifactDir = path.join(input.actorDir, "visual-evidence");
       await fs.mkdir(artifactDir, { recursive: true });
-      const imagePath = path.join(artifactDir, `${captureFileBase({ cycleId, phase })}.png`);
-      try {
-        await page.screenshot({ path: imagePath, fullPage: false });
-        const imageRef = actorRelativeRef(input.actorDir, imagePath);
-        const record = await writeCaptureArtifact({
-          actorDir: input.actorDir,
-          record: {
-            schema: "visual-evidence-capture/v1",
-            actor_id: input.actorId,
-            run_id: input.runId,
-            cycle_id: cycleId,
-            phase,
-            status: "captured",
-            captured_at: capturedAt,
-            method: "prismarine-viewer-web-screenshot",
-            image_ref: imageRef,
-            image_path: imagePath,
-            viewer_url: viewerUrl,
-            bot_position: botPosition(input.bot)
+      for (const session of sessions) {
+        if (!session.page) {
+          continue;
+        }
+        const imagePath = path.join(
+          artifactDir,
+          `${captureFileBase({ cycleId, phase, cameraMode: session.cameraMode })}.png`
+        );
+        try {
+          await session.page.waitForTimeout(1_000);
+          if (session.cameraMode === "third_person") {
+            await zoomThirdPersonCloser(session.page, width, height, -900);
           }
-        });
-        manifest.captures.push(record);
-      } catch (error) {
-        await recordFailure(cycleId, phase, error instanceof Error ? error.message : String(error));
+          await withTimeout(
+            session.page.screenshot({
+              path: imagePath,
+              fullPage: false,
+              timeout: 10_000,
+              ...(session.cameraMode === "third_person"
+                ? { clip: thirdPersonScreenshotClip(width, height) }
+                : {})
+            }),
+            12_000,
+            `visual evidence screenshot ${session.cameraMode} ${cycleId} ${phase}`
+          );
+          const imageRef = actorRelativeRef(input.actorDir, imagePath);
+          const record = await writeCaptureArtifact({
+            actorDir: input.actorDir,
+            record: {
+              schema: "visual-evidence-capture/v1",
+              actor_id: input.actorId,
+              run_id: input.runId,
+              cycle_id: cycleId,
+              phase,
+              status: "captured",
+              captured_at: capturedAt,
+              method: "prismarine-viewer-web-screenshot",
+              image_ref: imageRef,
+              image_path: imagePath,
+              viewer_url: session.viewerUrl,
+              bot_position: botPosition(input.bot),
+              camera_mode: session.cameraMode
+            }
+          });
+          manifest.captures.push(record);
+        } catch (error) {
+          await recordFailure(
+            cycleId,
+            phase,
+            error instanceof Error ? error.message : String(error),
+            session.cameraMode,
+            session.viewerUrl
+          );
+        }
       }
     },
     async close() {
-      try {
-        await page?.close();
-      } finally {
-        await browser?.close();
-        const viewer = (input.bot as Bot & { viewer?: { close?: () => void } }).viewer;
-        viewer?.close?.();
+      for (const session of sessions) {
+        try {
+          if (session.page) {
+            await withTimeout(session.page.close(), 5_000, `visual evidence page close ${session.cameraMode}`);
+          }
+        } finally {
+          if (session.browser) {
+            await withTimeout(session.browser.close(), 5_000, `visual evidence browser close ${session.cameraMode}`);
+          }
+          session.closeViewer?.();
+        }
       }
     }
   };

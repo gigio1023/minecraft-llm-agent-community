@@ -58,7 +58,8 @@ function memoryOnlyTrace(turnId: string): EvidenceTraceEntry {
     action_ref: `actions/${turnId}.json`,
     runtime_gate_ref: `gates/${turnId}.json`,
     outcome: "no_progress",
-    compact_summary: "remember preserved blocker note without physical progress"
+    compact_summary: "remember preserved blocker note without physical progress",
+    selected_action: { kind: "use_primitive", id: "remember", title: "Remember" }
   };
 }
 
@@ -68,9 +69,8 @@ test("decision frame uses structure evidence instead of pending checklist as ope
     observer_id: "npc_b",
     inventory_counts: { oak_planks: 4 },
     visible_actors: [],
-    nearby_block_hints: [],
+    nearby_block_observations: [],
     shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-    deposit_candidates: [],
     structure_progress: {
       status: "progressing",
       total_placed_blocks: 6,
@@ -89,7 +89,9 @@ test("decision frame uses structure evidence instead of pending checklist as ope
     settlement_progress: {
       inventory_counts: { oak_planks: 4 },
       shared_storage_status: "unknown",
-      known_position_summaries: ["shelter=progressing"],
+      known_positions: {
+        shelter: { status: "progressing", anchor: { x: -2, y: 64, z: -22 }, evidence_refs: ["evidence/cycle-0017-action-01-build_pattern.json"] }
+      },
       checklist: [
         {
           id: "starter_shelter_verified",
@@ -145,13 +147,14 @@ test("decision frame exposes death and respawn as current truth before older epi
       notes: ["A death event can reset inventory and invalidate older position/material assumptions."]
     },
     visible_actors: [],
-    nearby_block_hints: [],
+    nearby_block_observations: [],
     shared_storage: { status: "unknown", items: [], evidence_refs: [] },
-    deposit_candidates: [],
     settlement_progress: {
       inventory_counts: {},
       shared_storage_status: "unknown",
-      known_position_summaries: ["actor_position=(4, 65, 6)"],
+      known_positions: {
+        actor: { position: { x: 4, y: 65, z: 6 }, evidence_refs: [] }
+      },
       checklist: [],
       recent_blockers: []
     }

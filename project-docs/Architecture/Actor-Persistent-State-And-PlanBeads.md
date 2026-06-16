@@ -137,7 +137,7 @@ tracked concern is satisfied.
 | `ActorMemoryRecord` | historical evidence-linked recall | active work source of truth |
 | runtime evidence | observed game/runtime facts | provider intention |
 
-`StrategicGoal` is a legacy-adjacent medium-horizon interpretation. New
+`StrategicGoal` is a archived-adjacent medium-horizon interpretation. New
 restart-safe multi-cycle work should become PlanBeads and PlanBead dependencies,
 not a second persistent middle layer.
 
@@ -247,6 +247,21 @@ The field names intentionally echo issue trackers:
 - `metadata` is for bounded implementation or review annotations that do not
   deserve first-class schema yet.
 
+Automatic lifecycle updates are opt-in structured metadata, not title,
+description, or acceptance-prose parsing. If runtime evidence may close or update
+a PlanBead, use metadata signals such as:
+
+```json
+{
+  "lifecycle_close_signals": ["deposit_shared:oak_log", "crafted:crafting_table"],
+  "lifecycle_incomplete_signals": ["inspect_chest"]
+}
+```
+
+Without those signals, matching runtime evidence can still be shown to the Actor
+Turn LLM or branch-time Deliberation as context, but the lifecycle helper must
+not infer a close/update operation from PlanBead prose.
+
 ## Dependency Edges
 
 The PlanBead graph uses explicit dependency records:
@@ -310,7 +325,7 @@ A bead is ready when:
   `notes.next` to support a bounded Active Episode focus or compatibility
   CycleGoal.
 
-The ready front is context, not a command. It helps legacy CycleGoal routing
+The ready front is context, not a command. It helps archived CycleGoal routing
 when that path is explicitly under migration, and it helps branch-time
 Deliberation / Active Episode selection on the Actor Turn path. The Actor Turn
 provider may see only compact hints. Any selected Action Card or
@@ -417,7 +432,7 @@ plus a small blocked/in-progress summary when it explains current choice.
 ## Provider Proposal Boundary
 
 Providers may propose `bead_op_proposals` only through runtime-approved stages.
-The legacy social-cycle path accepts them from `CycleJudgment`, because judgment
+The archived social-cycle path accepts them from `CycleJudgment`, because judgment
 has the latest evidence interpretation in that path. The Actor Episode / Actor
 Turn path moves ordinary turns away from provider `CycleJudgment`; branch-time
 Deliberation is the approved transport for PlanBead operation proposals there.
@@ -571,8 +586,8 @@ Run reports should expose:
 - PlanBeadGraph summary at run start and end;
 - ready front at each cycle, when available;
 - cycle-level `plan_bead_packet_ref` values that point at ready-front snapshots;
-- provider input `compact_plan_bead_hints`, including empty arrays when no
-  current graph hints exist;
+- provider input `source_evidence_bundle.plan_bead_cards`, including empty
+  arrays when no current graph cards exist;
 - PlanBead refs cited by each CycleGoal, Active Episode, Actor Turn selection,
   or runtime action artifact;
 - accepted and rejected bead operations;

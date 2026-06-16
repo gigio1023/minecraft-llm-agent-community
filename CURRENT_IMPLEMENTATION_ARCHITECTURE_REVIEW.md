@@ -40,13 +40,13 @@ flowchart LR
   Soul["ActorSoul + LifeGoal<br/>identity and long-lived direction"]
   Workspace["Actor workspace<br/>evidence, memory, PlanBeads, skills"]
   Observe["Observation<br/>world, inventory, actors, transcript"]
-  Input["ActorTurnInput<br/>current_state, Evidence Trace,<br/>Action Cards, guide, hints"]
+  Input["ActorTurnInput<br/>current_state + source_evidence_bundle,<br/>Action Cards, guide"]
   LLM["Actor Turn LLM<br/>function tool selection"]
   Choice{"Exactly one tool call"}
   Card["Visible Action Card<br/>schema-bound parameters"]
   Author["author_mineflayer_action<br/>request codegen with full context"]
   Runtime["Runtime gates<br/>schema, permission, retry, verifier"]
-  Codegen["Internal Mineflayer codegen<br/>full ActorTurnInput + skill guide"]
+  Codegen["Internal Mineflayer codegen<br/>full ActorTurnInput + raw tool call + skill markdown"]
   MC["Mineflayer + Minecraft"]
   Evidence["Evidence Trace append<br/>reports and artifacts"]
 
@@ -119,6 +119,12 @@ must not turn every turn into a storage or shelter planner. The LLM reads the
 current evidence and Action Cards and decides directly. The runtime executes
 only when that decision passes explicit structured parameters and gates.
 
+`current_state` is the bounded typed fact layer. `source_evidence_bundle` is the
+bounded source layer that keeps observation, world-event, memory, recent-action,
+and PlanBead cards beside those facts. This pairing is intentional: compact
+summaries may help low-cost models, but summary-only observation/social/action
+context loses too much information and recreates a hidden planner bottleneck.
+
 ## Core Terms
 
 | Term | Current meaning |
@@ -126,7 +132,7 @@ only when that decision passes explicit structured parameters and gates.
 | `ActorSoul` | actor identity seed. Long-lived context, not decoration. |
 | `LifeGoal` | actor's long-lived direction. It shapes choices but does not execute. |
 | `ActiveEpisode` | current bounded focus window for ordinary Actor Turns. |
-| `ActorTurnInput` | provider-facing packet: current_state, Evidence Trace, Action Cards, Minecraft Basic Guide, memory refs, relationship context, PlanBead hints, budget hint. |
+| `ActorTurnInput` | provider-facing packet: `current_state`, `source_evidence_bundle`, Action Cards, Minecraft Basic Guide, relationship context, retry constraints, and budget hint. |
 | Action Card | visible function-tool affordance with a strict parameter schema and runtime mapping. |
 | `author_mineflayer_action` | logical tool selection that starts internal full-context Mineflayer codegen. It does not carry source. |
 | runtime action | validated resolved action or generated candidate trial that may reach Mineflayer. |
@@ -220,7 +226,7 @@ durable.
 flowchart LR
   Beads["PlanBeadGraph<br/>open, in_progress, blocked, deferred, closed"]
   Ready["ready front packet<br/>compact hints only"]
-  Turn["ActorTurnInput<br/>compact_plan_bead_hints"]
+  Turn["ActorTurnInput<br/>source_evidence_bundle.plan_bead_cards"]
   Branch["Deliberation<br/>branch-time only"]
   Applier["guarded PlanBead applier"]
   Evidence["runtime evidence refs"]
@@ -248,10 +254,11 @@ Bad PlanBeads behavior:
 Latest evidence matters here: the 2026-06-04 fresh-world 50-cycle run wrote
 ready-front snapshots on every cycle, but all PlanBead packets were empty:
 `selected_plan_bead_refs=0`, `plan_bead_operation_results=0`,
-`compact_plan_bead_hints=[]`. That means PlanBeads were wired but not
-substantively used in that run. The next implementation pass must create/update
-durable beads from meaningful social requests, completed/blocked episode work,
-and repeated no-progress evidence without turning PlanBeads into an executor.
+`source_evidence_bundle.plan_bead_cards=[]`. That means PlanBeads were wired but
+not substantively used in that run. The next implementation pass must
+create/update durable beads from meaningful social requests, completed/blocked
+episode work, and repeated no-progress evidence without turning PlanBeads into
+an executor.
 
 ## Generated Mineflayer Action Authoring
 
@@ -342,7 +349,7 @@ evidence, and persistence stay traceable despite that size.
 - Existing Action Card parameters are schema-bound and validated before
   execution.
 - `author_mineflayer_action` uses full-context internal codegen instead of a
-  lossy legacy summary.
+  lossy archived summary.
 - Runtime code rejects missing parameters rather than inferring them from prose.
 - Provider usage and artifacts make live runs auditable.
 - Runtime retry constraints can block exact repeated failures before another
@@ -358,7 +365,7 @@ evidence, and persistence stay traceable despite that size.
    decision frame may warn the model, but durable work state still needs to be
    updated.
 3. `socialCycleRunner.ts` is still a large orchestration file.
-4. Some legacy planner provider files and report schemas remain for explicit
+4. Some archived planner provider files and report schemas remain for explicit
    migration or historical artifact readability; they must not be treated as the
    active Actor Turn contract.
 5. Long-run behavior can still loop on observe/inspect/wait or repeated low-value

@@ -2,7 +2,7 @@
  * Full-context Mineflayer codegen contract for Actor Turn authoring.
  *
  * @remarks The request keeps the original ActorTurnInput and raw outer tool
- * call intact. The model must not receive a legacy planner summary as the
+ * call intact. The model must not receive a compressed planner summary as the
  * primary context for generated Mineflayer source.
  */
 import type {
@@ -10,7 +10,10 @@ import type {
   JsonObject,
   JsonValue
 } from "../runtime/goals/actorEpisode/index.js";
-import { mineflayerActionSkillHelperNames } from "../runtime/goals/actorEpisode/index.js";
+import {
+  buildMineflayerCodegenSkillProjection,
+  mineflayerActionSkillHelperNames
+} from "../runtime/goals/actorEpisode/index.js";
 import type { GeneratedActionSkillCandidate } from "../runtime/goals/types.js";
 import type { ActorTurnAuthorMineflayerActionArgs } from "./socialActorTurnToolParser.js";
 
@@ -20,9 +23,26 @@ export type MineflayerCodegenRequest = {
   actor_id: string;
   turn_id: string;
   created_at: string;
+  /**
+   * Full Actor Turn context as it was shown to the outer selection model.
+   *
+   * @remarks This is the main defense against lossy `ActionIntent`-style
+   * bottlenecks. Codegen should reason from the same current_state,
+   * source_evidence_bundle, action surface, memory cards, PlanBead cards, guide,
+   * and retry constraints that produced the outer authoring decision.
+   */
   actor_turn_input: ActorTurnInput;
+  /**
+   * Raw function-call item returned by Actor Turn for `author_mineflayer_action`.
+   *
+   * @remarks This is the outer Actor Turn output, preserved before local parsing
+   * so reviewers and the codegen stage can see the exact selected tool call. It
+   * is paired with `parsed_author_tool_args`, not a replacement for it.
+   */
   raw_outer_tool_call: JsonObject;
+  /** Parsed rationale and desired behavior from the outer authoring tool call. */
   parsed_author_tool_args: ActorTurnAuthorMineflayerActionArgs;
+  /** Full injected agent-skill body that constrains generated Mineflayer source. */
   mineflayer_codegen_skill_markdown: string;
   output_contract: {
     runtime_parameters: string;
@@ -126,7 +146,7 @@ export const mineflayerCodegenProviderSchema = {
 export const mineflayerCodegenSystemPrompt = `You are the internal Mineflayer action skill codegen stage for Actor Turn author_mineflayer_action.
 You receive the full original ActorTurnInput, the raw outer Responses function_call, the parsed author_mineflayer_action arguments, and the full injected mineflayer-code-generation SKILL.md body.
 
-Do not operate from a legacy planner summary. Do not ask for context_to_preserve or choose which context survives; the runtime already supplied the full context.
+Do not operate from a compressed planner summary. Do not ask for context_to_preserve or choose which context survives; the runtime already supplied the full context.
 Generate one bounded actor-owned Mineflayer TypeScript action skill candidate that can be trialed now.
 
 Return JSON only with mineflayer_codegen:
@@ -159,6 +179,7 @@ export function buildMineflayerCodegenRequest(input: {
   parsedAuthorToolArgs: ActorTurnAuthorMineflayerActionArgs;
   previousValidationError?: string;
 }): MineflayerCodegenRequest {
+  const codegenSkill = buildMineflayerCodegenSkillProjection();
   return {
     schema: "mineflayer-codegen-request/v1",
     request_id: input.requestId,
@@ -168,8 +189,7 @@ export function buildMineflayerCodegenRequest(input: {
     actor_turn_input: input.actorTurnInput,
     raw_outer_tool_call: input.rawOuterToolCall,
     parsed_author_tool_args: input.parsedAuthorToolArgs,
-    mineflayer_codegen_skill_markdown:
-      input.actorTurnInput.mineflayer_codegen_skill.skill_markdown,
+    mineflayer_codegen_skill_markdown: codegenSkill.skill_markdown,
     output_contract: {
       runtime_parameters:
         "Exact current runtime inputs for the generated action; every key must be declared by candidate.input_schema.",
@@ -178,7 +198,7 @@ export function buildMineflayerCodegenRequest(input: {
       codegen_rationale:
         "Detailed rationale preserving the outer Actor Turn judgment and full context usage.",
       forbidden_context_boundary:
-        "Do not replace this request with a legacy planner summary, context_to_preserve, selected_context, or any other lossy summary."
+        "Do not replace this request with a compressed planner summary, context_to_preserve, selected_context, or any other lossy summary."
     },
     ...(input.previousValidationError
       ? { previous_validation_error: input.previousValidationError }

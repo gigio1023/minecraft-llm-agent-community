@@ -1,13 +1,11 @@
 import type { SocialCycleContextPacket } from "../cycleContextAssembler.js";
 import type { ActorTurnCurrentStateProjection } from "./types.js";
-import { obligationsFromContext } from "./episodeContextProjection.js";
 import {
   asRecord,
   positionFromRecord,
   readBoolean,
   readNumber,
-  readString,
-  unique
+  readString
 } from "./projectionUtils.js";
 
 function inventoryCountsFromObservation(observation: unknown) {
@@ -49,25 +47,49 @@ function visibleActorsFromObservation(observation: unknown): ActorTurnCurrentSta
     .slice(0, 8);
 }
 
-function nearbyBlockHintsFromObservation(observation: unknown) {
+type NearbyBlockObservation = ActorTurnCurrentStateProjection["nearby_block_observations"][number];
+
+function nearbyBlocksFromObservation(observation: unknown): NearbyBlockObservation[] {
   const nearbyBlocks = asRecord(observation)?.nearbyBlocks;
   if (!Array.isArray(nearbyBlocks)) {
     return [];
   }
-  return nearbyBlocks
-    .map((block) => {
-      const record = asRecord(block);
-      const name = readString(record?.name);
-      if (!name) {
-        return null;
-      }
-      return {
-        name,
-        ...(readNumber(record?.distance) !== undefined ? { distance: readNumber(record?.distance) } : {})
-      };
-    })
-    .filter((block): block is { name: string; distance?: number } => block !== null)
-    .slice(0, 16);
+  const observations: NearbyBlockObservation[] = [];
+  for (const block of nearbyBlocks) {
+    const record = asRecord(block);
+    const name = readString(record?.name);
+    if (!name) {
+      continue;
+    }
+    observations.push({
+      name,
+      ...(positionFromRecord(record?.position) ? { position: positionFromRecord(record?.position) } : {}),
+      ...(readNumber(record?.distance) !== undefined ? { distance: readNumber(record?.distance) } : {}),
+      source: "observation_nearby_block",
+      evidence_refs: []
+    });
+  }
+  return observations.slice(0, 16);
+}
+
+function nearbyBlockKey(block: NearbyBlockObservation) {
+  return block.position
+    ? `${block.name}:${block.position.x}:${block.position.y}:${block.position.z}`
+    : `${block.name}:distance:${block.distance ?? "unknown"}:${block.source}`;
+}
+
+function uniqueNearbyBlockObservations(blocks: NearbyBlockObservation[]) {
+  const seen = new Set<string>();
+  const result: NearbyBlockObservation[] = [];
+  for (const block of blocks) {
+    const key = nearbyBlockKey(block);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(block);
+  }
+  return result.slice(0, 20);
 }
 
 function vitalsFromObservation(observation: unknown): ActorTurnCurrentStateProjection["vitals"] | undefined {
@@ -151,6 +173,16 @@ function sessionLifecycleFromObservation(
   };
 }
 
+function scanExampleFromRecord(value: unknown) {
+  const record = asRecord(value);
+  const name = readString(record?.name);
+  const position = positionFromRecord(record?.position);
+  const distance = readNumber(record?.distance);
+  return name && position && distance !== undefined
+    ? { name, position, distance }
+    : null;
+}
+
 function worldScanFromObservation(observation: unknown): ActorTurnCurrentStateProjection["world_scan"] | undefined {
   const summary = asRecord(asRecord(observation)?.worldStateSummary);
   if (!summary) {
@@ -159,6 +191,7 @@ function worldScanFromObservation(observation: unknown): ActorTurnCurrentStatePr
   const blockObservations = asRecord(summary.block_observations);
   const loadedCoverage = asRecord(summary.loaded_coverage);
   const byName = Array.isArray(blockObservations?.by_name) ? blockObservations.by_name : [];
+  const nearest = Array.isArray(blockObservations?.nearest) ? blockObservations.nearest : [];
   const retainedBlockCounts = byName
     .map((entry) => {
       const record = asRecord(entry);
@@ -168,14 +201,60 @@ function worldScanFromObservation(observation: unknown): ActorTurnCurrentStatePr
     })
     .filter((entry): entry is { name: string; count: number } => entry !== null)
     .slice(0, 16);
+  const namedBlockExamples = byName
+    .map((entry) => {
+      const record = asRecord(entry);
+      const name = readString(record?.name);
+      const count = readNumber(record?.count);
+      const examples = Array.isArray(record?.nearest)
+        ? record.nearest
+            .map((example) => {
+              const exampleRecord = asRecord(example);
+              const parsed = exampleRecord ? scanExampleFromRecord({ ...exampleRecord, name }) : null;
+              return parsed ? { position: parsed.position, distance: parsed.distance } : null;
+            })
+            .filter((example): example is { position: { x: number; y: number; z: number }; distance: number } =>
+              example !== null
+            )
+            .slice(0, 4)
+        : [];
+      return name && count !== undefined
+        ? { name, count, nearest: examples }
+        : null;
+    })
+    .filter((entry): entry is { name: string; count: number; nearest: Array<{ position: { x: number; y: number; z: number }; distance: number }> } =>
+      entry !== null
+    )
+    .slice(0, 12);
   return {
     scan_id: readString(summary.scan_id) ?? "unknown-scan",
+    ...(readString(summary.scan_ref) ? { scan_ref: readString(summary.scan_ref) } : {}),
+    ...(positionFromRecord(summary.center) ? { center: positionFromRecord(summary.center) } : {}),
     ...(readNumber(summary.radius) !== undefined ? { radius: readNumber(summary.radius) } : {}),
+    ...(asRecord(summary.vertical_range) &&
+      readNumber(asRecord(summary.vertical_range)?.min_y) !== undefined &&
+      readNumber(asRecord(summary.vertical_range)?.max_y) !== undefined &&
+      readNumber(asRecord(summary.vertical_range)?.center_y) !== undefined
+      ? {
+          vertical_range: {
+            min_y: readNumber(asRecord(summary.vertical_range)?.min_y) as number,
+            max_y: readNumber(asRecord(summary.vertical_range)?.max_y) as number,
+            center_y: readNumber(asRecord(summary.vertical_range)?.center_y) as number
+          }
+        }
+      : {}),
     coverage_scope: readString(loadedCoverage?.scope) ?? "unknown_scope",
     absence_claims_exhaustive: readBoolean(loadedCoverage?.absence_claims_exhaustive) ?? false,
     total_verified_blocks: readNumber(blockObservations?.total_verified) ?? 0,
     truncated: readBoolean(blockObservations?.truncated) ?? false,
     retained_block_counts: retainedBlockCounts,
+    nearest_blocks: nearest
+      .map(scanExampleFromRecord)
+      .filter((entry): entry is { name: string; position: { x: number; y: number; z: number }; distance: number } =>
+        entry !== null
+      )
+      .slice(0, 16),
+    named_block_examples: namedBlockExamples,
     limitations: Array.isArray(summary.limitations)
       ? summary.limitations.filter((entry): entry is string => typeof entry === "string").slice(0, 6)
       : []
@@ -199,11 +278,6 @@ function blockerProjection(context: SocialCycleContextPacket) {
   }));
 }
 
-function positionSummary(value: unknown) {
-  const position = positionFromRecord(value);
-  return position ? `(${position.x}, ${position.y}, ${position.z})` : undefined;
-}
-
 function distanceBetween(
   left: NonNullable<ActorTurnCurrentStateProjection["position"]>,
   right: NonNullable<ActorTurnCurrentStateProjection["position"]>
@@ -214,40 +288,55 @@ function distanceBetween(
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function tableUsabilitySuffix(input: {
-  actorPosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>;
-  tablePosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>;
-}) {
-  if (!input.actorPosition || !input.tablePosition) {
-    return "";
-  }
-  const distance = distanceBetween(input.actorPosition, input.tablePosition);
-  const rounded = Math.round(distance * 10) / 10;
-  return ` distance_from_actor=${rounded} usable_now=${distance <= 4.5}`;
-}
-
-function knownPositionSummaries(
+function knownPositionsProjection(
   context: SocialCycleContextPacket,
   actorPosition?: NonNullable<ActorTurnCurrentStateProjection["position"]>
-) {
+): ActorTurnCurrentStateProjection["settlement_progress"]["known_positions"] {
   const positions = context.settlement_state.known_positions;
-  const structureProgress = context.settlement_state.structure_progress;
   const craftingTablePosition = positions.crafting_table?.position
     ? positionFromRecord(positions.crafting_table.position)
     : undefined;
-  return [
-    positions.actor_position ? `actor_position=${positionSummary(positions.actor_position)}` : undefined,
-    positions.crafting_table
-      ? `crafting_table=${positions.crafting_table.status}${
-          positions.crafting_table.position ? ` at ${positionSummary(positions.crafting_table.position)}` : ""
-        }${tableUsabilitySuffix({ actorPosition, tablePosition: craftingTablePosition })}`
-      : undefined,
-    positions.shared_chest ? `shared_chest=${positions.shared_chest.status}` : undefined,
-    positions.shelter ? `shelter=${positions.shelter.status}` : undefined,
-    structureProgress.status !== "none"
-      ? `structure_progress=${structureProgress.status} placed_blocks=${structureProgress.total_placed_blocks}`
-      : undefined
-  ].filter((entry): entry is string => Boolean(entry));
+  const tableDistance = actorPosition && craftingTablePosition
+    ? distanceBetween(actorPosition, craftingTablePosition)
+    : undefined;
+  return {
+    ...(positions.actor_position && positionFromRecord(positions.actor_position)
+      ? {
+          actor: {
+            position: positionFromRecord(positions.actor_position) as { x: number; y: number; z: number },
+            evidence_refs: []
+          }
+        }
+      : {}),
+    ...(positions.crafting_table
+      ? {
+          crafting_table: {
+            status: positions.crafting_table.status,
+            ...(craftingTablePosition ? { position: craftingTablePosition } : {}),
+            ...(tableDistance !== undefined ? { distance_from_actor: Math.round(tableDistance * 10) / 10 } : {}),
+            ...(tableDistance !== undefined ? { usable_now: tableDistance <= 4.5 } : {}),
+            evidence_refs: [...positions.crafting_table.evidence_refs]
+          }
+        }
+      : {}),
+    ...(positions.shared_chest
+      ? {
+          shared_chest: {
+            status: positions.shared_chest.status,
+            evidence_refs: [...positions.shared_chest.evidence_refs]
+          }
+        }
+      : {}),
+    ...(positions.shelter
+      ? {
+          shelter: {
+            status: positions.shelter.status,
+            ...(positions.shelter.anchor ? { anchor: { ...positions.shelter.anchor } } : {}),
+            evidence_refs: [...positions.shelter.evidence_refs]
+          }
+        }
+      : {})
+  };
 }
 
 function sharedStorageProjection(context: SocialCycleContextPacket): ActorTurnCurrentStateProjection["shared_storage"] {
@@ -280,129 +369,20 @@ function structureProgressProjection(
   };
 }
 
-function requestLikeWorldEvents(context: SocialCycleContextPacket) {
-  return context.world_events.filter((event) =>
-    /\b(request|obligation|need|help|shared|deposit|deliver|contribut|material|resource|storage|chest)\b/i
-      .test(event.summary)
-  );
-}
-
-function normalizeItemText(value: string) {
-  return value.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function eventMentionsItem(summary: string, itemName: string) {
-  const normalizedSummary = normalizeItemText(summary);
-  const normalizedItem = normalizeItemText(itemName);
-  return normalizedSummary.includes(normalizedItem) || normalizedSummary.includes(itemName.toLowerCase());
-}
-
-function eventRequestsGenericMaterials(summary: string) {
-  return /\b(material|materials|resource|resources|useful|supplies|shared storage|shared chest|deposit|contribut)\b/i
-    .test(summary);
-}
-
-function eventMentionsSpecificMinecraftItem(summary: string) {
-  return /\b[a-z]+_[a-z_]+\b/i.test(summary) ||
-    /\b(oak|spruce|birch|jungle|acacia|dark oak|mangrove|cherry)\s+(log|planks|wood)\b/i.test(summary);
-}
-
-function eventMatchesDepositCandidate(input: {
-  summary: string;
-  itemName: string;
-  inventoryItemNames: readonly string[];
-}) {
-  if (eventMentionsItem(input.summary, input.itemName)) {
-    return true;
+function blockObservationsFromWorldScan(
+  worldScan: ActorTurnCurrentStateProjection["world_scan"] | undefined
+): NearbyBlockObservation[] {
+  if (!worldScan) {
+    return [];
   }
-  const eventMentionsAnyInventoryItem = input.inventoryItemNames.some((inventoryItemName) =>
-    eventMentionsItem(input.summary, inventoryItemName)
-  );
-  return !eventMentionsAnyInventoryItem &&
-    !eventMentionsSpecificMinecraftItem(input.summary) &&
-    eventRequestsGenericMaterials(input.summary);
-}
-
-function requestedCountFromSummary(summary: string) {
-  const numeric = summary.match(/\b([1-9]\d*)\b/);
-  if (numeric) {
-    return Number(numeric[1]);
-  }
-  if (/\bone\b/i.test(summary)) {
-    return 1;
-  }
-  if (/\btwo\b/i.test(summary)) {
-    return 2;
-  }
-  if (/\bthree\b/i.test(summary)) {
-    return 3;
-  }
-  return undefined;
-}
-
-function sharedStorageItemCount(context: SocialCycleContextPacket, itemName: string) {
-  return context.settlement_state.shared_storage.items
-    .filter((item) => item.name === itemName)
-    .reduce((sum, item) => sum + item.count, 0);
-}
-
-function requestSatisfiedBySharedStorage(input: {
-  context: SocialCycleContextPacket;
-  summary: string;
-  itemName: string;
-}) {
-  if (!eventMentionsItem(input.summary, input.itemName)) {
-    return false;
-  }
-  const requestedCount = requestedCountFromSummary(input.summary) ?? 1;
-  return sharedStorageItemCount(input.context, input.itemName) >= requestedCount;
-}
-
-function eventRefsForProvider(event: SocialCycleContextPacket["world_events"][number]) {
-  return event.evidence_refs.length > 0 ? [...event.evidence_refs] : [`world-events/${event.event_id}.json`];
-}
-
-function depositCandidatesFromContext(
-  context: SocialCycleContextPacket,
-  inventoryCounts: Record<string, number>
-): ActorTurnCurrentStateProjection["deposit_candidates"] {
-  const requestEvents = requestLikeWorldEvents(context);
-  const actorId = context.ActorSoul.actor_id;
-  const inventoryItemNames = Object.entries(inventoryCounts)
-    .filter(([, count]) => count > 0)
-    .map(([itemName]) => itemName);
-  return Object.entries(inventoryCounts)
-    .filter(([, count]) => count > 0)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .slice(0, 12)
-    .map(([itemName, inventoryCount]) => {
-      const matchingEvents = requestEvents.filter((event) =>
-        eventMatchesDepositCandidate({
-          summary: event.summary,
-          itemName,
-          inventoryItemNames
-        })
-      );
-      const openMatchingEvents = matchingEvents.filter((event) =>
-        !requestSatisfiedBySharedStorage({ context, summary: event.summary, itemName })
-      );
-      const requestedCount = matchingEvents
-        .map((event) => requestedCountFromSummary(event.summary))
-        .find((count): count is number => count !== undefined);
-      const suggestedCount = Math.max(1, Math.min(inventoryCount, requestedCount ?? 1));
-      return {
-        itemName,
-        inventoryCount,
-        suggestedCount,
-        maxDepositableCount: inventoryCount,
-        socially_requested: openMatchingEvents.length > 0,
-        requested_by_actor_ids: unique(
-          openMatchingEvents.flatMap((event) => event.actor_refs).filter((ref) => ref !== actorId)
-        ).slice(0, 6),
-        request_summaries: unique(openMatchingEvents.map((event) => event.summary)).slice(0, 3),
-        evidence_refs: unique(openMatchingEvents.flatMap(eventRefsForProvider)).slice(0, 6)
-      };
-    });
+  const scanRef = worldScan.scan_ref ?? `world-scan/${worldScan.scan_id}`;
+  return worldScan.nearest_blocks.slice(0, 16).map((block) => ({
+    name: block.name,
+    position: { ...block.position },
+    distance: block.distance,
+    source: "world_scan_nearest",
+    evidence_refs: [scanRef]
+  }));
 }
 
 export function buildActorTurnCurrentStateProjection(
@@ -414,6 +394,11 @@ export function buildActorTurnCurrentStateProjection(
   const actorPosition = positionFromRecord(asRecord(observation)?.position);
   const structureProgress = structureProgressProjection(context);
   const sessionLifecycle = sessionLifecycleFromObservation(observation);
+  const worldScan = worldScanFromObservation(observation);
+  const nearbyBlockObservations = uniqueNearbyBlockObservations([
+    ...blockObservationsFromWorldScan(worldScan),
+    ...nearbyBlocksFromObservation(observation)
+  ]);
   return {
     schema: "actor-turn-current-state/v1",
     observer_id: observerId,
@@ -422,16 +407,14 @@ export function buildActorTurnCurrentStateProjection(
     ...(vitalsFromObservation(observation) ? { vitals: vitalsFromObservation(observation) } : {}),
     ...(sessionLifecycle ? { session_lifecycle: sessionLifecycle } : {}),
     visible_actors: visibleActorsFromObservation(observation),
-    obligation_summaries: obligationsFromContext(context),
-    nearby_block_hints: nearbyBlockHintsFromObservation(observation),
+    nearby_block_observations: nearbyBlockObservations,
     shared_storage: sharedStorageProjection(context),
-    deposit_candidates: depositCandidatesFromContext(context, inventoryCounts),
-    ...(worldScanFromObservation(observation) ? { world_scan: worldScanFromObservation(observation) } : {}),
+    ...(worldScan ? { world_scan: worldScan } : {}),
     ...(structureProgress ? { structure_progress: structureProgress } : {}),
     settlement_progress: {
       inventory_counts: { ...context.settlement_state.inventory_counts },
       shared_storage_status: context.settlement_state.shared_storage.status,
-      known_position_summaries: knownPositionSummaries(context, actorPosition),
+      known_positions: knownPositionsProjection(context, actorPosition),
       checklist: checklistProjection(context),
       recent_blockers: blockerProjection(context)
     }

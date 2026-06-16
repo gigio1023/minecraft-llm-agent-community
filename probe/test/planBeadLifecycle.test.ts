@@ -16,7 +16,7 @@ import {
   type ActorPlanBead,
   type PlanBeadOperation
 } from "../src/runtime/goals/planBeads/index.js";
-import type { LegacyPlannerAction } from "../src/runtime/goals/types.js";
+import type { ActorTurnResolvedAction, JsonObject } from "../src/runtime/goals/actorEpisode/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const actorId = "npc_b";
@@ -37,6 +37,7 @@ function bead(input: {
   description: string;
   evidenceRequired: string[];
   status?: ActorPlanBead["status"];
+  metadata?: ActorPlanBead["metadata"];
 }): ActorPlanBead {
   return {
     schema: "actor-plan-bead/v1",
@@ -61,7 +62,7 @@ function bead(input: {
       key_decisions: []
     },
     labels: [],
-    metadata: {},
+    metadata: input.metadata ?? {},
     refs: {
       evidence_refs: [],
       memory_refs: [],
@@ -86,17 +87,18 @@ function bead(input: {
 
 function intent(input: {
   primitiveId: string;
-  parameters?: Record<string, unknown>;
-}): LegacyPlannerAction {
+  parameters?: JsonObject;
+}): ActorTurnResolvedAction {
   return {
-    schema: "legacy-planner-action/v1",
+    schema: "actor-turn-resolved-action/v1",
     actor_id: actorId,
     cycle_id: "cycle-0001",
     cycle_goal_id: "cycle-goal-0001",
     kind: "use_primitive",
+    action_card_id: `primitive:${input.primitiveId}`,
     primitive_id: input.primitiveId,
-    args: input.parameters ?? {},
     parameters: input.parameters ?? {},
+    expected_outcome: "record_blocker_or_done",
     why_this_action: "Runtime lifecycle test intent.",
     expected_evidence: ["runtime evidence"],
     fallback_if_blocked: "record blocker"
@@ -132,7 +134,8 @@ test("deposit_shared runtime evidence closes a matching shared-storage PlanBead 
       beadId: "bead-shared-storage",
       title: "Contribute useful materials to shared storage",
       description: "npc_a needs oak logs deposited into the shared chest.",
-      evidenceRequired: ["deposit_shared evidence with moved count"]
+      evidenceRequired: ["deposit_shared evidence with moved count"],
+      metadata: { lifecycle_close_signals: ["deposit_shared:oak_log"] }
     }));
 
     const operations = derivePlanBeadLifecycleOperationsFromTurnEvidence({
@@ -146,7 +149,8 @@ test("deposit_shared runtime evidence closes a matching shared-storage PlanBead 
         beadId: "bead-shared-storage",
         title: "Contribute useful materials to shared storage",
         description: "npc_a needs oak logs deposited into the shared chest.",
-        evidenceRequired: ["deposit_shared evidence with moved count"]
+        evidenceRequired: ["deposit_shared evidence with moved count"],
+        metadata: { lifecycle_close_signals: ["deposit_shared:oak_log"] }
       })]
     });
     assert.equal(operations.length, 1);
@@ -176,7 +180,11 @@ test("inspect_chest updates a deposit bead as incomplete instead of closing it",
     beadId: "bead-deposit",
     title: "Deposit oak logs into shared chest",
     description: "The actor should contribute materials, not only inspect the chest.",
-    evidenceRequired: ["deposit_shared movedCount > 0"]
+    evidenceRequired: ["deposit_shared movedCount > 0"],
+    metadata: {
+      lifecycle_close_signals: ["deposit_shared:oak_log"],
+      lifecycle_incomplete_signals: ["inspect_chest"]
+    }
   });
   const operations = derivePlanBeadLifecycleOperationsFromTurnEvidence({
     actorId,
@@ -199,7 +207,8 @@ test("current shared-storage contribution evidence closes stale deposit-access P
     beadId: "bead-shared-storage-access",
     title: "Verify shared chest access for oak_log deposit",
     description: "npc_a needs one oak_log deposited into shared storage before trusting progress.",
-    evidenceRequired: ["runtime evidence matching this PlanBead's concern"]
+    evidenceRequired: ["runtime evidence matching this PlanBead's concern"],
+    metadata: { lifecycle_close_signals: ["deposit_shared:oak_log"] }
   });
 
   const operations = derivePlanBeadLifecycleOperationsFromCurrentState({
@@ -211,12 +220,7 @@ test("current shared-storage contribution evidence closes stale deposit-access P
         status: "contributed",
         items: [{ name: "oak_log", count: 1 }],
         evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
-      },
-      deposit_candidates: [
-        {
-          socially_requested: false
-        }
-      ]
+      }
     },
     beads: [staleAccessBead]
   });
@@ -226,36 +230,6 @@ test("current shared-storage contribution evidence closes stale deposit-access P
   assert.equal(operations[0]?.bead_id, "bead-shared-storage-access");
   assert.equal(operations[0]?.patch.status, "closed");
   assert.match(operations[0]?.patch.close_reason ?? "", /deposited oak_log/);
-});
-
-test("current shared-storage lifecycle does not close when a social deposit request is still open", () => {
-  const openRequestBead = bead({
-    beadId: "bead-shared-storage-open-request",
-    title: "Deposit oak logs into shared chest",
-    description: "A newer actor request still needs more oak_log in shared storage.",
-    evidenceRequired: ["deposit_shared evidence"]
-  });
-
-  const operations = derivePlanBeadLifecycleOperationsFromCurrentState({
-    actorId,
-    cycleId: "cycle-0002",
-    turnId: "cycle-0002-current-state",
-    currentState: {
-      shared_storage: {
-        status: "contributed",
-        items: [{ name: "oak_log", count: 1 }],
-        evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
-      },
-      deposit_candidates: [
-        {
-          socially_requested: true
-        }
-      ]
-    },
-    beads: [openRequestBead]
-  });
-
-  assert.deepEqual(operations, []);
 });
 
 test("current shared-storage lifecycle does not close unrelated item-only PlanBeads", () => {
@@ -275,8 +249,7 @@ test("current shared-storage lifecycle does not close unrelated item-only PlanBe
         status: "contributed",
         items: [{ name: "oak_log", count: 1 }],
         evidence_refs: ["evidence/cycle-0001-action-01-deposit_shared.json"]
-      },
-      deposit_candidates: []
+      }
     },
     beads: [collectWoodBead]
   });
@@ -289,7 +262,8 @@ test("crafted item evidence closes only a matching crafting PlanBead", () => {
     beadId: "bead-crafting-table",
     title: "Craft crafting_table for table recipes",
     description: "The actor needs a crafting_table item before placing a station.",
-    evidenceRequired: ["crafted crafting_table inventory delta"]
+    evidenceRequired: ["crafted crafting_table inventory delta"],
+    metadata: { lifecycle_close_signals: ["crafted:crafting_table"] }
   });
   const unrelated = bead({
     beadId: "bead-storage",
@@ -348,7 +322,8 @@ test("lifecycle operations do not carry executable authority fields", () => {
         beadId: "bead-shared-storage",
         title: "Shared storage contribution",
         description: "Deposit oak_log into the shared chest.",
-        evidenceRequired: ["deposit evidence"]
+        evidenceRequired: ["deposit evidence"],
+        metadata: { lifecycle_close_signals: ["deposit_shared:oak_log"] }
       })
     ]
   });
