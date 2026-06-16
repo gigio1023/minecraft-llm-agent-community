@@ -180,6 +180,8 @@ shape active implementation or public docs navigation:
   `research-archive/2026-06-16/expanded-related-work-sweep.md`.
 - single-paper direction analyses such as
   `research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`.
+- single-project reference checks such as
+  `research-archive/2026-06-16/minestudio-reference-check.md`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
