@@ -184,6 +184,8 @@ shape active implementation or public docs navigation:
   `research-archive/2026-06-16/minestudio-reference-check.md`.
 - single-project implementation deep dives such as
   `research-archive/2026-06-16/minestudio-implementation-analysis.md`.
+- research-frame notes such as
+  `research-archive/2026-06-16/social-wam-research-frame.md`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
