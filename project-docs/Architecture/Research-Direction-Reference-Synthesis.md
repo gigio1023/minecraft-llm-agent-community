@@ -18,6 +18,8 @@ Primary archive:
   `project-docs/research-archive/2026-06-16/reference-sweep-beyond-project-sid.md`
 - `NITROGEN_2601_02427_ANALYSIS`:
   `project-docs/research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`
+- `EXPANDED_RELATED_WORK_SWEEP_2026_06_16`:
+  `project-docs/research-archive/2026-06-16/expanded-related-work-sweep.md`
 
 Related active docs:
 
@@ -103,6 +105,37 @@ over-optimizes, collapses diversity, or launders weak evidence into progress.
 | MAgIC, GLEE, MultiAgentBench, Concordia Contest | Mixed motives, cooperation, fairness, rationality, economic games, milestone KPIs, unfamiliar partners. | Add lightweight Minecraft economy through personal possession, claims, obligations, scarcity, and weak public affordances. |
 | SimBench, Sim2Real gap, social-simulation boundary work, solver-sampler mismatch | Plausibility is not validity; model strength may not imply faithful behavior; claims need boundaries. | Report social behavior as behavior, with cost and failure traces. Keep human-fidelity claims for a later validation layer. |
 | NitroGen, VPT, SIMA, GATO, Game-TARS | Generalist visual game-action policies, action-labeled gameplay data, unified action spaces, and cross-game transfer evaluation. | Treat as a future low-level policy substrate and contrast class. Do not make visual motor-control performance the current social benchmark target. |
+| MineExplorer, MCU, MineStudio, Plancraft | Scalable Minecraft task pools, hidden dependency graphs, rule/VLM milestone checks, solvable and unsolvable planning cases. | Use as competence gates, task pressure sources, and milestone design references. Do not make task success the social contribution. |
+| ALEM, Craftax, Multi-Agent Craftax, Melting Pot | Open-ended multi-agent coordination, base vs coordination rewards, partner/social generalization, fast ablation environments. | Separate base Minecraft progress from coordination/social progress; add seed/partner/role generalization. |
+| MineLand, PARTNR, TEACh, CoELA | Limited senses, physical needs, embodied dialogue, heterogeneous capabilities, human-robot style collaboration. | Add controlled social pressure variables: distance-limited communication, needs, asymmetric tools/knowledge, clarification, and recovery. |
+
+## Expanded Related Work Boundary
+
+The expanded sweep strengthens three boundaries:
+
+1. Minecraft task competence is necessary but not sufficient.
+2. Multi-agent coordination is the closest active research neighbor.
+3. Social simulation validity must be bounded to what the artifacts actually
+   prove.
+
+Most actionable additions:
+
+- use MineExplorer-style hidden dependency graphs and rule-based milestones, but
+  turn the graph into social/material dependencies;
+- use ALEM-style separate scoring for base progress and coordination progress;
+- use GLEE/MultiAgentBench metrics for fairness, efficiency, and contribution
+  only when Minecraft material constraints make them real;
+- use MineLand/PARTNR/TEACh pressure variables: limited senses, distance,
+  physical needs, heterogeneous capabilities, clarification, and recovery;
+- use SimBench/boundary papers to avoid claiming human society realism.
+
+The resulting benchmark frame should be:
+
+```text
+Do not ask whether agents can merely complete a Minecraft task.
+Ask whether a social event changes verified Minecraft state and constrains
+future behavior.
+```
 
 ## NitroGen Boundary
 
