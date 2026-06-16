@@ -22,6 +22,8 @@ Primary archive:
   `project-docs/research-archive/2026-06-16/expanded-related-work-sweep.md`
 - `MINESTUDIO_REFERENCE_CHECK_2026_06_16`:
   `project-docs/research-archive/2026-06-16/minestudio-reference-check.md`
+- `MINESTUDIO_IMPLEMENTATION_ANALYSIS_2026_06_16`:
+  `project-docs/research-archive/2026-06-16/minestudio-implementation-analysis.md`
 
 Related active docs:
 
@@ -171,6 +173,39 @@ Mineflayer/action skill executes today.
 Future vision-action policy may execute low-level control.
 Runtime evidence remains authoritative either way.
 ```
+
+## MineStudio Implementation Boundary
+
+MineStudio has substantial implementation depth. It should not be dismissed as
+only a benchmark list or paper artifact. The cloned repo includes a
+Gymnasium-style `MinecraftSim`, vendored MineRL/Malmo simulator code, simulator
+callbacks, VPT/STEVE-1/GROOT/ROCKET policies, trajectory datasets,
+offline/online training, Ray inference, YAML task configs, and VLM/video review
+scripts.
+
+Local boundary:
+
+```text
+MineStudio is deep in the visual-policy/MineRL/Malmo layer.
+This repo's active research target is the Actor Turn/Mineflayer/evidence-grounded
+social layer.
+```
+
+Use MineStudio for:
+
+- task manifest discipline;
+- reset and record callback design;
+- controlled competence gates;
+- secondary video/VLM review ideas;
+- future visual-policy baseline lanes.
+
+Do not use MineStudio for:
+
+- replacing the TypeScript Mineflayer runtime;
+- making low-level camera/buttons actions actor authority;
+- treating command-fixtured tasks as natural-world progress;
+- making regex or VLM video scoring runtime truth;
+- making short task completion the social-simulation objective.
 
 ## Operational Definition Of Society For This Repo
 

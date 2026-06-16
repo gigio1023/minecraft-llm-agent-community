@@ -10,6 +10,11 @@ Search token: `MINESTUDIO_REFERENCE_CHECK_2026_06_16`.
 Purpose: check CraftJarvis/MineStudio as a possible reference for this repo's
 Minecraft social-simulation benchmark and runtime harness.
 
+Implementation deep dive:
+
+- `MINESTUDIO_IMPLEMENTATION_ANALYSIS_2026_06_16`:
+  `project-docs/research-archive/2026-06-16/minestudio-implementation-analysis.md`
+
 Conclusion:
 
 ```text
