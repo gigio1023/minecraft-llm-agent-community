@@ -11,7 +11,7 @@ where social claims are constrained by verifiable movement, inventory, crafting,
 storage, material claims, public affordances, communication, memory, and
 shared-world consequences.
 
-[Documentation & Web Portal](https://naem1023.github.io/minecraft-llm-agent-community/)
+[Documentation & Web Portal](https://gigio1023.github.io/minecraft-llm-agent-community/)
 
 ## Current Direction
 
