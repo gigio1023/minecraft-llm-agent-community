@@ -28,6 +28,55 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
 6. If existing code, schemas, paths, or historical artifacts contain older
    vocabulary, treat that wording as a archived identifier. Do not copy it into
    new prose unless you also name the canonical term.
+7. Do not use **verified**, **evidence-backed**, or **evidence-first** as if
+   they were the research contribution. Runtime checking and audit artifacts are
+   experiment hygiene unless the project is explicitly studying verifier models.
+
+## Advisory Social-Material WAM
+
+An **advisory social-material World Action Model** is a predictor of the
+physical, material, and social consequences of candidate embodied Minecraft
+actions.
+
+It predicts deltas before an action and is scored after the action against
+runtime-observed deltas. It does not select the executed action, fill missing
+arguments, declare progress, close obligations, mutate actor state, or override
+runtime checks.
+
+Use **advisory WAM** or **social-material WAM** after the first full mention.
+
+Do not use **structured-state WAM** as the headline. Structured state is the
+representation choice, not the research contribution.
+
+## Social-Material Transition
+
+A **social-material transition** is a typed before/action/after record where an
+embodied Minecraft action changes physical state, possession, access, claims,
+public affordances, obligations, relationship state, memory commitments, or
+future action opportunities.
+
+The preferred dataset unit is `social-material-transition/v1`:
+
+```text
+state_before
+candidate_action
+predicted_delta
+observed_delta
+evidence_refs
+actor/model/provider/partner/seed
+cost/latency/token/action-count metadata
+```
+
+## Verification Hygiene
+
+**Verification hygiene** is the ordinary runtime practice of checking executed
+Minecraft actions against world, inventory, container, position, chat,
+transcript, or structured tool-result observations.
+
+Verification hygiene is required for credible experiments. It is not a novel
+contribution by itself, not a substitute for a research question, and not a
+reason to call a benchmark valuable. Use it as the audit surface that supports
+prediction scoring and run review.
 
 ## Platform-Sensitive Work
 
@@ -422,7 +471,7 @@ validate structured parameters before execution.
 
 For `author_mineflayer_action`, the resolver maps the proposal into the
 action-selection-gated generated action skill trial path. Generated code remains
-schema-bound, helper-limited, verifier-backed, and actor-workspace owned.
+schema-bound, helper-limited, trial-checked, and actor-workspace owned.
 
 ## Runtime Classifier
 

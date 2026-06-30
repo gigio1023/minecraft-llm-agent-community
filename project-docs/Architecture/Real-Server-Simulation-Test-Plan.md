@@ -6,6 +6,12 @@ This plan tests the runtime as a real Minecraft simulation: a managed server is
 running, Mineflayer bots connect to that server, actions mutate world
 state, and artifacts prove or reject progress.
 
+Research-direction update, 2026-06-18: this remains a runtime-readiness plan.
+It is not the research contribution by itself. Under the active Advisory
+Social-Material WAM direction, real-server runs become useful when they also
+emit predicted-vs-observed transition rows for candidate embodied actions.
+Verification, screenshots, logs, and pass/fail checks are expected hygiene.
+
 ## Goal
 
 Prove that the current architecture can run a bounded social-life simulation
@@ -90,7 +96,7 @@ bun run server:stop
 | T3 | Multi-actor connection smoke | deterministic | two actors | both actors connect and produce causal transcript artifacts |
 | T4 | Live Gemini social cycle under concrete world context | Gemini API `gemma-4-31b-it` | one actor | attempts evidence-backed Minecraft progress without fake pass and stays within usage guard |
 | T5 | Explicit target readiness gate | selected provider | one actor | passes only with current-run primitive/action-skill evidence, otherwise blocks |
-| T6 | Long-horizon social-cycle stress test | selected live provider with budget guard | one actor | context continuity, truthful blocked state, partial or complete verifier-backed evidence |
+| T6 | Long-horizon social-cycle stress test | selected live provider with budget guard | one actor | context continuity, truthful blocked state, partial or complete checked outcome evidence |
 
 ## T0: Server Preflight
 
@@ -262,7 +268,7 @@ Pass criteria:
 
 - run audits cleanly;
 - no pass without real gameplay progress;
-- if only one narrow action succeeds, the report names only that verified action
+- if only one narrow action succeeds, the report names only that checked action
   and does not claim broader goal completion;
 - if a target block or item action is attempted, evidence includes before/after
   inventory, position, block, container, or failure facts as applicable;
@@ -302,7 +308,7 @@ bun run probe:social-cycle -- \
   --fresh-world \
   --prepare-spawn-access \
   --world-seed social-context-100cycle-20260524 \
-  --world-event "Long-horizon settlement context: help npc_b make useful Minecraft progress selected from current observation, memory, prior judgment, and action_surface affordances. Progress should be incremental and evidence-first. Do not claim the broader goal is complete without verifier evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
+  --world-event "Long-horizon settlement context: help npc_b make useful Minecraft progress selected from current observation, memory, prior judgment, and action_surface affordances. Progress should be incremental and audit-clean. Do not claim the broader goal is complete without runtime outcome evidence. If blocked, record the exact blocker and pivot to a smaller useful Minecraft action." \
   --report ../tmp/live-social-cycle-gemini-social-context-100.json \
   --no-dashboard
 ```

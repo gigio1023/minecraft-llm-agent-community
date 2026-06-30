@@ -5,7 +5,10 @@ sidebar_position: 5
 # Roadmap
 
 The project is rebuilding from a small reliable core rather than starting with a
-large village simulation.
+large village simulation. The active research target is an advisory
+social-material WAM: a model that predicts how candidate Minecraft actions
+change physical state, possession, access, obligations, relationships, and
+future action opportunities.
 
 ## Current Target
 
@@ -14,7 +17,8 @@ large village simulation.
 - strong transcript and runtime artifacts;
 - truthful stall, failure, and reconnect reporting;
 - actor-owned action skill state;
-- persistent work state that survives context changes.
+- persistent work state that survives context changes;
+- transition rows that separate predicted consequences from observed outcomes.
 
 ## Next Layer
 
@@ -22,7 +26,9 @@ large village simulation.
 - stronger action-surface diagnostics;
 - better actor memory and relationship pressure;
 - bounded generated action-skill authoring through explicit action selection;
-- low-cost social-cycle runs that remain truthful under provider limits.
+- low-cost social-cycle runs that remain truthful under provider limits;
+- a first prompt-based advisory WAM over physical/material deltas;
+- dyadic social-material scenarios such as borrow/lend/return/refuse/repair.
 
 ## Deferred Investigation
 
@@ -38,8 +44,11 @@ large village simulation.
 - an always-on house-building planner;
 - a generic long-horizon autonomy demo;
 - persona text without Minecraft consequences;
+- evidence-first benchmarking as the headline;
+- treating verified actions as the novel contribution;
 - hidden planner heuristics that make the actor look smarter than the evidence
   supports.
 
 The public milestone is simple: a small runtime where observers can inspect what
-happened, why it happened, and what the actor should remember next.
+was predicted, what happened, why it happened, and what the actor should
+remember next.

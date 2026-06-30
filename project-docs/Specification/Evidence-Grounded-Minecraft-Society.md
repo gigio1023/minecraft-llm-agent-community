@@ -10,6 +10,13 @@ Status: active conceptual spec.
 
 Recorded: 2026-06-15 (`Asia/Seoul`).
 
+Direction note, 2026-06-18: this file name is retained for link stability, but
+the active research spine is now
+[`Advisory Social-Material World Action Model`](Advisory-Social-Material-WAM.md).
+Evidence and verification are audit hygiene, not the contribution. This document
+defines the social-material variables that the WAM should predict and the
+runtime should observe.
+
 ## Purpose
 
 This document defines what this repo means by `society`, `organization`, and
@@ -36,7 +43,8 @@ This definition has three important consequences:
 2. A society is not just believable dialogue.
 3. A society is not just task completion by a group.
 
-The social claim requires durable social state and Minecraft evidence.
+The social claim requires durable social state and Minecraft observations. In
+the current WAM framing, these variables are also prediction targets.
 
 ## Why Society Exists In An Open-Ended World
 
@@ -128,7 +136,9 @@ The society needs a common world surface:
 - hazards and safety state;
 - visible world improvements or damage.
 
-The substrate matters because it lets social claims be verified.
+The substrate matters because it lets social-material consequences be observed
+and compared with prior predictions. That check is baseline hygiene, not a
+standalone contribution.
 
 ### 4. Material Claims And Exchange
 
@@ -229,8 +239,9 @@ These are context sources, not mandatory phases.
 
 ## What Counts As Social Progress
 
-Social progress is a verified increase in the system's capacity to continue
-meaningful shared life.
+Social progress is an observed increase in the system's capacity to continue
+meaningful shared life. For the WAM program, the stronger question is whether
+the model predicted that increase before the action happened.
 
 Examples:
 
@@ -277,7 +288,7 @@ borrowing, credit, debt, and public infrastructure to matter.
 
 A society benchmark should report:
 
-- time and cycles to first verified social consequence;
+- time and cycles to first observed social-material consequence;
 - number and type of social events;
 - physical evidence for each social claim;
 - personal possession deltas;
@@ -299,6 +310,13 @@ Who asked for X, who accepted or refused, what changed in the world, who used
 the change, what was remembered, and what did the group do next?
 ```
 
+For the active research spine, also report:
+
+- predicted physical/material/social delta;
+- observed physical/material/social delta;
+- prediction accuracy or calibration by layer;
+- acting outcome separately from prediction outcome.
+
 ## Design Boundary
 
 This spec does not authorize a hidden society manager that chooses goals,
@@ -313,7 +331,7 @@ The runtime should provide:
 - personal possession, material claim, weak commons, public-affordance, and
   obligation state;
 - quota and provider usage guards;
-- verification and artifacts.
+- runtime checks and artifacts.
 
 The Actor Turn provider should still decide within the visible action surface,
 under ActorSoul/LifeGoal and current evidence. Runtime validators decide what

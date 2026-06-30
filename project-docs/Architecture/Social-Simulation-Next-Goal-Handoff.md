@@ -355,7 +355,7 @@ requested.
 
 Answer these before implementation is considered complete:
 
-- Did one actor's verified action change another actor's available choices?
+- Did one actor's checked action outcome change another actor's available choices?
 - Can the final success be proven without reading provider prose?
 - Which exact evidence refs caused the relationship event?
 - Did generated code use runtime helpers, and were helper calls recorded?

@@ -110,7 +110,7 @@ Reject or reframe these ideas:
 - user/assistant peer relationships as the NPC relationship model;
 - cloud recall as source of truth;
 - generic trust scores as success evidence;
-- completed-task diary entries without verifier-backed artifacts.
+- completed-task diary entries without observed runtime artifacts.
 
 ## Action Space Model
 

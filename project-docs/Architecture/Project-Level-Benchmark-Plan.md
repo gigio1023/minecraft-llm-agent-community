@@ -13,6 +13,13 @@ commons, obligations, and cross-actor continuity. Use
 `Material-Claims-And-Social-Economy-Benchmark-Plan.md` for the active social
 economy benchmark ladder.
 
+Research-direction update, recorded 2026-06-18: project-level benchmarks are
+now calibration and data-generation surfaces for Advisory Social-Material WAM.
+They should not be framed as "evidence-first" contributions. Runtime evidence,
+screenshots, ledgers, and pass/fail checks are mandatory audit hygiene. The
+research value comes from whether predicted physical/material/social deltas for
+candidate embodied actions match observed deltas in wild Minecraft worlds.
+
 ## Purpose
 
 This document defines a benchmark direction for evaluating the whole Minecraft
@@ -38,18 +45,19 @@ gates, transcript, evidence, and verifier contracts.
 
 ## Benchmark Philosophy
 
-The benchmark should be project-level and evidence-first.
+The benchmark should be project-level, transition-oriented, and audit-clean.
 
 It should evaluate the full loop:
 
 ```text
 ActorSoul + LifeGoal + current observation + memory + PlanBeads + action surface
+-> optional advisory prediction for candidate action consequences
 -> provider/model Actor Turn
 -> runtime action selection
 -> action-skill or primitive gate
 -> Mineflayer execution
--> verifier evidence
--> transcript, memory, judgment, and next-cycle context
+-> checked runtime outcome evidence
+-> transcript, memory, judgment, transition row, and next-cycle context
 ```
 
 For this project, a benchmark pass means:
@@ -60,6 +68,17 @@ For this project, a benchmark pass means:
 - the report does not launder provider prose into success;
 - later-cycle context preserves relevant consequences, blockers, and unfinished
   work.
+
+For the active WAM direction, a benchmark case should additionally record:
+
+- `state_before`: bounded world, actor, inventory, relationship, obligation,
+  and material-claim context;
+- `candidate_action`: the typed primitive or action skill considered;
+- `predicted_delta`: physical/material/social consequences predicted before
+  execution;
+- `observed_delta`: consequences observed after execution or rejection;
+- `prediction_score`: whether the predicted consequences matched the observed
+  transition, separate from task completion.
 
 This benchmark can include deterministic runs, provider-backed runs, and offline
 provider/context tests, but they must be labeled separately. A deterministic
@@ -311,13 +330,15 @@ Recommended metrics:
 
 | Metric | Meaning |
 |---|---|
-| `goal_pass_rate` | Fraction of goal cases with verifier-backed success |
+| `transition_prediction_accuracy` | Fraction of predicted physical/material/social deltas that match observed deltas |
+| `transition_calibration_error` | Gap between predicted confidence and observed outcome frequency |
+| `goal_pass_rate` | Fraction of goal cases with checked runtime success |
 | `goal_completion_score` | Weighted target-state and milestone completion score |
 | `partial_progress_rate` | Fraction with meaningful current-run progress but incomplete goal |
 | `milestone_coverage` | Fraction of declared progress milestones reached |
-| `time_to_first_progress_ms` | Wall-clock time before first verifier-backed progress |
+| `time_to_first_progress_ms` | Wall-clock time before first checked progress |
 | `time_to_goal_ms` | Wall-clock time before target completion |
-| `cycles_to_first_progress` | Cycles before first verifier-backed progress |
+| `cycles_to_first_progress` | Cycles before first checked progress |
 | `cycles_to_goal` | Cycles before target completion |
 | `actions_to_first_progress` | Runtime attempts before first useful progress |
 | `actions_to_goal` | Runtime attempts before target completion |
@@ -335,11 +356,11 @@ Recommended metrics:
 | `stall_rate` | Fraction of cycles with no new measurable progress |
 | `blocker_recovery_rate` | Fraction of blocker cases that later reach progress or a correct smaller target |
 | `evidence_density` | Useful evidence refs per action attempt |
-| `world_state_delta_count` | Count of verified inventory, block, container, position, or chat deltas |
+| `world_state_delta_count` | Count of observed inventory, block, container, position, or chat deltas |
 | `seed_consistency` | Success stability across repeated seeds or repeated runs |
 | `context_continuity_score` | Later turns use prior judgment, memory, blockers, or PlanBeads correctly |
 | `soul_alignment_score` | Action choices remain coherent with ActorSoul/LifeGoal and social obligations |
-| `social_consequence_score` | Relationship, shared storage, chat, obligation, or settlement state changes are evidence-backed |
+| `social_consequence_score` | Relationship, shared storage, chat, obligation, or settlement state changes are observed and preserved |
 
 Each run should also preserve raw provider input/output refs so later reviewers
 can explain why one model did better than another.
@@ -352,7 +373,7 @@ Per goal case:
 
 | Score | Label | Meaning |
 |---:|---|---|
-| 1.0 | pass | Verifier-backed goal completion in current run |
+| 1.0 | pass | Checked goal completion in current run |
 | 0.7 | strong partial | Most declared milestones reached, goal incomplete |
 | 0.4 | weak partial | At least one declared milestone reached |
 | 0.2 | attempted no progress | Relevant attempt occurred, but no target-state progress |
@@ -375,7 +396,7 @@ invalid or infrastructure-blocked and inspect them separately.
 Hard fail:
 
 - provider prose is the only success evidence;
-- runtime marked pass without verifier-backed world, inventory, position,
+- runtime marked pass without observed world, inventory, position,
   container, chat, or transcript evidence;
 - benchmark harness injects hidden domain strategy or pre-completed target state.
 

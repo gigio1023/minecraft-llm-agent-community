@@ -35,6 +35,7 @@ Prefer:
 - small modules;
 - explicit state transitions;
 - runtime evidence;
+- predicted-vs-observed transition rows when evaluating WAM behavior;
 - typed contracts;
 - explicit runtime action parameter validation;
 - bounded world-state diagnostics;
@@ -52,6 +53,8 @@ Avoid:
 - burying product intent in prompts only.
 - hidden physical-action defaults that turn invalid provider output into
   misleading movement or gameplay.
+- treating verification artifacts as the research result instead of experiment
+  hygiene.
 
 In TypeScript, use narrow types and small modules. In Python-like code, the
 equivalent rule would be to prefer explicit domain models such as Pydantic
@@ -94,6 +97,7 @@ Use comments to explain:
 - why a Minecraft/Mineflayer behavior is non-obvious;
 - how Soul/LifeGoal/social context affects an implementation boundary;
 - how evidence should be interpreted.
+- whether a field belongs to acting, prediction, observed delta, or scoring.
 
 Do not use comments to narrate obvious code. Prefer extracting a named helper
 when a comment becomes too long.
@@ -115,11 +119,13 @@ Use tests this way:
 - protect action-skill gates, runtime action validators, verifier rules,
   artifact refs, world-state diagnostic summaries, compaction invariants, and
   domain models;
+- protect transition-row semantics, especially the separation between
+  `predicted_delta`, `observed_delta`, and acting outcome;
 - delete or rewrite tests that would pass after real logic breaks.
 
 Do not add elaborate test scaffolds for persona richness or long-run autonomy.
 
-## Primary Evidence
+## Primary Evidence And Transition Data
 
 Primary evidence should come from:
 
@@ -133,9 +139,14 @@ Primary evidence should come from:
 - world-state diagnostic artifacts that scope absence claims and loaded-world
   limits;
 - compact provider context packets with evidence refs for long runs.
+- social-material transition rows when WAM behavior is under evaluation.
 
 Smoke tests are allowed as wiring checks. They do not replace current-run
 Minecraft evidence.
+
+For advisory WAM work, the primary research artifact is not the evidence trail
+alone. It is the comparison between predicted and observed deltas, with the
+acting outcome reported separately. Verification remains required hygiene.
 
 ## Documentation
 

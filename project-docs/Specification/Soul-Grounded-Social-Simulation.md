@@ -6,11 +6,16 @@ sidebar_position: 1
 
 This is the product-identity spec.
 
-The project is not "an LLM in Minecraft." It is a Soul-grounded social
-simulation seed that uses Minecraft as a live observation/evidence substrate.
-The runtime should preserve raw world facts, evidence refs, memory, and
-Mineflayer affordances so the model can decide what matters under ActorSoul and
-LifeGoal.
+The project is not "an LLM in Minecraft." It studies advisory social-material
+WAMs in Minecraft, with Soul-grounded social simulation as the motivating
+domain. The runtime should preserve raw world facts, evidence refs, memory, and
+Mineflayer affordances so actors and predictors can reason about what matters
+under ActorSoul and LifeGoal.
+
+Use [`Advisory Social-Material World Action Model`](Advisory-Social-Material-WAM.md)
+as the current research spine. This document explains why actor identity,
+LifeGoal continuity, memory, obligations, and relationships matter as inputs and
+outcomes for that predictor.
 
 ## Core Claim
 
@@ -35,13 +40,13 @@ Soul / ActorSoul
 
 The actor may still gather, craft, place blocks, move, communicate, inspect,
 store, repair, or perform other Minecraft actions. Those actions matter because
-they create social consequences and durable evidence. They are not isolated
-benchmark objectives.
+they create physical, material, and social consequences that can become
+transition rows. They are not isolated benchmark objectives.
 
 The runtime should increase actor autonomy by improving context, action
-surface, gates, hooks, verification, and artifact memory. It should not encode
-one example activity, such as building a house or shelter, as the hidden shape
-of every cycle.
+surface, gates, hooks, transition logging, runtime feedback, and artifact
+memory. It should not encode one example activity, such as building a house or
+shelter, as the hidden shape of every cycle.
 
 ## Soul And Actor Identity
 
@@ -88,7 +93,7 @@ affordances, and settlement commitments.
 
 ## What Counts As Progress
 
-Progress requires both runtime evidence and social interpretation.
+Progress requires both runtime observations and social interpretation.
 
 Examples:
 
@@ -108,8 +113,10 @@ many, not the architecture. A cycle about storage, request fulfillment,
 scarcity, repair, movement, or conflict should not be forced through a building
 plan.
 
-The runtime evidence proves what happened. CycleJudgment explains why it matters
-under Soul/LifeGoal.
+Runtime observation and checks establish what happened. CycleJudgment explains
+why it matters under Soul/LifeGoal. The advisory WAM predicts the expected
+delta before the action; acting outcome and prediction quality must stay
+separate.
 
 ## What Does Not Count
 
@@ -122,6 +129,8 @@ Do not count these as social-simulation success:
   invisible;
 - a successful unit test that never exercises the live runtime path being
   claimed.
+- verified action artifacts by themselves, if they are not tied to a
+  social-material prediction or social consequence question.
 
 ## Social Context Vocabulary
 
@@ -163,7 +172,8 @@ It is one actor that can:
 4. execute or truthfully block a real action;
 5. write CycleJudgment from evidence;
 6. persist memory;
-7. use that memory or prior judgment in a later cycle.
+7. use that memory or prior judgment in a later cycle;
+8. emit transition rows that make predicted-vs-observed consequences inspectable.
 
 For the active definition of `society`, `organization`, `settlement`, and
 `village` in this repo, use

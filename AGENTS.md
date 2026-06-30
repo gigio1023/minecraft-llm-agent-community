@@ -8,14 +8,14 @@ loop.
 Do not revive the old Voyager-style architecture as the active path.
 
 The current implementation goal is not a full village simulator.
-It is a small, bounded, observable runtime that can later grow into an
-evidence-grounded social simulation seed.
+It is a small, bounded, observable runtime that can generate truthful transition
+data for an advisory social-material World Action Model (WAM).
 
 Minecraft task completion is a competence gate, not the final research target.
-The project goal is to evaluate whether LLM-controlled embodied actors can
-sustain socially meaningful behavior in natural Minecraft worlds, where social
-claims are constrained by verifiable movement, inventory, crafting, storage,
-communication, memory, and shared-world consequences.
+The project goal is to study whether a separate advisory predictor can forecast
+how LLM-controlled embodied actors' actions change physical state, material
+access, obligations, relationships, memory, and future action opportunities in
+natural Minecraft worlds.
 
 Immediate target:
 
@@ -24,16 +24,24 @@ Immediate target:
 - transcript and runtime artifacts that explain success, failure, stall, and reconnect;
 - reconnect/session lifecycle that stays truthful when explicitly in scope;
 - architecture support for per-actor action skill ownership and later bounded
-  action skill evolution.
+  action skill evolution;
+- transition rows that can compare predicted consequences with observed
+  consequences without confusing prediction quality with acting success.
 
 North star:
 
+- an advisory social-material WAM that predicts physical, material, social, and
+  later institutional deltas for candidate embodied Minecraft actions;
 - actors, represented by Mineflayer bots, with role context, action skill
   ownership, memory, relationships, obligations, material claims, public
   affordances, weak commons, and visible consequences that persist after one
   immediate task is completed.
-- benchmark and experiment reports that distinguish physical competence from
-  social consequence, continuity, robustness, and efficiency.
+- benchmark and experiment reports that distinguish prediction accuracy, acting
+  outcome, physical competence, social consequence, continuity, robustness, and
+  efficiency.
+- a coding-agent autoresearch loop that can propose improvements to prompts,
+  action surfaces, action skills, scenarios, reports, and predictor code while
+  scoring against locked transition targets.
 
 Not current delivery targets:
 
@@ -41,6 +49,8 @@ Not current delivery targets:
 - long-run autonomy as a product goal;
 - large multi-actor society behavior before single-actor competence is trustworthy.
 - benchmark-maximization as the top-level research objective.
+- presenting runtime verification, logs, screenshots, or scoring scripts as the
+  research contribution.
 
 ## Research Value Boundary
 
@@ -50,7 +60,21 @@ seed/reset records, cost traces, and scoring scripts are support infrastructure:
 they make claims checkable, prevent fake progress, and let runs be reviewed.
 They are necessary hygiene, not the thing being studied.
 
+Verification is expected engineering hygiene. Do not talk as if "verified
+actions" or "verifier-backed evidence" are a novel contribution. Unless this
+repo explicitly starts studying a model-based verifier, checking executed
+Minecraft actions against runtime observations is simply the baseline standard
+for credible embodied-agent experiments.
+
 The research value must come from a more substantive question:
+
+```text
+Can an advisory World Action Model predict how embodied Minecraft actions
+transform physical state, material access, obligations, relationships, memory,
+and future action opportunities in wild, reproducible worlds?
+```
+
+The broader society question still matters:
 
 ```text
 What counts as a Minecraft society, organization, settlement, or social life
@@ -59,21 +83,30 @@ relationships, material stakes, conflict, cooperation, repair, and continuation
 beyond one scripted task?
 ```
 
-Benchmark design should therefore measure lived social behavior, not the
-existence of benchmark artifacts. A good benchmark is a lens for seeing whether
-actors form and maintain meaningful social patterns under Minecraft constraints.
-It is not valuable merely because it records evidence cleanly.
+But benchmark design should now serve the WAM question first: it should produce
+state/action/next-state transition rows and evaluate predicted-vs-observed
+social-material deltas. A good benchmark is a lens for seeing whether actors
+form and maintain meaningful social patterns under Minecraft constraints. It is
+not valuable merely because it records evidence cleanly.
 
 Do not let the project drift into a "reproducibility-only" or
 "evidence-first benchmark" paper. Reproducibility and evidence are the audit
-surface. The main work is defining and testing realistic social dynamics:
+surface. The main work is defining and testing social-material consequence
+prediction:
 
-- why actors stay near each other or separate;
+- what physical/material/social delta a candidate action is expected to cause;
+- why actors stay near each other or separate after a material change;
 - how needs create dependence, exchange, refusal, conflict, or repair;
 - how possession, access, and place become socially meaningful;
 - how roles, norms, obligations, trust, and reputation arise or fail to arise;
 - how social state changes after the immediate goal is done;
 - how the world itself, not just dialogue, shapes collective behavior.
+
+Prediction and acting must be reported separately. A strong actor with a weak
+predictor is not the same result as a weak actor with a calibrated predictor.
+The advisory WAM may inform analysis or future selection, but it must not
+select the executed action, fill missing parameters, declare progress, close
+obligations, or override runtime checks.
 
 Project Sid is a cautionary reference here. It claims broad Minecraft
 civilization-scale behavior, but the public artifact is a technical report plus
@@ -86,6 +119,9 @@ Do not discard useful Project Sid material: extract case designs, metrics,
 failure modes, and prompt/config patterns with exact citation, while labeling
 them as unverified report claims until runnable code, raw logs, scoring scripts,
 or independent replication exist.
+
+Use `project-docs/Specification/Advisory-Social-Material-WAM.md` as the active
+research spine for new direction-setting docs.
 
 ## PlanBeads Intent Rule
 
@@ -284,6 +320,20 @@ Codex/MCP-style references should be adapted as autonomy substrate: action
 surface, direct/deferred tool exposure, hooks, permission gates, event streams,
 verification, and artifacts. Do not adapt them as hidden domain strategy.
 
+WAM, VLA, MineStudio, MineDojo, Voyager, Project Sid, Generative Agents, SOTOPIA,
+Concordia, ENPIRE, Codex, Claude Code, SWE-agent, DSPy, and related systems are
+all references, not specs. Translate them through the active spine:
+
+1. what action-conditioned consequence prediction they teach;
+2. which physical/material/social transition labels they make easier to collect
+   or score;
+3. whether they are actor policy, predictor, loop method, substrate, or only a
+   contrast class.
+
+Do not headline "structured state" or "verified evidence" as the novelty. The
+novelty target is advisory prediction of social-material consequences in wild
+Minecraft, measured against ordinary runtime observations.
+
 ## Canonical Docs
 
 Read these first:
@@ -293,36 +343,37 @@ Read these first:
 3. `CLAUDE.md`
 4. `GEMINI.md`
 5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-7. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
-8. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-9. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-10. `project-docs/Specification/Reference-Adaptation-Guide.md`
-11. `project-docs/Documentation-Map.md`
-12. `project-docs/Agent-Search-Index.md`
-13. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-14. `project-docs/Terminology.md`
-15. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-16. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-17. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-18. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-19. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-20. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-21. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-22. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-23. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-24. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-25. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-26. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-27. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
-28. `project-docs/Architecture/Implementation-Workstreams.md`
-29. `project-docs/Architecture/Action-Skill-Verification.md`
-30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-31. `project-docs/Architecture/Minimal-Probe.md`
-32. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-33. `project-docs/Setup/Headless-Server.md`
-34. `project-docs/Setup/Provider-Setup.md`
-35. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+6. `project-docs/Specification/Advisory-Social-Material-WAM.md`
+7. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+8. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+9. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+10. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+11. `project-docs/Specification/Reference-Adaptation-Guide.md`
+12. `project-docs/Documentation-Map.md`
+13. `project-docs/Agent-Search-Index.md`
+14. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+15. `project-docs/Terminology.md`
+16. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+17. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+18. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+19. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+20. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+21. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+22. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+23. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+24. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+25. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+26. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+27. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+28. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
+29. `project-docs/Architecture/Implementation-Workstreams.md`
+30. `project-docs/Architecture/Action-Skill-Verification.md`
+31. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+32. `project-docs/Architecture/Minimal-Probe.md`
+33. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+34. `project-docs/Setup/Headless-Server.md`
+35. `project-docs/Setup/Provider-Setup.md`
+36. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -502,6 +553,9 @@ Important search tokens:
 - `RUNTIME_ACTION_CONTRACT`
 - `RUNTIME_RETRY_CONSTRAINT`
 - `CONTEXT_COMPACTION`
+- `ADVISORY_SOCIAL_MATERIAL_WAM`
+- `SOCIAL_MATERIAL_TRANSITION`
+- `VERIFICATION_IS_HYGIENE`
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW`
 - `SOCIAL_SIMULATION_SEED`
 - `SPEED_BOUNDED_SOCIAL_SIMULATION`
@@ -518,9 +572,10 @@ Important search tokens:
 
 ## Design Rules
 
-- Use Minecraft as an experiment accelerator.
+- Use Minecraft as an experiment accelerator and embodied social-material
+  transition substrate.
 - The first meaningful proof is not a big society. It is boring competence plus
-  strong observability.
+  transition rows that separate prediction quality from acting outcome.
 - Keep implementation aggressively simple. Prefer small, named modules over large files.
 - Keep architecture extensible by making ownership boundaries explicit, not by
   adding general-purpose abstractions early. Prefer small typed modules with
@@ -550,9 +605,9 @@ Important search tokens:
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
   eval.
 - Prefer autonomy substrate over domain-specific strategy encoding. Improve
-  context packets, `action_surface`, gates, hooks, verifier feedback, and actor
-  memory before adding a specialized planner for one activity such as house
-  building.
+  context packets, `action_surface`, gates, hooks, runtime feedback, transition
+  logging, and actor memory before adding a specialized planner for one activity
+  such as house building.
 - Preserve enough world-state evidence for post-run diagnosis. A claim such as
   "no matching block was observed" must be backed by a bounded scan or an
   explicit loaded-world limitation, not only by a thin nearest-block summary.
@@ -611,8 +666,8 @@ Important search tokens:
   refs.
 - Compaction must not launder weak evidence into progress. Provider text,
   memory notes, `wait`, or repeated observation are context, not physical
-  success unless verifier-backed world, inventory, position, block, container,
-  chat, or transcript evidence supports them.
+  success unless observed world, inventory, position, block, container, chat, or
+  transcript evidence supports them.
 - Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
   artifacts, structured logs, and optional viewer evidence.
 - Failures should be explainable from artifacts without immediate reproduction.

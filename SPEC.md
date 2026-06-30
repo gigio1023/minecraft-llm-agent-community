@@ -1,15 +1,24 @@
 # SPEC
 
-Updated: 2026-05-25
+Updated: 2026-06-18
 
 This is the canonical gateway spec for the current rebuild.
 
-The long-term product direction is a **Soul-grounded Minecraft social
-simulation seed**. Minecraft is the observation/evidence substrate: raw world
-state, inventory, entities, positions, chat, blocks, tool results, and artifact
-refs should be preserved richly enough for the model to decide what matters.
+The long-term research direction is an **advisory social-material World Action
+Model (WAM) for wild Minecraft**. The motivating domain remains Soul-grounded
+Minecraft social simulation, but the concrete research object is a predictor of
+action-conditioned physical, material, and social consequences.
+
+Minecraft is the embodied substrate: raw world state, inventory, entities,
+positions, chat, blocks, tool results, and artifact refs should be preserved
+richly enough for actors and predictors to reason about what matters.
 The project is not a generic Minecraft LLM benchmark, a race-to-diamond agent,
 a fastest-tech tree contest, or a Voyager clone.
+
+Runtime verification is required experiment hygiene. It is not, by itself, a
+novel contribution or the main differentiator. The contribution should be framed
+around predicted-vs-observed social-material transitions, not around the mere
+fact that actions are checked.
 
 ## 1. Spec Authority And Governance
 
@@ -37,7 +46,7 @@ Detailed governance lives in:
 
 - `project-docs/Specification/Engineering-Governance-And-Testing.md`
 
-## 2. Product Identity
+## 2. Product Identity And Research Object
 
 The actor is not just an LLM controller attached to Mineflayer.
 
@@ -47,18 +56,34 @@ Soul/LifeGoal frame and informed by observed world state, role context, memory,
 relationships, obligations, trust, conflict, personal possession, material
 claims, public affordances, weak commons, and settlement state.
 
-Gameplay progress matters because it creates observations, evidence, and social
-consequences. It is not the top-level objective by itself.
+Gameplay progress matters because it creates observations, material changes,
+and social consequences. It is not the top-level objective by itself.
+
+The current research object is separate from the actor:
+
+```text
+state_before + actor frame + candidate action
+-> advisory predicted_delta
+-> Mineflayer execution
+-> observed_delta
+-> transition row for scoring and analysis
+```
+
+The advisory WAM predicts what should change. It never selects the executed
+action, fills missing runtime parameters, decides success, closes obligations,
+mutates actor truth, or overrides runtime checks. Actor Turn remains the action
+selection path and the runtime remains the execution boundary.
 
 Read the product identity spec:
 
 - `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+- `project-docs/Specification/Advisory-Social-Material-WAM.md`
 
 ## 2.1 Autonomy Substrate, Not Domain Strategy
 
 The long-term architecture should give the actor more usable context, a clearer
-action surface, verifier-backed feedback, hook points, and artifact-grounded
-memory. It must not turn one example goal into core runtime strategy.
+action surface, runtime feedback, hook points, and artifact-grounded memory. It
+must not turn one example goal into core runtime strategy.
 
 House, shelter, base, storage, mining, farming, travel, repair, conversation,
 and conflict are possible things the actor may notice or care about. None of
@@ -77,7 +102,7 @@ Concrete rules:
 - `buildBasicShelter` is one bounded seed action skill. It is not the product
   architecture, default objective, or proof of social simulation by itself.
 - The runtime may expose an `action_surface` packet, direct/deferred
-  affordances, pre/post action hooks, approval-like gates, verifier status,
+  affordances, pre/post action hooks, approval-like gates, runtime status,
   event streams, and review artifacts. Those are substrate capabilities.
 - A provider may choose building only when current observation, memory,
   relationship context, or CycleGoal makes building a reasonable action. The
@@ -162,7 +187,7 @@ silently applying a movement default.
 
 Mineflayer-backed primitives should document the Mineflayer API assumptions they
 depend on: loaded-chunk visibility, target lookup, pathfinder behavior, timeout
-and cancellation semantics, and the evidence needed to verify success or
+and cancellation semantics, and the observations needed to check success or
 truthful failure.
 
 Long social-cycle runs need context compaction. The provider should not receive
@@ -189,56 +214,60 @@ Read these documents to understand the full spec:
 1. `SPEC.md`
    - entrypoint, authority, project identity, non-negotiable rules.
 2. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-   - Soul/ActorSoul identity, LifeGoal continuity, social context, and what
-     counts as social simulation progress.
-3. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+   - Soul/ActorSoul identity, LifeGoal continuity, social context, and why
+     Minecraft actions matter for social-material consequences.
+3. `project-docs/Specification/Advisory-Social-Material-WAM.md`
+   - current research spine: advisory WAM object, social-material transition
+     rows, prediction-vs-acting separation, autoresearch loop boundary, and
+     verification-as-hygiene rule.
+4. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.
-4. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+5. `project-docs/Specification/Engineering-Governance-And-Testing.md`
    - spec change governance, implementation style, Detroit-style tests, live
      runs, comments, file size, domain modeling, and documentation rules.
-5. `project-docs/Specification/Reference-Adaptation-Guide.md`
+6. `project-docs/Specification/Reference-Adaptation-Guide.md`
    - how to use external research without copying reference architectures.
-6. `project-docs/Documentation-Map.md`
+7. `project-docs/Documentation-Map.md`
    - documentation authority order, active/supporting/historical categories,
      and cleanup rules.
-7. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+8. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
    - compact current-goal routing for Actor Turn as hot path and PlanBeads as
      passive actor-owned work state.
-8. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+9. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
    - active campaign gates for proving cheap-model Actor Turn behavior.
-9. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+10. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
    - Active Episode, Actor Turn, Action Cards, Evidence Trace, and branch-only
      Deliberation architecture.
-10. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+11. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
     - current implementation sequence and acceptance gates for the Actor Turn
       migration.
-11. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+12. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
    - concrete Soul/LifeGoal/CycleGoal architecture.
-12. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+13. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
    - hot path, runtime verification, and bounded execution.
-13. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+14. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
    - transcript and artifact persistence contract.
-14. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+15. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
    - actor-owned memory and action-skill state.
-15. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+16. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
    - restart-safe actor state, PlanBead work graph, dependencies, and ready front.
-16. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+17. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
     - Actor Turn-only generated Mineflayer action-skill authoring authority.
-17. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+18. `project-docs/Architecture/Minecraft-Basic-Guide.md`
     - provider-visible basic Minecraft mechanics guide.
-18. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+19. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
     - actor profiles, role context, and relationship state.
-19. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+20. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
     - current implementation state and next work.
-20. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+21. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
     - repo-internal whole-project implementation map for current boundaries,
       runtime flow, evidence, and risks.
-21. `project-docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+22. `project-docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
     - latest architecture/implementation cross-check.
-22. `project-docs/Agent-Search-Index.md`
+23. `project-docs/Agent-Search-Index.md`
     - routing map and search tokens.
-23. `project-docs/Terminology.md`
+24. `project-docs/Terminology.md`
     - canonical terms such as `agent skill` and `action skill`.
 
 Setup docs:
@@ -250,11 +279,17 @@ Setup docs:
 ## 4. Non-Negotiable Direction
 
 - Soul/LifeGoal continuity is the top-level simulation frame.
+- The active research spine is advisory social-material consequence prediction,
+  not task completion, evidence-first benchmarking, or civilization spectacle.
 - WorldEvents are event/context records, not raw observation and not a direct
   replacement for LifeGoal.
 - Runtime owns physical truth: validation, timeout, cancellation, execution,
   verification, transcript, artifacts, and lifecycle guards.
+- Verification is expected hygiene and must not be presented as the
+  differentiating research claim.
 - Providers propose goals and actions. They do not decide success.
+- The advisory WAM predicts deltas. It does not execute, score itself, or
+  override runtime checks.
 - Reviewers explain and propose repairs. They do not mutate actor truth directly.
 - Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
   agent skills.

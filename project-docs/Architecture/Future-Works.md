@@ -306,8 +306,10 @@ Potential action-skill candidates:
 - `check_path_to_block`;
 - `collect_dropped_items`.
 
-Keep movement bounded and evidence-first. Do not turn exploration into unbounded
-wandering or into a hidden strategy phase.
+Keep movement bounded and audit-clean. Do not turn exploration into unbounded
+wandering or into a hidden strategy phase. If this becomes part of the Advisory
+Social-Material WAM path, record predicted target-discovery consequences before
+execution and observed consequences afterward.
 
 ## Minecraft MCP And Codex-Style Tool Runtime References
 

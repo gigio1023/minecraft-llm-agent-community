@@ -13,27 +13,39 @@ user has approved an operating-rule change.
 4. `project-docs/Documentation-Map.md`
 5. `project-docs/Agent-Search-Index.md`
 6. `project-docs/Terminology.md`
-7. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-8. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
-9. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-10. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-11. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-12. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-13. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-14. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-15. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
-16. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-17. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-18. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-19. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-20. `project-docs/Setup/Provider-Setup.md`
-21. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+7. `project-docs/Specification/Advisory-Social-Material-WAM.md`
+8. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+9. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+10. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+11. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+12. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+13. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+14. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+15. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+16. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+17. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+19. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+20. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+21. `project-docs/Setup/Provider-Setup.md`
+22. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 ## Project Direction
 
-This repo is a bounded, observable headless Minecraft runtime for a
-Soul-grounded social simulation seed. It is not a Voyager clone, a Minecraft
-benchmark project, or a house-building architecture.
+This repo is a bounded, observable headless Minecraft runtime for advisory
+social-material WAM research in wild Minecraft. It is not a Voyager clone, a
+Minecraft benchmark project, or a house-building architecture.
+
+The active research object is a separate advisory predictor of physical,
+material, and social deltas for candidate embodied actions. Actor Turn chooses
+actions; the runtime executes and records observations; transition rows compare
+predicted deltas with observed deltas. Prediction quality and acting outcome are
+separate axes.
+
+Runtime verification, logs, screenshots, ledgers, and scoring scripts are
+mandatory experiment hygiene. Do not present "verified actions" or
+"evidence-first benchmarking" as the contribution unless the user explicitly
+starts a model-based verifier project.
 
 Providers propose goals, actions, and judgments. Runtime code owns Minecraft
 truth: schemas, structured args, permission gates, Mineflayer execution,

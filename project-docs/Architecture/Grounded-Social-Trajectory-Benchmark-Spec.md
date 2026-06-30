@@ -10,10 +10,17 @@ Status: initial provider-free smoke spec; retained as a legacy sanity check.
 
 Recorded: 2026-06-15 (`Asia/Seoul`).
 
+Direction note, 2026-06-18: this is no longer the headline research framing.
+Use `project-docs/Specification/Advisory-Social-Material-WAM.md` for the active
+research spine. This smoke remains useful only as a cheap ledger/report sanity
+check and as one source of transition-row fixtures.
+
 ## Purpose
 
-This benchmark asks whether the runtime can evaluate social simulation as
-evidence-backed behavior, not as persona text or generic Minecraft progress.
+This benchmark originally asked whether the runtime can evaluate social
+simulation as behavior, not as persona text or generic Minecraft progress. In
+the current WAM framing, its useful role is narrower: generate simple
+social-material transition rows and test report readability.
 
 The original smoke uses shared storage because deposit/inspect/withdraw events
 are cheap to verify without a live provider. That shape is still useful as a
@@ -30,17 +37,16 @@ Use `Material-Claims-And-Social-Economy-Benchmark-Plan.md` for the current
 benchmark ladder.
 
 The immediate smoke does not call an LLM provider and does not require a live
-Minecraft server. It verifies the scoring contract, event ledger, evidence
+Minecraft server. It checks the scoring contract, event ledger, evidence
 requirements, and report shape before expensive multi-actor live runs.
 
 The long-term benchmark question is:
 
 ```text
-Can LLM-controlled Minecraft actors sustain evidence-grounded social behavior
-in natural open-world seeds, where progress is measured not only by task
-completion but by durable obligations, material claims, public affordance use,
-memory continuity, recovery from blockers, and observable changes to a common
-world?
+Can an advisory social-material WAM predict how LLM-controlled Minecraft actors'
+actions change durable obligations, material claims, public affordance use,
+memory continuity, blocker recovery, and observable common-world state in
+natural open-world seeds?
 ```
 
 ## Research Gap
@@ -49,12 +55,11 @@ The repo's primary research framing is an application and methodological gap:
 
 - Minecraft LLM-agent benchmarks mostly evaluate bounded individual task
   completion, tech-tree progress, or task-oriented collaboration.
-- LLM social simulations can model rich interaction, but they often lack a live
-  physical substrate where social claims are constrained by verifiable
-  movement, inventory, crafting, storage, communication, memory, and world
-  consequences.
-- This repo should evaluate the overlap: persistent embodied social behavior
-  in Minecraft with runtime-owned evidence.
+- LLM social simulations can model rich interaction, but they often lack
+  embodied material consequences such as possession, access, obligations, and
+  future action opportunities.
+- This repo should evaluate the overlap by comparing predicted social-material
+  deltas with observed Minecraft transition rows.
 
 ## Non-Goals
 
@@ -64,6 +69,8 @@ The repo's primary research framing is an application and methodological gap:
   core runtime planner.
 - Do not claim a broad society from one actor or from a single successful
   exchange.
+- Do not present verification, evidence records, screenshots, or report
+  completeness as the contribution.
 - Do not start provider-backed experiments without provider-specific quota
   preflight and operator approval.
 
@@ -180,6 +187,8 @@ Provider-free smoke artifacts:
 
 Future live artifacts:
 
+- predicted and observed physical/material/social deltas;
+- `social-material-transition/v1` rows;
 - runtime action records;
 - personal possession deltas;
 - material claim and access ledgers;
@@ -203,6 +212,9 @@ The smoke passes if:
 - every scoring claim cites event evidence;
 - the HTML report makes the social chain readable without treating prose alone
   as success.
+
+For WAM-facing use, the smoke is incomplete until it also records a
+`predicted_delta` and `observed_delta` pair for each scored action.
 
 ## Next Live Step
 

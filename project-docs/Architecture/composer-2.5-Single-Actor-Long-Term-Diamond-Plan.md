@@ -87,7 +87,7 @@ Extend `createDirectContext` substrate in `directGeneratedRunner.ts`:
 - `iron_ingot` — mine `iron_ore`, smelt via `smeltItem` helper (stub → blocked with reason if furnace missing)
 - `iron_pickaxe`, `diamond` — incremental; locator records block scan evidence
 
-New tool modules (evidence-first, minimal):
+New tool modules (audit-clean, minimal):
 
 - `probe/src/tools/longObjectiveHelpers.ts` — `smeltItem`, `mineOre`, `scanNearbyBlocks` wrappers used by ctx
 

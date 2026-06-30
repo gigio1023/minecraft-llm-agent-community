@@ -494,8 +494,7 @@ evidence gates.
 Implementation rules:
 
 - An objective phase asks for one bounded current-run outcome and passes only
-  from verifier-backed world, inventory, container, position, or transcript
-  evidence.
+  from observed world, inventory, container, position, or transcript evidence.
 - A direct-generated trial records generated source, helper calls, action
   attempts, timeout/error, verifier output, and memory writes before any cleanup
   into an action skill candidate.

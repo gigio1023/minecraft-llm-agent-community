@@ -7,8 +7,14 @@ sidebar_position: 2
 This is the execution-truth spec.
 
 The runtime owns Minecraft reality. Providers and reviewers can propose,
-interpret, and diagnose, but success belongs to verifier-backed runtime
+interpret, and diagnose, but success belongs to checked runtime outcome
 evidence.
+
+For the active research direction, this is experiment hygiene rather than the
+headline. Runtime checks and evidence artifacts exist so advisory WAM
+predictions can be compared with observed deltas. Do not present verification
+itself as the differentiating contribution unless the project explicitly changes
+scope to model-based verifier research.
 
 ## Runtime Authority
 
@@ -27,6 +33,14 @@ Required properties:
 - verifier status comes from world, inventory, position, block, container, chat,
   transcript, or structured tool result evidence;
 - optimistic provider text cannot mark success.
+
+The research-facing unit derived from this hot path is the transition row:
+
+```text
+state_before + candidate_action + predicted_delta + observed_delta + evidence_refs
+```
+
+Prediction quality and acting outcome must be stored and reported separately.
 
 ## World-State Diagnostics
 
@@ -168,6 +182,11 @@ produces real world, inventory, movement, container, or block mutation but the
 final verifier or action-skill postcondition does not pass. This status must
 not be used to claim completion.
 
+Verification is not a social claim and not a WAM claim. It is the runtime check
+that creates an observed target for the predictor. New reports should avoid
+making `verified_progress` the central success metric when the research question
+is social-material consequence prediction.
+
 ## Action Surface
 
 The provider-visible action surface is the actor's current body. It should show:
@@ -176,7 +195,7 @@ The provider-visible action surface is the actor's current body. It should show:
 - deferred primitives or action skills that explain missing affordances;
 - relevant preconditions and verifier expectations;
 - recent blockers and missing primitive blockers;
-- rules that remind the provider that runtime verification decides success.
+- rules that remind the provider that runtime checks decide success.
 
 The action surface is substrate. It is not a domain strategy. For example,
 `build_pattern` may appear as a direct primitive for a settler, but that does
@@ -201,7 +220,7 @@ Runtime evidence and action-surface gates remain authoritative:
 - current state comes from observation and runtime artifacts;
 - executable choices come from `runtime_affordances`, direct action skills, and
   runtime gates;
-- physical success comes from verifier-backed evidence;
+- physical success comes from runtime-observed evidence;
 - `minecraft_basic_guide` supplies background mechanics only.
 
 ## Transcript And Artifacts
@@ -214,6 +233,7 @@ Every meaningful run should leave artifacts that explain:
 - what tool ran;
 - what changed in the world or inventory;
 - what verifier decided;
+- what the advisory predictor expected, when present;
 - what memory or judgment was written;
 - what should be tried next.
 
@@ -265,9 +285,9 @@ Compaction should drop or summarize:
 - stale proposed plans that never became validated runtime actions.
 
 Compaction must not launder weak evidence into progress. Memory notes,
-provider prose, and `wait` records remain context unless verifier-backed world,
-inventory, position, block, container, chat, or transcript evidence proves a
-real change.
+provider prose, and `wait` records remain context unless observed world,
+inventory, position, block, container, chat, or transcript evidence proves a real
+change.
 
 ## Current Evidence Belongs In Handoff Docs
 

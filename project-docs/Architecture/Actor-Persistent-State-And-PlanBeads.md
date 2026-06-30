@@ -593,7 +593,7 @@ Run reports should expose:
 - accepted and rejected bead operations;
 - dependency edges created or cleared;
 - bead status transitions;
-- cycles that made verified or partial verified progress on a bead;
+- cycles that made checked or partial observed progress on a bead;
 - cycles that repeated a blocker without bead-aware pivot.
 
 Review summaries should ask:

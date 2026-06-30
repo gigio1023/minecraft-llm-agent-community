@@ -19,11 +19,13 @@ questions quickly:
 3. How do Actor Turn, Action Cards, PlanBeads, and generated action skills fit
    together?
 4. How does the runtime distinguish real Minecraft progress from fake progress?
-5. What are the largest current implementation risks?
+5. Where does the advisory WAM prediction layer fit?
+6. What are the largest current implementation risks?
 
-In one sentence: this repository is building a **headless runtime where one
-Soul/LifeGoal-grounded actor directly attempts small Minecraft actions, while
-the runtime validates, executes, verifies, and records what happened**.
+In one sentence: this repository is building a **headless runtime where
+Soul/LifeGoal-grounded actors attempt Minecraft actions while an advisory
+social-material WAM predicts the expected consequences and transition rows
+compare those predictions with observed outcomes**.
 
 The important boundary is that the LLM/provider does not own Minecraft truth.
 During Actor Turn, the provider chooses one visible Action Card function tool or
@@ -33,6 +35,10 @@ Mineflayer calls the actual Minecraft client API. The actor workspace carries
 evidence, memory, PlanBeads, relationships, and generated action-skill state
 into later turns.
 
+Runtime verification is mandatory hygiene, not the research contribution. The
+research object is the advisory prediction of physical, material, and social
+deltas; acting success and prediction quality must be reported separately.
+
 ## One-Page Mental Model
 
 ```mermaid
@@ -41,6 +47,7 @@ flowchart LR
   Workspace["Actor workspace<br/>evidence, memory, PlanBeads, skills"]
   Observe["Observation<br/>world, inventory, actors, transcript"]
   Input["ActorTurnInput<br/>current_state + source_evidence_bundle,<br/>Action Cards, guide"]
+  WAM["Advisory WAM<br/>predicted delta"]
   LLM["Actor Turn LLM<br/>function tool selection"]
   Choice{"Exactly one tool call"}
   Card["Visible Action Card<br/>schema-bound parameters"]
@@ -48,24 +55,30 @@ flowchart LR
   Runtime["Runtime gates<br/>schema, permission, retry, verifier"]
   Codegen["Internal Mineflayer codegen<br/>full ActorTurnInput + raw tool call + skill markdown"]
   MC["Mineflayer + Minecraft"]
+  Row["Transition row<br/>predicted vs observed delta"]
   Evidence["Evidence Trace append<br/>reports and artifacts"]
 
   Soul --> Input
   Workspace --> Input
   Observe --> Input
+  Input --> WAM
   Input --> LLM --> Choice
   Choice --> Card --> Runtime
   Choice --> Author --> Codegen --> Runtime
-  Runtime --> MC --> Evidence --> Workspace
+  WAM --> Row
+  Runtime --> MC --> Row --> Evidence --> Workspace
 ```
 
 Arrows show information and artifact flow, not authority transfer. Provider text
 does not establish execution or success. Only validated runtime actions,
-Mineflayer execution, and verifier-backed evidence create Minecraft progress.
+Mineflayer execution, and runtime-observed evidence create Minecraft progress.
+The WAM predicts expected deltas but does not execute, score itself, or override
+runtime checks.
 
 ## Current Product Scope
 
-The long-term direction is a Soul-grounded Minecraft social simulation seed.
+The long-term direction is advisory social-material WAM research in wild
+Minecraft, motivated by Soul-grounded social simulation.
 The current delivery target is deliberately smaller.
 
 | Scope | Current target |
@@ -76,6 +89,7 @@ The current delivery target is deliberately smaller.
 | Provider hot path | one low-cost Actor Turn tool-selection call per ordinary turn |
 | Generated behavior | Actor Turn-only `author_mineflayer_action`, then bounded codegen/trial |
 | Continuity | actor workspace evidence, memory, PlanBeads, relationships, action skill state |
+| WAM layer | not yet implemented; target is predicted-vs-observed transition rows |
 
 Current non-goals:
 
@@ -85,7 +99,9 @@ Current non-goals:
 - persona text alone pretending to be social simulation;
 - hidden Minecraft heuristics that choose for the LLM while claiming the LLM
   stayed free;
-- provider prose being treated as runtime authority.
+- provider prose being treated as runtime authority;
+- verification, screenshots, logs, or benchmark artifacts being presented as
+  the research contribution.
 
 ## Actor Perspective
 
@@ -99,6 +115,7 @@ flowchart TD
   Memory["What I remember<br/>evidence-linked memory and recent trace"]
   Work["What remains open<br/>PlanBead hints when any exist"]
   Body["What I can try<br/>Action Cards and generated-action path"]
+  Prediction["What I expect<br/>advisory predicted delta"]
   Turn["What I choose now<br/>one function tool call"]
   World["What actually happens<br/>Mineflayer execution or trial"]
   Consequence["What carries forward<br/>evidence, memory, PlanBeads, skill state"]
@@ -108,7 +125,9 @@ flowchart TD
   Memory --> Turn
   Work --> Turn
   Body --> Turn
+  Turn --> Prediction
   Turn --> World --> Consequence
+  Prediction --> Consequence
   Consequence --> Memory
   Consequence --> Work
 ```
@@ -124,6 +143,8 @@ bounded source layer that keeps observation, world-event, memory, recent-action,
 and PlanBead cards beside those facts. This pairing is intentional: compact
 summaries may help low-cost models, but summary-only observation/social/action
 context loses too much information and recreates a hidden planner bottleneck.
+The advisory WAM uses the same evidence-rich context to predict deltas, but it
+is not an action-selection authority.
 
 ## Core Terms
 
@@ -139,6 +160,8 @@ context loses too much information and recreates a hidden planner bottleneck.
 | PlanBeads | passive actor-owned work graph for open work, blockers, obligations, followups. |
 | Evidence Trace | compact window of runtime-backed action/evidence results for the next Actor Turn. |
 | actor workspace | source of truth for actor artifacts: evidence, memory, PlanBeads, relationships, provider snapshots, generated action skills. |
+| advisory WAM | predictor of physical/material/social deltas for a candidate action; it is not the actor or runtime. |
+| social-material transition | state/action/predicted-delta/observed-delta row used for WAM scoring. |
 
 `agent skill` and `action skill` are different. An `agent skill` is a Codex or
 Claude capability such as `.agents/skills/mineflayer-code-generation/SKILL.md`.
@@ -181,6 +204,8 @@ supply args, clear retry, grant permission, authorize source, or prove success.
 
 Tool calling and schemas/enums define the flow. Runtime validation and evidence
 define execution truth.
+Prediction rows define WAM evaluation; they must not be collapsed into the
+Actor Turn success label.
 
 ## Runtime Gates
 
@@ -299,8 +324,8 @@ Actor workspace is the continuity source of truth.
 | provider usage | budget and free-tier guard evidence |
 
 Weak evidence must stay weak. Observation, wait, provider narration, or memory
-can provide context, but they are not physical success unless verifier-backed
-world, inventory, position, block, container, chat, or transcript evidence
+can provide context, but they are not physical success unless observed world,
+inventory, position, block, container, chat, or transcript evidence
 supports the claim.
 
 ## How To Diagnose A Run
