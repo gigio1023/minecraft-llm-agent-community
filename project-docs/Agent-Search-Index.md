@@ -26,8 +26,14 @@ guidance.
 
 | Search Token | Meaning | Primary References |
 |--------------|---------|--------------------|
-| `ADVISORY_SOCIAL_MATERIAL_WAM` | Active research spine: advisory WAM predicts physical/material/social deltas for embodied Minecraft actions; verification is hygiene, not the contribution | `Specification/Advisory-Social-Material-WAM.md`, `SPEC.md`, `AGENTS.md`, `Architecture/Research-Direction-Reference-Synthesis.md` |
-| `SOCIAL_MATERIAL_TRANSITION` | Dataset/evaluation unit for WAM work: state_before + candidate_action + predicted_delta + observed_delta + evidence refs and cost metadata | `Specification/Advisory-Social-Material-WAM.md`, `Terminology.md`, `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md` |
+| `ACTIVE_CENTRAL_PLAN` | Current research spine: build the no-regret core first, then use branch gates before selecting F-native, F-loop, or F-society as the headline | `Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`, `Architecture/Research-Documentation-Hierarchy.md`, `AGENTS.md` |
+| `NO_REGRET_CORE` | Immediate target: a non-degenerate small Minecraft runtime that records independent `(state_before, executed_action, observed_delta)` transition rows before larger claims | `Architecture/No-Regret-Core-Research-Protocol.md`, `Architecture/Transition-Row-V1-Contract.md`, `Architecture/No-Regret-Core-Scenario-Catalog.md`, `Architecture/No-Regret-Core-Implementation-Campaign.md` |
+| `GOLDILOCKS_GATE` | Branch gate for F-native/F-loop: find whether a layer exists where LLM prior is insufficient and observed history adds learnable signal | `Architecture/Goldilocks-Preflight-Protocol.md`, `Architecture/Research-Decision-Current-Spine-2026-06-29.md`, `Architecture/Research-Value-Harness.md` |
+| `SOCIETY_OBSERVABLE_PREFLIGHT` | Separate F-society gate: look for recurring social-material patterns under small embodied constraints; prediction lift alone does not decide it | `Architecture/Society-Observable-Preflight.md`, `Specification/Evidence-Grounded-Minecraft-Society.md`, `Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md` |
+| `RESEARCH_VALUE_HARNESS` | Research-planning harness for pressure-testing novelty, closest prior work, falsifiable claims, and experiment sketches before implementation | `Architecture/Research-Value-Harness.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md`, `Architecture/Prior-Work-Proximity-Current-Spine-2026-06-29.md` |
+| `ADVISORY_SOCIAL_MATERIAL_WAM` | Historical/reference framing and possible F-loop branch: advisory consequence prediction is no longer the selected project headline | `Specification/Advisory-Social-Material-WAM.md`, `Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`, `research-archive/2026-06-27/wam-direction-stress-test-and-reframe/` |
+| `TRANSITION_ROW_V1` | Current data unit for no-regret core work: independent state/action/observed-delta rows, separate from actor self-declared expected outcomes | `Architecture/Transition-Row-V1-Contract.md`, `Architecture/Transition-Row-Label-Codebook.md`, `Architecture/Seed-Reset-Record-V1-Contract.md` |
+| `SOCIAL_MATERIAL_TRANSITION` | Older name for related WAM-era dataset thinking; translate active work to `transition-row/v1` unless quoting archive material | `Specification/Advisory-Social-Material-WAM.md`, `Terminology.md`, `Architecture/Transition-Row-V1-Contract.md` |
 | `VERIFICATION_IS_HYGIENE` | Runtime verification, screenshots, logs, ledgers, and scoring scripts are mandatory audit hygiene, not the research contribution by themselves | `Specification/Advisory-Social-Material-WAM.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `AGENTS.md`, `Terminology.md` |
 | `SOUL_GROUNDED_SOCIAL_SIMULATION` | Minecraft is observation and evidence for Soul/LifeGoal-grounded social simulation, not a generic benchmark | `SPEC.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Soul-Life-Goal-Runtime-Architecture.md` |
 | `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational definition of society, organization, settlement, and village; now interpreted as social-material variables for WAM prediction, not evidence as contribution | `Specification/Evidence-Grounded-Minecraft-Society.md`, `Specification/Advisory-Social-Material-WAM.md`, `Specification/Soul-Grounded-Social-Simulation.md`, `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md` |
@@ -58,7 +64,7 @@ guidance.
 | `ACTOR_EPISODE_ACTOR_TURN` | Target replacement for the per-cycle goal/action/judgment hot path: Active Episode, Actor Turn, Action Cards, Evidence Trace, branch-only Deliberation | `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Terminology.md` |
 | `LOW_COST_SOCIAL_SIMULATION_CAMPAIGN` | Campaign-level spec, gates, social proof scenarios, and implementation sequence for proving cheap-model Actor Turn behavior | `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md` |
 | `GROUNDED_SOCIAL_TRAJECTORY_BENCHMARK` | Legacy provider-free smoke contract for social trajectories; useful for ledger/report sanity and transition-row fixtures, not the headline research target | `Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`, `Specification/Advisory-Social-Material-WAM.md`, `Experiments/2026-06-15/grounded-social-trajectory-smoke/README.md`, `probe/src/objectives/socialTrajectory/` |
-| `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK` | Active benchmark family for social-material transition prediction over possession, claims, public affordances, weak commons, obligations, continuity, and model/cost comparison | `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`, `Specification/Advisory-Social-Material-WAM.md`, `Specification/Evidence-Grounded-Minecraft-Society.md`, `Terminology.md` |
+| `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK` | Reference case library for possession, access, claims, obligations, refusal, repair, public affordances, and weak commons; not the active phase order before Goldilocks | `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`, `Architecture/Research-Documentation-Hierarchy.md`, `Specification/Evidence-Grounded-Minecraft-Society.md`, `Terminology.md` |
 | `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL` | Compact `/goal` companion for the current pivot: Actor Turn as hot path, PlanBeads as passive issue-like state, branch-only Deliberation | `Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`, `Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing compressed planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
 | `CONTEXT_PROJECTION_SOURCE_EVIDENCE` | Actor Turn context rule: bounded facts may be compacted, but observation/action/social/work history must carry source evidence cards and refs beside summaries | `Architecture/Context-Projection-And-Source-Evidence.md`, `Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`, `AGENTS.md` |
@@ -75,6 +81,7 @@ guidance.
 | `WORLD_STATE_DIAGNOSTICS` | World scans must be query-neutral and scoped by loaded-world limits | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/src/tools/worldStateScan.ts` |
 | `CONTEXT_COMPACTION` | Preserve evidence-linked state without laundering weak evidence into progress | `SPEC.md`, `Specification/Runtime-Evidence-And-Action-Skills.md`, `probe/src/runtime/goals/socialCycleContextCompaction.ts` |
 | `LIVE_TRANSCRIPT_FIRST` | Runtime value is primarily proven through live transcript and artifact evidence | `Architecture/Transcript-And-Runtime-Artifacts.md`, `Architecture/Current-Handoff-And-Next-Work.md` |
+| `VISUAL_EVIDENCE_1_21_4_RULE` | Report-grade Minecraft screenshots must use the supported visual capture protocol, three camera modes, and same-cycle state evidence; pixels never prove block identity alone | `Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`, `AGENTS.md`, `probe/src/runtime/visualEvidence.ts` |
 
 ## Current Implementation
 
@@ -118,38 +125,45 @@ For any onboarding developer or agent, read in this order:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CLAUDE.md` or `GEMINI.md` when using those agents
-4. `README.md`
-5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `project-docs/Documentation-Map.md`
-7. `project-docs/Terminology.md`
-8. `project-docs/Specification/Advisory-Social-Material-WAM.md`
-9. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-10. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
-11. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-12. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-13. `project-docs/Specification/Reference-Adaptation-Guide.md`
-14. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
-15. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-16. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-17. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-18. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
-19. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-20. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-21. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-22. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-23. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-24. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-25. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
-26. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-27. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-28. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-29. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-29. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
-30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-31. `project-docs/Setup/Headless-Server.md`
-32. `project-docs/Setup/Provider-Setup.md`
-33. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
-34. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
+4. `project-docs/Architecture/Research-Documentation-Hierarchy.md`
+5. `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+6. `project-docs/Architecture/Research-Value-Harness.md`
+7. `project-docs/Architecture/No-Regret-Core-Research-Protocol.md`
+8. `project-docs/Architecture/Transition-Row-V1-Contract.md`
+9. `project-docs/Architecture/Goldilocks-Preflight-Protocol.md`
+10. `project-docs/Architecture/Society-Observable-Preflight.md`
+11. `README.md`
+12. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+13. `project-docs/Documentation-Map.md`
+14. `project-docs/Terminology.md`
+15. `project-docs/Specification/Advisory-Social-Material-WAM.md`
+16. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+17. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+18. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+19. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+20. `project-docs/Specification/Reference-Adaptation-Guide.md`
+21. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+22. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+23. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+24. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+25. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
+26. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+27. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+28. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+29. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+30. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+31. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+32. `project-docs/Architecture/Actor-Memory-Observation-And-Action-Space-Plan.md`
+33. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+34. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+35. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+36. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+37. `project-docs/Architecture/Social-Cycle-LLM-Input-Cleanup-Plan.md`
+38. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+39. `project-docs/Setup/Headless-Server.md`
+40. `project-docs/Setup/Provider-Setup.md`
+41. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+42. `project-docs/Setup/ModelScope-Qwen-API-Access.md`
 
 ## Active vs Archived
 
