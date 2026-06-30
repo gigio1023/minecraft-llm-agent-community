@@ -1,0 +1,94 @@
+\section{Experiments}
+
+\subsection{Training Dataset}
+To support robust tool learning through RL, we construct a mixed dataset spanning diverse tool use scenarios:
+
+\begin{itemize}[topsep=2pt, leftmargin=10pt, itemsep=-2pt]
+\item \textbf{ToolACE}~\citep{liu2024toolace}: A general tool use dataset where the model learns when to invoke tools versus respond directly, improving decision-making in multi-step interactions.
+
+\item \textbf{Hammer (Masked)}~\citep{lin2024hammer}: A subset of Hammer with randomized tool and parameter names, forcing the model to rely on descriptions rather than memorized labels, thus enhancing generalization and reducing overfitting to certain tools.
+
+\item \textbf{xLAM}~\citep{zhang2024xlam}: A compositional dataset requiring one or multiple tool calls per turn, encouraging the model to reason about tool dependencies and plan diverse tool calling action actively.
+\end{itemize}
+
+For RL training, we sample 2K examples from ToolACE and 1K each from Hammer and xLAM, creating a balanced dataset spanning diverse levels of complexity and tool use. Multi-step trajectories are decomposed into single-step instances, with prior dialogue history injected into the user prompt (as shown in \Cref{prompt:user}) to preserve context. This setup encourages strategic exploration and teaches the model to select and apply tools appropriately within each step. Please see \Cref{apdx:training} for more details and justifications.
+% \xiusi{Is there a specific reason for sampling the data? Why not use the full training data?} \cheng{full data is too much is all data are of same distribution, we will explain in appendix}
+
+\subsection{Experiment Settings}
+\paragraph{Training.}  We conduct all RL experiments using the veRL framework~\citep{sheng2024hybridflow}, adopting the GRPO algorithm detailed in the previous section. For each training step, we sample a batch of 512, and generate 4 responses per query, training for 15 epochs in total (see \Cref{apdx:training} for full configuration details). To encourage broader policy exploration, we remove KL regularization and apply a generation temperature of 1.0. We initialize our models with the Qwen-2.5-Instruct~\citep{2024qwen2.5} and Llama-3.2-Instruct~\citep{dubey2024llama} series, which are further tuned under the GRPO objective with our customized reward design.
+
+\paragraph{Evaluation.} We evaluate our approach on the \textbf{Berkeley Function Call Leaderboard} (BFCL)~\citep{patil2024gorilla}, a comprehensive benchmark that spans a diverse set of challenges, including single-step reasoning, multi-step tool use, real-time execution, irrelevant tool rejection, simultaneous multi-tool selection, and multi-tool application\footnote{\url{https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html}}. In addition, we present results on \textbf{API-Bank}~\citep{li2023api}, a three-level evaluation framework comprising 73 diverse and complex API tools. It assesses an LLM’s ability to select and apply tools through natural multi-turn dialogues, across three levels of difficulty. We also evaluate on a representative QA benchmark \textbf{Bamboogle}~\citep{press2022measuring}, which comprises a variety of question-answering tasks where performance is measured based on the final answer accuracy rather than the correctness of tool use. These broad coverage makes our evaluation setting effective for evaluating real-world LLM tool use proficiency. All results are reported in terms of accuracy.
+% \emre{bamboogle?}\cheng{Make bamboogle an additional study here, we could change later in submission version}
+
+\paragraph{Baselines.} We compare our approach against several baselines to better isolate the effects of GRPO training: (1) \textbf{Raw Instruct Model}: the original model without any additional fine-tuning or RL, evaluated using the same prompts. (2) \textbf{SFT on RL Data}: the instruct model fine-tuned using the same 4K / selected 400 data points as the RL training set, providing a comparison point to assess whether GRPO training outperforms standard SFT. (3) \textbf{GRPO on SFT Model}: GRPO is applied to a model that has already undergone SFT on the selected 400 data points. This setup allows us to evaluate the impact of initializing GRPO with a format-aware model, in contrast to starting from the raw instruct model in a cold start manner. (4) \textbf{PPO:} We also include the standard PPO setting as a baseline to evaluate whether our reward design is effective beyond GRPO. We report results for both a cold start PPO model and a PPO model initialized with SFT, using the same hyperparameters as in the GRPO setup for a fair comparison. Please refer to \Cref{apdx:training} for more details and justifications.
+
+% \emre{we should decide which one to show, my bet is for 4k}
+% \emre{maybe we say I/O prompting baseline}
+% \hongru{the baseline here is a little weird, why bother to have another 400 data points (and how to select them?) and why not adding SFT4k + GRPO?} \cheng{because this 4k data is also used for GRPO, this setting entails SFT and RL done with the same data which is also kind of weird. Current 400 data is not in 4k, but of the same distribution and randomly selected} \hongru{My point is you need to explain why you need this sft 400 data and why 400 instead of 300. Basically I do not see the motivation about this, and sft4k + GRPO can show the upper bound or show the power of sft on same data.} \cheng{more explained in appendix}
+
+
+\subsection{Results}
+
+\input{tables/main_result}
+
+\paragraph{Main Results.} We report BFCL and API-Bank results in \Cref{tab:bfcl-result-main} and \Cref{tab:apibank-result-main}, respectively. Our GRPO method, trained from scratch on the Qwen2.5-Instruct series, generally outperforms other baselines, achieving \~10\% absolute gains over SFT trained on the same data volume. In contrast, LLaMA-3.2-Instruct shows less improvement, possibly due to the model's lower adaptability to GRPO-style generalization. Nevertheless, it remains competitive and outperforms most baselines on API-Bank.
+% \hongru{why sft400 better than sft4k in api-bank but worse on BFCL?} \cheng{Yes, it's kind of hard to predict SFT behavior on held-out tasks ... But empirical results indeed show as they are}
+
+\begin{figure}
+    \centering
+    \subfigure[Format Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/main_format.pdf}
+    }
+    \hfill
+    \subfigure[Correctness Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/main_correctness.pdf}
+    }
+    \caption{Format (left) and correctness (right) reward trends across training steps for Qwen2.5-3B-Instruct with different model initialization strategies.}
+    \label{fig:main_initialization}
+\end{figure}
+
+
+\paragraph{SFT Initialization Impacts.} Interestingly, GRPO also improves models initialized with limited SFT, often outperforming full-scale SFT trained on 10 times more data. However, this setup still underperforms compared to cold start GRPO. We hypothesize that SFT initialization leads to memorization and overfitting, which reduces the impact of GRPO’s effectiveness in generalization. As shown in \Cref{fig:main_initialization}, SFT-initialized models achieve higher training rewards due to distributional alignment between SFT and RL data, but empirically generalize worse on the two benchmarks. This further highlights that higher training rewards do not necessarily translate to better generalization.
+% \hongru{do not see this result?}\cheng{all tested benchmarks are held-out tasks}
+
+\begin{figure}
+    \centering
+    \subfigure[Format Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/ppo_format.pdf}
+    }
+    \hfill
+    \subfigure[Correctness Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/ppo_correctness.pdf}
+    }
+    \caption{Format (left) and correctness (right) reward trends across training steps for Qwen2.5-3B-Instruct with different RL strategies (GRPO v.s. PPO).}
+    \label{fig:main_ppo}
+\end{figure}
+
+\paragraph{Reward Design on PPO.} We also evaluate PPO under both cold start and SFT-initialized settings to examine the effectiveness of our reward design. The results show that while PPO with a cold start can outperform SFT in some cases, it tends to be less stable across different model settings. In contrast, GRPO consistently achieves higher rewards even from a cold start, suggesting that our reward design is partially effective for PPO but works best in the GRPO framework. As shown in \Cref{fig:main_ppo}, GRPO not only achieves higher correctness rewards but also gains format rewards more rapidly during training. Interestingly, PPO benefits from SFT initialization, generally yielding better results than a cold start, whereas GRPO performs better when trained from scratch. These findings highlight that while PPO can benefit from our reward design, its impact is more limited compared to the more robust and consistent improvements observed with GRPO.
+
+
+\begin{figure}
+    \centering
+    \subfigure[Unfamiliar Scenario]{
+        \includegraphics[width=0.469\linewidth]{figures/main_setting.pdf}
+    }
+    \hfill
+    \subfigure[Unfamiliar Goal]{
+        \includegraphics[width=0.469\linewidth]{figures/main_relevance.pdf}
+    }
+    \caption{Qwen2.5-3B-Instruct's performance across unfamiliar programming language scenarios (left) and novel relevance detection task goals (right), evaluated under different training settings.}
+    \label{fig:main_generalization}
+\end{figure}
+
+\input{tables/main_generalization}
+
+\paragraph{Generalization Studies.} We evaluate the generalization ability of our trained model in two challenging settings: unfamiliar scenarios and novel task goals (both from BFCL benchmark subset). Specifically, we test the model's performance in tool usage within unseen programming languages and its ability to detect irrelevant tools, neither of which were explicitly included during RL training or in the dataset. As shown in \Cref{fig:main_generalization}, Qwen2.5-3B-Instruct, when trained from scratch with our GRPO-based reward design, consistently achieves highest performance. Additionally, \Cref{tab:generalization_cases} presents two qualitative examples where the model proactively rejects inappropriate tool use—first by clarifying ambiguous intent, and second by opting to answer directly without tools. These behaviors reflect emergent proactivity and metacognition, enhancing efficiency, reducing hallucinations, and signaling foundational agentic intelligence.
+
+\paragraph{Free-form Inference Effectiveness.} While our model is trained with a focus on tool call format and correctness, we further evaluate its ability to handle free-form tool use in a QA setting. Unlike the structured tool selection and application tasks, QA setting: (1) imposes no constraints on tool call parameters, and (2) evaluates only the final answer, making it a ``goal-oriented'' rather than a ``process-oriented'' task. This naturally introduces a multi-step interaction scenario.
+
+Specifically, we use Bamboogle, a multi-hop QA dataset, to assess this capability. The model is equipped with a web search tool, and we report both the answer accuracy and the number of tool calls for all baselines and our approach. As shown in \Cref{tab:bamboogle-result-main}, our reward design achieves the highest performance, despite this setting not being explicitly seen during training. Notably, our cold start GRPO model surpasses others in accuracy without relying on excessive number of tool calls. This suggests that the model can flexibly invoke tools when needed, effectively leverage feedback, wisely and efficiently navigating toward the correct answer.
+
+
+% \paragraph{Tool Use Behavior Analysis}
+
+

@@ -1,0 +1,54 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{async} \PYG{k}{def} \PYG{n+nf}{forward}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{taskInfo}\PYG{p}{):}
+    \PYG{k+kn}{import} \PYG{n+nn}{asyncio}
+
+    \PYG{c+c1}{\PYGZsh{} Step 1: Initial reasoning by diverse expert agents}
+    \PYG{n}{initial\PYGZus{}instruction} \PYG{o}{=} \PYG{l+s+s1}{\PYGZsq{}Please think step by step and solve the task based on your expertise.\PYGZsq{}}
+    \PYG{n}{expert\PYGZus{}agents} \PYG{o}{=} \PYG{p}{[}
+        \PYG{n}{LLMAgentBase}\PYG{p}{([}\PYG{l+s+s1}{\PYGZsq{}thinking\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}answer\PYGZsq{}}\PYG{p}{],} \PYG{l+s+s1}{\PYGZsq{}Expert Agent\PYGZsq{}}\PYG{p}{,} \PYG{n}{role}\PYG{o}{=}\PYG{n}{role}\PYG{p}{,} \PYG{n}{temperature}\PYG{o}{=}\PYG{l+m+mf}{0.7}\PYG{p}{)}
+        \PYG{k}{for} \PYG{n}{role} \PYG{o+ow}{in} \PYG{p}{[}\PYG{l+s+s1}{\PYGZsq{}Reading Specialist\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}Logic Specialist\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}Generalist\PYGZsq{}}\PYG{p}{]}
+    \PYG{p}{]}
+
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf}{run\PYGZus{}expert}\PYG{p}{(}\PYG{n}{agent}\PYG{p}{):}
+        \PYG{k}{return} \PYG{k}{await} \PYG{n}{agent}\PYG{p}{([}\PYG{n}{taskInfo}\PYG{p}{],} \PYG{n}{initial\PYGZus{}instruction}\PYG{p}{)}
+
+    \PYG{n}{initial\PYGZus{}results} \PYG{o}{=} \PYG{k}{await} \PYG{n}{asyncio}\PYG{o}{.}\PYG{n}{gather}\PYG{p}{(}\PYG{o}{*}\PYG{p}{[}\PYG{n}{run\PYGZus{}expert}\PYG{p}{(}\PYG{n}{agent}\PYG{p}{)} \PYG{k}{for} \PYG{n}{agent} \PYG{o+ow}{in} \PYG{n}{expert\PYGZus{}agents}\PYG{p}{])}
+
+    \PYG{n}{combined\PYGZus{}infos} \PYG{o}{=} \PYG{p}{[}\PYG{n}{taskInfo}\PYG{p}{]} \PYG{o}{+} \PYG{p}{[}\PYG{n}{info} \PYG{k}{for} \PYG{n}{result} \PYG{o+ow}{in} \PYG{n}{initial\PYGZus{}results} \PYG{k}{for} \PYG{n}{info} \PYG{o+ow}{in} \PYG{n}{result}\PYG{p}{]}  \PYG{c+c1}{\PYGZsh{} Flattening initial\PYGZus{}results}
+
+    \PYG{c+c1}{\PYGZsh{} Step 2: Iterative refinement with external knowledge integration}
+    \PYG{n}{max\PYGZus{}iterations} \PYG{o}{=} \PYG{l+m+mi}{2}
+    \PYG{k}{for} \PYG{n}{iteration} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{max\PYGZus{}iterations}\PYG{p}{):}
+        \PYG{c+c1}{\PYGZsh{} Retrieve external knowledge}
+        \PYG{n}{knowledge\PYGZus{}retrieval\PYGZus{}instruction} \PYG{o}{=} \PYG{l+s+s1}{\PYGZsq{}Retrieve relevant information from a knowledge base that can assist in refining the solution.\PYGZsq{}}
+        \PYG{n}{knowledge\PYGZus{}retrieval\PYGZus{}agent} \PYG{o}{=} \PYG{n}{LLMAgentBase}\PYG{p}{([}\PYG{l+s+s1}{\PYGZsq{}retrieved\PYGZus{}info\PYGZsq{}}\PYG{p}{],} \PYG{l+s+s1}{\PYGZsq{}Knowledge Retrieval Agent\PYGZsq{}}\PYG{p}{)}
+        \PYG{n}{retrieved\PYGZus{}results} \PYG{o}{=} \PYG{k}{await} \PYG{n}{knowledge\PYGZus{}retrieval\PYGZus{}agent}\PYG{p}{(}\PYG{n}{combined\PYGZus{}infos}\PYG{p}{,} \PYG{n}{knowledge\PYGZus{}retrieval\PYGZus{}instruction}\PYG{p}{)}
+        \PYG{n}{retrieved\PYGZus{}info} \PYG{o}{=} \PYG{n}{retrieved\PYGZus{}results}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{]}
+
+        \PYG{c+c1}{\PYGZsh{} Verify external knowledge}
+        \PYG{n}{verification\PYGZus{}instruction} \PYG{o}{=} \PYG{l+s+s1}{\PYGZsq{}Verify the relevancy and accuracy of the retrieved information.\PYGZsq{}}
+        \PYG{n}{verification\PYGZus{}agent} \PYG{o}{=} \PYG{n}{LLMAgentBase}\PYG{p}{([}\PYG{l+s+s1}{\PYGZsq{}verified\PYGZus{}info\PYGZsq{}}\PYG{p}{],} \PYG{l+s+s1}{\PYGZsq{}Verification Agent\PYGZsq{}}\PYG{p}{)}
+        \PYG{n}{verified\PYGZus{}results} \PYG{o}{=} \PYG{k}{await} \PYG{n}{verification\PYGZus{}agent}\PYG{p}{([}\PYG{n}{taskInfo}\PYG{p}{,} \PYG{n}{retrieved\PYGZus{}info}\PYG{p}{],} \PYG{n}{verification\PYGZus{}instruction}\PYG{p}{)}
+        \PYG{n}{verified\PYGZus{}info} \PYG{o}{=} \PYG{n}{verified\PYGZus{}results}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{]}
+
+        \PYG{c+c1}{\PYGZsh{} Refinement phase using verified knowledge}
+        \PYG{n}{refinement\PYGZus{}instruction} \PYG{o}{=} \PYG{l+s+s1}{\PYGZsq{}Review and refine the insights provided by other agents using the verified external knowledge.\PYGZsq{}}
+        \PYG{n}{refinement\PYGZus{}agents} \PYG{o}{=} \PYG{p}{[}
+            \PYG{n}{LLMAgentBase}\PYG{p}{([}\PYG{l+s+s1}{\PYGZsq{}refined\PYGZus{}thinking\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}refined\PYGZus{}answer\PYGZsq{}}\PYG{p}{],} \PYG{l+s+s1}{\PYGZsq{}Refinement Agent\PYGZsq{}}\PYG{p}{,} \PYG{n}{role}\PYG{o}{=}\PYG{n}{role}\PYG{p}{,} \PYG{n}{temperature}\PYG{o}{=}\PYG{l+m+mf}{0.5}\PYG{p}{)}
+            \PYG{k}{for} \PYG{n}{role} \PYG{o+ow}{in} \PYG{p}{[}\PYG{l+s+s1}{\PYGZsq{}Reading Specialist\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}Logic Specialist\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}Generalist\PYGZsq{}}\PYG{p}{]}
+        \PYG{p}{]}
+        \PYG{n}{combined\PYGZus{}infos\PYGZus{}with\PYGZus{}verification} \PYG{o}{=} \PYG{n}{combined\PYGZus{}infos} \PYG{o}{+} \PYG{p}{[}\PYG{n}{verified\PYGZus{}info}\PYG{p}{]}
+
+        \PYG{k}{async} \PYG{k}{def} \PYG{n+nf}{run\PYGZus{}refinement}\PYG{p}{(}\PYG{n}{agent}\PYG{p}{):}
+            \PYG{k}{return} \PYG{k}{await} \PYG{n}{agent}\PYG{p}{(}\PYG{n}{combined\PYGZus{}infos\PYGZus{}with\PYGZus{}verification}\PYG{p}{,} \PYG{n}{refinement\PYGZus{}instruction}\PYG{p}{)}
+
+        \PYG{n}{refinement\PYGZus{}results} \PYG{o}{=} \PYG{k}{await} \PYG{n}{asyncio}\PYG{o}{.}\PYG{n}{gather}\PYG{p}{(}\PYG{o}{*}\PYG{p}{[}\PYG{n}{run\PYGZus{}refinement}\PYG{p}{(}\PYG{n}{agent}\PYG{p}{)} \PYG{k}{for} \PYG{n}{agent} \PYG{o+ow}{in} \PYG{n}{refinement\PYGZus{}agents}\PYG{p}{])}
+        \PYG{n}{combined\PYGZus{}infos}\PYG{o}{.}\PYG{n}{extend}\PYG{p}{([}\PYG{n}{info} \PYG{k}{for} \PYG{n}{result} \PYG{o+ow}{in} \PYG{n}{refinement\PYGZus{}results} \PYG{k}{for} \PYG{n}{info} \PYG{o+ow}{in} \PYG{n}{result}\PYG{p}{])}  \PYG{c+c1}{\PYGZsh{} Flattening refinement\PYGZus{}results}
+
+    \PYG{c+c1}{\PYGZsh{} Step 3: Final synthesis agent integrates all refined insights}
+    \PYG{n}{final\PYGZus{}decision\PYGZus{}instruction} \PYG{o}{=} \PYG{l+s+s1}{\PYGZsq{}Synthesize all refined insights and provide a final answer.\PYGZsq{}}
+    \PYG{n}{final\PYGZus{}decision\PYGZus{}agent} \PYG{o}{=} \PYG{n}{LLMAgentBase}\PYG{p}{([}\PYG{l+s+s1}{\PYGZsq{}thinking\PYGZsq{}}\PYG{p}{,} \PYG{l+s+s1}{\PYGZsq{}answer\PYGZsq{}}\PYG{p}{],} \PYG{l+s+s1}{\PYGZsq{}Final Decision Agent\PYGZsq{}}\PYG{p}{,} \PYG{n}{temperature}\PYG{o}{=}\PYG{l+m+mf}{0.3}\PYG{p}{)}
+    \PYG{n}{final\PYGZus{}thinking}\PYG{p}{,} \PYG{n}{final\PYGZus{}answer} \PYG{o}{=} \PYG{k}{await} \PYG{n}{final\PYGZus{}decision\PYGZus{}agent}\PYG{p}{(}\PYG{n}{combined\PYGZus{}infos}\PYG{p}{,} \PYG{n}{final\PYGZus{}decision\PYGZus{}instruction}\PYG{p}{)}
+
+    \PYG{k}{return} \PYG{n}{final\PYGZus{}answer}\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

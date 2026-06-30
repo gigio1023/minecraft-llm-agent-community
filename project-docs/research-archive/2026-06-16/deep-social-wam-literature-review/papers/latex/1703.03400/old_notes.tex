@@ -1,0 +1,179 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading nips_2016
+%
+% to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{nips_2016}
+
+\usepackage{nips_2016}
+\setcitestyle{numbers,square,citesep={,},aysep={,},yysep={,}}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+% \usepackage[final]{nips_2016}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usetikzlibrary{arrows}
+
+% use Times
+\usepackage{times}
+% For figures
+\usepackage{graphicx} % more modern
+%\usepackage{epsfig} % less modern
+%\usepackage{subfigure} 
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{wrapfig}
+
+
+% For algorithms
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% As of 2011, we use the hyperref package to produce hyperlinks in the
+% resulting PDF.  If this breaks your system, please commend out the
+% following usepackage line and replace \usepackage{icml2016} with
+% \usepackage[nohyperref]{icml2016} above.
+\usepackage{hyperref}
+
+% Packages hyperref and algorithmic misbehave sometimes.  We can fix
+% this with the following command.
+% \newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Employ the following version of the ``usepackage'' statement for
+% submitting the draft version of the paper for review.  This will set
+% the note in the first column to ``Under review.  Do not distribute.''
+% \usepackage[accepted]{icml2016}
+
+% Employ this version of the ``usepackage'' statement after the paper has
+% been accepted, when creating the final version.  This will set the
+% note in the first column to ``Proceedings of the...''
+%\usepackage[accepted]{icml2016}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage[font=footnotesize]{caption,subcaption}
+\usepackage{sidecap}
+
+\usepackage{xspace}
+
+\usepackage{color}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+
+\newcommand{\pushright}[1]{\ifmeasuring@#1\else\omit\hfill$\displaystyle#1$\fi\ignorespaces}
+
+\newcommand{\xb}{\mathbf{x}}
+\newcommand{\Xb}{\mathbf{X}}
+\newcommand{\Yb}{\mathbf{Y}}
+\newcommand{\Kb}{\mathbf{K}}
+
+\newcommand{\specialcell}[2][c]{%
+	\begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
+
+\include{defs}
+
+\title{Notes: Training Sensitive Policies}
+
+\author{
+  David S.~Hippocampus\thanks{Use footnote for providing further
+    information about author (webpage, alternative
+    address)---\emph{not} for acknowledging funding agencies.} \\
+  Department of Computer Science\\
+  Cranberry-Lemon University\\
+  Pittsburgh, PA 15213 \\
+  \texttt{hippo@cs.cranberry-lemon.edu} \\
+  %% examples of more authors
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \AND
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+}
+
+\begin{document}
+% \nipsfinalcopy is no longer used
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{abstract} 
+
+These notes discuss how we can train policies that are able to adapt quickly.
+
+\end{abstract} 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Sensitive Policies}
+\label{sec:sensitivity}
+
+Fast, sample-efficient learning is a huge challenge for deep RL. But does it have to be? The conventional wisdom is that ``shallow'' RL is sample-efficient because the hand-designed features provide a good basis for fast learning. But don't deep networks learn good features? Shouldn't deep RL therefore be \emph{faster} once good features have been learned? Indeed, one of the huge benefits of deep architectures should be the ability to learn high-sensitivity neurons that can change the policy behavior in large but structured ways. For example, if a bipedal walker policy can learn a ``direction'' neuron it should be able to toggle walking right versus walking left just by changing the sign on that neuron, which requires changing a relatively small number of connections in relatively local ways.
+
+So the goal is to learn policy parameters $\params$ that can change the policy in large but structured ways in response to small local changes in $\params$. That is, we should have a \emph{sensitive} policy. We can define sensitivity in terms of the change in the reward function. For example, if our goal is to maximize $E_{\policy_\params}[r(\traj)]$, and we take gradient steps of the form
+\[
+\params' \leftarrow \params + \alpha\nabla_\params E_{\policy_\params}[r(\traj)],
+\]
+we can define sensitivity as
+\[
+\lim_{\alpha \rightarrow 0} \frac{E_{\policy_{\params'}}[r(\traj)] - E_{\policy_\params}[r(\traj)]}{\alpha}.
+\]
+Equivalently, this corresponds to the derivative of the expected reward with respect to the step size. The goal is to have a large (positive) sensitivity with respect to a reward of interest. If we have that, we can learn quickly. If we have high sensitivity to \emph{many} different rewards, we can likely learn quickly even with respect to new rewards.
+
+\section{Optimizing for Sensitivity}
+
+Let us define \emph{locally adapted} parameters in terms of an adaptation operator $f_i(\params)$:
+\[
+f_i(\params) = \params + \alpha\nabla_\params E_{\policy_\params}[r_i(\traj)],
+\]
+where $r_i(\traj)$ is a reward function from the set of rewards $\{r_i\}$. We can define a sensitivity optimization problem as
+\[
+\max_\params E_{\policy_\params}[r_0(\traj)] + \sum_i E_{\policy_{f_i(\params)}}[r_i(\traj)],
+\]
+where $r_0(\traj)$ is a \emph{base} reward function (which may be omitted in general) that defines the main problem we are solving, while $r_i(\traj)$ are auxiliary reward functions that encourage the discovery of a policy that is sensitive to the types of rewards we care about. For example, $r_0$ for a humanoid might be to stand upright, while each $r_i$ might correspond to running in a different direction. If we solve this type of problem, we get a policy that can very quickly learn to run in different directions, and perhaps can generalize to other structured exploration behaviors.
+
+As Chelsea pointed out, this procedure assumes that the reward expectations are smooth. This is not the same as assuming that the rewards \emph{themselves} are smooth, since the expectation of a discontinuous function might still be continuous. This also assumes that the auxiliary rewards are sufficiently diverse.
+
+The optimization requires second derivatives, but these can likely be computed efficiently with most automatic differentiation packages.
+
+\section{The \emph{Other} Fast Weights}
+
+An interesting extension on the above optimization problem is to define a \emph{fast weights} mask $M$, so that only a subset of the policy parameters are adapted, and redefine $f_i$ as
+\[
+f_i(\params) = \params + \alpha\nabla_\params E_{\policy_\params}[r_i(\traj)] \circ M,
+\]
+where $\circ$ represents an elementwise product. Under the ``feature learning'' view of deep networks, this amounts to saying that some weights should be trained for sensitivity, while others are frozen during adaptation because they represent broadly useful features. $M$ might be either fixed or learned.
+
+\section{Open Problems}
+
+While the procedure described above may be effective for optimizing sensitive policies that adapt quickly to new situations, it leaves a number of openings for improvement. First, the adaptation procedure considered involves only one gradient step. This is fine in the ``differential'' view of sensitivity defined in Section~\ref{sec:sensitivity}, but may be limiting in general. It's also not immediately obvious how to extend this framework from policy gradient to other algorithms such as actor-critic, though the extension may be relatively straightforward.
+
+\end{document}

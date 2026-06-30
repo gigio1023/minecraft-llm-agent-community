@@ -1,0 +1,588 @@
+\appendix
+
+
+\section{Methods} 
+
+\subsection{Open source attention module} \label{app:methods:opensource}
+
+We have open-sourced a Jax/Haiku implementation of our Hierarchical Attention Module, which can be found at: \url{https://github.com/deepmind/deepmind-research/tree/master/hierarchical_transformer_memory/hierarchical_attention}
+
+We have also released our Ballet and Rapid Word Learning environments, and include links to those and the released versions of other environments we used below. 
+
+\subsection{Agent architecture and training} \label{app:methods:agents}
+
+\begin{table}[H]
+    \centering
+    \caption{Hyperparameters used in main experiments. Where only one value is listed across multiple columns, it applies to all. Where hyperparameters were swept, parameters used for HCAM and TrXL are reported separately.}
+    \resizebox{\textwidth}{!}{
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+      \hline
+      & \textbf{Ballet} & \textbf{Objects} & \textbf{Words} & \textbf{Image} & \textbf{Streets} & \textbf{Associative}  \\ \hline
+      \hline
+      All activation fns & \multicolumn{6}{c|}{ReLU} \\ \hline
+      State dimension & \multicolumn{6}{c|}{512} \\ \hline
+      Memory dimension & \multicolumn{6}{c|}{512} \\ \hline
+      Memory layers & \multicolumn{6}{c|}{4} \\ \hline
+      Memory num. heads & \multicolumn{6}{c|}{8} \\ \hline
+      HCAM chunk size & 32 & 16 & 16 & 16 & 4 & 2 \\ \hline
+      HCAM chunk overlap & \multicolumn{4}{c|}{-} & 1 & -\\ \hline
+      HCAM top-\(k\) & 8 & 8 & 16 & 16 & 32 & 32 \\ \hline
+      HCAM total num. chunks & \multicolumn{6}{c|}{always greater than max episode length // chunk size} \\ \hline
+      TrXL extra length & 256 & 512 & 256 & NA & 200 (full) & NA \\ \hline
+      \hline
+      Visual encoder & CNN & \multicolumn{5}{c|}{ResNet}\\ \hline 
+      Vis. enc. channels & \multicolumn{6}{c|}{(16, 32, 32)} \\ \hline 
+%      Vis. enc. channels & \multicolumn{5}{c|}{(16, 32, 32)} & (16, 16, 32, 32) \\ \hline 
+      Vis. enc. filt. size & (9, 3, 3) & \multicolumn{5}{c|}{(3, 3, 3)}\\ \hline 
+      Vis. enc. filt. stride & (9, 1, 1) & \multicolumn{5}{c|}{(2, 2, 2)}\\ \hline 
+%      Vis. enc. num. blocks & NA & \multicolumn{4}{c|}{(2, 2, 2)} & (1, 1, 1, 1)\\ \hline 
+      Vis. enc. num. blocks & NA & \multicolumn{5}{c|}{(2, 2, 2)}\\ \hline 
+      \hline
+      Language encoder & \multicolumn{3}{c|}{1-layer LSTM} & \multicolumn{3}{c|}{NA} \\ \hline
+      Lang. enc. dimension & \multicolumn{3}{c|}{256} & \multicolumn{3}{c|}{NA} \\ \hline
+      Word embed. dimension & \multicolumn{3}{c|}{32} & \multicolumn{3}{c|}{NA} \\ \hline
+      \hline
+      Policy \& value nets & \multicolumn{6}{c|}{MLP with 1 hidden layer with 512 units.} \\ \hline
+      Reconstruction decoders & \multicolumn{6}{c|}{Architectural transposes of the encoders, with independent weights.} \\ \hline
+      \hline
+      Recon. loss weight (HCAM) & \multicolumn{2}{c|}{1.} & 0.3 & 1. & 0.3 & NA \\ \hline
+      Recon. loss weight TrXL & \multicolumn{3}{c|}{1.} & NA & 1. & NA\\ \hline
+      \(V\)-trace loss weight (HCAM) & \multicolumn{2}{c|}{0.1} & 0.3 & 0.1 & 1. & NA \\ \hline
+      \(V\)-trace loss weight (TrXL) & 0.3 & \multicolumn{2}{c|}{0.1} & NA & 1. & NA \\ \hline
+      \(V\)-trace baseline weight (HCAM) & \multicolumn{2}{c|}{1.} & 0.3 & 1. & 0.3  & NA\\ \hline
+      \(V\)-trace baseline weight (TrXL) & 1. & 0.3 & 1. & NA & 1.  & NA\\ \hline
+      Entropy weight & \(1\cdot10^{-3}\) & \multicolumn{4}{c|}{\(1\cdot10^{-4}\)} & NA\\ \hline
+      \hline
+      Batch size & \multicolumn{6}{c|}{32} \\ \hline
+      Training unroll length & 64 & 128 & 128 & 128 & 64 & NA \\ \hline
+      \hline 
+      Optimizer & \multicolumn{6}{c|}{Adam \citep{kingma2014adam}} \\ \hline
+      LR & \multicolumn{4}{c|}{\(2\cdot10^{-4}\)} & \(4\cdot10^{-4}\) & \(1\cdot10^{-4}\) \\ \hline
+    \end{tabular}}
+    \label{tab:app:hyper}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Hyperparameter sweeps used in main experiments. The One-Shot StreetLearn and Paired Associative Inference tasks used different chunk size sweeps due to the different task lengths and demands. The Paired Associative Inference tasks do not use RL losses and so did not use the corresponding loss sweeps.} \label{tab:app:hypersweep}
+    \begin{tabular}{|c|c|}
+      \hline
+      Reconstruct. loss weight & \{0.1, 0.3, 1.\}\\
+      \(V\)-trace loss weight &  \{0.1, 0.3, 1.\}\\
+      \(V\)-trace baseline weight &   \{0.1, 0.3, 1.\}\\
+      HCAM chunk size & \{16, 32, 64\}, except Streets=(2, 4, 8, 16) and Associative=None\\
+      LR & None, except Streets and Associative=\{1, 2, 4\}\(\cdot 10^{-4}\)\\
+      \hline
+    \end{tabular}
+\end{table}
+In Table \ref{tab:app:hyper} we show the hyperparameters used for all experiments, and in Table \ref{tab:app:hypersweep} we show the hyperparameters sweeps used, although we generally used a subset of the full sweep. We swept each hyperparameter with a single seed per condition, and then reran the best parameter settings for each condition with more seeds to get a more robust estimate of the performance of each approach.
+
+In most cases the hyperparameters that were not swept were taken from other sources without tuning for our architecture. In particular, the first tasks we considered were the rapid word learning tasks, and many parameters were taken directly from the hyperparameters of the original paper on which the tasks were based \citep{hill2020grounded}. These hyperparameters were therefore tuned directly by prior researchers for other models, but we found them to work well for our memory as well. The visual encoder, language encoder, unsupervised reconstruction loss etc. were copied from those described in the prior work.
+
+Since we ran all other experiments after the initial word learning experiments, we used many of these same hyperparameters on other experiments, such as the visual and language encoder architecture across all experiments. However, some hyperparameters do differ across tasks due to specific task features. For example, the visual encoder for the ballet tasks is set to have a filter size of 9 because this is the resolution of each square in the grid, and the entropy cost for the ballet tasks was chosen from our prior work \citep{hill2019environmental} which used a similar grid world action space. These decisions were shared across all architectures, so should not favor our model over the baselines.
+
+\paragraph{Self-supervised reconstruction loss} We used the same reconstruction loss as \citet{hill2020grounded}, namely reconstructing the language with a softmax cross-entropy loss, and reconstructing the image pixels (normalized to range [0, 1] on each color channel) with a sigmoid cross-entropy loss. The image reconstruction loss was averaged across all pixels and channels, while the language reconstruction loss was summed across the sequence. 
+
+\subsubsection{Bug fixed between original and revised versions of this paper} \label{app:methods:bug_fixed}
+
+Shortly before the camera-ready deadline for NeurIPS, we discovered a bug in the configuration of the HCAM in the Ballet, Words, and Passive Visual Match domains: the local attention window was much longer than intended. Fixing this bug did not substantially alter results in the Ballet or Passive Visual Match tasks, but did change our results somewhat in the Rapid Word Learning tasks. The qualitative patterns of extrapolation and generalization to multiple episodes remain the same, but generalization of HCAM is somewhat worse, although still much better than the baseline models. This does not substantially affect the conclusions of the paper. We have revised the Rapid Word Learning plots in the main text to reflect these updated results, and included evaluation on the original levels in Fig. \ref{fig:supp_exp:fastbind_harder_holdouts}. However, note that our supplemental analyses in this domain were carried out with the longer attention window.
+
+\subsection{Plotting methods}
+In all plots, each curve is an average across multiple runs. The \(x\)-axis is always the number of agent steps (actions taken/frames seen) during training. The number of learner updates is generally \(2000-4000\times\) smaller with a batch size of 32 trajectories per update, and unroll lengths of 64-128. The dark regions around the curve show \(\pm\)SD across runs, the light regions show the total range. The plots are smoothed by interpolation with a triangular window, with width and sampling frequency chosen to present results clearly depending on the speed and variability of learning the different tasks. All figures were made with seaborn \citep{Waskom2021} and matplotlib \citep{Hunter2007}.
+
+\subsection{Compute resources}
+All experiments were run using Google TPU 
+\ifanonymized
+  v2 and v3
+\else
+  v2, v3, and v4
+\fi
+devices. Each run lasted between a few hours and a few days depending on the experiment. We ran actors/evaluators on CPUs. We estimate the total time needed to reproduce all experiments (including baselines and experiments in appendices) to be around 1000 TPU-hours + 300000 CPU hours.
+
+\section{Tasks} \label{app:tasks}
+
+We have uploaded selected video recordings of the HCAM-based agent performing our main tasks 
+\ifanonymized
+in the supplemental materials for the paper.
+\else
+at \url{https://www.youtube.com/playlist?list=PLE5lx5-YU_Hr8Q9IgTAfisJ6XCy3Jhh6F}
+\fi
+
+\subsection{Open source or released tasks}
+
+We have open-sourced our Ballet environment at: \url{https://github.com/deepmind/deepmind-research/tree/master/hierarchical_transformer_memory/hierarchical_attention}
+
+We have released our rapid-word-learning tasks in the repository for the paper they were based upon \url{https://github.com/deepmind/dm_fast_mapping}
+
+The environments from other papers that we used also have corresponding releases:
+\begin{enumerate}
+    \item Passive Visual Match: \url{https://github.com/deepmind/deepmind-research/tree/master/tvt}
+    \item Paired Associative Inference: \url{https://github.com/deepmind/deepmind-research/tree/master/memo}
+    \item One-Shot StreetLearn \url{https://github.com/deepmind/deepmind-research/tree/master/rapid_task_solving}
+\end{enumerate}
+
+
+\subsection{Ballet} \label{app:tasks:ballet}
+The tasks took place in a \(9 \times 9\) tile room with an extra 1 tile wall surrounding on all sides, for a total of \(11 \times 11\) tiles. This was upsampled at a resolution of 9 pixels per tile to form a \(99 \times 99\) image as input to the agent. The agent was placed in the center of the room, and the dancers were placed randomly in 8 possible locations around it. The dancers always had distinct colors and shapes, selected from 15 shapes and 19 colors. These features merely served to distinguish the dancers. The agent always appeared as a white square. The agent received egocentric inputs (that is, its visual input was centered on its location), as this can improve generalization \citep{hill2019environmental}. 
+
+In Listing \ref{lst:app:tasks:ballet:dances} we show the dance sequences used for the ballet tasks. All dances are 16 steps long. We trained all agents with levels uniformly sampled to have 16 or 48 steps of delay between dances, and 2, 4, or 8 dances. The number of dancers in the room corresponded to the number of dances, such that if there were only 2 dances, there were only 2 dancers, while if there were 8 dances there were 8 dancers. This is why chance-level performance is 50\% with 2 dances, but 12.5\% with 8. The agent was given a reward of 1 for a correct choice, and 0 for an incorrect choice.
+\begin{lstfloat}
+\begin{lstlisting}
+{
+"circle_cw": [0, 2, 4, 4, 6, 6, 0, 0, 2, 2, 4, 4, 6, 6, 0, 2],
+"circle_ccw": [0, 6, 4, 4, 2, 2, 0, 0, 6, 6, 4, 4, 2, 2, 0, 6],
+"up_down": [0, 4, 4, 0, 0, 4, 4, 0, 0, 4, 4, 0, 0, 4, 4, 0],
+"left_right": [2, 6, 6, 2, 2, 6, 6, 2, 2, 6, 6, 2, 2, 6, 6, 2],
+"diagonal_uldr": [7, 3, 3, 7, 7, 3, 3, 7, 7, 3, 3, 7, 7, 3, 3, 7],
+"diagonal_urdl": [1, 5, 5, 1, 1, 5, 5, 1, 1, 5, 5, 1, 1, 5, 5, 1],
+"plus_cw": [0, 4, 2, 6, 4, 0, 6, 2, 0, 4, 2, 6, 4, 0, 6, 2],
+"plus_ccw": [0, 4, 6, 2, 4, 0, 2, 6, 0, 4, 6, 2, 4, 0, 2, 6],
+"times_cw": [1, 5, 3, 7, 5, 1, 7, 3, 1, 5, 3, 7, 5, 1, 7, 3],
+"times_ccw": [7, 3, 5, 1, 3, 7, 1, 5, 7, 3, 5, 1, 3, 7, 1, 5],
+"zee": [1, 6, 6, 2, 2, 5, 1, 5, 5, 2, 2, 6, 6, 1, 5, 1],
+"chevron_down": [7, 4, 3, 1, 0, 5, 1, 5, 1, 4, 5, 7, 0, 3, 7, 3],
+"chevron_up": [3, 0, 7, 5, 4, 1, 5, 1, 5, 0, 1, 3, 4, 7, 3, 7],
+}
+\end{lstlisting}
+\caption{Dances used in the ballet task. 0-7 refer to directions of movement, clockwise from 0 = up.}
+\label{lst:app:tasks:ballet:dances}
+\end{lstfloat}
+
+\subsection{Object permanence}
+The tasks took place within a 3D environment created with Unity. The agent received a visual observation of \(96 \times 72 \times 3\) pixel RGB images, and a language observation that was tokenized at the word-level. The agent was initially placed in a fixed position near one wall of the room facing toward the center, and the boxes were randomly placed within the agent's field of view. When each object appeared, it jumped out of its box three times in succession. If there was a delay period, it began after the object returned to its box for the third time. The delay periods we used for the varying length training were 0, 10, 20, and 30 seconds. After the last presentation and delay phase, the lids of the boxes closed.
+
+After the lids of the boxes closed, the agent was allowed to move and look around, and was given the instruction ``look backward.'' The agent was rewarded 0.3 for looking backwards (far enough that the boxes were out of view), and looking backward allowed it to advance to the choice phase of the task. In the choice phase, the agent was told ``go to the box containing the [duck]'' and was rewarded 1 for making the correct choice, and 0 for an incorrect choice.
+
+\subsection{Rapid word learning with distractors}
+We used the tasks created by \citet{hill2020grounded} with the following modifications. First, we removed three of the possible objects (trains, robots, and rockets) to be used in the distractor task. We then added 0-20 distractor phases between the word binding and test phases. In each distractor phase, the agent and the three distractor objects were randomly placed in the room, and the agent was asked to lift one of them, e.g. ``lift the rocket.'' The agent received a reward of 0.1 for successfully lifting the right object, and was allowed to progress to the next distractor task. If the agent lifted the wrong object, it was neither rewarded nor allowed to progress until it had lifted the correct object or until 20 seconds had passed. All agents rapidly learned to solve these distractor tasks. A fixed time limit of 450 seconds was used across all episodes, after which the episode terminated with reward 0 regardless of what phase the agent was in. 
+
+For the multi-episode evaluation tasks, we simply combined the number of episodes we wished to test across into a single ``super-episode.'' For the final test phase, where we tested earlier words, the distractor objects were always taken from the same learning phase as the target object (to ensure that the agent remembered the exact name-object pairings, rather than simply which name appeared with which group of objects). We set a time limit of 450 seconds to complete \emph{all} the sub-episodes. Agents with HCAM and TrXL memories were able to consistently complete the super-episodes within this time limit---even though TrXL could not choose the correct objects, it was consistently reaching the end and choosing \emph{some} object for a chance at the final reward. However, the LSTM-based agents often timed out on these multi-episode evaluations.
+
+\subsection{Comparisons to other papers} \label{app:tasks:other}
+
+The Passive Visual Match and Paired Associative Inference tasks were used unmodified. The StreetLearn \citep{mirowski2019streetlearn} images and maps we used for the One-Shot StreetLearn were a more recent version than those used by \citet{ritter2020rapid}. Because the task difficulty is fixed through the sampling of neighborhoods from the larger city graph, this should not substantially alter the difficulty of the tasks. We received permission from an author on each paper to use their tasks. 
+
+All three tasks from other papers have been released under Apache licenses, and the open source code can be found at:
+\begin{itemize}
+    \item Passive visual match: \url{https://github.com/deepmind/deepmind-research/tree/master/tvt/dmlab}
+    \item Paired Associative Inference: \url{https://github.com/deepmind/deepmind-research/tree/master/memo}
+    \item One-Shot StreetLearn: \url{https://github.com/deepmind/deepmind-research/tree/master/rapid_task_solving}.
+\end{itemize}
+
+
+\paragraph{The PAI task}
+In order to apply HCAM to the supervised PAI task, we took the following steps. We embedded all the input memories and probes using a single shared embedding layer. The structure of the memories for the PAI task matches the structure of HCAM's contents, where each pair of associated images corresponds to a single chunk in memory (of length 2). We therefore created a HCAM-style memory containing these embedded contents, and keyed by their summaries (averages across each chunk). We then provided the embedded query as input to the multi-layer HCAM model, but used the same set of embedded task memories at every layer. After 4 HCAM layers, we averaged-pooled across the sequence of resulting embeddings, and then performed a linear projection to produce a final output embedding. We then compared this ouptut embedding to the embeddings of the two possible choices using dot products. These dot products were used as logits in a softmax to choose the answer, and the model was trained using a cross-entropy loss. We did not use a self-supervised reconstruction loss for this setting.
+
+\section{Detailed results}
+
+In Table \ref{tab:app:numericalresults} we show the mean performance and standard deviation across runs from our main experiments.
+
+\begin{table}[htb]
+    \centering
+    \caption{Numerical results from main experiments/figures---mean \(\pm\) standard deviation across 3 runs per condition. Results are average performance (\% correct) across evaluations during the last 1\% of training, except for the One-Shot StreetLearn tasks, where they are average reward during the last 1\% of training. (Note that on some levels LSTMs were not consistently completing the task before the episode time limit. Incomplete episodes are scored as 0.)} \label{tab:app:numericalresults}
+    \begin{tabular}{cccccc}
+      Experiment & Level & Fig. & HCAM & TrXL & LSTM\\ \hline
+      \multirow{3}{*}{Ballet} & 2 dances, delay 16 & \ref{fig:exp:ballet:2} & \(99.8 \pm 0.3\) & \(96.9 \pm 1.4\) & \(97.4 \pm 1.8\) \\
+      & 8 dances, delay 16 &\ref{fig:exp:ballet:8} & \(98.1 \pm 3.3\)  & \(65.7 \pm 13.7\) & \(25.2\pm 2.7\) \\
+      & 8 dances, delay 48 &\ref{fig:exp:ballet:8long} & \(97.2 \pm 2.5\) & \(49.2 \pm 13.0\) & \(29.7 \pm 9.4\)\\ \hline
+      \multirow{3}{*}{Objects} & No delay, varying train & \ref{fig:exp:objects:curr_short} & \(96.7\pm 0.9\) & \(82.2 \pm 28.7\) & \(33.2 \pm 6.6\) \\
+      & Long delay, varying train & \ref{fig:exp:objects:curr_long}  & \(91.7\pm 8.3\) & \(46.1 \pm 20.0\) & \(34.8 \pm 5.5\) \\
+      & Long delay, long-only train & \ref{fig:exp:objects:longonly} & \(82.9\pm 16.4\) & \(31.1 \pm 0.6\) & - \\\hline
+      \multirow{3}{*}{Words} & 10 distractors & \ref{fig:exp:fastbind:curr} & \(93.0 \pm 4.0\) & \(76.7 \pm 12.5\) & \(21.0 \pm 18.3\) \\
+      & 4 episodes, 0 distractor each &  \ref{fig:exp:fastbind:across_eps_4_1}& \(82.8\pm 6.4\) & \(49.3 \pm 16.5\) & \(19.8 \pm 17.4\)  \\
+      & 2 episodes, 5 distractors each &  \ref{fig:exp:fastbind:across_eps_2_5}& \(71.1\pm 8.0\) & \(48.7 \pm 13.2\) & \(22.9 \pm 20.1\)\\\hline
+      Image & &  \ref{fig:exp:other_papers:tvt} & \(97.0\pm 2.8\) & - & - \\\hline
+      Associative & &\ref{fig:exp:other_papers:pai}  & \(97.5\pm 0.9\) & - & - \\\hline
+      Streets & & \ref{fig:exp:other_papers:ossl} & \(26.8\pm 0.44\) &  \(19.9\pm 0.65\) & - \\\hline
+    \end{tabular}
+\end{table}
+
+\section{Supplemental experiments} \label{app:supp_exp}
+
+In this section we present some supplemental experiments and analyses. However, we make several notes here. First, these supplemental analyses were mostly run with a longer local attention window than used in the main text, see App. \ref{app:methods:bug_fixed}, which could potentially affect results, particularly in the rapid word learning domain. Second, we use the original acronym HTM instead of HCAM in most of these plots, because we revised it only after a reviewer pointed out a name clash. 
+
+\subsection{Fast-binding performance on harder hold-out tasks} \label{app:supp_exp:fastbind}
+In our original version of this paper, we presented generalization results on a harder set of evaluation tasks. Unfortunately, the high generalization performance on these results seemed to be at least in part due to a bug causing our HCAM memory to have a large local attention window (see above). We therefore changed the main text figures to show performance on slightly easier task variations. However, in Fig. \ref{fig:supp_exp:fastbind_harder_holdouts} we show performance on the original evaluation tasks. HCAM still achieves off-chance performance in 2 out of 3 cases, with fairly decent performance in one case, and performance continues to improve as training goes on.
+
+\begin{figure}[htb]
+\centering
+%\begin{subfigure}{0.33\textwidth}
+%\includegraphics[width=\textwidth]{figures/fastbind_results/fastbind_supplement_curriculum_eval_fast_map_three_objs_two_distractor.pdf}
+%\captionsetup{width=.8\textwidth}
+%\caption{Train task, 2 dist.} \label{fig:supp_exp:fastbind_harder:2}
+%\end{subfigure}\\%
+\begin{subfigure}{0.33\textwidth}
+\includegraphics[width=\textwidth]{figures/fastbind_results/fastbind_supplement_curriculum_eval_fast_map_three_objs_twenty_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Eval. 20 dist.} \label{fig:supp_exp:fastbind_harder:20}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\includegraphics[width=\textwidth]{figures/fastbind_results/fastbind_supplement_curriculum_eval_fast_map_four_episodes_three_objs_one_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Eval. 4 eps., 1 dist.} \label{fig:supp_exp:fastbind_harder:4_1}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\includegraphics[width=\textwidth]{figures/fastbind_results/fastbind_supplement_curriculum_eval_fast_map_three_episodes_three_objs_five_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Eval. 3 eps., 5 dist.} \label{fig:supp_exp:fastbind_harder:3_5}
+\end{subfigure}%
+\caption{Evaluating HCAM on the harder generalization tasks we considered in the original version of this paper, after longer training (note horizontal axis). HCAM achieves off-chance performance, and continues to improve as training goes on. (3 seeds per condition.)}
+\label{fig:supp_exp:fastbind_harder_holdouts}
+\end{figure}
+
+
+\subsection{Ballet generalization}  \label{app:supp_exp:ballet_gen}
+In the main text Ballet experiments (Fig. \ref{fig:exp:ballet}), we compared differences only in training performance. In Fig. \ref{fig:supp_exp:ballet_gen}, we show that HCAM is also able to generalize well from training on 2, 4, or 6 dances, to evaluation on 8 dances with either short or long delays.
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_generalization_8_delay16_fixed.pdf}
+    \captionsetup{width=.8\textwidth}
+    \caption{Evaluate 8 dances, short delays.}
+    \label{fig:supp_exp:ballet_gen:8}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_generalization_8_delay48_fixed.pdf}
+    \captionsetup{width=.8\textwidth}
+    \caption{Evaluate 8 dances, long delays.}
+    \label{fig:supp_exp:ballet_gen:8long}
+    \end{subfigure}
+    \caption{HCAM (labeled as HTM) trained on 2, 4, or 6 dance ballets generalizes well to 8 dance ballets, while TrXL does not. Results are from two seeds in each condition.}
+    \label{fig:supp_exp:ballet_gen}
+\end{figure}
+
+\subsection{Analyzing memory attention in the rapid word learning tasks} \label{app:supp_exp:attention_analyses}
+
+In this section, we show that the HCAM agent's extrapolation to cross-episode evaluation (Fig. \ref{fig:exp:fast_binding_tasks:episodes}) in the rapid word learning tasks is supported by selective patterns of memory access. In summary, we show that when the agent is asked to recall a word from many episodes before, all layers of its memory exhibit significantly higher attention to phase when it learned that word, compared to its attention patterns when tested on a more recent word. 
+
+Specifically, we considered the case of evaluation across 4 episodes, with 1 distractor each. To lay out the ``super-episode'' structure of this setting very explicitly, it proceeds through 4 episodes, each of which has three distinct phases. In other words, the episodes proceed as: learn 1, distract 1, test 1, learn 2, distract 2, test 2, learn 3, distract 3, test 3, learn 4, distract 4, test 4. Tests 1-3 evaluate memory for a word learned in their respective learn phases 1-3, but test 4 tests surprises the agent by asking about a word learned in learning phase 1 (Fig. \ref{fig:exp:fast_binding_tasks:episodes}). As shown in the main text (Fig. \ref{fig:exp:fastbind:across_eps_4_1}), the HCAM-based agent achieves above 90\% performance on test 4, despite never being evaluated on words from earlier episodes during training.
+
+To investigate the attention patterns underlying this result, we analyzed what chunks of memory the agent was attending to in test phase 4 (Fig. \ref{fig:supp_exp:fb_attn:summary}). In particular, we ran the agent on 100 of these episodes, and saved its attention weights for each phase of the experiment. In 93 of these episodes, the agent chose correctly in test 4. Within those 93 episodes, we then evaluated the agent's attention to the first memory chunk of learn 1, the learning phase of the first episode (which generally contained most, if not all, of that learn phase). We compare the attention weight on this chunk when the agent is tested on one of these words in test phase 4 to a within-episode control: the relative weight when the agent is tested on a word from learn 3 during test phase 3. Is the agent attending more to its memory of learn phase 1 in test 4, when that memory is relevant, compared to test 3, when it is irrelevant? In fact, we find that across all four layers of the agent's memory, the agent is attending more strongly to the memory when it is relevant than when it is not. That is, the agent is distributing its attention intelligently, in a query-dependent way. It is attending most strongly to memories of the learn 1 phase when it is asked to recall a word from it, compared to a within-super-episode control where it is asked to recall a word from another phase (learn 3). 
+
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.5\textwidth}
+    \includegraphics[width=\textwidth]{figures/fastbind_results/attention_analysis/attention_analysis.png}
+    \caption{Analysis sketch.}
+    \label{fig:supp_exp:fb_attn:diagram}
+    \end{subfigure}%
+    \begin{subfigure}{0.5\textwidth}
+    \includegraphics[width=\textwidth]{figures/fastbind_results/attention_analysis/attention_summary.pdf}
+    \caption{Results.}
+    \label{fig:supp_exp:fb_attn:results}
+    \end{subfigure}
+    \caption{The HCAM-based agent selectively attends to relevant memories in the rapid-word-learning generalization tasks. (\subref{fig:supp_exp:fb_attn:diagram}) We analyze the relative weight of attention to the first memory from the first learning phase, when the agent is asked to recall a word form the first phase in test 4 vs. when it is asked to recall a word from a later phase in test 3. (\subref{fig:supp_exp:fb_attn:results}) Across all 4 memory layers, the agent attends more strongly to its memory of this first learning phase when that memory is relevant---in test 4---compared to when that memory is irrelevant---in test 3. (This plot shows relative attention weights---that is, attention weights divided by average attention weight, so that if the agent were attending uniformly to all memories, their relative attention weights would be 1, indicated by the dotted line. This plot shows averages and 95\%-CIs across the 93 episodes where the agent made a correct choice in test 4, out of 100 total super-episodes run.)} \label{fig:supp_exp:fb_attn:summary}
+\end{figure}
+
+The results above involve several levels of aggregation: averaging within phases, and across many super-episodes. To give a flavor for the complexity of the full patterns of attention, in Fig. \ref{fig:supp_exp:fb_attn:detailed} we show the average attention weights for every layer across all the stored memories, in the final four phases of two super-episodes. 
+\begin{figure}[p]
+    \centering
+    \begin{subfigure}{0.66\textwidth}
+        \includegraphics[width=\textwidth]{figures/fastbind_results/attention_analysis/attention_example_episode.pdf}
+        \caption{Example super-episode 1}
+    \end{subfigure}\\
+    \begin{subfigure}{0.66\textwidth}
+        \includegraphics[width=\textwidth]{figures/fastbind_results/attention_analysis/attention_example_episode_2.pdf}
+        \caption{Example super-episode 2}
+    \end{subfigure}\\
+    \caption{Patterns of attention within four phases of two example (randomly chosen) super-episodes on the rapid-word-learning generalization tasks. The higher layers of the network show clear shifts in attention patterns between the different phases, although with some consistent biases within each super-episode, especailly at the lower layers. The pink bar shows the weight on the first chunk from learn phase 1---the analyis shown in Fig. \ref{fig:supp_exp:fb_attn:summary} corresponds to comparing the pink bars in the first and last column, aggregated across many more episodes. (This plot shows relative attention weights---that is, attention weights divided by average attention weight, so that chance level relative attention would be 1, indicated by the dotted line. Note that these were computed \emph{before} the top-\(k\) operation on the attention weights, which is why more than 16 weights are active. The two super-episodes had different lengths, which is why more memories were stored in the first.)} \label{fig:supp_exp:fb_attn:detailed}
+\end{figure}
+
+\subsection{Varying chunk sizes}  \label{app:supp_exp:varying_chunk_size}
+In Fig. \ref{fig:supp_exp:ballet} we show that the performance of the HCAM model is robust to varying chunk sizes in the ballet task; therefore its advantage in this task is not due to having additional information about the correct segmentation of the episodes. Furthermore, HCAM performs well even when its chunk size is 12, and so the total number of timepoints it can attend to at each layer is smaller than the number that the TrXL can attend to at each layer. Thus its advantage in these tasks is not due to attending to more of the episode, but rather to attending more effectively. 
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_chunksize_2_delay16_fixed.pdf}
+    \caption{2 dances, short delays.}
+    \label{fig:supp_exp:ballet:2}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_chunksize_4_delay16_fixed.pdf}
+    \caption{4 dances, short delays.}
+    \label{fig:supp_exp:ballet:4}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_chunksize_8_delay16_fixed.pdf}
+    \caption{8 dances, short delays.}
+    \label{fig:supp_exp:ballet:8}
+    \end{subfigure}\\
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_chunksize_2_delay48_fixed.pdf}
+    \caption{2 dances, long delays.}
+    \label{fig:supp_exp:ballet:2long}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_chunksize_4_delay48_fixed.pdf}
+    \caption{4 dances, long delays.}
+    \label{fig:supp_exp:ballet:4long}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/ballet_results/ballet_chunksize_8_delay48_fixed.pdf}
+    \caption{8 dances, long delays.}
+    \label{fig:supp_exp:ballet:8long}
+    \end{subfigure}
+    \caption{Comparison of HCAM (labeled as HTM) with different chunk sizes to TrXL across the different ballet levels. The performance of the HCAM model is robust to varying chunk size, indicating that HCAM does not need a task-relevant segmentation to perform well. The results reported in the main text use chunk size 32; panels \subref{fig:supp_exp:ballet:2}, \subref{fig:supp_exp:ballet:8}, and \subref{fig:supp_exp:ballet:8long} correspond to main text Fig. \ref{fig:exp:ballet}. These comparisons were run before a minor bug was fixed in HCAM memory writing. Results are from three seeds in each condition.}
+    \label{fig:supp_exp:ballet}
+\end{figure}
+
+\subsection{Varying \(k\) for memory selection} \label{app:supp_exp:varying_k}
+In Fig. \ref{fig:supp_exp:varying_k} we show that HCAM is robust to varying the number \(k\) of memory chunks selected in the top-\(k\) step of the hierarchical attention at each layer. Specifically, while the main text experiments used \(k=16\), we show that HCAM is able to perform the ballet and object permanence tasks well even with \(k=4\), and can perform the shorter tasks even with \(k=2\) or even \(k=1\). While it initially surprised us that hard memory selection with \(k=1\) did not harm the optimization process, it resonates with recent results from the Switch Transformer \citep{fedus2021switch}, which found that hard selection of a single expert was effective in a mixture-of-experts style model.
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/varying_k_results/ballet_varying_k_2_delay16_fixed.pdf}
+    \caption{Ballet, 2 dances, short delays.}
+    \label{fig:supp_exp:varying_k:ballet2}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/varying_k_results/ballet_varying_k_8_delay48_fixed.pdf}
+    \caption{Ballet, 8 dances, long delays.}
+    \label{fig:supp_exp:varying_k:ballet8long}
+    \end{subfigure}\\
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/varying_k_results/objects_varying_k_eval_recall_which_bin_llb.pdf}
+    \caption{Object permanence, no delays.}
+    \label{fig:supp_exp:varying_k:objects}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/varying_k_results/objects_varying_k_eval_recall_which_bin_llb_30sdelays.pdf}
+    \caption{Object permanence, 30s delays.}
+    \label{fig:supp_exp:varying_k:objects30s}
+    \end{subfigure}\\
+    \caption{Varying the number \(k\) of memory chunks selected in the top-\(k\) step of hierarchical attention. Performance is relatively robust to \(k\) smaller than used in the main experiments (\(k=16\)), in fact shorter tasks can be learned even with \(k=1\), while longer tasks require \(k\geq 4\). (\subref{fig:supp_exp:varying_k:ballet2}-\subref{fig:supp_exp:varying_k:ballet8long}) On the ballet tasks, HCAM can learn fairly well even with \(k=1\), both for the shorter and longer tasks. (\subref{fig:supp_exp:varying_k:objects}-\subref{fig:supp_exp:varying_k:objects30s}) On the object permanence tasks, HCAM can learn the shortest tasks well even with \(k=1\), but struggles to learn the longer tasks unless \(k\geq 4\). (One seed per condition.)}
+    \label{fig:supp_exp:varying_k}
+\end{figure}
+
+\subsection{The importance of self-supervised learning} \label{app:supp_exp:selfsupervised}
+In Fig. \ref{app:supp_exp:selfsupervised}, we show that the self-supervised loss (image + language reconstruction at the agent output) that we used as an auxiliary loss during training is necessary for our model to achieve good performance on the ballet and fast-binding tasks. This is presumably because this loss forces the model to encode the input in detail, and therefore that information is in-principle retrievable from the state representations stored in the agent memory. 
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/recon_lesion/recon_lesion_ballet_2_delay16_fixed.pdf}
+    \caption{Ballet, 2 dances, short delays.}
+    \label{fig:supp_exp:selfsupervised:ballet2}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/recon_lesion/recon_lesion_ballet_8_delay48_fixed.pdf}
+    \caption{Ballet, 8 dances, long delays.}
+    \label{fig:supp_exp:selfsupervised:ballet8long}
+    \end{subfigure}\\
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/recon_lesion/recon_lesion_fastbind_eval_fast_map_three_objs_no_distractor.pdf}
+    \caption{Rapid word learning, no distractors.}
+    \label{fig:supp_exp:selfsupervised:fb0}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \includegraphics[width=\textwidth]{figures/recon_lesion/recon_lesion_fastbind_eval_fast_map_three_objs_two_distractor.pdf}
+    \caption{Rapid word learning, 2 distractors.}
+    \label{fig:supp_exp:selfsupervised:fb2}
+    \end{subfigure}
+    \caption{The self-supervised loss (SSL) is necessary for the model to learn appropriate representations. When the SSL is disabled, the model either fails to achieve substantially-above-chance performance, for example in the ballet tasks (\subref{fig:supp_exp:selfsupervised:ballet2}-\subref{fig:supp_exp:selfsupervised:ballet8long}), or fails to learn the tasks to even chance level, as in the rapid word learning tasks (\subref{fig:supp_exp:selfsupervised:fb0}-\subref{fig:supp_exp:selfsupervised:fb2}). (HTM refers to HCAM, see note above. 3 runs per condition for main results, 2 runs per condition for results without SSL.)}
+    \label{fig:supp_exp:selfsupervised}
+\end{figure}
+
+
+
+\subsection{Memory layer gating} \label{app:supp_exp:gating}
+In Fig. \ref{fig:supp_exp:gating_lesion}, we show that HCAM's performance is not enhanced by the gating mechanism proposed by \citet{parisotto2020stabilizing}, and in fact HCAM actually learns slightly more slowly when its layers are gated. This is potentially because HCAM already has some notion of gating in its selection of relevant chunks, and additional gating therefore only interferes with the optimization process. Thus, we did not use gating for HCAM in our main experiments. Furthermore, we found that gating was not necessary to train the TrXL memory on our tasks, although we used it in our main experiments to match \citet{parisotto2020stabilizing}. However, HCAM with or without gating outperforms TrXL with or without gating.
+
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.33\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/gating_results/gating_fastbind_eval_fast_map_three_objs_twenty_distractor.pdf}
+    \captionsetup{width=.8\textwidth}
+    \caption{Train 0-2 distractors,\\evaluate 20.}
+    \label{fig:supp_exp:gating_lesion:fb:extrap}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/gating_results/gating_fastbind_eval_fast_map_four_episodes_three_objs_one_distractor.pdf}
+    \captionsetup{width=.8\textwidth}
+    \caption{Evaluate 4 episodes,\\1 distractor each.}
+    \label{fig:supp_exp:gating_lesion:fb:across_4_1}
+    \end{subfigure}%
+    \begin{subfigure}{0.33\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/gating_results/gating_fastbind_eval_fast_map_three_episodes_three_objs_five_distractor.pdf}
+    \captionsetup{width=.8\textwidth}
+    \caption{Evaluate 3 episodes,\\5 distractors each.}
+    \label{fig:supp_exp:gating_lesion:fb:across_3_5}
+    \end{subfigure}%
+    \caption{HCAM (labeled as HTM) performs better without gating \citep{parisotto2020stabilizing} than with gating. On the fast-binding tasks HCAM with gating learns slightly more slowly and generalizes slightly worse than without gating. Gating of memory layers does not appear necessary for TrXL in our tasks, unlike the experiments of \citet{parisotto2020stabilizing}. However, neither gated nor ungated TrXL are able to extrapolate to the tasks that gated or ungated HCAM does. (3 seeds per condition for main runs, 2 per condition for alternatives.)}
+    \label{fig:supp_exp:gating_lesion}
+\end{figure}
+\subsection{Comparing a TrXL that is 2\(\times\) wider/deeper than HCAM} \label{app:supp_exp:matched_params}
+
+Because our HCAM-based agents have an added HCAM attention block in each memory layer compared to our TrXL-based ones, it might seem that they have somewhat more parameters and greater total depth. However, as noted in Section \ref{app:supp_exp:gating}, HCAM does not use the gating layers used by the TrXL memory \citep{parisotto2020stabilizing} and because of this HCAM uses about 20\% fewer parameters and is in some sense shallower than our TrXL baselines. However, it does have more layers of attention. To ensure that this or other simple factors were not the primary driver of HCAM's advantage, we ran comparisons where we either made the TrXL twice as wide (i.e. each layer had twice as many hidden units, including the attention projections etc.) or twice as deep (i.e. an 8-layer TrXL memory instead of 4-layers as we used for our main experiments). Both of these have substantially more parameters than our HCAM-based models, and the latter is substantially deeper as well. However, we show in Fig. \ref{fig:supp_exp:matched_params} that these much larger TrXL models were also unable to match the performance of HCAM on the rapid word-learning tasks. Thus the advantage of HCAM is not due to parameters or depth alone.
+
+\begin{figure}[htb]
+\centering
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/params_results/params_fastbind_eval_fast_map_three_objs_twenty_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Train 0-2 distractors,\\evaluate 20.}
+\label{fig:supp_exp:params:fb:extrap}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/params_results/params_fastbind_eval_fast_map_four_episodes_three_objs_one_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Evaluate 4 episodes,\\1 distractor each.}
+\label{fig:supp_exp:params:fb:across_4_1}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/params_results/params_fastbind_eval_fast_map_three_episodes_three_objs_five_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Evaluate 3 episodes,\\5 distractors each.}
+\label{fig:supp_exp:params:fb:across_3_5}
+\end{subfigure}%
+
+\caption{Comparing agents with TrXL memories that have more parameters than HCAM on the rapid word-learning tasks. Neither a TrXL model that is twice as wide, nor one that is twice as deep are able to perform as well as HCAM. Thus, HCAM's advantage is not due to the added blocks or slightly more parameters than our TrXL baseline. (HTM refers to HCAM, see note above. 3 seeds per main condition, 2 seeds per condition for supplemental.)}
+\label{fig:supp_exp:matched_params}
+\end{figure}
+
+\subsection{Sparsity without hierarchy: a top-\(k\) TrXL} \label{app:supp_exp:topk_trxl}
+One possible explanation of our results would be that sparsity alone is sufficient---perhaps the TrXL is suffering from spreading its attention across too many points in the past, but if it were restricted to only a few points hierarchy would not be necessary. To evaluate this possibility, we created a modified TrXL where we imposed sparsity of attention, by truncating its attention to only the top-\(k\) most relevant timepoints. We chose \(k=16\) to match HCAM. We show the results in Fig. \ref{app:supp_exp:topk_trxl}. The top-\(k\) TrXL performs comparably to a standard TrXL on the ballet tasks (i.e. does not perform as well as HCAM), and fails to learn properly on the rapid word-learning tasks, even if allowed to attend to a larger number of points (\(k=32\)). Thus, sparsity without hierarchy does not suffice, and may actually harm learning.
+\begin{figure}[htb]
+\centering
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/topk_trxl/topktrxl_ballet_2_delay16_fixed.pdf}
+\caption{Ballet, 2 dances, short delays.}
+\label{fig:supp_exp:topktrxl:ballet:2}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/topk_trxl/topktrxl_ballet_8_delay48_fixed.pdf}
+\caption{Ballet, 8 dances, long delays.}
+\label{fig:supp_exp:topktrxl:ballet:8}
+\end{subfigure}\\
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/topk_trxl/topktrxl_fastbind_fast_map_three_objs_no_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Word learning, train:\\no distractors.}
+\label{fig:supp_exp:topktrxl:fb:0}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/topk_trxl/topktrxl_fastbind_fast_map_three_objs_two_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Word learning, train:\\2 distractors.}
+\label{fig:supp_exp:topktrxl:fb:2}
+\end{subfigure}%
+
+\caption{Sparsity alone is not sufficient---a TrXL restricted to attend to only the top-\(k\) timepoints performs comparably to a standard TrXL at the ballet tasks (\subref{fig:supp_exp:topktrxl:ballet:2}-\subref{fig:supp_exp:topktrxl:ballet:8}), but collapses and fails to learn in the rapid word learning tasks (\subref{fig:supp_exp:topktrxl:fb:0}-\subref{fig:supp_exp:topktrxl:fb:2}), even if given a larger \(k\). The advantage of HCAM is not due to sparsity alone. (HTM refers to HCAM, see note above. 3 seeds per main condition, 2 seeds per condition for supplemental.)}
+\label{fig:supp_exp:topktrxl}
+\end{figure}
+
+%\subsection{Summaries without hierarchy}\label{app:supp_exp:summaries_only}
+%Another possible explanation of our results is that what is important is having summaries of past events (the keys of our memory), and that more detailed attention within those memories is unnecessary. To evaluate this possibility, we modified HCAM so that instead of performing more detailed attention within the top-\(k\) memory chunks, it simply returned the summaries of those chunks. 
+
+\subsection{Compute efficiency assessed by learner FPS} \label{app:supp_exp:fps}
+One goal of HCAM is that sparser attention might be more efficient than full attention. This is especially true when comparing HCAM without gating to the more computationally intense Gated TrXL \citep{parisotto2020stabilizing}. Correspondingly, we show in Fig. \ref{fig:supp_exp:fps} that HCAM generally runs \(\sim\)30-40\% faster than TrXL. 
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.33\textwidth]{figures/htm_trxl_fps_comp.pdf}
+\caption{HCAM (labeled as HTM) runs at a higher speed (measured in average learner frames processed per second) than TrXL. Results on TPUv3, error bars show 95\%-CI across 3 runs.}
+\label{fig:supp_exp:fps}
+
+\end{figure}
+
+\clearpage
+\subsection{Results are robust to reviewer-suggested hyperparameter sweeps} \label{app:supp_exp:response}
+
+Our reviewers evaluated the paper carefully, and expressed concerns that there might be bias in our hyperparameter selection. In particular, one reviewer raised a concern that TrXL might learn tasks like Ballet if given a different learning rate. To address these concerns, we ran a set of follow-up hyperparameter sweeps. We swept the learning rate and entropy weight (which we had not varied previously from the values used in prior work) on both the Ballet and Word tasks. We ran a full product of three learning rates above/below our original values (5e-4, 5e-5, 1e-5) and entropy weights \(5\!\times\) more or less than the original value, with 2 seeds per condition (for a total of 24 hyper \(\times\) seed \(\times\) memory type combinations per task domain). We emphasize that the same hyperparameters were tested for both models, and that these sweeps centered on hyperparameter settings that were previously untuned (sourced from prior papers), and that this sweep focuses on learning rate, which a reviewer suggested might particularly benefit TrXL. Our results show that HCAM is more robust to variation in these hyperparameters than TrXL, and generally sweeping these parameters does not improve TrXL's performance substantially beyond the results reported in the main text.
+
+\textbf{Ballet results:} HCAM substantially outperforms TrXL in this sweep as well. First, HCAM is far more robust to varying the hyperparameters—in every hyperparameter setting, agents with HCAM achieved off chance performance (measured as window-averaged performance >5 percentage points above chance-level) on the hard 8-dance tasks within 1 billion steps. By contrast, 58\% of the TrXL jobs did not attain off chance performance on even the easiest task within 1.5 billion steps (when we stopped the training). In addition, 66\% of the HCAM jobs achieved above-75\% performance on the easiest tasks before \emph{any} of the TrXL jobs achieved above-chance performance on any task. The performance of the best TrXL jobs from this sweep is comparable to the performance at the same point in training from our original experiments: about 40-50\% performance on the 8 dance, short delays task, and 25-35\% on the 8 dance, long delays task at 1.5 billion steps. HCAM performed much better than TrXL, with 75\% of the HCAM jobs outperforming even the best TrXL agents on the hardest task, and the best HCAM jobs comparable to the results in the paper, achieving 80-90\% performance on the hardest tasks at 1.5 billion steps. In both 8 dance levels, the advantage of the two HCAM seeds with the best hyperparams over the two TrXL seeds with the best hyperparams is significant by a paired\footnote{paired reflecting the non-independence of the encoder initialization when the agents are initialized with the same random seed, but results are similar with an unpaired test, respectively \(t(2)=29\), \(p=0.001\); \(t(2)=9.5\), \(p=0.01\))} t-test, respectively \(t(1)=21\), \(p=0.03\) and \(t(1) = 101, p=0.006\). In summary, TrXL’s performance at these tasks does not seem to be improved by varying learning rates or entropy weight, and HCAM seems much more robust to variation in these hyperparameters.
+
+\begin{figure}[htb]
+\centering
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_ballet_2_delay16_fixed.pdf}
+\caption{Ballet, 2 dances, short delays.}
+\label{fig:supp_exp:response:ballet:2}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_ballet_8_delay16_fixed.pdf}
+\caption{Ballet, 8 dances, short delays.}
+\label{fig:supp_exp:response:ballet:8short}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_ballet_8_delay48_fixed.pdf}
+\caption{Ballet, 8 dances, long delays.}
+\label{fig:supp_exp:response:ballet:8long}
+\end{subfigure}%
+\caption{Sweeping hyperparameters (learning rate and entropy weight) in the Ballet tasks: HCAM is substantially more robust to variation in these hyperparameters, and the conclusions of our main text experiments are unaltered. The thick line plots the mean, while the thin lines plot individual sweep values. (The wide variability in early accuracy values should be disregarded---it is due to smoothing artifacts due to sparse data in this region as evaluation jobs are starting.)}
+\label{fig:supp_exp:response:ballet}
+\end{figure}
+
+\textbf{Rapid word learning results:} The results are similar to the above. First, HCAM is more robust to varying hyperparameters: In these more challenging tasks, only 17\% of the TrXL jobs achieve high training performance within 5 billion steps, while 50\% of the HCAM jobs achieve high performance on the training tasks. HCAM also generalizes better than TrXL. However, unlike our original experiments, one set of these TrXL jobs does achieve somewhat above-chance performance at one of the the evaluation tasks we considered. We performed a replication with three new random seeds in the best hyperparameters from this sweep for each memory (as in the main results), and in this replication the TrXL did not achieve significantly off chance performance. However, HCAM did achieve significantly off-chance performance, (though not as high as the main text results using the hyperpareters tuned in our original sweeps). Thus, HCAM again appears to be both more robust across hyperparameters, and better when comparing best-hyperparameter configurations.
+
+\begin{figure}[htb]
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_sweep_eval_fast_map_three_objs_two_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Sweep: Train 0-2 distractors, evaluate 2 distractors.}
+\label{fig:supp_exp:response:words:2}
+\end{subfigure}\\
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_sweep_eval_fast_map_three_objs_twenty_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Sweep: Train 0-2 distractors, evaluate 20 distractors.}
+\label{fig:supp_exp:response:words:20}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_sweep_eval_fast_map_four_episodes_three_objs_one_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Sweep: Train 0-2 distractors, evaluate 4 eps, 1 dist. each.}
+\label{fig:supp_exp:response:words:4_1}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_sweep_eval_fast_map_three_episodes_three_objs_five_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Sweep: Train 0-2 distractors, evaluate 3 eps, 5 dist. each.}
+\label{fig:supp_exp:response:words:3_5}
+\end{subfigure}\\
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_replication_eval_fast_map_three_objs_two_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Replication: Evaluate 2 distractors.}
+\label{fig:supp_exp:response:words:rep2}
+\end{subfigure}\\
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_replication_eval_fast_map_three_objs_twenty_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Replication: Evaluate 20 distractors.}
+\label{fig:supp_exp:response:words:rep20}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_replication_eval_fast_map_four_episodes_three_objs_one_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Replication: Evaluate 4 eps, 1 dist. each.}
+\label{fig:supp_exp:response:words:rep4_1}
+\end{subfigure}%
+\begin{subfigure}{0.33\textwidth}
+\centering
+\includegraphics[width=\textwidth]{figures/response/response_fastbind_main_replication_eval_fast_map_three_episodes_three_objs_five_distractor.pdf}
+\captionsetup{width=.8\textwidth}
+\caption{Replication: Evaluate 3 eps, 5 dist. each.}
+\label{fig:supp_exp:response:words:rep3_5}
+\end{subfigure}%
+\caption{Sweeping hyperparameters (learning rate and entropy weight) in the Words tasks: HCAM is again more robust to variation in these hyperparameters. (\subref{fig:supp_exp:response:words:2}-\subref{fig:supp_exp:response:words:3_5}) The sweep results. The thick line plots the mean, while the thin lines plot individual sweep values. While HCAM is much more robust overall, as shown in the number of hyperparameter settings that learn the train tasks (\subref{fig:supp_exp:response:words:2}), a few TrXL jobs show above chance generalization on some tasks in the sweep. (\subref{fig:supp_exp:response:words:rep2}-\subref{fig:supp_exp:response:words:rep3_5}) To follow-up on the above result, we ran a replication of the best hyperparameters from the sweep with three new random seeds (as we did for all our main text results). This replication does not show substantially above-chance generalization performance from TrXL and shows some collapse in performance on the train tasks. HCAM's performance remains substantially above chance in a replication of the best values in the sweep, although note that the best results from the sweep are worse than the results with the tuned hyperparameters used in the original experiments. (Note also that these experiments were run with a longer attention window for HCAM than intended, see App. \ref{app:methods:bug_fixed}.)}
+\label{fig:supp_exp:response:words}
+\end{figure}

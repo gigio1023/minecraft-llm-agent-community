@@ -1,0 +1,24 @@
+\clearpage
+\section{Detailed Task Descriptions}
+\label{sec:test_train_split}
+\label{sec:task_desc}
+
+\textbf{HotPotQA} \cite{yang-etal-2018-hotpotqa} is a dataset of  questions that require reasoning over multiple Wikipedia articles to answer. We adopt the ``fullwiki'' setting in which the system must retrieve the right articles from all 5M Wikipedia page abstracts. Our LM program, derived from \citealt{khattab2024dspy}, involves three stages, given a question: (1) generating a search query that a retrieval model uses to find Wikipedia passages, (2) reading those passages to generate a second ``hop'' query for the retrieval model, and finally (3) reading all of the retrieved passages to answer the question. %
+
+\textbf{HotPotQA Conditional} We hypothesize that optimizing instructions can have the most impact on tasks with rules that (1) are not immediately obvious to the task LM and (2) cannot be fully defined through a few examples. To test this, we devise a task that applies additional conditional rules to HotPotQA: depending on the category of the answer, the LM must respond in a specific format:
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item When the answer is a person, the response must be in lowercase. When it's a place, the response should contain no punctuation. 
+\item When the it's a date, the response must end with ``Peace!'', but in no other circumstances. 
+\item If answer falls into another category, the response must be in all caps.
+\end{itemize}
+We use GPT-4 to annotate the answer types as ``person'', ``place'', or ``date'' with author supervision for applying special conditional rules based on answer type. We use the same multi-hop LM program described above to solve this task, and initialize the program with an instruction describing the rules of the task. This program is then evaluated using exact match along with regex parsing to determine if all other conditions are being followed.
+
+\textbf{Iris} is a classic classification dataset over floating-point features~\citep{Fisher1936THEUO}. It involves classifying a flower as one of three iris species given the flower's sepal and petal width and length.  Our LM program for this task is a simple Chain-of-Thought program, initialized the instruction: ``Given the petal and sepal dimensions in cm, predict the iris species.'' Crucially, we know that Iris can be nearly solved with a simple set of rules (not provided to the LM) and seek to test if LM program optimizers can automatically teach LMs to also perform well on such tasks.
+
+\textbf{Heart Disease} \cite{Detrano1989InternationalAO} is a classification task where it may be harder to find a small number of crucial patterns. Given a set of 13 features including a patient's age, biological sex, and cholesterol, we must predict whether the patient has heart disease. Our LM program generates three separate clinical opinions using Chain-of-Thought LM calls and then generates a final judgment based on the opinions given.
+
+\textbf{ScoNe} \citep{she-etal-2023-scone} evaluates logical reasoning with negation. We define a simple Chain-of-Thought program to reason over ScoNe entailment questions and produce a binary answer. %
+ScoNe allows us to represent rich single-stage tasks in our evaluation. We hypothesize that ScoNe's focus on NLI and logical deduction with nested negations evaluates whether optimizers can express task nuances via instructions or demonstrations.
+
+\textbf{HoVer} \citep{jiang-etal-2020-hover} contains claims that require many-hop search steps over Wikipedia to be fact-checked. We consider the sub-task of retrieving all required evidence. Our LM program performs a search on the claim, summarizes the results (LM call 1), adds that to context and proposes the next search query (LM call 2), performs a search, summarizes the results (LM call 3), proposes a search query based on both summaries (LM call 4), and finally searches once more. HoVer has gold labels for the documents to be retrieved. We measure Retrieval@21 with all top-10 retrieved documents across three hops. We restrict HoVer to examples with 3 supporting facts in order to study optimization in a more challenging setting. We note that different supporting facts can originate from the same document, so finding all required documents can sometimes be done in <3 hops. Approximately 67\% (83\%) of the training (test) sets are 3-hop queries, and the rest are 2-hop queries. In follow-up studies, we recommend filtering by examples that require 3-hops to study retrieval in a more uniform setting.
+

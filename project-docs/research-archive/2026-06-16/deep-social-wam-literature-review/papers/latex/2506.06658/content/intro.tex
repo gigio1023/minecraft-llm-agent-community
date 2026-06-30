@@ -1,0 +1,54 @@
+\vspace{-0.75em}
+\section{Introduction}
+\vspace{-0.15em}
+Advancements in video generative modeling capabilities have directly led to their increased utilization as visual planners for robotic applications~\citep{du2024video, yang2023learning,  ko2024avdc, liang2024dreamitate}. The synthesized visual plan, in the form of video frames generated with text conditioning, can be translated into executable actions via inverse dynamics models (IDMs). Intuitively, the data on which the video generative models and the IDMs are trained can greatly impact robotic performance and generalization.  When explicitly optimized on in-domain examples of expert behavior, such visual planners are able to synthesize successful plans for solving demonstrated tasks in a robust manner.  However, for arbitrary robotic behaviors, expert-quality demonstrations may not be readily available, and collection may be prohibitively expensive. It is thus worthwhile to investigate how visual planning can automatically \textit{adapt} and \textit{generalize} to novel tasks of interest.
+
+Recent work has investigated how base generalization performance for visual planning can be improved by integrating knowledge from large-scale datasets of text and video collected from the internet.  Adapt2Act~\citep{luo2025solving} creates a powerful, generalizable, text-conditioned visual planner by combining a large-scale model pretrained on web-scale video data with a video model trained on a small set of in-domain demonstrations via score composition.  At a high level, the adapted video model draws upon large-scale motion priors and powerful zero-shot text conditioning capabilities from the web-pretrained video model to facilitate generalization. Simultaneously, it can leverage the in-domain video model to better generate visual plans that respect the environment-specific visual characteristics and dynamics of the robotic setting.  The result is an adapted video model that can generate in-domain-appearing plans for novel, unseen tasks conditioned on natural language.
+
+Despite extending the amount of data utilized for visual planning to internet-level, the model still only has access to purely offline data. In the era of experience, we aim to design agents that can continuously improve from self-collected behaviors and feedback. In such a way, the agent can break free beyond the limits of offline data and learn by itself to refine performance on a specified task of interest.  We therefore propose \textbf{\underline{S}elf-\underline{I}mproving \underline{L}oops for \underline{V}isual \underline{R}obotic Planning (SILVR)}, where the generated video iteratively self-improves with online experience, particularly with respect to behaviors previously unseen in the initial dataset of environment demonstrations. As shown in Figure~\ref{fig:sail_teaser}, each loop adapts the video generative model (and optionally, the IDM) with environment-grounded data collected by the robotic agents following their own-generated visual plans.
+
+SILVR utilizes a sparse reward signal to filter online experience for further finetuning of the visual planner; however, it is quite natural to consider alternative methods beyond visual planning or direct finetuning of the generative model.  In our experiments we demonstrate that visual planning is superior to direct behavior cloning in both initial generalization performance as well as self-improvement capability, given the same amount of offline data and online experience.  Furthermore, the final resulting visual planner can be distilled into a lightweight policy via behavior cloning for both fast and performant decision-making.  We further showcase how SILVR is more sample efficient than reinforcement learning finetuning approaches, making it more applicable to real-world robotic settings.  SILVR is also robust to the quality of the sparse reward signal; rather than requiring a human-defined ground-truth success function, we demonstrate that iterative improvements still arise when utilizing a pretrained vision-language model (VLM) to score experience based on the task descriptions.
+
+To summarize, SILVR enables superior sample-efficient self-improvement over initially unseen tasks through visual planning, naturally integrating internet-scale pretrained video priors over text-alignment and motion when necessary, in comparison to regular action-prediction policies. %
+During deployment, a policy can be ``distilled'' from SILVR's components for fast inference, showcasing how SILVR facilitates effective generalization and self-improvement for robotic tasks without sacrificing final execution speed.
+
+We perform extensive evaluations of SILVR on the MetaWorld task suite, focusing on novel tasks unseen during initial training of the in-domain video model. We discover that the success rate of following visual plans synthesized through SILVR indeed continuously improves, by as much as \textbf{285\%} over 10 iterations.  We also apply SILVR to a real-world robot arm for two distinct manipulation tasks: selecting and pushing a colored object, and selecting and opening a colored drawer.  We show how SILVR also naturally enables the incorporation of priors from internet-scale pretrained video generative models to facilitate task and visual generalization in real-world visual settings and dynamics.  We demonstrate that performance for color combinations unseen during the initial offline training improves over multiple iterations through SILVR. 
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/silvr_teaser_figure_resized_new.pdf}
+    \caption{\textbf{SILVR Framework.}
+    SILVR has access to two pretrained video generative models (left): one pretrained generally on internet-scale data and another pretrained on a general set of in-domain demonstrations.  By default, SILVR uses the in-domain video model as a visual planner, which when utilized to interact with the environment, is able to achieve successful trajectories even for initially unseen tasks.  These trajectories are then iteratively fed back to finetune the in-domain model (right), thus improving the overall quality of future visual planning as a whole through self-collected online experience.  SILVR can optionally incorporate internet-scale pretrained video models as prior, which particularly improves performance in the case of real-world robotic experiments.}
+    \label{fig:sail_teaser}
+    \vspace{-5pt}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

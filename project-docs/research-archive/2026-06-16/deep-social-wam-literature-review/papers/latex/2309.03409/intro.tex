@@ -1,0 +1,76 @@
+\vspace{-1em}
+\begin{figure}[H]
+\centering
+\scalebox{0.79}{
+\subfigure[GSM8K]{\label{fig:prompt_optimization_graph_in_intro_gsm8k}\includegraphics[width=.4\linewidth]{\figurepath gsm8k_s_pretrained_palm_2_l_o_finetuned_palm_2_l.pdf}}
+\hspace{.01\linewidth}
+\subfigure[BBH movie\_recommendation]{\label{fig:prompt_optimization_graph_in_intro_bbh}\includegraphics[width=.43\linewidth]{\figurepath bbh_movie_recommendation_s_text_bison_o_finetuned_palm_2_l.pdf}}
+}
+\caption{Prompt optimization on GSM8K~\citep{cobbe2021training} and BBH~\citep{suzgun2022challenging} movie\_recommendation. 
+The optimization on GSM8K has pre-trained \texttt{PaLM 2-L} as the scorer and the instruction-tuned \texttt{PaLM 2-L} (denoted \texttt{PaLM 2-L-IT}) as the optimizer; the optimization on BBH movie\_recommendation has \texttt{text-bison} as the scorer and \texttt{PaLM 2-L-IT} as the optimizer.
+Each dot is the average accuracy across all (up to 8) generated instructions in the single step, and the shaded region represents standard deviation.
+See Section~\ref{sec:exp} for more details on experimental setup.}
+\label{fig:prompt_optimization_graph_in_intro}
+\end{figure}
+
+\vspace{-1em}
+\begin{table}[H]
+\caption{Top instructions with the highest GSM8K zero-shot test accuracies from prompt optimization with different optimizer LLMs. All results use the pre-trained \texttt{PaLM 2-L} as the scorer. 
+}
+\centering
+\scalebox{0.81}{
+\begin{tabular}{P{3.5cm}P{10.5cm}P{1cm}}
+\toprule
+Source & Instruction & Acc \\
+\midrule
+\multicolumn{3}{l}{\textit{Baselines}} \\
+\hdashline\noalign{\vskip 0.5ex}
+\citep{kojima2022large} & Let's think step by step. & 71.8 \\
+\citep{zhou2022large} & Let’s work this out in a step by step way to be sure we have the right answer. & 58.8 \\
+& (empty string) & 34.0 \\
+\midrule
+\multicolumn{3}{l}{\textit{Ours}} \\
+\hdashline\noalign{\vskip 0.5ex}
+\texttt{PaLM 2-L-IT} & Take a deep breath and work on this problem step-by-step. & \textbf{80.2} \\
+\texttt{PaLM 2-L} & Break this down. & 79.9 \\
+\texttt{gpt-3.5-turbo} & A little bit of arithmetic and a logical approach will help us quickly arrive at the solution to this problem. & 78.5 \\
+\texttt{gpt-4} & Let's combine our numerical command and clear thinking to quickly and accurately decipher the answer. & 74.5\\
+\bottomrule
+\end{tabular}}
+\label{table:gsm8k_top_instructions_in_intro}
+\end{table}
+
+\section{Introduction}
+\label{sec:intro}
+
+Optimization is critical for all areas. Many optimization techniques are iterative: the optimization starts from an initial solution, then iteratively updates the solution to optimize the objective function~\citep{amari1993backpropagation,qian1999momentum,kingma2014adam,back1993overview,rios2013derivative,reeves1993modern}.
+The optimization algorithm typically needs to be customized for an individual task to deal with the specific challenges posed by the decision space and the performance landscape, especially for derivative-free optimization.
+
+In this work, we propose Optimization by PROmpting (\name{}), a simple and effective approach to utilize large language models (LLMs) as optimizers.
+With the advancement of prompting techniques, LLMs have achieved impressive performance in various domains~\citep{wei2022chain,kojima2022large,wang2022self,zhou2022least,madaan2023self,bai2022constitutional,chen2023teaching}.
+Their ability to understand natural language lays out a new possibility for optimization: instead of formally defining the optimization problem and deriving the update step with a programmed solver, we describe the optimization problem in natural language, then instruct the LLM to iteratively generate new solutions based on the problem description and the previously found solutions.
+Optimization with LLMs enables quick adaptation to different tasks by changing the problem description in the prompt, and the optimization process can be customized by adding instructions to specify the desired properties of the solutions.
+
+To demonstrate the potential of LLMs for optimization, we first present case studies on linear regression and the traveling salesman problem, which are two classic optimization problems that underpin many others in mathematical optimization, computer science, and operations research.
+On small-scale optimization problems, we show that LLMs are able to find good-quality solutions simply through prompting, and sometimes match or surpass hand-designed heuristic algorithms.
+
+Next, we demonstrate the ability of LLMs to optimize prompts: the goal is to find a prompt that maximizes the task accuracy. 
+Specifically, we focus on natural language tasks where both the task input and output are texts. 
+LLMs are shown to be sensitive to the prompt format~\citep{zhao2021calibrate,lu2021fantastically,wei2023larger,madaan2022text}; in particular, semantically similar prompts may have drastically different performance~\citep{kojima2022large,zhou2022large,zhang2022tempera}, and the optimal prompt formats can be model-specific and task-specific~\citep{ma2023let,chen2023you}.
+Therefore, prompt engineering is often important for LLMs to achieve good performance~\citep{reynolds2021prompt}.
+However, the large and discrete prompt space makes it challenging for optimization, especially when only API access to the LLM is available. 
+Following prior work on continuous and discrete prompt optimization~\citep{lester2021power,li2021prefix,zhou2022large,pryzant2023automatic}, we assume a training set is available to compute the training accuracy as the objective value for optimization, and we show in experiments that optimizing the prompt for accuracy on a small training set is sufficient to reach high performance on the test set.
+
+The prompt to the LLM serves as a call to the optimizer, and we name it the \emph{meta-prompt}. 
+Figure~\ref{fig:meta_prompt_example} shows an example.
+The meta-prompt contains two core pieces of information.
+The first piece is previously generated prompts with their corresponding training accuracies. 
+The second piece is the optimization problem description, which includes several exemplars randomly selected from the training set to exemplify the task of interest.
+We also provide instructions for the LLM to understand the relationships among different parts and the desired output format.
+Different from recent work on using LLMs for automatic prompt generation~\citep{zhou2022large,pryzant2023automatic}, each optimization step in our work \emph{generates} new prompts that aim to increase the test accuracy based on a trajectory of previously generated prompts, instead of \emph{editing} one input prompt according to natural language feedback~\citep{pryzant2023automatic} or requiring the new prompt to follow the same semantic meaning~\citep{zhou2022large}.
+Making use of the full optimization trajectory, \name{} enables the LLM to gradually generate new prompts that improve the task accuracy throughout the optimization process, where the initial prompts have low task accuracies.
+
+We conduct comprehensive evaluation on several LLMs, including \texttt{text-bison} and \texttt{Palm 2-L} in the PaLM-2 model family~\citep{anil2023palm}, as well as \texttt{gpt-3.5-turbo} and \texttt{gpt-4} in the GPT model family. 
+We optimize prompts on GSM8K~\citep{cobbe2021training} and Big-Bench Hard~\citep{suzgun2022challenging}, which are reasoning benchmarks where prompting techniques have achieved remarkable performance breakthrough~\citep{wei2022chain,kojima2022large,suzgun2022challenging}. Starting from initial prompts with low task accuracies, we show that all LLMs in our evaluation are able to serve as optimizers, which consistently improve the performance of the generated prompts through iterative optimization until convergence (see Figure~\ref{fig:prompt_optimization_graph_in_intro}). 
+In particular, while these LLMs generally produce instructions of different styles (see Table~\ref{table:gsm8k_top_instructions_in_intro}), with zero-shot prompting, their best generated instructions match the few-shot chain-of-thought prompting performance when applied to \texttt{PaLM 2-L}, outperforming the zero-shot performance with human-designed prompts by up to $8\%$ on GSM8K.
+Additionally, we observe that the \name{}-optimized prompts transfer to other benchmarks of the same domain and also deliver notable performance gain.

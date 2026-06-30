@@ -1,0 +1,689 @@
+\documentclass{article}
+
+\input{config.tex}
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2020
+
+% ready for submission
+% \usepackage{neurips_2023}
+% \usepackage[preprint]{neurips_2023}
+\usepackage[final,nonatbib]{neurips_2023}
+\usepackage{titletoc}
+
+\newcommand\DoToCc{%
+  \startcontents
+  \printcontents{}{1}{{\fontsize{14}{14}\selectfont \textbf{Contents}}\vskip3pt\hrule\vskip5pt}
+  \vskip3pt\hrule\vskip5pt
+}
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2023}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2023}
+
+% to avoid loading the natbib package, add option nonatbib: \usepackage[nonatbib]{neurips_2023}
+
+\title{Describe, Explain, Plan and Select: \\Interactive Planning with Large Language Models Enables Open-World Multi-Task Agents}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+\author{
+  Zihao Wang$^{1,2}$, Shaofei Cai$^{1,2}$, Guanzhou Chen$^{3}$, Anji Liu$^{4}$, Xiaojian Ma$^{4}$, Yitao Liang$^{1,5}$\thanks{Corresponding Author.} \vspace{5pt} \\ 
+  {\bf\large Team CraftJarvis} \vspace{5pt} \\
+    $^{1}$Institute for Artificial Intelligence, Peking University\\
+    $^{2}$School of Intelligence Science and Technology, Peking University \\
+    $^{3}$School of Computer Science, Beijing University of Posts and Telecommunications \\
+    $^{4}$Computer Science Department, University of California, Los Angeles \\
+    $^{5}$Beijing Institute for General Artificial Intelligence (BIGAI)\\
+    {\tt \small \{zhwang,caishaofei\}@stu.pku.edu.cn,rayment@bupt.edu.cn} \\
+    {\tt \small liuanji@cs.ucla.edu,xiaojian.ma@ucla.edu,yitaol@pku.edu.cn} 
+}
+
+\begin{document}
+% \doparttoc % Tell to minitoc to generate a toc for the parts
+% \faketableofcontents % Run a fake tableofcontents command for the partocs
+
+% \part{} % Start the document part
+% \parttoc % Insert the document TOC
+
+
+\maketitle
+
+\begin{abstract}
+  We investigate the challenge of task planning for multi-task embodied agents in open-world environments.\footnote{We borrow the term ``open world'' from the game community. It highlights that the agent can navigate inside a diverse environment and accomplish open-ended tasks freely.\vspace{-15pt}}
+  Two main difficulties are identified: 1) executing plans in an open-world environment (e.g., Minecraft) necessitates accurate and multi-step reasoning due to the long-term nature of tasks, and 2) as vanilla planners do not consider how easy the current agent can achieve a given sub-task when ordering parallel sub-goals within a complicated plan, the resulting plan could be inefficient or even infeasible.
+  To this end, we propose ``\underline{D}escribe, \underline{E}xplain, \underline{P}lan and \underline{S}elect'' (\textbf{DEPS}), an interactive planning approach based on Large Language Models (LLMs). DEPS facilitates better error correction on initial LLM-generated \textit{plan} by integrating \textit{description} of the plan execution process and providing self-\textit{explanation} of feedback when encountering failures during the extended planning phases. Furthermore, it includes a goal \textit{selector}, which is a trainable module that ranks parallel candidate sub-goals based on the estimated steps of completion, consequently refining the initial plan.
+  Our experiments mark the milestone of the first zero-shot multi-task agent that can robustly accomplish 70+ Minecraft tasks and nearly double the overall performances.
+  Further testing reveals our method's general effectiveness in popularly adopted non-open-ended domains as well (i.e., ALFWorld and tabletop manipulation). 
+  The ablation and exploratory studies detail how our design beats the counterparts and provide a promising update on the \texttt{ObtainDiamond} grand challenge with our approach. 
+  The code is released at \url{https://github.com/CraftJarvis/MC-Planner}.
+\end{abstract}
+
+\section{Introduction}\label{sec:introduction}
+
+Developing multi-task agents that can accomplish a vast and diverse suite of tasks in complex domains has been viewed as one of the key milestones towards generally capable artificial intelligence~\cite{gato,flamingo,gpt3,minedojo,jxma5}. To enable such capabilities, earlier works have suggested employing a hierarchical goal execution architecture~\cite{bacon2017option,saycan}, where a planner generates action plans that would then be executed by low-level goal-conditioned controllers. This architecture has been delivering promising progress in many robotics domains, including table-top and mobile manipulation~\cite{socraticmodels,saycan}, 2D shape drawing~\cite{codeaspolicies} and table rearrangement~\cite{innermonologue}. 
+However, whether such success can be transferred to a more open-ended world with unlimited exploration areas and internet-scale knowledge remains open~\cite{minerl,minedojo,minerl-rel-1,minerl-rel-2,minerl-rel-3}.
+
+To understand the gap, we run Inner Monologue\!~\cite{innermonologue}, a general and competitive hierarchical goal execution model on a typical open-world domain Minecraft \cite{malmo,minerl,minedojo} and two classical robotic environments ALFWorld~\cite{alfworld} and Tabletop environments~\cite{clipport,saycan}. The algorithm uses a Large Language Model (LLM) based planner that contains domain-specific knowledge for all three environments. In all environments, we use either an Oracle goal-conditioned controller or a learned one. Results are shown in the bar plot in Figure~\ref{fig:challenge}. First, even when the Oracle controller is used, the success rate of executing Minecraft tasks is much less than that of the other environments. Next, the task failure rate becomes even higher in Minecraft when the learned controller is substituted. Both failures originate from unique challenges brought by open-world environments, which we identify in the following.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale = 0.35]{figures/challenge.pdf}
+    \caption{
+        \textbf{Planning success rates plummet in open worlds due to new challenges}.}
+    \label{fig:challenge}
+    \vskip -0.2in
+\end{figure}
+
+First, compared to canonical environments (e.g., Atari~\cite{atari} and robotic control suite~\cite{clipport}), open worlds have highly abundant object types with complex dependency and relation. As a result, ground-truth plans typically involve a long sequence of sub-goals with strict dependencies. As Figure~\ref{fig:challenge} challenge \#1 suggests, it requires at least 13 sub-goals executed in proper order to obtain a diamond in Minecraft, while in Tabletop a task is typically no more than a few consecutive sub-goals.
+
+
+Another challenge brought by the complicated tasks in an open-ended world is the feasibility of the produced plans. Consider the example shown in Figure~\ref{fig:challenge} (challenge \#2). To craft a bed in Minecraft, the fastest way is by either slaughtering a sheep to obtain wool, which can be used to craft beds, or collecting beds from a village. However, since no sheep or village is reachable by the agent within 3 minutes of gameplay, to craft a bed efficiently, the agent should choose to slaughter a spider and use materials (e.g., string) it drops to craft wool, and then a bed. That is, when dealing with a task that can be completed by executing multiple possible sequences of sub-goals, the planner should be able to select the best route based on the current state of the agent. However, the complex and diverse state distribution of open-world environments makes state awareness hard to achieve.
+
+To tackle these problems, we propose ``\underline{D}escribe, \underline{E}xplain, \underline{P}lan and \underline{S}elect'' (\textbf{DEPS}), an interactive planning approach based on Large Language Models (LLMs) to alleviate the aforementioned issues.
+The key to tackling the first challenge is to effectively adjust the generated plan upon failure.
+Specifically, whenever the controller fails to complete a sub-goal, a \textit{descriptor} will summarize the current situation as text and send it back to the LLM-based planner. We then prompt the LLM as an \textit{explainer} to locate the errors in the previous plan. 
+Finally, a \textit{planner} will refine the plan using information from the descriptor and explainer. 
+To improve the feasibility of generated plans conditioned on the current state, which is the second identified challenge, we use a learned goal-\textit{selector} to choose the most accessible sub-task based on the proximity to each candidate sub-goal.
+
+Our experiments are conducted on 71 tasks in open-ended Minecraft without any demonstration. Given the goal-conditioned controller for atom sub-tasks (i.e., mine log and mine stone), our zero-shot\footnote{Similar to \cite{gpt3,huang2022language}, ``zero-shot'' here means no gradient updates are performed. However we provide some related demonstrations as prompts during inference time.\vspace{-10pt}} LLM-based planner can finish all tasks within a limited horizon (3000-12000 steps for different tasks). We find DEPS outperforms all language planner baselines by nearly doubling the overall success rate, with the same initial state and goal-conditioned controller. 
+Our ablation and exploratory studies then explain how our approach beats the counterparts and becomes the first planning-based agent that accomplishes the challenging \texttt{ObtainDiamond} task. DEPS does not require any planning training for the environment. Additionally, DEPS achieves between on-par and more than 50\% relative improvement over existing or concurrent LLM-based planning methods on non-open-ended
+ robotics domains such as ALFWorld~\cite{alfworld} and Tabletop environments~\cite{clipport}.
+
+
+\section{Background}\label{sec:background}
+
+We aim to develop an agent capable of solving long-horizon goal-reaching tasks using image observations and language goals. To accomplish this, we propose a combined approach involving goal-conditioned policies (termed controllers) and a planner. The goal-conditioned policies are trained to complete sub-goals, while the planner decomposes long-horizon tasks into a series of $K$ short-horizon sub-goals, $g_1, \ldots, g_K$, to be executed by the controller. At each time step $t$, the goal-conditioned policy $\pi(a_t\mid s_t,g_k)$ generates an action $a_t$ based on the current state $s_t$ and the specified sub-goal $g_k$.
+
+
+\paragraph{Planning with Large Language Models} Previous works have shown that LLMs such as InstructGPT \cite{instructGPT} and Codex \cite{codex} can be used as zero-shot planners to generate sub-goal sequences for various tasks in embodied environments \cite{huang2022language,progprompt}.
+Formally, given the task description $T$ as prompt $p$, LLM acts as a planner to decode $T$ into $K$ sub-goals, $g_1, \ldots, g_K$, which are then executed one by one by the low-level controller $\pi(a_t \mid s_t, g_k)$ to accomplish the task.
+
+However, the above pipeline suffers from both challenges identified in Section~\ref{sec:introduction}. Regarding the first challenge, the probability of generating a flawless plan directly from the task description decreases significantly as the required number of sub-goals increases. Moreover, even when the LLM generates a correct plan, it is very likely that the plan is highly inefficient given the agent's current state (challenge \#2). Prior works mostly focus on solving the first challenge by providing environmental feedback to the LLM through affordance functions \cite{saycan}, success detector \cite{codeaspolicies} or scene descriptor \cite{innermonologue}. However, although these approaches work well on many non-open-ended domains, they still suffer from high failure rates in open-world environments.
+
+
+%\section{Method}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale = 0.42]{figures/merge_architecture.pdf}
+    \caption{
+        \textbf{Overview of our proposed interactive planner architecture}. 
+        % Given a task $T$, our DEPS pipeline generates feasible plans $P_t$ iteratively with the description and . The horizon-predictive \textit{selector} selects as state-aware goal as the current goal $g_t$. 
+        % The symbol $\land$ and $\vee$ in plan $P$ represent the relation \textit{AND} (all goals need to be finished, with no particular requirement on the order) and \textit{OR} (either needs to be finished), respectively.
+        }
+    \label{fig:pipeline}
+    \vspace{-0.2 in}
+\end{figure}
+
+\section{Towards Reliable Planning in Embodied Open-World Environments}\label{sec:method}
+
+In this section, we first give an overview of our proposed interactive planning framework ``\underline{D}escibe, \underline{E}xplain, \underline{P}lan, and \underline{S}elect'' (DEPS) for solving complex and long-horizon tasks in open-world environments (Sec.~\ref{sec:architecture}). Next, in Section~\ref{sec:descriptor}, we elaborate how DEPS iteratively refines its plan to combat the first identified challenge. Section~\ref{sec:HPGM} introduces the \textit{selector} module that is used to identify efficient plans in response to the second identified challenge. 
+
+\subsection{DEPS Overview}\label{sec:architecture}
+
+As demonstrated in Figure~\ref{fig:pipeline}, our agent (DEPS) consists of an event-triggered \underline{D}escriptor, a Large Language Model (LLM) as \underline{E}xplainer and \underline{P}lanner, a goal \underline{S}elector based on horizon prediction and a goal-conditioned controller. In the following, we use Minecraft as a running example to better elaborate our agent. Note that DEPS can be directly applied to other (non-)open-ended tasks.
+
+We take a large language model (LLM) as a zero-shot \textit{planner} of the agent to complete tasks.
+Given a goal command (e.g., \texttt{ObtainDiamond}) as task $T$, the LLM-based planner decomposes this high-level task into a sequence of sub-goals $\{g_1, \ldots, g_K\}$, as the initial plan $P_0$.
+The goals are instructions in natural language, such as \texttt{mine oak wood} \includegraphics[scale=0.18,valign=c]{minecraft/oak_wood.png} (in Minecraft), find two cups (in ALFWorld), put block A on top of block B (in Tabletop Manipulation).
+
+As described in Section~\ref{sec:background}, a controller is then invoked to execute the provided sub-goals sequentially through a goal-conditioned policy $\pi (a \mid s, g)$. However, the initial plan provided by the planner often contains errors, which results in execution failures of the controller. For example, the goal \includegraphics[scale=0.04,valign=c]{minecraft/iron_ore.png} can not be finished only with a wooden pickaxe \includegraphics[scale=0.08,valign=c]{minecraft/wooden_pickaxe.png} as shown in Figure~\ref{fig:pipeline}. 
+When failure pops up, the \textit{descriptor} will summarize the current state $s_t$ and execution outcome of the most recent goal into text $d_t$ and send it to the LLM.
+The LLM will first try to locate the errors in the previous plan $P_{t-1}$ by \textit{self-explanation}, e.g., the goal \includegraphics[scale=0.04,valign=c]{minecraft/iron_ore.png} need to be executed with a stone pickaxe \includegraphics[scale=0.08,valign=c]{minecraft/stone_pickaxe.png}.
+Then it will re-plan the current task $T$ and generate a revised plan $P_t$ according to the explanation. In this process, the LLM is also treated as an \textit{explainer} in addition to the \textit{planner} role.
+The Descriptor, Explainer, and Planner will be detailed in Section~\ref{sec:descriptor}.
+\begin{equation}\label{eq:pipeline}
+\begin{aligned}
+	\text{Description}&: d_t = f_{\text{DESC}}(s_{t-1}), \\
+    \text{Explanation}&: e_t = f_{\text{EX}}(d_t), \\
+	\text{Prompt}&: p_t = \text{CONCAT}(p_{t-1}, d_t, e_t), \\
+	\text{Plan}&: P_t = f_{\text{LM}}(p_t), \\
+	\text{Goal}&: g_t \sim f_{\text{S}}(\text{P}_t, s_{t-1}), \\
+	\text{Action}&: a_{t} \sim \pi(a_t \mid s_{t-1}, g_{t})
+\end{aligned}
+\end{equation}
+
+As shown in Equation~(\ref{eq:pipeline}), DEPS will iteratively update the plan $P_t$ until the task is finished, where $f_\text{DESC}$ is the descriptor model, $f_\text{LM}$ denotes the language model as explainer and planner, $f_\text{S}$ is the selector model, $\pi$ is goal-conditioned policies from the controller.
+
+To filter out inefficient plans, the \textit{selector} is trained to predict the number of time steps remaining to achieve every goal $g_k$ in a set of parallel goals given the current state $s_t$. When the generated plan contains alternative routes, the selector uses this information to choose a suitable goal as the current goal $g_t$. For example, the horizon predicted by the selector of goal \texttt{acacia tree} \includegraphics[scale=0.08,valign=c]{minecraft/Acacia_Log.png} is less than goal \texttt{oak tree} \includegraphics[scale=0.2,valign=c]{minecraft/oak_wood.png} in \texttt{Savanna} biome, which leads to \texttt{chop acacia tree} as current goal $g_t$.
+
+\subsection{Describe, Explain and Plan with LLM Generates Executable Plans}
+\label{sec:descriptor}
+
+\floatname{algorithm}{Prompt}
+\begin{algorithm}[t]
+\caption{Planner prompt template, Python-like code}
+\label{alg:prompt}
+\definecolor{codeblue}{rgb}{0.25,0.5,0.5}
+\definecolor{codekw}{rgb}{0.85, 0.18, 0.50}
+\lstset{
+  backgroundcolor=\color{white},
+  basicstyle=\fontsize{7.5pt}{7.5pt}\ttfamily\selectfont,
+  columns=fullflexible,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\fontsize{7.5pt}{7.5pt}\color{codeblue},
+  keywordstyle=\fontsize{7.5pt}{7.5pt}\color{codekw},
+}
+\begin{lstlisting}[language=python]  
+def craft_wooden_axe(initial_inventory={}):
+    # step 1: mine 3 logs
+    mine(obj = {"log":3}, tool = None) 
+    # step 2: craft 12 planks from 3 logs
+    craft(obj = {"planks":12}, materials = {"log":3}, tool = None) 
+    # step 3: craft 4 sticks from 2 planks
+    craft(obj = {"stick":4}, materials = {"planks":2}, tool = None) 
+    # step 4: craft 1 crafting_table from 4 planks
+    craft(obj = {"crafting_table":1}, materials = {"planks":4}, tool = None) 
+    # step 5: craft 1 wooden_axe from 3 planks and 2 sticks on crafting table
+    craft(obj = {"wooden_axe":1}, {"planks": 3, "stick": 2}, tool = "crafting_table") 
+    return "wooden_axe"
+\end{lstlisting}
+\vspace{-0.1 in}
+\end{algorithm}
+
+Current LLM-based planners usually query the LLM once at the beginning of every episode and use the output plan throughout the episode \cite{huang2022language,progprompt}.
+However, as demonstrated by Figure~\ref{fig:challenge}, such one-shot planning methods often fail on long-horizon tasks that require many sub-goals.
+This is caused by two major issues.
+First, since the correct plan for long-horizon tasks needs to respect various complex preconditions, it is extremely hard for the LLM to generate a flawless plan directly from the task instructions, resulting in failure when simply following the initial plan. 
+Additionally, due to the unpredictable transition dynamics, some incidents may happen during the execution and make the initial plan non-executable.
+To remedy these problems, existing methods introduce feedback (e.g., from success detector or scene descriptor) to reflect on the results of previous executions \cite{innermonologue,codeaspolicies,saycan}. 
+However, merely informing the LLM whether a sub-goal is completed is often insufficient to correct the planning error.
+
+To remedy this, we propose ``describe, explain and plan'', a new interactive planning method to generate more executable and explainable plans.
+We start with rewriting the prompt into an interactive dialogue format as in ChatGPT \cite{instructGPT} so that subsequent feedback can be passed to the LLM effectively. 
+The produced plan is also augmented with the preconditions and effects of each goal.
+The structured prompt improves the readability and interpretability of the plan and facilitates error-locating when the execution fails later, as demonstrated in Prompt~\ref{alg:prompt}.
+
+The \textit{descriptor} will then collect the feedback generated by the agent during the execution of the task.
+The feedback can be practically obtained either by a person (human feedback~\cite{saycan}), or by a pre-trained vision-language model CLIP~\cite{clip}. 
+While the previous type of feedback needs intensive human involvement, the latter from the pre-trained model needs to be fine-tuned for the specific domain, which decreases the automation and generalization of the agent.
+On the contrary, Minecraft returns the `info' and other high-level observations (such as biome, GPS, and compass), we can easily translate the unstructured information into structured language. 
+Therefore we take the symbolic information available in the game and translate it into feedback description $d_t$ in this work.
+To avoid carrying unrelated information in the prompt, we further distill plan-related messages (e.g., inventory information, biome) as final event-level description $d_t$ as demonstrated in Figure~\ref{fig:pipeline}.
+
+Notably, we also treat the LLM as an \textit{explainer} to explain why the previous plans $P_{t-1}$ failed.
+Specifically, by analyzing the current state from description $d_t$ and precondition of current goal $g_t$, the explainer can identify the reason why the current goal cannot be executed successfully.
+As shown in Figure~\ref{fig:pipeline}, the reason may be \textit{the current goal requires the use of an iron pickaxe, but the tool is not prepared in advance, or the current goal requires the use of 3 planks, but the currently available planks are not enough}. 
+To implement this, we provide few-shot demonstrations to the LLM as in chain-of-thoughts prompting~\cite{chainofthought}, as shown in Prompt~\ref{alg:prompt}. 
+Finally, the LLM goes back to its role as a \textit{planner} and re-plans the task with the explicit explanation of existing bugs in the previous plan $P_{t-1}$, ultimately generating an updated plan $P_{t}$ according to the explanation.
+
+\subsection{Horizon-Predictive Selector Yields Efficient Plans}\label{sec:HPGM}
+
+
+Due to the abundance of objects and the compositional nature of their functionalities, there often exist multiple feasible plans to complete a task, i.e., there are usually multiple paths for the completion of a particular goal. 
+However, despite the feasibility of all such plans, most of them are highly inefficient to execute in the current episode.
+For example, as shown in Figure~\ref{fig:pipeline}, obtaining a \texttt{wood} can be done by chopping oak trees \includegraphics[scale=0.2,valign=c]{minecraft/oak_wood.png}, birch trees \includegraphics[scale=0.2,valign=c]{minecraft/birch_wood.png}, or acacia trees \includegraphics[scale=0.08,valign=c]{minecraft/Acacia_Log.png}. 
+But only oak trees are available in the \texttt{plains} biome. 
+So the planner needs to choose oak trees since it is more efficient, as the agent does not need to travel to another biome.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale = 0.48]{figures/selection.pdf}
+    \caption{
+        \textbf{Selection Demonstration from ``Selector''}. Given parallel sub-goals, i.e. candidate skills, our Selector will determine the sequence in which to carry out these sub-goals based on their current proximity to the agent and modify the original plan produced by the LM planner.}
+    \label{fig:selection}
+    \vskip -0.2in
+\end{figure}
+
+On the other hand, there is no strict sequential requirement for some goals in the plan $P_t$, i.e., $g_i, g_j \sim P_t$ enjoy the same precondition, which means $g_i$ and $g_j$ can be executed in any order.
+As shown in Figure~\ref{fig:challenge}, the choice of different paths (sequences) may affect the execution efficiency of the plan $P_t$ as one goal might be closer to the agent.
+Always choosing the closer goal to execute first could yield more efficient plans and improve the final success rate under a limited episode length.
+Moreover, the dynamic nature of open-world environments further amplifies the impact of efficient plans on the success rate. 
+For example, in Minecraft, if the agent chooses to execute a further goal like \texttt{collect wood} first, the much closer target \texttt{sheep} may disappear and be hard to find again.
+
+
+In order to improve the efficiency of our plans, we propose to use a \textit{selector} that selects the most efficient path with the highest execution success rate as the final plan.
+Specifically, we design a state-aware selector to choose the nearest goal under state $s_t$ as the current goal $g_t$ from the candidate goal sets in plan $P_t$.
+It predicts the goal distribution $p(g_t |s_t, P_t)$ under the current state $s_t$ and plan $P_t$, where $g_t \in G_t$, $G_t$ describes all current executable goals in $P_t$. A straight way to implement the selector is to leverage the semantic similarity between the current state and the goal text using a vision-language model (VLM) such as CLIP \cite{clip}. Nevertheless, this may not exactly reflect the difficulty of completing the goal since VLM lacks practical experience. For example, an ``oak tree'' in front of the agent could lead to high semantic similarity for the ``chopping tree'' goal, but it may be inefficient to achieve this goal if a canyon is in the middle between the agent and the oak tree. 
+
+To mitigate this, we implement a horizon-predictive selector that embeds practical task experience to accurately rank the goals based on their efficiency and feasibility. 
+Here, we define the horizon of a goal $h_t(g) := T_g - t$  as the remaining time steps to complete the given goal, where $T_g$ is the time of completing goal $g$. 
+This metric accurately reflects how quickly we can achieve the given goal from the current state. To estimate the horizon, we learn a neural network $\mu$ to fit the offline trajectories by minimizing the entropy loss $-\text{log}\ \mu(h_t(g) \mid s_t, g)$, where $h_t$ is the ground-truth horizon in trajectories of completing goal $g$. Therefore, the goal distribution can be formulated as follows:
+\begin{equation}
+    f(g_t \mid s_t,P_t) = \frac{\exp(-\mu(g_t, s_t))}{\sum_{g\in G_t} \exp(-\mu(g, s_t))}.
+\end{equation}
+\vskip -0.1in
+We set goal-sensitive Impala CNN~\cite{shaofei} as the backbone of the selector. In practice, the horizon predictive selector can be jointly trained with the controller policies and share the backbone parameters~\cite{shaofei}.
+
+
+\section{Experiments}
+
+This section analyzes and evaluates our proposed ``describe, explain, plan, and select" (DEPS) method.
+To minimize performance variation caused by the low-level controller, we standardize all experiments with one controller learned by behavior cloning. We refer to the details of this controller in Appendix \ref{sec:controller}. 
+In Section~\ref{sec:setup}, we introduce our testing environments and our evaluation task set, consisting of the hardest 71 tasks from MCU SkillForgeChain~\cite{mcu}. 
+In Section~\ref{sec:results}, we report our performance in the context of existing LLM-based planners.
+Ablation studies are conducted in Section~\ref{sec:ablation}. 
+Finally, we pay close attention to the hardest task, \texttt{ObtainDiamond}, which is long-hailed as a major challenge in the community.
+The experiments on ALFWorld and Tabletop Manipulation environments are shown in Appendix~\ref{sec:other_exp}.
+
+\subsection{Experimental Setup}\label{sec:setup}
+
+% \input{tables/meta_task.tex}
+
+\paragraph{Environment and Task Setting}
+We first evaluate our proposed method in Minecraft, a popular open-world environment with both challenges discussed in Section~\ref{sec:introduction}. For better reflecting the performance of DEPS, we choose three Minecraft environments with different versions for better evaluation, including Minedojo~\cite{minedojo} with Minecraft 1.11.2, MineRL~\cite{vpt} with Minecraft 1.16.5, and MC-TextWorld~\cite{mcu} with Minecraft 1.19.2. Rules and items have something different in the above three Minecraft environments, which can better evaluate the dynamic and interactive planning abilities of DEPS. 
+%and having the features in Challenge I and Challenge II.\anji{Make sure that we have stated both challenges explicitly (with the prompt ``challenge I/II'').}
+
+\input{tables/meta_task}
+
+We choose 71 tasks from the Minecraft Universe Benchmark SkillForgeChain~\cite{mcu} for evaluation. These tasks are related to items that can be obtained in the Minecraft overworld.
+To better present the results, we divide the 71 Minecraft tasks into 8 meta groups according to the ingredients and function of the tasks, i.e., MT1-MT8. The instruction for every task is written in natural language, e.g., \texttt{make a  wooden door} in MT1 (Basic group) and \texttt{obtain a diamond} in MT8 (Challenge group), as illustrated in Table~\ref{tab:meta_task}.
+Considering how long it typically takes human players to complete each task as a ballpark \cite{minerl}, we set different maximum episode steps for different meta tasks from 3000 (for easiest \textbf{Basic} tasks) to 12000 (for the hardest \textbf{Challenge} tasks).
+The names, number of required skills, and functions of all tasks are listed in Appendix~\ref{sec:task_details}. 
+We give an empty inventory for every task in Survival mode and require the agent to obtain every item from the environment by itself.
+Note that our agent will be summoned in different environments randomly for each evaluation. Biomes and initial positions are also different each time.
+Following the previous work \cite{malmo}, we take the success rate as the evaluation metric.
+
+\paragraph{Baselines} We compare DEPS with other language-based planners, including GPT as Zero-shot Planner(GPT)~\cite{huang2022language}, ProgPrompt(PP)~\cite{progprompt}, Chain-of-Thought(CoT)~\cite{chainofthought}, Inner Monologue(IM)~\cite{innermonologue}, and Code as Policies(CaP)~\cite{codeaspolicies}. For all baseline models, we use the same demonstration example in the prompt, the same LM model from OpenAI, and the same controller in all tasks for a fair comparison. 
+% Note that all the above baseline methods are not tested in Minecraft officially. We try our best to keep their pipeline and modify their prompt for adapting to the tasks in Minecraft. 
+Since these methods were not originally experimented with Minecraft, we reproduce them to conform to the Minecraft specification based on prompt and feedback template design.
+All planner methods access the LLM model through OpenAI API (\texttt{text-davinci-03} model \cite{instructGPT} for GPT, CoT, and IM, and \texttt{code-davinci-02} model \cite{codex} for PP, CaP, and Ours). All hyper-parameters of LLM (including the \textit{temperature} and \textit{best\_of}, etc.) are kept as default. We also list the full prompt of all different methods in Appendix~\ref{sec:prompt}.
+
+% \vspace{-0.6em}
+
+% \vspace{0.4em}
+
+\subsection{Main Results}\label{sec:results}
+
+Every task is executed 30 times and the average results in Minedojo~\cite{minedojo} for every meta task are listed in Table~\ref{tab:main_results}. 
+Our approach achieves the best performance with all meta tasks.
+As the complexity of the task increases from MT1-MT8, the planner usually needs to give more accurate task steps (i.e., longer goal sequence) to achieve the final task. 
+Therefore the success rate of all agents decreases with the reasoning steps increasing. 
+Starting from MT6, almost all existing LLM-based planners fail (nearly 0 success rate).
+DEP (w/o Selector) already consistently beats existing LLM-based planners in all meta tasks with a significant margin. 
+This validates that ``describe, explain and plan'' can estimate the reason for current plan failure and correct the original flawed plans.
+Due to the limited maximum episode length and restricted control success rate for a hard goal (e.g., \texttt{Mine diamond with iron\_pickaxe}), the final success rate is still capped.
+
+\input{tables/main_results.tex}
+
+
+In addition, \textit{selector} also greatly improves the final task success rate of the agent (from \textbf{DEP w/o Selector} to \textbf{DEPS}). 
+Hard meta tasks usually require the completion of multiple sub-goals (up to dozens of goals), thus bringing more flexibility and providing more candidate goals for the Selector. At the same time, as the agent conducts experiments with limited episode length, it also places high demands on the efficiency of the plan. Therefore, the Selector brings a significant improvement on efficiency-sensitive tasks such as MT7 (up to \textbf{+2.7} times success rate).
+
+\paragraph{Robustness on different controller and different Minecraft versions} 
+We also evaluate DEPS on MineRL~\cite{vpt} and MC-Textworld~\cite{mcu}. Note that DEPS is a planning method, which needs to equip the goal-conditioned controller for interacting with the Minecraft environments. We choose MC-Controller~\cite{shaofei} and Steve-1~\cite{steve1} as controllers to interact with Minedojo and MineRL, respectively. These two methods are all control policies that perceive visual partial observations and produce mouse and keyboard actions. While MC-Textworld is a text world, which only keeps the Minecraft crafting recipes and mining rules. So MC-Textworld does not require the controller. The DEPS results of the task set MT1-MT8 on different Minecraft environments are shown in Table~\ref{tab:ablation_on_env}. The results report that DEPS can generate effective plans in various Minecraft environments. The results on MC-Textworld~\cite{mcu} also show that the performance drops on more difficult task sets from MT6 to MT8 are mainly from the controller limitation.
+
+\input{tables/ablation_env}
+
+\subsection{Ablation Study}\label{sec:ablation}
+
+We conduct ablation experiments to investigate the number of candidate executable goals for different Selector models and the specific impact of the rounds of DEPS.
+
+\subsubsection{Ablation on Selector}
+
+We verify the robustness of our proposed Selector under different parallel goals.
+The agent is asked to complete 2, 3, and 4 candidate goals (the precondition is consistent for all goals), respectively.
+The goals of the task correspond to different kinds of mobs or materials. 
+
+We report the final success rate of our method (DEP) with different selector implementations, including using a fixed sequence of goals, a random sequence of goals, and selecting a goal based on MineCLIP~\cite{minedojo}, CLIP~\cite{clip}, and our horizon-predictive Selector (HPS).
+As Figure~\ref{fig:ablation_goalmodel} shows, in one round of parallel candidate goals, an improvement of $\Delta$=+22.3\%, +29.2\%, +32.6\% is obtained using our horizon-predictive Selector compared to not any selector (i.e., fixed plan), respectively. 
+
+At a limited episode length, e.g., 1000 steps, goal-model shows a greater advantage, which proves that goal-model can improve the execution efficiency of the plan in embodied environments.
+In addition, compared to using vision-language models such as CLIP\ \cite{clip} and MineCLIP \cite{minedojo} as a goal model, horizon-predictive has the best performance due to better estimation of the horizon information.
+The curve trend also demonstrates that agents with Selector scale up under large amounts of goals in an open-world environment.
+
+\input{tables/ablation}
+
+
+\subsubsection{Ablation on Re-Planning Rounds}
+We evaluate our agent on all tasks with increasing maximum rounds of DEPS. 
+The round is defined as a cycle of interactive LLM-based planning with description, explanation, and planning and selecting, i.e., an updated plan.
+All tasks for every maximum round are executed 30 times and the average success rate is reported in Table~\ref{tab:ablation_on_feedback}.
+We take the vanilla LLM planner as the baseline, in which the model takes the initially generated plan as the final execution plan, without involving any description, re-planning, or self-explanation processes during the task execution.
+Our results in the previous subsection utilize the maximum rounds possible under maximum tokens capped by OpenAI.
+We also report the success rate increment from vanilla planner to DEPS of every meta task in column $\Delta$ in Table~\ref{tab:ablation_on_feedback}.
+This set of experiments demonstrates that DEPS can iteratively improve its plan in open-world environments. More description, self-explanation, and re-planning rounds produce better results, especially for hard tasks.
+
+% \input{tables/ablation_feedback.tex}
+
+
+\subsection{\texttt{ObtainDiamond} Challenge}\label{sec:bonus}
+
+
+Mining diamonds in the open-world game Minecraft, i.e. MT8 in Table~\ref{tab:main_results}, has been a long-standing challenge for the community \cite{minerl}. It is challenging because mining diamonds from scratch in Minecraft involves acquiring a sequence of difficult-to-obtain items that require complex planning on goals like mining, inventory management, crafting with and without a crafting table, tool use, smelting iron ingot in a furnace, and mining at the lowest depths. 
+We take the \texttt{ObtainDiamond} task as a bonus experiment to show the capabilities of our zero-shot planner on complex tasks in embodied environments. 
+Previous methods' success rates on this challenge further vouch for its difficulty. \cite{skrynnik2021forgetful,patil2020align} leverages domain-secific reward functions and RL fine-tuning to achieve $\backsim$0.1\% success rate in 15 minutes of game play.
+VPT further boosts the success rate to $20\%$ within 20 minutes of play through pre-training on collects $\backsim$70k hours human demonstrations and finetuning with human-designed reward function \cite{vpt}.
+DreamerV3 is trained from scratch to collect diamonds in a modified Minecraft environment (easier to break blocks) with world models to achieve a success rate of 2\%~\cite{dreamerv3}.
+
+Our DEPS manages to achieve on-par performance in this grand challenge; our agent achieves a 0.59\% success rate within 10 minutes of gameplay. Note our method does not specifically fine-tune for this challenge. It is designed to be multi-task in its nature. Furthermore, considering our planner operates with demonstration prompts on a fixed Large Language Model, it can be straightforwardly adapted to other open-ended environments with modifications.
+
+\section{Related Works}\label{sec:related_works}
+
+\paragraph{Task planning with LLMs}
+There have been some methods leveraging the large language model to generate action plans for high-level tasks in embodied environments~\cite{socraticmodels,reporter,jxma4}.
+\cite{huang2022language} decompose natural language commands into sequences of executable actions by text completion and semantic translation, while SayCan generates feasible plans for robots by jointly decoding an LLM weighted by skill affordances from value functions \cite{saycan}.
+For better executing the plan in embodied environments, some methods use an object detector describing the initial environment into the language prompt to produce environment-suitable plans and adopt success detectors to check that each step is executed successfully~\cite{innermonologue,codeaspolicies}.
+\cite{progprompt} and \cite{codeaspolicies} use the pythonic-style prompt to produce more executable plans.
+However, all of the above methods assume that the initial plan from the LLM is correct. When there are bugs in the initial plan, it's difficult for the agent to finish the task successfully.
+
+\paragraph{Interactive Planning with LLMs} Inner Monologue~\cite{innermonologue} pilots the front of interactive planning with LLMs, which introduces the feedback (including success detection and scene description) to the planner. However, we found it could still suffer from accumulative planning error, especially in long-horizon open-world tasks. Rather, our ``\textit{Describe, Explain, Plan and Select}'' (DEPS) method can produce more reliable plans by leveraging chain-of-thought thinking and explanation to locate the errors in previous plans. Moreover, we also propose a goal Selector to further improve the efficiency of the plan, thereby yielding much better performances. Readers are encouraged to refer to the comparative results in Section~\ref{sec:results} between DEPS and these prior arts. There are also some concurrent works on planning with LLMs~\cite{reflexion,mai2023llm,text2motion,generativeagents,proagent}.
+
+\paragraph{Agents in Minecraft} 
+Some previous works have employed the hierarchical architecture to solve long-horizon tasks in Minecraft \cite{oh2017zero,mao2022seihai,lin2021juewu}. 
+Recently, based on the internet-scale corpus, \cite{minedojo} pre-trains a language-conditioned reward function and learns multi-task MineAgent.
+\cite{vpt} collects a vast amount of human demonstrations to train a behavior cloning agent. More recently, \cite{dreamerv3} utilized a learned world model to distill a policy that can efficiently explore in Minecraft. There are also some works focus on learning goal-conditioned policies for better instruction-following~\cite{shaofei,groot,steve1}. While these efforts all focus on improving the low-level controller. Rather, the planner in our architecture emphasizes applying domain knowledge to propose and arrange the sub-goals. It significantly influences the complexity and breadth of tasks that the agent can handle. Moreover, our planner is zero-shot, making it possible to generalize to other long-horizon open worlds.
+
+\section{Limitations}
+
+Albeit the impressive results of our approach, we believe there are at least two major limitations within our approach. First of all, our framework relies on privately-held LLMs like GPT-3 and ChatGPT, which makes it less accessible to those who cannot afford or access the service. However, we're fully committed to ensuring a more democratized method and will explore using open-sourced models including OPT~\cite{zhang2022opt} and BLOOM~\cite{scao2022bloom}. Another issue is the explicit step-by-step planning in our system. Although it brings us superior performances over the baselines, the planning bottleneck can also prevent our model from being further scaled up. A more appealing approach will be amortizing the planning within an end-to-end trainable goal-conditioned policy, which is worth exploring next.  Furthermore, some previous fundamental challenges in planning (e.g., dead ends) may not prevalent in our adopted environments and hence could be inadvertently overlooked by our paper. We are dedicated to addressing more fundamental challenges present in building a multi-task generalist agent in our series of following work.
+
+
+
+\section{Conclusion}
+
+We investigate the problem of planning in open worlds. We identify two major challenges unique to these environments: 1) long-term planning requires precise and multi-step reasoning, and 2) planning efficiency could be compromised since canonical planners do not take the agent's proximity to parallel goals/subtasks into consideration. We propose ``\underline{D}escribe, \underline{E}xplain, \underline{P}lan and \underline{S}elect'' (\textbf{DEPS}), an interactive approach based on Large Language Models (LLMs) to tackle them both. Our experiments in the challenging Minecraft domain verify the advantages of our approach over counterparts by marking the milestone of robustly accomplishing 70+ Minecraft tasks and nearly doubling the overall performances. DEPS also is the first planning-based agent that can reach the diamond in this game. 
+
+\newpage
+
+% Acknowledgements should only appear in the accepted version.
+\section*{Acknowledgements}
+This work is funded in part by the National Key R\&D Program of China \#2022ZD0160301, a grant from  CCF-Tencent Rhino-Bird Open Research Fund, NSF grants \#IIS-1943641, \#IIS-1956441, \#CCF-1837129, an SRA from Meta and a research
+gift from Amazon Alexa AI, and a gift from RelationalAI. We thank Dai Zhixiang from NVIDIA and Xu Hongming from BIGAI on training LLMs and infrastructure supports, respectively.
+
+% In the unusual situation where you want a paper to appear in the
+% references without citing it in the main text, use \nocite
+% \nocite{langley00}
+
+\bibliographystyle{abbrv}
+\bibliography{main}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+\onecolumn
+% \section{You \emph{can} have an appendix here.}
+
+\section*{\centering {\fontsize{20}{20} \selectfont Appendix}}
+
+\DoToCc
+
+\clearpage
+
+% \frame{\tableofcontents[currentsection,subsubsectionstyle=hide]}
+
+% \section{Experiments on Other Environments}\label{sec:other_exp}
+\section{Additional Experiments}\label{sec:other_exp}
+
+% We also conduct experiments on ALFWorld~\cite{alfworld} and Tabletop Manipulation environments~\cite{clipport} to demonstrate the generalization performance of DEPS.
+Additional experiments are conducted on the ALFWorld~\cite{alfworld} and Tabletop Manipulation environments~\cite{clipport} to showcase the generalization capabilities of DEPS.
+
+\subsection{ALFWorld}
+
+% TODO: the objective of additional experiments
+% ALFWorld is an aligning text and embodied environment for interactive learning, which enables agents to learn abstract, text-based policies in TextWorld and then execute goals from the ALFRED benchmark in a rich visual environment.
+ALFWorld~\cite{alfworld} is an interactive learning environment that aligns text and embodiment, allowing agents to acquire abstract, text-based policies in TextWorld, and subsequently execute goals from the ALFRED benchmark in a visually rich environment.
+
+\subsubsection{Tasks}
+The ALFWorld framework contains six types (namely \texttt{Pick \& Place}, \texttt{Examine in Light}, \texttt{Clean \& Place}, \texttt{Heat \& Place}, \texttt{Cool \& Place}, \texttt{Pick Two \& Place}) of tasks with various difficulty levels. Tasks involve first finding a particular object, which often requires the agent to open and search receptacles like drawers or cabinets. Subsequently, all tasks other than Pick \& Place require some interaction with the object such as heating (place the object in a microwave and start it) or cleaning (wash the object in a sink). To complete the task, the object must be placed in the designated location. We sample 10 tasks from ALFWorld randomly and list all the task names, types, and the number of receptacles in Table~\ref{tab:alfworld_task_list}. We classify them into 6 groups based on their functionality. For all tasks, the maximum number of steps is set as 50.
+
+\input{tables/alfworld_task_list.tex}
+
+
+We select the GPT as Zero-Shot Planner (GPT)~\cite{huang2022language} and Inner Monologue (IM)~\cite{innermonologue} as baseline methods. For the Inner Monologue, the planning goal is the next goal among all candidate goals. For the GPT and DEP, which produce the full plan at once, the planning goal is the full plan (a goal sequence). Then the plan will be executed step-by-step, i.e., the current goal will be given to the controller and select suitable action according to the current state. The goal termination module is also employed with the LLM. For better demonstrate the effectiveness of self-explanation in DEP, we also augment the zero-shot planner with re-planning ability (GPT+RP).
+All planner methods access the LLM model through OpenAI API (\texttt{text-davinci-03} model~\cite{gpt3}). Since ALFWorld is a text world, the environment will be given a literal description and candidate language-conditioned actions for each state, so the controller under ALFWorld is also LLM-based. Chain-of-Thought~\cite{chainofthought} is also employed in the controller for better decision-making. All prompts for planner and controller in ALFWorld are listed in Section~\ref{sec:alfworld_prompt}.
+
+
+
+
+% \subsubsection{Details}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/alfworld_demos.pdf}
+    % \vspace{-0.6em}
+    \caption{
+        \textbf{Planning in the ALFWorld experiments.}
+        }
+    \label{fig:alfworld_demos}
+\end{figure}
+
+\subsubsection{Results}
+
+Each task is executed five times, and the average results for each task group are presented in Table~\ref{tab:alfworld_results}. BUTLER is the a training-based method, the results are sourced from \cite{alfworld}. Re-planning is a crucial capability in complex and exploratory environments. The short-horizon planning approach (IM) with re-planning capability outperforms the long-horizon planning approach (GPT) without re-planning capability with a large margin. Furthermore, the long-horizon planning method augmented with re-planning capability (GPT+RP) achieves superior performance ranging from 10\% (GPT) to 52\%. DEP further enhances the feasibility of planning with descriptions and self-explanation. Notably, all planning methods fail on \texttt{Place Two \& Place} tasks, which is attributable to LLM's lack of requisite knowledge for this task. It is worth investigating how to effectively incorporate the distinctive knowledge of an environment into LLM.
+
+% TODO: draw some conclusions
+\input{tables/alfworld_results.tex}
+
+\subsection{Tabletop Manipulation}
+
+The Tabletop Manipulation experiments are conducted on a Universal Robot UR5e with a suction gripper in the simulated environments~\cite{clipport}.
+
+\subsubsection{Tasks}
+
+The assessment of all methods is conducted in five seen tasks, as illustrated in Table~\ref{tab:cliport_task_list}, wherein the seen tasks are employed for training the CLIPort~\cite{clipport} as the controller. The task involves a robotic arm equipped with a gripper, which is tasked with rearranging a number of blocks and bowls on a table to achieve a desired configuration specified via natural language (e.g., "putting the blocks in the bowls with matching colors").
+
+
+\input{tables/cliport_task_list.tex}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figures/cliport_demos.png}
+    % \vspace{-0.6em}
+    \caption{
+        \textbf{Planning in the Tabletop Manipulation experiments.}
+        }
+    \label{fig:cliport_demos}
+    \vspace{-0.2 in}
+\end{figure}
+
+
+We utilized Inner Monologue (IM)~\cite{innermonologue} and Zero-shot Planner (GPT)~\cite{huang2022language} as planning baselines, in addition to comparing with a multi-task CLIPort policy directly trained on long-horizon task instructions (i.e., without utilizing LLM for planning). As CLIPort is a single-step policy that does not spontaneously terminate during policy rollout, we report CLIPort evaluations with Oracle termination (i.e., repeat until the Oracle indicates task completion) and fixed-step termination (i.e., repeat for $k$ steps). For Inner Monologue, which directly produces the next-step goal and terminates when the LLM ceases to generate new steps, we similarly set the maximum number of steps to be $k$ for practical considerations. For the zero-shot planner~\cite{huang2022language} and our DEP, which produce the full plan at once, they are augmented with the LLM-based termination. DEP also involves the description, explanation, and re-planning process. The same $k$ step is suitable for these two methods. In practice, $k$ is set as 15. The prompts for all methods are listed in Section~\ref{sec:tabletop_prompt}. We use the checkpoints provided by CLIPort as the controller and all planner methods access the ChatGPT (as LLM) through OpenAI API (\texttt{gpt-3.5-turbo} model). Each task is evaluated 5 times with different seeds. 
+
+
+\subsubsection{Results}
+
+The results of each method are listed in Table~\ref{tab:cliport_results}. All LLM-based planning methods perform well on tabletop rearrangement tasks. Given the compact nature of the tabletop environment, the performance gap among the various LLM-planning methods is not as pronounced as in the open-ended Minecraft. This observation underscores the robust generalization capabilities of LLM-based planning methods across diverse environments.
+
+\input{tables/cliport_results.tex}
+
+\section{Minecraft Task Details}\label{sec:task_details}
+
+To fully validate the multitask planning and execution capability of our agent, we choose over 70 tasks from the Minecraft Universe Benchmark~\cite{mcu} as the set of evaluation tasks. These tasks are related to items that can be obtained in the Minecraft overworld. These tasks are also a subset of MineDojo~\cite{minedojo} programmatic tasks.
+Minedojo exists some programmatic tasks sharing the same object item given different conditions (e.g., obtain wool given shear or obtain wool given nothing).
+Minedojo expands the richness of the same tasks (sharing the same Minecraft item as an object) by giving different initial conditions (e.g., \texttt{obtain wool given shears} or \texttt{obtain wool given nothing}).
+We keep only the 71 hardest conditions (i.e. \texttt{given nothing}) as tasks.
+
+We list all task names, objects, and their required skills number for planning from Table~\ref{tab:mt1_task_list} to Table~\ref{tab:mt8_task_list}. 
+Object item is used as the basis for the successful completion of the task. These objects cannot be obtained directly from the environment, and usually require multiple goals (i.e., reasoning steps) to be constructed. Here we only consider the number of required goal types, and multiple identical goals are unified into 1 reasoning step. 
+Note that the reasoning steps for each task are not fixed, and as the initial state of the agent and the biome is in change, more reasoning steps may be required to complete it, we only report the most basic case here.
+
+
+As shown in Figure~\ref{fig:ablation_goalmodel}, for each task, a relaxed (longer) maximum episode steps will increase the success rate of the task. To fully test the efficiency of our method, we set an upper limit on the episode length for each task. Since different tasks have different difficulty levels, we double the average completion time of human players for different meta-tasks as the upper limit of the episode. The play time are computed as corresponding maximum steps (i.e., Max. Steps in Table~\ref{tab:meta_task}) of episode length at 20Hz.
+
+\input{tables/minecraft_task_list}
+
+%\section{Goal Setting and Controller Details}\label{sec:controller}
+\section{DEPS Implementation Details }\label{sec:controller}
+
+We study three different implementations of DEPS for each of the experimental settings. While each version incorporates description and self-explanation to improve planning of LLM, there are differences in the internal components of each system, as seen in Table~\ref{tab:implementation_comparison}.
+
+\input{tables/implementation_details}
+
+\subsection{Controller}
+
+As the name implies, tasks in Minecraft are usually related to \texttt{mine} and \texttt{craft} goals.
+% Goals in Minecraft can be divided into the \texttt{mine} and \texttt{craft} categories based on the action type. 
+\texttt{Mine} goals require the agent to collect raw materials from the environment using the appropriate tools.
+\texttt{Craft} goals ask the agent to synthesize using existing materials. 
+Any raw material used requires the agent to collect through suitable tools (e.g., diamonds can only be collected by an iron pickaxe or a better pickaxe).
+So a task usually requires dozens of step-by-step \texttt{mine} and \texttt{craft} goals, as the required skills in Table~\ref{tab:mt1_task_list}. Note that the successful execution of a task needs to satisfy certain exact numerical constraints due to the presence of strict generation recipes in the environment (e.g., a log can craft 4 planks, so harvesting 6 planks requires at least 2 logs). 
+When the number of materials collected is not enough, the goal cannot be completed successfully.
+When more materials are collected than actually needed, the execution success rate of the task could also be reduced because the plan can not be finished under the maximum action steps. 
+
+\input{tables/skill.tex}
+
+We designed the agent's skill space based on these goals, as shown in Table~\ref{tab:skill_success_rate}, with a total of 262 goals.
+Every goal is designed with an objective item (e.g., 1 \texttt{minecraft:cobblestone} for skill ``\texttt{Mine 1 cobblestone with pickaxe}''), which is used to evaluate the achievement of the goal.
+The skill, as a goal-conditioned policy $\pi(a|s, g)$ for decision-making, maps the current state $s$ and goal $g$ to action $a$. 
+%Compared to the canonical formulation of policies where the goal is absent, goal-conditioned policies offers flexibility of learning \textit{multi-task} agent as it allows different behaviors for different tasks by simply altering the goal. 
+The goal is specified as natural language instructions here, which is similar to \cite{saycan}.
+
+When training the controller, we adopt the observation space provided by MineDoJo \cite{minedojo}, which includes an RGB camera view, yaw/pitch angle, GPS location, and the type of $3 \times 3$ blocks surrounding the agent. We discretize the original multi-discrete action space provided by MineDojo into 42 discrete actions. 
+We use the proposed imitation learning method proposed by \cite{shaofei} in training. To be specific, a modified goal-sensitive Impala CNN is used as the backbone network. 
+The success rate under a fixed episode length of every skill is listed in Table~\ref{tab:skill_success_rate}.
+
+\subsection{LLM as Planner}
+
+DEPS relies on Large Language Models (LLMs) to generate language-based plans. In our Minecraft experiment, we chose Codex~\cite{codex} as the LLM Planner because it can accept longer input tokens and is cost-effective. However, DEPS is compatible with various types of LLMs. Therefore, we used GPT3~\cite{gpt3} and ChatGPT as LLM Planners in the ALFWorld and Tabletop Manipulation experiments, respectively. Due to the effective planning and error correction performance of DEPS, the initial plan generated by the LLM has little impact on the final performance of the Agent. We also conduct ablation experiments on 
+
+
+even if the initial plan generated by the LLM has low accuracy, DEPS can generate a final feasible plan through self-explanation and re-planning. Therefore, we conducted ablation experiments on LLM in Minecraft.
+
+We choose Codex~\cite{codex}, ChatGPT, GPT3~\cite{gpt3}, and recent GPT-4~\cite{gpt4} as Planners. We used Vanilla Planner~\cite{huang2022language} as baselines and excluded the re-planning process. Given the same prompt with DEPS, the performance of baseline models reflects the planning ability of different LLMs. The success rate of baseline and DEPS on different LLMs are reported in Table~\ref{tab:ablation_on_llm}. 
+
+\input{tables/ablation_llm}
+
+The success rate of Vanilla Planner varies on the LLMs. The GPT-4 baseline achieved an initial plan accuracy twice as high as the baselines on other LLMs, demonstrating superior planning ability. After being augmented by Descriptor, Explainer, and Selector, DEPS based on different LLMs showed almost identical success rates. This indicates that DEPS-augmented LLMs can generate more feasible plans in open-world environments even if the initial plan is less successful.
+
+It is noteworthy that DEPS is constrained by the maximum token limits of various models, which dictate the maximum re-planning rounds that can be supported. Longer re-planning rounds tend to yield superior performance, particularly in long-horizon tasks requiring more skills (in MT6-MT7), as detailed in the Section~\ref{sec:ablation}.
+
+Since we use pretrained LLM as a planner, it indeed requires exposure to a large amount of Minecraft-related corpus during the pretraining phase. Considering that Minecraft is one of the most popular games worldwide, there is relatively abundant data about Minecraft available online. We conducted experiments using open-source pretrained LLaMA2-70B on several Minecraft tasks and found that DEPS based on LLaMA2 also performs reliable planning under Minecraft conditions. Considering limited training data used by LLaMA2, we further finetuned an open-source language model (LLaMA2-13B) using Minecraft texts obtained from the internet which exhibited better planning performance. The results are shown in Table~\ref{tab:llama_results}. 
+
+\input{tables/llama_results}
+
+\subsection{LLM as Explainer}
+
+Given the description and previous plan, the explainer can generate a self-explanation of the failure of the current plan and give instructions to fix the bugs. The explainer is implemented with the OpenAI completion mode based on \texttt{text-davinci-03} models. The prompt for the explainer is listed in Listing~\ref{lst:explainer_prompt}.
+
+\input{appendix/explainer_prompt}
+
+\subsection{Other modules}
+
+\paragraph{Goal Parser}
+We need to map the plan expressed in free-form language to the pre-defined controller skills set. We use the LLM as an automatic parser to parse the language plan first. For the goals not following pre-defined code expression, we calculate its semantic distance to the skills by cosine similarity with pre-trained Sentence-Bert model \cite{sentencebert} and select the most similar skill as the corresponding goal. All executable goals are listed in Appendix~\ref{sec:controller}. The LLM-based parser is general and can be transferred to other domains easily by modifying the prompt. The prompt for Minecraft parser is listed in Listing~\ref{lst:parser_prompt}.
+
+\input{appendix/parser_prompt}
+
+\paragraph{Success Detector}
+
+The successful execution of a plan is contingent upon the agent's perception of the current goal's completion status, which is assessed by the success detector. In Minecraft, agents possess an inventory that contains all pertinent information regarding the agent's current state. Thus, the Success Detector can be implemented by monitoring changes in object information within the item inventory. In other scenarios, we can query the LLM to ascertain whether the agent has accomplished a general goal by describing the agent's current state. Alternatively, in certain environments~\cite{clipport}, the execution of a goal is linked to the agent's current reward, signifying that these rewards can serve as automatic success detectors.
+
+\paragraph{Prompt}
+The generalization of the LLM to different tasks relies on well-designed prompts and related demonstrations \cite{min2022rethinking}. 
+Given an instruction command (e.g., \texttt{ObtainDiamond}) as task $T$, a prompt generator (ProG) will translate $T$ into prompt text. We also added two DEP examples in the prompt as demonstrations to make the LLM output familiar to the chain-of-thought thinking and structural output.
+We also design a chain-of-thought code-comments-type planning prompt to better demonstrate the capabilities of LLM.
+All messages are modified to suitable prompts through the prompt-generator before being input to LLM, including task $T$ and description $d_t$.
+The full prompt sentences and interaction logs are listed in Appendix~\ref{sec:interaction}.
+%\anji{Details like this might be better to defer to later sections where we introduce each component in more detail.}
+
+\section{Comparison with other LLM-based Planners}\label{sec:planner_comparison}
+
+The architectures of the different LLM-based planners are illustrated in Figure~\ref{fig:planner_comparison}. Where (b) describes the information in the environment into LLM via scene descriptor and success detector, and directly plans the next goal/action, (c) is Zero-Shot planner~\cite{huang2022language}, which generates the step-by-step goal sequences as plan and ignores the environment state and execution feedback, (d) is the Zero-Shot planner augmented with textual feedback and re-planning process.
+DEPS further rethink and explain the feedback of previous plans explicitly with the descriptor and explainer. The LLM-based planner will re-plan the task according to the explanation, as demonstrated in Figure~\ref{fig:planner_comparison}(a).
+In addition, the goal Selector further improves the executability of 
+the LLM plan.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale = 0.5]{figures/architecture_2.pdf}
+    \caption{
+        \textbf{Comparison of LLM-based planner architecture}. (a), (b), (c), (d) represents planner of ours, Inner Monologue~\cite{innermonologue}, Zero-Shot Planner~\cite{huang2022language} and Zero-Shot Planner with re-planning process, respectively.
+        }
+    \label{fig:planner_comparison}
+    \vskip -0.2in
+\end{figure}
+
+\section{Discussion on \texttt{ObtainDiamond} Task}\label{sec:obtain_diamond_task}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale = 0.3]{figures/appendix_obtain_diamond_process.pdf}
+    \caption{
+        \textbf{The milestone goals of the \texttt{ObtainDiamond} task.} 
+        }
+    \label{fig:obtain_diamond_task}
+\end{figure}
+
+As outlined in Section~\ref{sec:bonus}, \texttt{ObtainDiamond} task is a formidable task within the open-ended Minecraft environment. Given the necessity to explore an infinitely expansive world, an efficient plan can prove advantageous, as shown in Figure~\ref{fig:obtain_diamond_task}. The task is allotted a maximum of 12,000 steps to interact with the environment, which is comparable to that of human performance~\cite{minerl}. Rather than manually devising explicit hierarchical rewards, we opt to utilize DEPS for generating a hierarchical plan, which is then transferred to the downstream controller to progressively achieve each goal. When equipped with an \textbf{Oracle} Controller, DEPS yields a success rate of 60\% for ObtainDiamond. In our experimentation, we employed Behavior Cloning to train a Controller agent~\cite{shaofei}. DEPS+BC Controller achieved a success rate of 0.6\% in randomly generated Minecraft worlds. The primary bottleneck impeding overall agent success rate lies within the goal-conditioned Controller, not the plans generated by DEPS. Thus, it is worth exploring the development of a data-efficient Controller capable of accepting Language goals. 
+
+Another rationale for using DEPS is that, akin to reality, materials in Minecraft possess quantity constraints, and durability for tools. In \texttt{ObtainDiamond} task, an iron pickaxe is typically insufficient to support the agent, given the rarity of diamonds within the environment (which are predominantly found between depths of 2-16 layers and appear only 0.0846\% of the time). The robust re-planning capabilities of DEPS can facilitate the generation of a feasible plan (initiating with crafting an iron-pickaxe) based on the agent's current state. 
+
+Additionally, we report the milestones, which demonstrate the decreasing success rate of subsequent tasks in Figure~\ref{fig:ObtainDiamond} attributable to the task's inherent complexity and Controller constraints.
+
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale = 0.45]{figures/ObtainDiamond.pdf}
+    \caption{
+        \textbf{Success rate of milestone items for mining diamond}. 
+        }
+    \label{fig:ObtainDiamond}
+\end{figure}
+
+\section{Success Rates of ALL Tasks in Minecraft}\label{sec:success_rate_list}
+
+We report the complete and detailed success rate table of all tasks for different methods in Table~\ref{tab:full_results}, including Zero-shot Planner~\cite{huang2022language}, ProgPrompt~\cite{progprompt}, Chain-of-Thought~\cite{chainofthought}, Inner Monologue~\cite{innermonologue}, Code as Policies~\cite{codeaspolicies}, and proposed methods (i.e., DEP w/o Selector, and DEPS).
+
+All tasks are executed for at least 30 times across different world seeds, given the same initial conditions. The birth positions of the world are random according to the seed. The average success rates are listed in Table~\ref{tab:full_results}. 
+Our approach is state-of-the-art on almost all tasks, especially on difficult tasks that require more skills.
+
+\input{tables/full_results.tex}
+
+\section{Prompt for Different Tasks and Different Methods}\label{sec:prompt}
+
+\subsection{Prompt for Minecraft Tasks}\label{sec:minecraft_prompt}
+
+\subsubsection{DEPS}
+
+\input{appendix/minecraft_deps_prompt}
+
+\subsubsection{Baselines}
+
+\input{appendix/minecraft_zsp_prompt}
+
+\input{appendix/minecraft_pp_prompt}
+
+\input{appendix/minecraft_cot_prompt}
+
+\input{appendix/minecraft_im_prompt}
+
+\input{appendix/minecraft_cap_prompt}
+
+\subsection{Prompt for ALFWorld Tasks}\label{sec:alfworld_prompt}
+
+\subsubsection{DEPS}
+
+\input{appendix/alfworld_deps_prompt.tex}
+
+\input{appendix/alfworld_controller_prompt.tex}
+
+\subsubsection{Baselines}
+
+\input{appendix/alfworld_im_prompt.tex}
+
+\subsection{Prompt for Tabletop Manipulation Tasks}\label{sec:tabletop_prompt}
+
+\subsubsection{DEPS}
+
+\input{appendix/cliport_deps_prompt.tex}
+
+\subsubsection{Baselines}
+
+\input{appendix/cliport_im_prompt.tex}
+
+\section{Full Dialogue}\label{sec:interaction}
+
+
+\input{appendix/full_interaction.tex}
+
+
+\end{document}

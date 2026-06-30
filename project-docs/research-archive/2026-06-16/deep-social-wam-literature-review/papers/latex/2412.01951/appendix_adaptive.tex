@@ -1,0 +1,123 @@
+
+
+
+
+  \bestofnalg is a simple and natural self-training scheme, and
+  converges to a sharpened policy as $n, N\to \infty$. However, using
+  a fixed response sample size $N$ may be wasteful for prompts where
+  the model is confident. To this end, in this section we introduce
+  and analyze, a variant of
+  \bestofnalg based on \emph{adaptive sampling}, which adjusts the
+  number of sampled responses adaptively.
+
+
+
+  \paragraph{Algorithm}
+  We present the adaptive \bestofnalg algorithm only for the special case of the
+  maximum likelihood sharpening self-reward. Let a \emph{stopping parameter} $\mu>0$ be given. For $x_i\in\cX$,
+  and $y_{i,1},y_{i,2}\ldots\sim\piref(\cdot\mid{}x_i)$, define a
+  stopping time (e.g., \iftoggle{workshop}{\cite{benjamini1995controlling}}{ \citet{benjamini1995controlling}}) via:
+  \begin{align}
+    \label{eq:bon_stopping}
+    \taumu(x_i) := \inf \left\{k : \frac{1}{\max_{1 \le j \le k} \piref(y_{i,j}\mid{}x_i)} \le \frac{k}{\mu} \right\}.
+  \end{align}
+  The adaptive \bestofnalg algorithm computes adaptively sampled
+  responses $\yada_i$ via
+  \[
+    \yada_i\sim\argmax\crl*{\log\piref(y_{i,j}\mid{}x_i)\mid{}y_{i,1},\ldots,y_{i,\taumu(x_i)}},
+  \]
+  then trains the sharpened model through SFT:
+  \[
+    \pihatada =
+    \argmax_{\pi\in\Pi}\sum_{i=1}^{n}\log\pi(\yada_i\mid{}x_i).
+  \]
+  Critically,
+  by using scheme in \cref{eq:bon_stopping}, this algorithm can stop
+  sampling responses for the prompt $x_i$ if it becomes clear that the
+  confidence is large.
+
+\paragraph{Theoretical guarantee}  
+
+We now show that adaptive \bestofnalg enjoys provable benefits over
+its non-adaptive counterpart through the dependence on the accuracy
+parameter $\eps>0$.  
+
+
+  Given $x\in\cX$, and $y_1,y_2\ldots\sim\piref(x)$, let
+  $\taumu(x) := \inf \crl[big]{k : \frac{1}{\max_{1 \le i \le k}
+      \piref(y_i\mid{}x)} \le k/\mu }$, and define a random variable 
+  $\yada(x)\sim\argmax\crl*{\log\piref(y_i\mid{}x)\mid{}y_1,\ldots,y_{\taumu}\sim\piref(x)}$.
+Let $\piada(x)$ denote the distribution over $\yada(x)$. We make the
+following realizability assumption.
+\begin{assumption}\label{ass:ada-realizability}
+  The model class $\Pi$ satisfies $\piada\in\Pi$.
+\end{assumption}
+Compared to \bestofnalg, we require a somewhat stronger coverage
+coefficient given by 
+  \begin{align}
+    \Cstarb = \En_{x\sim\mu}\brk*{\frac{1}{\max_{y\in\cY}\piref(y\mid{}x)}}.
+  \end{align}
+  This definition coincides with \cref{eq:cstar} when the arg-max
+  response is unique, but is larger in general.\loose
+
+Our main theoretical guarantee for adaptive \bestofnalg is as follows.
+  \begin{theorem}
+    \label{thm:bestofn_adaptive}
+    Let $\delta,\rho\in (0,1)$ be given. Set $\mu =
+    \ln(2\delta^{-1})$, and assume \cref{ass:ada-realizability}
+    holds. Then with probability at least $1-\deltaf$, the adaptive \bestofnalg
+    algorithm has
+\begin{align}
+  \Pr_{x \sim \cdist}[\pihat(\Ystar(x) \mid x) \leq 1 - \delta] \lesssim  \frac{\log(|\Pi|\deltaf^{-1})}{\delta n} ,
+\end{align}
+and has sample complexity $\En[m] = n\cdot\Cstarb
+\log(\delta^{-1})$. Taking $n \gtrsim
+\frac{\log(|\Pi|\deltaf^{-1})}{\delta \epsilon} $ ensures that with
+probability at least $1-\deltaf$, $\Pr_{x \sim \cdist}[\pihat(\Ystar(x) \mid x) \leq 1 -
+  \delta]\leq\eps$, and gives total sample complexity
+\begin{align}
+  \En\brk*{m} = O\left(\frac{\Cstarb\log(\abs{\Pi}\delfail^{-1})\log(\delta^{-1})}{\delta\eps}\right).
+\end{align}
+\end{theorem}
+Compared to the result for \bestofnalg in \cref{thm:bestofn}, this
+shows that adaptive \bestofnalg achieves sample complexity scaling
+with $\frac{1}{\eps}$ instead of $\frac{1}{\eps^2}$. We believe the dependence on $\Cstarb$ for this algorithm
+is tight, as the adaptive stopping rule used in the algorithm can be
+overly conservative when $\abs{\Ystar(x)}$ is large.
+\loose
+
+\paragraph{A matching lower bound}
+We now prove a complementary lower bound, which shows that the
+$\eps$-dependence in \cref{thm:bestofn_adaptive} is tight. To do so,
+we consider the following adaptive variant of the \framework framework.
+\begin{definition}[Adaptive sample-and-evaluate framework]
+  In the \textbf{Adaptive Sample-and-Evaluate} framework, the
+  learner is allowed to sample $n$ prompts $x \sim \cdist$, and sample an
+  arbitrary, adaptively chosen number of samples
+  $y_1,y_2,\dots \sim \piref(\cdot \mid x)$ before sampling a new
+  prompt $x' \sim \cdist$. In this framework we define sample
+  complexity $m$ as the total number of pairs $(x,y)$ sampled by the
+  algorithm, which is a random variable.
+\end{definition}
+Our main lower bound is as follows.
+\begin{theorem}[Lower bound for sharpening under adaptive sampling]
+  \label{thm:lower_adaptive}
+  Fix an integer $d \ge 1$ and parameters $\epsilon \in (0,1)$ and $C
+  \ge 1$. There exists a class of models $\Pi$ such that (i) $\log |\Pi|
+  \eqsim d (1+\log(C \epsilon^{-1}))$, (ii) $\sup_{\pi \in \Pi}
+  \Cstar(\pi) \lesssim C$, and (iii) $\Ypi(x)$ is a singleton for all
+  $\pi\in\Pi$, for which any sharpening algorithm $\pihat$ in the
+  adaptive \framework framework that
+  achieves $\En\brk*{\Pr_{x \sim \cdist}[\pihat(\Ypi[\piref](x)\mid{}x) > 1/2]}  \ge 1
+  - \epsilon$ for all $\piref \in \Pi$ must collect a total number of samples $m = n\cdot{}N$ at least
+\begin{align}
+  \En\brk{m}
+  \gtrsim 
+        \frac{ C\log |\Pi|}{\epsilon\cdot{}(1+\log(C
+  \epsilon^{-1}))}.
+\end{align}
+\end{theorem}
+\cref{thm:lower_adaptive} is a special case of a more general theorem, \cref{thm:lower_general}, which is stated and proven in \cref{sec:proofs_lower}.
+
+
+

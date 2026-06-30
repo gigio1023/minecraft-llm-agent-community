@@ -1,0 +1,126 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/llm_withtools.py b/llm_withtools.py
+index d1394bb..6cc3604 100644
+--- a/llm_withtools.py
++++ b/llm_withtools.py
+@@ -29,7 +29,7 @@ def process_tool_call(tools_dict, tool_name, tool_input):
+ )
+ def get_response_withtools(
+     client, model, messages, tools, tool_choice,
+-    logging=None,
++    logging=None, system_message=None,
+ ):
+     try:
+         if 'claude' in model:
+@@ -52,13 +52,32 @@ def get_response_withtools(
+             raise ValueError(f"Unsupported model: {model}")
+         return response
+     except Exception as e:
+-        logging(f"Error in get_response_withtools: {str(e)}")
++        error_msg = str(e)
++        logging(f"Error in get_response_withtools: {error_msg}")
+ 
+         # Hitting the context window limit
+-        if 'Input is too long for requested model' in str(e):
+-            pass
++        if 'Input is too long for requested model' in error_msg or 'maximum context length' in error_msg:
++            if not system_message:
++                # Extract system message from the first message if available
++                system_message = messages[0].get('content', '') if messages else ''
++                if isinstance(system_message, list):
++                    system_message = ' '.join(block['text'] for block in system_message if block['type'] == 'text')
++
++            # Summarize the conversation history
++            summarized_messages = summarize_messages(client, model, messages, system_message)
++            
++            # Retry with summarized messages
++            return get_response_withtools(
++                client=client,
++                model=model,
++                messages=summarized_messages,
++                tools=tools,
++                tool_choice=tool_choice,
++                logging=logging,
++                system_message=system_message
++            )
+ 
+-        raise  # Re-raise the exception after logging
++        raise  # Re-raise other exceptions
+ 
+ def check_for_tool_use(response, model=''):
+     """
+@@ -247,6 +266,57 @@ def convert_msg_history_openai(msg_history):
+ 
+     return new_msg_history
+ 
++def summarize_messages(client, model, messages, system_message):
++    """
++    Creates a condensed summary of older messages while preserving recent context.
++    Only summarizes assistant and user messages, keeps tool results as is for accuracy.
++    """
++    # Keep the most recent messages intact
++    recent_msgs = messages[-2:] if len(messages) > 2 else messages
++    if len(messages) <= 2:
++        return messages
++
++    # Prepare messages to be summarized
++    msgs_to_summarize = messages[:-2]
++    
++    # Create a prompt to summarize the conversation
++    summary_request = "Please create a concise summary of this conversation that preserves the key context and important details:"
++    for msg in msgs_to_summarize:
++        if isinstance(msg.get('content', ''), list):
++            content = ' '.join(block['text'] for block in msg['content'] if block['type'] == 'text')
++        else:
++            content = str(msg.get('content', ''))
++        if msg.get('role') in ['assistant', 'user']:
++            summary_request += f"\n{msg['role']}: {content}"
++
++    try:
++        # Get summary from the model
++        summary_response, _ = get_response_from_llm(
++            msg=summary_request,
++            client=client,
++            model=model,
++            system_message="You are a summarizer. Create a concise but informative summary.",
++            print_debug=False,
++            msg_history=[]
++        )
++        
++        # Create new message history with the summary
++        summarized_history = [{
++            "role": "system",
++            "content": [{"type": "text", "text": system_message}]
++        }, {
++            "role": "assistant",
++            "content": [{"type": "text", "text": f"Previous conversation summary: {summary_response}"}]
++        }]
++        
++        # Add back the recent messages
++        summarized_history.extend(recent_msgs)
++        
++        return summarized_history
++    except Exception:
++        # If summarization fails, return original messages with the most recent ones
++        return [messages[0]] + recent_msgs
++
+ def convert_msg_history(msg_history, model=None):
+     """
+     Convert message history from the model-specific format to a generic format.
+@@ -263,7 +333,14 @@ def chat_with_agent_manualtools(msg, model, msg_history=None, logging=print):
+     if msg_history is None:
+         msg_history = []
+     system_message = f'You are a coding agent.\n\n{get_tooluse_prompt()}'
+-    new_msg_history = msg_history
++    new_msg_history = msg_history.copy() if msg_history else []
++    
++    # Ensure system message is the first message in history
++    if not new_msg_history or new_msg_history[0].get('role') != 'system':
++        new_msg_history.insert(0, {
++            "role": "system",
++            "content": [{"type": "text", "text": system_message}]
++        })
+ 
+     try:
+         # Load all tools
+\end{lstlisting}

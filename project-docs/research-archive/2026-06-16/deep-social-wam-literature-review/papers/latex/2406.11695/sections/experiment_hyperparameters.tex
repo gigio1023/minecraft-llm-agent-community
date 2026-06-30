@@ -1,0 +1,67 @@
+\section{Experiment Setup Details}
+\label{experiment_hyperparameters}
+
+\subsection{Data Splits}\label{sec:data_splits}
+
+Our data splits are described in Table~\ref{tab:test_train_split}.  We generally use 500 examples for training, 500 for our development, and a test set of 2k examples (or the full test set for tasks with test sets <2k samples).
+
+\begin{table}[tp]
+\begin{center}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Benchmark} & \textbf{Train} & \textbf{Dev} & \textbf{Test} \\ \midrule
+HotPotQA & 500 & 500 & 2000 \\
+HotPotQA Conditional & 500 & 200 & 200 \\
+Iris & 75 & N/A & 75 \\
+Heart Disease & 120 & N/A & 183 \\
+ScoNe & 500 & 500 & 1200 \\
+HoVer & 500 & 500 & 1520 \\
+\bottomrule
+\end{tabular}
+\caption{Train, Dev, Test splits for each of our datasets. Training data was used for training our Optimizers. Dev data was used as a development set to internally iterate on methods. Test was used for final evaluation and reporting. The datset for HotPotQA Conditional is smaller because the labels were created by hand. We do not create a devset for Iris or Heart Disease due to the fact that these were (1) small datasets and (2) we did not use them for method iteration.}
+\label{tab:test_train_split}
+\end{center}
+\end{table}
+
+\subsection{Optimizer Budget}
+We optimize HotPotQA and ScoNe with a budget of 50 full evaluation trials (which translates to about 300 minibatch trials).
+Iris, Heart Disease, and HotPotQA Conditional are run with a budget of 30 full evaluation trials, and HoVer 20 full evaluation trials. We use less trials for HoVer experiments given that it is the most expensive program to run. We use less trials for Iris, Heart Disease, and HotPotQA Conditional given that these experiments were focused on understanding the value of instruction versus few-shot optimization rather than evaluating specific methods, which may need more trials to see differentiated results.
+\subsection{Optimizer Hyperparameters}
+Table~\ref{tab:opt_hyperparams} shows the number of instruction and / or few-shot demonstration candidates for each module ($N$) that 0-Shot MIPRO, Bayesian Bootstrap, and MIPRO were used to optimize over in our experiments. We note that these hyperparameters were not chosen with extensive sweeps, but were instead chosen built on intuition built over running past experiments. Our general rule of thumb was to set $N$ to be < $T/v$, where $T$ is the trial optimization budget, and $v$ is the total number of variables we are optimizing over.
+
+\subsection{Language Model Hyperparameters}
+We perform most of our experiments with the LLama 3 8B model \cite{llama3modelcard} which we serve using SGLang \cite{zheng2024sglang} on A100 GPUs.  We parallelize inference calls across 8 A100 GPUs for many of our experiments. However, only a single GPU capable of running Llama 3 8B or a cloud inference provider would be necessary to replicate all results.  The temperature of our Llama model is optimized as a part of the MIPRO++ experiments, but we otherwise use temperature 0.7.  We also always use top\_p=1.0 sampling for Llama.  We generate until the model reaches the max tokens for a given task or the stop tokens \texttt{\["\backslash n \backslash n", "\backslash n---", "assistant"\]}.  For ScoNe this is 200 tokens, for HoVer this is 600 tokens, and for all other tasks this is 150 tokens.  Importantly we run Llama 3 without a chat template as we find this behaves better given DSPy's autocomplete prompt style.  For our proposer model, we use GPT-3.5 with temperature 0.7 and top\_p=1.0 or GPT-4 with the same settings for ScoNe, HoVer, and Iris.
+
+\begin{table}[tp]
+\begin{center}
+\small
+\begin{tabular}{llc}
+\toprule \textbf{Optimizer} &
+\textbf{Benchmark} & \textbf{N} \\ \midrule
+\multirow{6}{*}{0-Shot MIPRO} & HotPotQA & 60  \\
+ & HotPotQA Conditional & 35 \\
+ & Iris & 50 \\
+ & Heart Disease & 30  \\
+ & ScoNe & 70 \\
+ & HoVer & 15 \\
+ \midrule
+\multirow{6}{*}{Bayesian Bootstrap} & HotPotQA & 60  \\
+ & HotPotQA Conditional & N/A \\
+ & Iris & N/A \\
+ & Heart Disease & N/A  \\
+ & ScoNe & 70 \\
+ & HoVer & 15 \\
+ \midrule
+\multirow{6}{*}{MIPRO} & HotPotQA & 30  \\
+ & HotPotQA Conditional & 30 \\
+ & Iris & 30 \\
+ & Heart Disease & 15  \\
+ & ScoNe & 70 \\
+ & HoVer & 10 \\
+\bottomrule
+\end{tabular}
+\caption{Number of candidates per module (N) used for optimization. Note that this hyperparameter only applies to our 0-Shot MIPRO, MIPRO, and Bayesian Bootstraping optimizers, because for other optimizers the \# of candidates explored equals the number of trials.}
+\label{tab:opt_hyperparams}
+\end{center}
+\end{table}

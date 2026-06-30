@@ -1,0 +1,42 @@
+
+
+\section{Introduction}
+Planning~\citep{mattar2022planning}---deciding on optimal action sequences to achieve goals---has been fundamental to artificial intelligence since its inception.
+Research into generalist web agents capable of planning and executing a sequence of actions to complete complex tasks across diverse websites has gained significant interest~\citep{mind2web,zhou2023webarena,zheng2024seeact,koh2024visualwebarena}, partly due to the web's potential as a complex yet realistic environment for driving agent research and development.
+However, applying existing planning algorithms~\citep[\textit{inter alia}]{tot, world, gu-etal-2023-dont, wang2024planning, feng2023alphazero, brown2024large} to the online web environment presents formidable challenges.
+Real-world environments such as the web are rife with state-changing and irreversible actions---for example, a single website like Amazon.com can involve numerous such actions, including submitting an order, creating an account, changing privacy settings, among many others---making \textit{backtracking}, a cornerstone of search-based planning~\citep{koh2024tree, putta2024agent}, highly challenging, if not infeasible.
+The latency from excessive exploration in test-time search also hurts \textit{efficiency} and compromises user experience.
+
+
+\begin{figure*}[tbh]
+    % \vspace{-1em}
+    \centering
+    \includegraphics[width=\linewidth]{figs/wm_fig1.pdf}
+    % \vspace{-1.5em}
+    \captionof{figure}{Schematic illustration of different web agent strategies as a search problem, where each node represents a webpage.
+    (a) Reactive: The agent selects locally optimal actions without planning, often leading to suboptimal results.
+    (b) Tree search with real interactions: The agent explores multiple paths via active website navigation, potentially allowing backtracking (dashed arrows). However, backtracking is often infeasible due to irreversible actions.
+    (c) Model-based planning: The agent simulates outcomes (cloud-bordered nodes) before execution, reducing real interactions while maintaining effectiveness.
+    }
+    % \vspace{-1.2em}
+    \label{fig:overview}
+\end{figure*}
+
+One promising solution to address these challenges is \textit{model-based planning}~\citep{pascanu2017learning, moerland2023model}, which equips agents with the ability to simulate action sequences within a \textit{world model}---a computational representation of environment dynamics.
+World models have achieved notable success~\citep{ha2018world, Hafner2020Dreamv1, hafner2021dreamerv2} in traditional reinforcement learning (RL) tasks within simulated environments like Atari games~\citep{Bellemare2013Atari, brockman2016openaigym}, where environment dynamics are well-defined and the action space is small and fixed, making world model training relatively straightforward.
+However, building world models for web environments remains under-explored.
+In contrast to the simulated environments, the Internet is open-ended and ever-evolving, with complex and diverse page structures and a wide range of possible user interactions.
+This raises the question: \textit{How can we build effective world models for the Internet?}
+
+We propose building world models for the Internet by leveraging large language models (LLMs) as the foundation.
+Pretrained on web-scale data, LLMs have implicitly acquired both structural knowledge of websites and common sense needed to predict the outcomes of proposed actions, potentially making them well-suited to simulate transitions in complex web environments.
+To this end, we introduce \OurMethod, a model-based planning framework that uses LLMs to simulate and score possible future states before executing actions, enabling informed decision-making (Figure~\ref{fig:overview}).
+Building on this framework, we further train a dedicated world model, Dreamer-7B, using over 3.1 million interaction instances synthesized by our scalable data synthesis pipeline.
+
+Empirical results demonstrate the effectiveness of our approach:
+\OurMethod, when powered by state-of-the-art LLMs such as GPT-4o, achieves significant performance improvements over reactive baselines across three benchmarks, covering both online and sandbox environments.
+It is also competitive with the tree search method, while being 4–5 times more efficient on sandbox environment VisualWebArena, and performs effectively on real-world websites (Online-Mind2Web and Mind2Web-Live), where tree search methods are difficult to implement and deploy.
+Moreover, Dreamer-7B achieves performance comparable to GPT-4o on two online benchmarks.
+In VisualWebArena, we can continue fine-tuning our Dreamer-7B with in-domain data synthesized by our pipeline.
+With just 25K training instances, the resulting domain-specific world models yield even stronger results, surpassing GPT-4o.
+These findings not only demonstrate the potential of using LLMs for model-based planning, but also establish a practical foundation for building world models for the open web through data synthesis, training, and evaluation.

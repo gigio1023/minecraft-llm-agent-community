@@ -1,0 +1,58 @@
+
+\section{The \name~Benchmark}
+\label{sec:methods}
+
+In this section, we detail the design philosophy and construction of the evaluation dataset.
+The dataset is designed to provide a broad set of basic evaluations for reward models, covering chat, instruction following, coding, safety, and other important metrics for fine-tuned language models.
+The \name~dataset contains a combination of existing evaluation prompt-completion pairs, and those curated for this project.
+
+A good reward function, and therefore a good RM broadly, is one that stably assigns credit to the classes of good or bad content.%\footnote{There are more considerations on how to \textit{use} a RM, but the initial notion of quality should be one that agrees with curated data. Next, we can evaluate which RMs are best for downstream tasks such as RLHF.}
+Given one verified answer that is better than another for factual or clear qualitative reasons (e.g. typos), a good reward model will choose the correct one 100\% of the time.
+To evaluate this, each datapoint consists of a \texttt{prompt} and two completions, \texttt{chosen} and \texttt{rejected}.
+For each prompt, the score of the reward model is computed. The prompt is then categorized as a win if the score of the prompt with the verified chosen completion is higher than that of the verified rejected completion, as shown in Fig.~\ref{fig:method}.
+Finally, we report accuracy for each subset as the percentage of wins. 
+For all the section scores of~\name~(e.g. \texttt{Chat} or \texttt{Safety}) except \texttt{Prior Sets}, the average score is weighted per-prompt in the requisite subsets.
+
+\subsection{\name~Dataset}
+\label{sec:subsets}
+
+The benchmark is broken down into five sections from different subsets -- the first four compose the~\name~dataset described in this section.
+We have broken down the dataset into these subsections to create one final~\name~score in order to reasonably weigh different aspects of an RM's performance.
+The RewardBench dataset is released under the ODC-BY license\footnote{ODC-BY: \url{https://opendatacommons.org/licenses/by/1-0/}} and the code is released under Apache 2.0\footnote{Apache 2.0: \url{https://www.apache.org/licenses/LICENSE-2.0}}.
+The summary of the dataset is shown in Tab.~\ref{table:dataset_char} (see appendix~\ref{appdx:data_details} for full details) At a high level, the subsets consist of the following:
+
+\begin{enumerate}[leftmargin=0.5cm]
+    \item \textbf{Chat}: Testing a reward model's basic ability to distinguish a thorough and correct chat response in open-ended generation.
+    Prompts and chosen, rejected pairs are selected from AlpacaEval~\citep{alpaca_eval} and MT Bench~\citep{zheng2023judging}, two popular open-ended chat evaluation tools. 
+    \item \textbf{Chat Hard}: Testing a reward model's abilities to understand trick questions and subtly different instruction responses. 
+    Prompts and chosen, rejected pairs are selected from MT Bench examples with similar ratings and adversarial data specifically for fooling LLM-as-a-judge tools from LLMBar's evaluation set~\citep{zeng2023llmbar} (reformatted for RMs).
+    \item \textbf{Safety}: Testing the models' tendencies to refuse dangerous content and to avoid incorrect refusals to similar trigger words. 
+    Prompts and chosen, rejected pairs are selected from custom versions of the datasets XSTest~\citep{rottger2023xstest}, Do-Not-Answer~\citep{wang2023donotanswer}, and examples from an in-development refusals dataset at AI2, where the chosen response is a refusal and the rejected is harmful text of either dangerous or offensive nature.
+    \item \textbf{Reasoning}: Evaluating the models code and reasoning abilities. 
+    Code prompts are created by reformatting HumanEvalPack examples with correct code as chosen and rejected as one with bugs~\citep{muennighoff2023octopack}.
+    Reasoning prompts pair reference answers with incorrect model generations from the PRM800k dataset~\citep{lightman2023let}.
+    
+    \input{tables/top20_leaderboard_snapshot}
+
+    \item \textbf{Prior Sets}\footnote{For the final RewardBench score, we weigh the Prior Sets category at 0.5 weight of the others due to multiple factors: noise, lack of clearly defined tasks, etc. The dataset is found here: \url{https://huggingface.co/datasets/allenai/preference-test-sets} }: For consistency with recent work on training reward models, we average performance over test sets from existing preference datasets.
+    We use the Anthropic Helpful split~\citep{bai2022training} (the only multi-turn data), the Anthropic HHH subset of BIG-Bench~\citep{askell2021general}, a curated subset of the test set from the Stanford Human Preferences (SHP) Dataset~\citep{pmlr-v162-ethayarajh22a}, and OpenAI's Learning to Summarize Dataset~\citep{stiennon2020learning}.
+\end{enumerate}
+
+
+
+
+\subsection{\name~Scoring}
+
+\name~is scored via accuracy.
+For each prompt-chosen-rejected trio, we infer the score the RM assigns for the prompt-chosen and prompt-rejected pairs
+%\footnote{For some reward models, such as PairRM and SteamSHP, their intended use is with pairwise inputs, so we evaluate in that manner following the original source code.} 
+then assign a true classification label when the chosen score is higher than rejected, as highlighted in Fig.~\ref{fig:method}.
+Details on computing scores for classifiers and DPO models is in Sec.~\ref{sec:back}.
+Given the binary classification task, a random model achieves a result of 50\%.
+%On many subsets, models achieve at or well below the random baseline, indicating substantial areas of progress in reward models. \vp{Todo: @ Nathan rephrase}
+In order to create a representative, single evaluation score, we perform a mixture of averaging across results.
+For the sections detailed in Sec.~\ref{sec:subsets} except for Reasoning, we perform per-prompt weighted averaging across the subsets to get the normalized section scores.
+For example, in Chat we take a weighted average of the AlpacaEval and MT Bench sets based on the number of prompts.
+For Reasoning, we increase the weight of the PRM-Math subset so code and math abilities are weighed equally in the final number.
+For Prior Sets, we take an unweighted average over the subsets due to the large disparity in dataset sizes.
+Once all subsets weighted averages are achieved, the final~\name~score is the weighted average across the section scores (Prior Sets at 0.5 weight).

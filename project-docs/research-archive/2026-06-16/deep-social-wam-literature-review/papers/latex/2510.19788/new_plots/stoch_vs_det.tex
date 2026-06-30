@@ -1,0 +1,90 @@
+% Auto-generated PGFPlots template — grouped vertical bars (ggplot-like)
+% Ensure required packages when included standalone in lint/preview
+\makeatletter
+\@ifundefined{pgfplotsversion}{\RequirePackage{pgfplots}}{}
+\@ifundefined{pgfplotstableread}{\RequirePackage{pgfplotstable}}{}
+\makeatother
+% Data: new_plots/data/score_by_task_type_mean_wide.csv
+\tikzset{external/export next=false}
+
+\begingroup
+% ------- configurable knobs -------
+% overall size (avoid digits in macro names)
+\newcommand{\PerfTaskPlotWidth}{.88\linewidth}
+\newcommand{\PerfTaskPlotHeight}{7em}
+% typography
+\newcommand{\PerfTaskFont}{\scriptsize}
+\newcommand{\PerfTaskXFont}{\tiny}
+% bar geometry
+\setlength{\PerfTaskBarWidth}{4pt}
+\setlength{\PerfTaskBarSep}{4.4pt} % adjacent bars touch
+% margins
+\newcommand{\PerfTaskEnlargeX}{0.08}
+\newcommand{\PerfTaskEnlargeY}{0.04}
+% ---------------------------------
+
+% color palette provided centrally in main.tex: PerfClaude, PerfGemini, PerfHuman, PerfOThree, PerfAutumnSim
+
+% load combined mean+SEM table (wide)
+\pgfplotstableread[col sep=comma]{new_plots/data/stoch_vs_det.csv}{\perftablesrc}
+\begin{tikzpicture}[baseline={(current axis.south)}]
+      \begin{axis}[
+                  % title={Mean Score by Task Type and Agent},
+                  ylabel={Score},
+                  tick label style={font=\PerfTaskFont},
+                  xticklabel style={font=\PerfTaskXFont, rotate=20, anchor=east, yshift=0pt},
+                  xtick=data,
+                  % modern, ggplot-like styling
+                  grid=none,
+                  axis background/.style={fill=PlotBackground},
+                  axis lines=left,
+                  axis line style={draw=none},
+                  x axis line style={draw=none},
+                  axis y line*=left,
+                  y axis line style={draw=black, -, xshift=-3pt},
+                  tick style={draw=none},
+                  ytick style={draw=black, xshift=-3pt},
+                  yticklabel style={xshift=-1pt},
+                  ytick pos=left,
+                  tick align=outside,
+                  legend style={font=\PerfTaskFont, draw=none, fill=none, at={(0.5,1.05)}, anchor=south},
+                  legend image code/.code={\draw[#1,draw=none] (0cm,-0.08cm) rectangle (0.28cm,0.08cm);},
+                  legend columns=2,
+                  label style={font=\PerfTaskFont, at={(ticklabel* cs:0.5)}, anchor=south, yshift=5pt},
+                  title style={font=\PerfTaskFont},
+                  scale only axis=true,
+                  width=\PerfTaskPlotWidth,
+                  height=\PerfTaskPlotHeight,
+                  ymin=0,
+                  ymax=1,
+                  ytick distance=1,
+                  unbounded coords=discard,
+                  symbolic x coords={o3, claude-4-sonnet, gemini-2.5-pro, gemini-2.5-flash, qwen3-235b-a22b-thinking-2507, oracle, human},
+                  bar width=\PerfTaskBarWidth,
+                  enlarge x limits=\PerfTaskEnlargeX,
+                  enlarge y limits={upper, value=\PerfTaskEnlargeY},
+            ]
+            % oracle,0.5079346677377056,0.06779241266425819,0.40797147693105873,0.05668887521141108
+
+            % grouped vertical bars per task type with error bars (SEM)
+            \addplot+[ybar, bar shift=\dimexpr-0.5\PerfTaskBarSep\relax, draw=none, fill=PerfDeterministic, mark=none,
+                  error bars/.cd, y dir=both, y explicit,
+                  error bar style={draw=black!40, line width=0.5pt, xshift=-0.5\PerfTaskBarSep},
+                  error mark=|,
+                  error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=-0.5\PerfTaskBarSep}]
+            table [x={source}, y={deterministic}, y error=deterministic_sem,
+                        row predicate/.code={\edef\tempa{\thisrow{source}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+            \addplot+[ybar, bar shift=\dimexpr+0.5\PerfTaskBarSep\relax, draw=none, fill=PerfStochastic, mark=none,
+                  error bars/.cd, y dir=both, y explicit,
+                  error bar style={draw=black!40, line width=0.5pt, xshift=0.5\PerfTaskBarSep},
+                  error mark=|,
+                  error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=0.5\PerfTaskBarSep}]
+            table [x={source}, y={stochastic}, y error=stochastic_sem,
+                        row predicate/.code={\edef\tempa{\thisrow{source}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+            % legend with color patches (not lines)
+            % legend using solid color patches (not dashed lines)
+            \addlegendimage{ybar,ybar legend, draw=none, fill={PerfDeterministic}}\addlegendentry{deterministic}
+            \addlegendimage{ybar,ybar legend, draw=none, fill={PerfStochastic}}\addlegendentry{stochastic}
+      \end{axis}
+\end{tikzpicture}
+\endgroup

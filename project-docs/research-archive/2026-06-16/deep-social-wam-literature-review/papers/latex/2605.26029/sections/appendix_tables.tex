@@ -1,0 +1,668 @@
+\section{Appendix}
+\label{app:appendix}
+
+\subsection{Benchmark Setup and Causal-Discovery Context}
+\label{app:setup_details}
+
+This section collects setup details that are needed to interpret the main
+results but are too mechanical for the main text. The benchmark uses a fixed
+budget policy except in the explicit observation--intervention scaling suites:
+for a \(k\)-node graph, the observation budget is 2 and the intervention budget
+is \(4(k - 1)\). The graph families span 3--7 node SCMs; Table~\ref{tab:app_main_graph_stats}
+summarizes the topology distribution used in the main experiments.
+
+Classical causal discovery studies how causal structure can be learned from
+observational, interventional, or shifted data, including constraint- and
+score-based discovery, interventional Markov equivalence, discovery across
+multiple contexts, and unknown shift interventions
+\citep{Pearl_2009,andersson1997mec,JMLR:v13:hauser12a,JMLR:v21:17-123,backshift2015,zang2023discovering}.
+\projectname{} is closest to the shift-intervention regime of this literature,
+but it does not propose a new discovery algorithm or assume perfect
+\(do\)-interventions. Instead, it evaluates whether an LLM agent can recover
+the graph and equations of a hidden SCM through a finite sequence of
+shift-style interventions on controllable properties.
+
+\subsection{SCM and Hidden-Disturbance Details}
+\label{app:scm_details}
+
+Formally, each episode instantiates an SCM
+\(\mathcal{M}=(\mathbf{U},\mathbf{V},F,P(\mathbf{U}))\)
+\citep{Pearl_2009}: \(\mathbf{V}\) are endogenous variables determined inside
+the system, \(\mathbf{U}\) are exogenous variables drawn from \(P(\mathbf{U})\),
+and \(F\) is a collection of structural equations mapping each variable's
+parents and exogenous term to its value. In \projectname{},
+\(\mathbf{V}=O\cup\{Y\}\), where \(O\) are observable property variables and
+\(Y=\texttt{frequency}\). Root variables remain endogenous nodes, but their
+values are generated from exogenous source terms; in hidden-noise suites, the
+exogenous terms also include an unobserved disturbance \(H\).
+
+The agent observes \(O\) and \(Y\) in the prior evidence records, may observe
+and intervene on the configured subset \(C\subseteq O\) of the manipulator
+crystal during interaction, and observes only \(O\) on the reactor crystal.
+Variables in \(O\setminus C\) are observable but not controllable; \(Y\) is
+never controllable; and \(H\), when present, is neither observable nor
+controllable. Hidden-disturbance suites resample \(H\) after each intervention
+and add it as a fixed-weight shift to a designated subset of observable
+endogenous variables; these shifted values then propagate downstream through
+the structural equations. The agent sees only the resulting observed values,
+not \(H\) itself.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Nodes & Graphs & Edge mean & Edge var. & Fork mean & Collider mean \\
+\midrule
+3 & 50 & 2.56 & 0.25 & 0.68 & 0.72 \\
+4 & 50 & 4.54 & 1.01 & 2.18 & 2.22 \\
+5 & 50 & 7.26 & 4.23 & 5.54 & 5.26 \\
+6 & 50 & 8.82 & 5.15 & 6.72 & 6.22 \\
+7 & 50 & 10.26 & 4.95 & 7.84 & 7.00 \\
+\bottomrule
+\end{tabular}
+\caption{Main-experiment graph statistics. Forks and colliders are counted as three-node motif instances; edge variance is the population variance over the 50 graphs in each row.}
+\label{tab:app_main_graph_stats}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Variable role} & \textbf{SCM role} & \textbf{Observable} & \textbf{Intervenable} \\
+\midrule
+Controllable property ($X\in C$) & Endogenous & \checkmark & \checkmark \\
+Non-controllable property ($X\in O\setminus C$) & Endogenous & \checkmark & --- \\
+Target \(Y=\texttt{frequency}\) (evidence records / manipulator crystal) & Endogenous & \checkmark & --- \\
+Target \(Y=\texttt{frequency}\) (reactor crystal) & Endogenous & --- & --- \\
+Hidden disturbance \(H\) (when present) & Exogenous & --- & --- \\
+\bottomrule
+\end{tabular}
+\caption{Per-variable SCM role and access for the agent in a \projectname{} episode. The agent observes prior evidence records, intervenes only on the configured controllable subset \(C\) of the manipulator crystal, never observes hidden exogenous disturbances, and predicts the held-out \texttt{frequency} of the reactor crystal.}
+\label{tab:variable_access}
+\end{table}
+
+\subsection{Artifact and Implementation Details}
+\label{app:artifact_implementation}
+
+\projectname{} builds its embodied interface on DiscoveryWorld
+\citep{DBLP:journals/corr/abs-2406-06769}, released under the Apache-2.0
+license; its SCM generator, intervention/reactor mechanics, DSL traces, and
+scoring code are new synthetic research and evaluation artifacts. This use is
+consistent with DiscoveryWorld's role as a virtual environment for evaluating
+scientific-discovery agents. The benchmark is generated from fixed templates
+over synthetic laboratory variables, so it contains no demographic attributes,
+personal identifiers, or naturally occurring offensive web text. Appendix
+\ref{app:scm_details} and \ref{app:full_experiment_tables} document artifact
+coverage, variable access, and evaluation/experiment settings.
+
+\subsection{Prompt Templates}
+
+The benchmark uses a two-stage prompting scheme. The first prompt governs
+iterative hypothesis--experiment interaction in the environment, while the
+second prompt frames the reactor activation objective and embeds the
+task-specific laboratory rules. The templates below are the exact prompt files
+used in the implementation, with runtime placeholders filled by the environment
+during evaluation.
+
+\input{sections/prompts/phase1_controller_prompt}
+
+\input{sections/prompts/phase2_reactor_task_prompt}
+
+\subsection{DSL Implementation Details}
+\label{app:dsl_implementation}
+
+The DSL hypothesis schema is presented with field-by-field descriptions and a
+small worked example so the model knows the expected key names, edge format,
+coefficient format, and convention for referring to \texttt{frequency}. The
+episode configuration fixes the property names and functional family, so the
+parser only accepts variables emitted by the environment prompt. If a record
+fails the schema check, for example because it contains an undeclared property,
+a non-numeric coefficient, or a mismatch between listed parents and equation
+terms, we re-prompt up to two times with the parser error before recording a
+parse failure for that step.
+
+\subsection{Trajectory-Level DSL Visualization}
+\label{app:dsl_visualization}
+
+The DSL records make the agent's evolving causal hypothesis auditable, rather
+than leaving mechanism recovery to be inferred from a final reactor prediction.
+Figure~\ref{fig:causal_visualization} is included because the DSL and task
+sections refer to this trajectory-level view: it shows the ground-truth graph,
+the agent hypothesis graph, and recovery metrics over the interaction sequence.
+
+\begin{figure*}[t]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/causalgame_5node_diagnostics.pdf}\\
+{\small (a) Paper-ready trajectory schematic.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/causal_visualization.pdf}\\
+{\small (b) Visualization-platform screenshot.}
+\end{minipage}
+\caption{Trajectory-level causal graph visualizations in \projectname{}. The schematic and screenshot both expose the ground-truth graph, the agent's hypothesis graph, and recovery metrics over the intervention sequence.}
+\label{fig:causal_visualization}
+\end{figure*}
+
+\subsection{Mechanism Robustness and Perturbation Controls}
+\label{app:robustness_controls}
+
+The main text uses these results to separate task success from causal
+faithfulness. Table~\ref{tab:linear_quad_metrics} supports the hard-quadratic
+comparison by showing that the main degradation is in the recovered
+\texttt{frequency} mechanism, not root discovery. Figure~\ref{fig:hidden_variables}
+and Table~\ref{tab:hidden_metrics} expand the hidden-noise analysis: ordinary
+hidden count/range perturbations mostly reduce graph \(F_1\), while perturbing
+the \texttt{frequency} target family sharply reduces task accuracy. The
+\texttt{FreqParent} follow-up in Figure~\ref{fig:FreqParent_followup_metrics}
+and Table~\ref{tab:freqparent_followup_metrics} tests a related modelling
+choice: allowing \texttt{frequency} outgoing edges improves prediction but
+hurts full-graph fidelity.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Setting & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+GPT-5-mini 4-node linear reference & 48 & 0.559 & 0.833/0.778/0.793 & 0.812 & 0.589 \\
+GPT-5-mini 4-node quad-hard & 24 & 0.829 & 0.902/0.667/0.736 & 0.741 & 0.251 \\
+\bottomrule
+\end{tabular}
+\caption{Linear versus hard-quadratic mechanisms on matched 4-node graphs. The main loss under quadratic dynamics is not root discovery but identifying the correct frequency mechanism.}
+\label{tab:linear_quad_metrics}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.70\linewidth]{figures/rq6_hidden_noise_asymmetry.pdf}
+\caption{Hidden-noise diagnostics across all ten 4-node settings, plotted as
+(task accuracy, all-edge $F_1$) and colored by noise category. The dashed
+cross marks the unperturbed baseline. Hidden-count and Hidden-range settings
+drop $F_1$ but keep accuracy near baseline; the \texttt{freqnode} family
+collapses accuracy without further $F_1$ loss, exposing a fragile
+parent--target shortcut.}
+\label{fig:hidden_variables}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Setting & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+4-node main baseline & 48 & 0.559 & 0.833/0.778/0.793 & 0.812 & 0.589 \\
+\midrule
+hidden count \(=1\) & 50 & 0.708 & 0.854/0.610/0.689 & 0.781 & 0.477 \\
+hidden count \(=2\) & 48 & 0.747 & 0.838/0.576/0.647 & 0.781 & 0.510 \\
+hidden count \(=3\) & 48 & 0.672 & 0.883/0.581/0.671 & 0.799 & 0.493 \\
+hidden range \(=\pm 0.5\) & 40 & 0.666 & 0.818/0.534/0.614 & 0.729 & 0.389 \\
+hidden range \(=\pm 5\) & 54 & 0.755 & 0.876/0.610/0.673 & 0.766 & 0.546 \\
+hidden range \(=\pm 50\) & 52 & 0.675 & 0.920/0.605/0.698 & 0.818 & 0.567 \\
+\midrule
+hidden \texttt{freqnode} \(=1\) & 26 & 0.805 & 0.800/0.573/0.634 & 0.678 & 0.218 \\
+hidden \texttt{freqnode} \(=2\) & 28 & 0.699 & 0.851/0.603/0.670 & 0.735 & 0.327 \\
+hidden \texttt{freqnode} \(=3\) & 40 & 0.623 & 0.850/0.537/0.631 & 0.789 & 0.361 \\
+\bottomrule
+\end{tabular}
+\caption{Hidden-noise robustness on 4-node graphs under exact-context re-evaluation. The table includes the 4-node main baseline, standard hidden settings, and controlled \texttt{hidden-freqnode} settings where \texttt{resonanceFreq} is explicitly included among hidden targets.}
+\label{tab:hidden_metrics}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.62\linewidth]{figures/rq7_freqparent_tradeoff.pdf}
+\caption{\texttt{FreqParent} experiments on \texttt{GPT-5-mini} in
+(task accuracy, all-edge $F_1$) space. Baseline $\to$ \texttt{FreqParent}
+arrows move down-right on both graph sizes: prediction accuracy rises while
+graph fidelity falls, especially on 6-node graphs.}
+\label{fig:FreqParent_followup_metrics}
+\end{figure}
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llccccc}
+\toprule
+Suite & Setting & \(n\) & Acc. & All-edge \(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+4-node main & Baseline & 50 & 48.0 & 0.793 & 0.812 & 0.589 \\
+4-node main & FreqParent & 50 & 56.0 & 0.606 & 0.733 & 0.451 \\
+6-node main & Baseline & 50 & 24.0 & 0.628 & 0.679 & 0.455 \\
+6-node main & FreqParent & 50 & 36.0 & 0.387 & 0.582 & 0.364 \\
+\bottomrule
+\end{tabular}
+\caption{FreqParent follow-up under exact-context re-evaluation (GPT-5-mini). Allowing \texttt{resonanceFreq} as a parent improves prediction but degrades full-graph recovery.}
+\label{tab:freqparent_followup_metrics}
+\end{table}
+
+\subsection{Intervention-Trace Controls}
+\label{app:intervention_trace_controls}
+
+The Golden follow-up tests whether better intervention traces alone are enough
+to recover a faithful SCM. Table~\ref{tab:golden_followup_metrics} supports
+the main-text claim that low-MEC traces greatly improve endpoint prediction,
+yet do not produce matching gains in all-edge recovery.
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llccccc}
+\toprule
+Suite & Setting & \(n\) & Acc. & All-edge \(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+4-node main & Baseline & 50 & 48.0 & 0.793 & 0.812 & 0.589 \\
+4-node main & Golden & 50 & 90.0 & 0.728 & 0.743 & 0.644 \\
+6-node main & Baseline & 50 & 24.0 & 0.628 & 0.679 & 0.455 \\
+6-node main & Golden & 50 & 44.0 & 0.574 & 0.715 & 0.498 \\
+\bottomrule
+\end{tabular}
+\caption{Golden follow-up under exact-context re-evaluation (GPT-5-mini). Injected low-MEC intervention traces strongly improve frequency prediction but do not improve all-edge recovery.}
+\label{tab:golden_followup_metrics}
+\end{table}
+
+\subsection{Model Family and Graph-Size Scaling}
+\label{app:model_scale_results}
+\label{app:full_experiment_tables}
+
+These tables give the full numeric support for the model-family and
+graph-size claims in RQ3. Table~\ref{tab:gpt_model_metrics} combines the
+3--7 node GPT and Qwen sweeps behind the model-family radar plots, while
+Figure~\ref{fig:scaling_metric_curves} shows the corresponding GPT absolute
+metric trajectories (the capability-gap decomposition is in
+Figure~\ref{fig:model_metric_support} in the main text).
+Table~\ref{tab:simple_graph_imec} keeps the small-graph ambiguity diagnostic:
+even when task accuracy is high, the final hypotheses do not necessarily
+identify a singleton SCM.
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llccccccc}
+\toprule
+Model & Nodes & Rows & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & SHD\(\downarrow\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+\texttt{GPT-5-mini} & 3 & 50 & 90.00 & 0.727 & 0.907/0.880/0.889 & 0.458 & 0.907 & 0.890 \\
+\texttt{GPT-5-mini} & 4 & 50 & 48.00 & 0.559 & 0.833/0.778/0.793 & 1.766 & 0.812 & 0.589 \\
+\texttt{GPT-5-mini} & 5 & 50 & 18.00 & 0.413 & 0.825/0.629/0.697 & 3.543 & 0.687 & 0.468 \\
+\texttt{GPT-5-mini} & 6 & 50 & 24.00 & 0.379 & 0.739/0.574/0.628 & 5.490 & 0.679 & 0.455 \\
+\texttt{GPT-5-mini} & 7 & 50 & 16.00 & 0.353 & 0.700/0.449/0.519 & 7.511 & 0.585 & 0.418 \\
+\midrule
+\texttt{GPT-5.2-high} & 3 & 50 & 100.00 & 0.740 & 1.000/1.000/1.000 & 0.000 & 1.000 & 1.000 \\
+\texttt{GPT-5.2-high} & 4 & 50 & 94.00 & 0.590 & 0.957/0.972/0.963 & 0.391 & 0.977 & 0.980 \\
+\texttt{GPT-5.2-high} & 5 & 50 & 92.00 & 0.499 & 0.946/0.896/0.913 & 1.319 & 0.980 & 0.985 \\
+\texttt{GPT-5.2-high} & 6 & 50 & 80.00 & 0.353 & 0.878/0.840/0.838 & 2.660 & 0.956 & 0.956 \\
+\texttt{GPT-5.2-high} & 7 & 50 & 64.00 & 0.273 & 0.855/0.703/0.745 & 4.761 & 0.921 & 0.917 \\
+\midrule
+\texttt{Qwen3.5 non-thinking} & 3 & 50 & 72.00 & 0.713 & 0.840/0.717/0.761 & 1.060 & 0.833 & 0.870 \\
+\texttt{Qwen3.5 non-thinking} & 4 & 50 & 52.00 & 0.526 & 0.648/0.492/0.539 & 3.520 & 0.640 & 0.691 \\
+\texttt{Qwen3.5 non-thinking} & 5 & 50 & 22.00 & 0.551 & 0.727/0.506/0.570 & 4.840 & 0.612 & 0.513 \\
+\texttt{Qwen3.5 non-thinking} & 6 & 50 & 20.00 & 0.341 & 0.604/0.374/0.430 & 7.620 & 0.575 & 0.493 \\
+\texttt{Qwen3.5 non-thinking} & 7 & 50 & 22.00 & 0.370 & 0.483/0.284/0.331 & 10.800 & 0.497 & 0.508 \\
+\midrule
+\texttt{Qwen3.5 thinking} & 3 & 49 & 95.92 & 0.823 & 0.884/0.745/0.796 & 0.898 & 0.884 & 0.983 \\
+\texttt{Qwen3.5 thinking} & 4 & 50 & 52.00 & 0.663 & 0.711/0.559/0.599 & 3.180 & 0.680 & 0.739 \\
+\texttt{Qwen3.5 thinking} & 5 & 50 & 36.00 & 0.586 & 0.760/0.503/0.578 & 5.040 & 0.717 & 0.614 \\
+\texttt{Qwen3.5 thinking} & 6 & 50 & 34.00 & 0.412 & 0.706/0.403/0.475 & 6.620 & 0.704 & 0.572 \\
+\texttt{Qwen3.5 thinking} & 7 & 50 & 36.00 & 0.463 & 0.609/0.323/0.388 & 9.080 & 0.630 & 0.568 \\
+\bottomrule
+\end{tabular}
+\caption{GPT and Qwen model comparison across the 3--7 node main suites. Acc.\ is endpoint reactor accuracy in percent; each P/R/\(F_1\) cell reports precision, recall, and \(F_1\) for the corresponding recovery target. SHD is directed all-edge structural Hamming distance, with reversed edges counted as one error.}
+\label{tab:gpt_model_metrics}
+\label{tab:qwen_model_metrics}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_accuracy_vs_size.pdf}\\
+{\small (a) Task accuracy.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_all_edge_f1_vs_size.pdf}\\
+{\small (b) All-edge $F_1$.}
+\end{minipage}
+
+\vspace{0.5em}
+
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_freq_weight_vs_size.pdf}\\
+{\small (c) \texttt{frequency}-weight $F_1$.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_root_f1_vs_size.pdf}\\
+{\small (d) Root-node $F_1$.}
+\end{minipage}
+\caption{Absolute trajectories of the four recovery metrics across graph
+sizes for \texttt{GPT-5-mini} and \texttt{GPT-5.2-high}. Task accuracy and
+\texttt{frequency}-weight $F_1$ separate the two models cleanly; root-node
+$F_1$ shows the smallest gap and both models still drop on 6--7 node
+graphs.}
+\label{fig:scaling_metric_curves}
+\end{figure}
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcc}
+\toprule
+Model & 3-node IMEC & 4-node IMEC \\
+\midrule
+GPT-5-mini & 1.920 & 4.540 \\
+GPT-5.2-high & 1.480 & 3.620 \\
+\bottomrule
+\end{tabular}
+\caption{Final IMEC on the simple 3- and 4-node main settings.}
+\label{tab:simple_graph_imec}
+\end{table}
+
+Even on simple 3--4 node settings, high task success does not imply sufficient
+causal disambiguation: the models' own interventions leave final IMEC above
+one, so they do not reduce the possible SCM set to a singleton.
+
+\subsection{Observation--Intervention Scaling}
+\label{app:observation_intervention_scaling}
+
+The scaling appendix supports the RQ2 claim that observations and interventions
+help different axes of performance. Figure~\ref{fig:regime_scatter} summarizes
+the regime-level frontier, Figures~\ref{fig:app_scaling_curves}
+and~\ref{fig:app_reeval_scaling} show the task and all-edge recovery curves,
+and Tables~\ref{tab:scaling_mini_4nodes_metrics}--\ref{tab:scaling_gpt52_6nodes_metrics}
+provide the numeric metric breakdowns for each model/size suite.
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_regime_scatter_mini_4nodes.pdf}\\
+{\small (a) \texttt{GPT-5-mini}, 4 nodes.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_regime_scatter_mini_6nodes.pdf}\\
+{\small (b) \texttt{GPT-5-mini}, 6 nodes.}
+\end{minipage}
+
+\vspace{0.5em}
+
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_regime_scatter_gpt52_4nodes.pdf}\\
+{\small (c) \texttt{GPT-5.2-high}, 4 nodes.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_regime_scatter_gpt52_6nodes.pdf}\\
+{\small (d) \texttt{GPT-5.2-high}, 6 nodes.}
+\end{minipage}
+\caption{All scaling-suite settings plotted as (task accuracy, all-edge $F_1$),
+colored by regime. Each regime is drawn as a polyline through its settings
+in order of budget; the arrow on the final segment points toward the
+largest budget. Mixed obs.+int.\ reaches the upper part of the
+frontier; pure observation buys task accuracy without lifting
+$F_1$; pure intervention stays near the lower-left. The pattern is
+consistent across both models and both graph sizes.}
+\label{fig:regime_scatter}
+\end{figure}
+
+The next two tables unpack the \texttt{GPT-5-mini} scaling runs behind the
+frontier plot. They show the same asymmetry as Figure~\ref{fig:regime_scatter}:
+observation-only budgets often improve endpoint prediction, while mixed
+observation--intervention budgets are the ones that consistently lift explicit
+graph recovery.
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Setting & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure observation}} \\
+\(3\mathrm{o}0\mathrm{i}\) & 60 & 0.542 & 0.905/0.461/0.598 & 0.869 & 0.610 \\
+\(6\mathrm{o}0\mathrm{i}\) & 72 & 0.545 & 0.930/0.486/0.625 & 0.901 & 0.727 \\
+\(12\mathrm{o}0\mathrm{i}\) & 72 & 0.572 & 0.913/0.489/0.626 & 0.861 & 0.719 \\
+\(24\mathrm{o}0\mathrm{i}\) & 74 & 0.542 & 0.898/0.460/0.595 & 0.864 & 0.740 \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure intervention}} \\
+\(0\mathrm{o}3\mathrm{i}\) & 44 & 0.315 & 0.416/0.318/0.349 & 0.364 & 0.341 \\
+\(0\mathrm{o}6\mathrm{i}\) & 46 & 0.243 & 0.349/0.234/0.271 & 0.318 & 0.315 \\
+\(0\mathrm{o}12\mathrm{i}\) & 34 & 0.208 & 0.347/0.194/0.235 & 0.277 & 0.185 \\
+\(0\mathrm{o}24\mathrm{i}\) & 32 & 0.213 & 0.300/0.196/0.223 & 0.251 & 0.239 \\
+\midrule
+\multicolumn{6}{l}{\textit{Mixed intervention}} \\
+\(3\mathrm{o}0\mathrm{i}\) & 60 & 0.542 & 0.905/0.461/0.598 & 0.869 & 0.610 \\
+\(3\mathrm{o}3\mathrm{i}\) & 62 & 0.668 & 0.922/0.625/0.723 & 0.839 & 0.729 \\
+\(3\mathrm{o}6\mathrm{i}\) & 64 & 0.716 & 0.937/0.616/0.721 & 0.877 & 0.741 \\
+\(3\mathrm{o}12\mathrm{i}\) & 66 & 0.719 & 0.922/0.632/0.726 & 0.845 & 0.620 \\
+\(3\mathrm{o}24\mathrm{i}\) & 58 & 0.749 & 0.919/0.634/0.730 & 0.843 & 0.609 \\
+\bottomrule
+\end{tabular}
+\caption{GPT-5-mini scaling on 4-node graphs. Rows are grouped into pure observation, pure intervention, and mixed intervention blocks. Task accuracy favors pure observation, while graph-faithfulness favors mixed settings.}
+\label{tab:scaling_mini_4nodes_metrics}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Setting & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure observation}} \\
+\(5\mathrm{o}0\mathrm{i}\) & 30 & 0.214 & 0.853/0.168/0.265 & 0.622 & 0.310 \\
+\(10\mathrm{o}0\mathrm{i}\) & 20 & 0.245 & 0.848/0.165/0.260 & 0.580 & 0.200 \\
+\(20\mathrm{o}0\mathrm{i}\) & 14 & 0.271 & 0.812/0.174/0.272 & 0.584 & 0.187 \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure intervention}} \\
+\(0\mathrm{o}5\mathrm{i}\) & 12 & 0.095 & 0.298/0.114/0.154 & 0.206 & 0.179 \\
+\(0\mathrm{o}10\mathrm{i}\) & 12 & 0.047 & 0.187/0.081/0.103 & 0.142 & 0.110 \\
+\(0\mathrm{o}20\mathrm{i}\) & 16 & 0.073 & 0.243/0.108/0.145 & 0.177 & 0.137 \\
+\midrule
+\multicolumn{6}{l}{\textit{Mixed intervention}} \\
+\(5\mathrm{o}0\mathrm{i}\) & 30 & 0.214 & 0.853/0.168/0.265 & 0.622 & 0.310 \\
+\(5\mathrm{o}5\mathrm{i}\) & 26 & 0.378 & 0.868/0.344/0.434 & 0.661 & 0.505 \\
+\(5\mathrm{o}10\mathrm{i}\) & 16 & 0.318 & 0.849/0.275/0.376 & 0.590 & 0.409 \\
+\(5\mathrm{o}20\mathrm{i}\) & 26 & 0.342 & 0.841/0.320/0.428 & 0.676 & 0.438 \\
+\bottomrule
+\end{tabular}
+\caption{GPT-5-mini scaling on 6-node graphs. Rows are grouped into pure observation, pure intervention, and mixed intervention blocks. Mixed settings improve graph recovery even when all end-task accuracies remain low.}
+\label{tab:scaling_mini_6nodes_metrics}
+\end{table}
+
+Figure~\ref{fig:app_scaling_curves} then plots the same task-prediction axis
+for both model families and graph sizes, making clear that better endpoint
+frequency prediction does not by itself certify full causal recovery.
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/scaling_mini_4nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5-mini, 4 nodes.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/scaling_mini_6nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5-mini, 6 nodes.}
+\end{minipage}
+
+\vspace{0.5em}
+
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/scaling_gpt52_4nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5.2-high, 4 nodes.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/scaling_gpt52_6nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5.2-high, 6 nodes.}
+\end{minipage}
+\caption{Observation/intervention scaling curves of \texttt{frequency} prediction score under different interaction modes.}
+\label{fig:app_scaling_curves}
+\end{figure}
+
+The stronger-model tables below expose the complementary failure mode. Even
+when \texttt{GPT-5.2-high} solves most endpoint predictions under
+observation-only budgets, the graph metrics still require mixed interaction.
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Setting & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure observation}} \\
+\(3\mathrm{o}0\mathrm{i}\) & 100 & 0.544 & 1.000/0.488/0.648 & 1.000 & 1.000 \\
+\(6\mathrm{o}0\mathrm{i}\) & 100 & 0.557 & 1.000/0.488/0.648 & 1.000 & 1.000 \\
+\(12\mathrm{o}0\mathrm{i}\) & 100 & 0.541 & 1.000/0.488/0.648 & 1.000 & 1.000 \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure intervention}} \\
+\(0\mathrm{o}3\mathrm{i}\) & 100 & 0.330 & 0.310/0.325/0.317 & 0.323 & 0.336 \\
+\(0\mathrm{o}6\mathrm{i}\) & 100 & 0.320 & 0.314/0.315/0.314 & 0.330 & 0.348 \\
+\(0\mathrm{o}12\mathrm{i}\) & 98 & 0.200 & 0.222/0.223/0.222 & 0.240 & 0.261 \\
+\midrule
+\multicolumn{6}{l}{\textit{Mixed intervention}} \\
+\(3\mathrm{o}0\mathrm{i}\) & 100 & 0.544 & 1.000/0.488/0.648 & 1.000 & 1.000 \\
+\(3\mathrm{o}3\mathrm{i}\) & 96 & 0.947 & 0.971/0.954/0.958 & 0.990 & 0.970 \\
+\(3\mathrm{o}6\mathrm{i}\) & 96 & 0.947 & 0.980/0.935/0.949 & 0.987 & 0.987 \\
+\(3\mathrm{o}12\mathrm{i}\) & 96 & 0.900 & 0.974/0.956/0.960 & 0.992 & 0.992 \\
+\bottomrule
+\end{tabular}
+\caption{GPT-5.2-high scaling on 4-node graphs. Rows are grouped into pure observation, pure intervention, and mixed intervention blocks. Observation-only settings already solve the reactor task, while mixed settings best recover the full explicit graph.}
+\label{tab:scaling_gpt52_4nodes_metrics}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Setting & Acc. & Root \(F_1\) & All-edge P/R/\(F_1\) & Freq-edge \(F_1\) & Freq-weight \(F_1\) \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure observation}} \\
+\(5\mathrm{o}0\mathrm{i}\) & 90 & 0.309 & 0.990/0.316/0.469 & 1.000 & 1.000 \\
+\(10\mathrm{o}0\mathrm{i}\) & 86 & 0.313 & 1.000/0.316/0.471 & 1.000 & 0.980 \\
+\(20\mathrm{o}0\mathrm{i}\) & 92 & 0.329 & 1.000/0.316/0.471 & 1.000 & 1.000 \\
+\midrule
+\multicolumn{6}{l}{\textit{Pure intervention}} \\
+\(0\mathrm{o}5\mathrm{i}\) & 68 & 0.293 & 0.378/0.278/0.305 & 0.386 & 0.401 \\
+\(0\mathrm{o}10\mathrm{i}\) & 76 & 0.130 & 0.278/0.254/0.259 & 0.318 & 0.327 \\
+\(0\mathrm{o}20\mathrm{i}\) & 82 & 0.317 & 0.333/0.304/0.311 & 0.379 & 0.385 \\
+\midrule
+\multicolumn{6}{l}{\textit{Mixed intervention}} \\
+\(5\mathrm{o}0\mathrm{i}\) & 90 & 0.309 & 0.990/0.316/0.469 & 1.000 & 1.000 \\
+\(5\mathrm{o}5\mathrm{i}\) & 74 & 0.731 & 0.882/0.763/0.793 & 0.957 & 0.957 \\
+\(5\mathrm{o}10\mathrm{i}\) & 72 & 0.687 & 0.874/0.778/0.793 & 0.939 & 0.920 \\
+\(5\mathrm{o}20\mathrm{i}\) & 80 & 0.767 & 0.889/0.778/0.799 & 0.957 & 0.959 \\
+\bottomrule
+\end{tabular}
+\caption{GPT-5.2-high scaling on 6-node graphs. Rows are grouped into pure observation, pure intervention, and mixed intervention blocks. Observation-only settings favor end-task success, while mixed settings favor explicit graph recovery.}
+\label{tab:scaling_gpt52_6nodes_metrics}
+\end{table}
+
+Finally, Figure~\ref{fig:app_reeval_scaling} plots all-edge recovery directly.
+The figure is placed after the numeric tables so the reader can first inspect
+the per-suite values and then compare the aggregate trend across both models.
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/reeval_scaling_mini_4nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5-mini, 4 nodes.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/reeval_scaling_mini_6nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5-mini, 6 nodes.}
+\end{minipage}
+
+\vspace{0.5em}
+
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/reeval_scaling_gpt52_4nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5.2-high, 4 nodes.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/reeval_scaling_gpt52_6nodes.pdf}
+
+\vspace{0.3em}
+{\small GPT-5.2-high, 6 nodes.}
+\end{minipage}
+\caption{Observation/intervention scaling curves of all-edge recovery $F_1$ score under different interaction modes.}
+\label{fig:app_reeval_scaling}
+\end{figure}
+
+\subsection{Early-Commitment Diagnostics}
+\label{app:early_commitment}
+
+Figure~\ref{fig:overconfidence_diagnostics} provides the full diagnostics for
+the RQ4 early-commitment analysis in \S\ref{sec:rq4-failure}.
+
+\begin{figure}[!htbp]
+\centering
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{-2pt}
+\begin{minipage}[t]{0.64\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq5_intervention_budget_used.pdf}\\[-0.4em]
+{\small (a) Budget vs.\ used.}
+\end{minipage}
+
+\vspace{-0.3em}
+\begin{minipage}[t]{0.44\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq5_hypothesis_data_match.pdf}\\[-0.4em]
+{\small (b) Hypothesis--data match.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.44\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq5_verification_gain.pdf}\\[-0.4em]
+{\small (c) Verification gain.}
+\end{minipage}
+\caption{Early-commitment diagnostics for \texttt{GPT-5-mini}: both outcome
+groups leave roughly half the budget unused; failed hypotheses fit collected
+data worse; one verification step raises 4-node accuracy from 48\% to 60\%.}
+\label{fig:overconfidence_diagnostics}
+\end{figure}

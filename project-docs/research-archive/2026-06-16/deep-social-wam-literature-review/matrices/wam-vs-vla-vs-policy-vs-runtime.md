@@ -20,9 +20,9 @@ Primary sources: WAM survey 2605.12090; DreamZero 2602.15922; Do-WAMs-Generalize
 | **Symbolic planner** (PDDL/HTN-style) | Yes (symbolic state) | Yes (plan) | Actuator (emits plan/actions) | symbolic predicates | symbolic operators | hand-authored domain model | actuator | Contrast. Pure symbolic planning is brittle/authoritative; repo forbids hidden planners. But its *structured-state transition* idea is the right representation level. |
 | **LLM tool-use agent** (this repo's Actor Turn) | No (LLM reasons, no learned forward model) | **Yes** (selects one function-tool under schema) | **Selection authority, bounded by runtime gates** | typed Minecraft + social state (`current_state`) + source evidence | typed primitive / action-skill / social action | n/a (prompted LLM, not trained WM) | n/a (selector) | This **is** the runtime. |
 | **Mineflayer action-skill runtime** (this repo's execution layer) | No | No | **Owns physical truth** (schema, permission, retry, verifier, artifacts) | Minecraft world via Mineflayer | executes typed action / generated action-skill | n/a | n/a (executor of truth) | This **is** the runtime's authority layer. |
-| **(proposed) Structured-state Social WAM** | Yes (typed social-material delta `o'`) | No | **None — advisory** (predict + evaluate consequences) | typed Minecraft + social/material/institutional state | candidate typed action as input | logged social-material transition records (small, first) | **advisory only** | The project's target: predict deltas + expected evidence + risk; never fills args, marks progress, or overrides verifiers. |
+| **(proposed) Structured-state Social WAM** | Yes (typed social-material delta `o'`) | No | **None - advisory** (predict + evaluate consequences) | typed Minecraft + social/material/institutional state | candidate typed action as input | logged social-material transition records (small, first) | **advisory only** | The project's target: predict deltas + expected evidence + risk; never fills args, marks progress, or overrides verifiers. |
 
-## Authority / advisory column — the load-bearing distinction for this repo
+## Authority / advisory column - the load-bearing distinction for this repo
 
 The repo's hard rule: "the LLM proposes; the runtime owns physical truth ... A WAM, if
 adopted, must stay advisory: it predicts/evaluates consequences; it must not fill
@@ -38,13 +38,13 @@ Mapping that onto the matrix:
   true, overrides a verifier, or replaces Actor Turn selection; a symbolic planner or
   RL-in-imagination policy that becomes the action authority.
 
-## Observation-type axis — why structured is the project's fit
+## Observation-type axis - why structured is the project's fit
 
 | Observation representation | Examples | Cost | Encodes hidden social/material state? | Checkable against repo artifacts? |
 |---|---|---|---|---|
-| Pixels / video | MineWorld, Oasis, Matrix-Game, Solaris, Genie, GameNGen | High (40k–160k tokens/16 frames; 7Hz@14B; 4.8x slower than π0.5) | No (WildWorld: hidden state not in pixels) | No (would need IDM / VLM-judge) |
+| Pixels / video | MineWorld, Oasis, Matrix-Game, Solaris, Genie, GameNGen | High (40k-160k tokens/16 frames; 7Hz@14B; 4.8x slower than π0.5) | No (WildWorld: hidden state not in pixels) | No (would need IDM / VLM-judge) |
 | Latent (visual) | DreamerV3, Dreamer4, JEPA/V-JEPA2 | Lower than pixels; single-GPU real-time (Dreamer4) | Partly (latent may capture task structure; Dreamer4 adds inventory state) | Indirectly |
-| Structured / symbolic state | WildWorld state annotations; this repo's `current_state` | Lowest (typed fields) | **Yes — directly** (possession, claim, obligation, trust as typed fields) | **Yes — directly** (inventory, container, transcript, verifier artifacts) |
+| Structured / symbolic state | WildWorld state annotations; this repo's `current_state` | Lowest (typed fields) | **Yes - directly** (possession, claim, obligation, trust as typed fields) | **Yes - directly** (inventory, container, transcript, verifier artifacts) |
 
 The bottom row is where the repo already operates (typed `current_state`, verifier
 evidence) and where social-material state is *natively* representable and checkable.

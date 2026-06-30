@@ -1,0 +1,364 @@
+
+\section{Details about the \texttt{Find-HS} procedure}\label{sec:hyperplane}
+
+
+In this section, we describe in details the \texttt{Find-HS} procedure (Algorithm~\ref{alg:find_hyperplane}).
+%
+%The procedure takes as inputs a lower bound $\mathcal{L}_{d_i}$ of some meta-action $d_i \in \mathcal{D}$ (computed by \texttt{Try-Partition} procedure) and a contract $p \in \mathcal{P}$, and it tries to find an approximate separating hyperplane defining a boundary between $\mathcal{L}_{d_i}$ and the lower bound $\mathcal{L}_{d_k}$ of another meta-action $d_k \in \mathcal{D}$.
+%
+The procedure takes as inputs a meta-action $d_i \in \mathcal{D}$ and a contract $p \in \mathcal{P}$, and it tries to find one of the approximate halfspaces defining a suitable approximate best-response region for the meta-action $d_i$.
+%
+It may terminate either with a pair $(\widetilde{H}, d_k)$ such that $\widetilde{H}$ is an approximate halfspace in which $d_i$ is ``supposedly better'' than the meta-action $d_k \in \mathcal{D}$ or with a pair $(\varnothing, \bot)$, whenever a call to \texttt{Action-Oracle} returned $\bot$.
+%
+Let us recall that, for ease of presentation, we assume that Algorithm~\ref{alg:find_hyperplane} has access to all the variables declared in the \texttt{Try-Cover} procedure (Algorithm~\ref{alg:try_partition}), namely $\mathcal{L}_d$, $\mathcal{U}_d$, $\mathcal{D}_d$, $\widetilde{H}_{ij}$, and $\Delta \widetilde{c}_{ij}$.
+%
+% lower bound $\mathcal{L}_{d_i}$ of some meta-action $d_i \in \mathcal{D}$ (computed by \texttt{Try-Cover} procedure) and a contract $p \in \mathcal{P}$, and it tries to find an approximate separating hyperplane defining a boundary of $\mathcal{L}_{d_i}$.
+
+
+
+\begin{algorithm}[H]
+	\caption{\texttt{Find-HS}}\label{alg:find_hyperplane}
+	\begin{algorithmic}[1]
+		\Require ${d_i}, p$
+		\State $p^1 \gets $ any contract in $ \lreg_{d_i}$
+		\State $p^2 \gets p$
+		\State $d_j\gets \texttt{Action-Oracle}(p^1)$
+		\State $d_k \gets \texttt{Action-Oracle}(p^2)$
+		\State $y \gets 18 B \epsilon m n^2 + 2  n \eta \sqrt{m}$
+		%\State $D_i\gets \{d_q: \widetilde {H}_{i,q}\neq \emptyset\}$
+		% Set  $p^1$ such that $p^1 \in \lreg_{d_i}$, $p^2 \leftarrow p$, $d \gets \bot$
+		\While{$\| p^1 - p^2 \|_2 > \eta $}\label{line:hyperplane_loop}
+		\State $p'_\omega \leftarrow (p^1_\omega + p^2_\omega)/2$ for all $\omega \in \Omega$\Comment{\textcolor{gray}{Middle point of the current line segment}}
+		\State $d \leftarrow \texttt{Action-Oracle}(p')$
+		\IfThen{$d = \bot$}%
+		{\textbf{return} $(\varnothing, \bot)$}\Comment{\textcolor{gray}{Force termination of \texttt{Try-Cover}}}\label{line:bot_hp}
+		\If {$\mathcal{L}_{d} = \varnothing$} \label{line:add_hp_1}\Comment{\textcolor{gray}{Add $d$ to to-be-processed meta-actions in \texttt{Try-Cover}}}
+		\State $\mathcal{L}_{d} \gets \{ p' \}$, $\mathcal{C} \gets \mathcal{C} \cup \{d\}$\label{line:add_hp_2}
+		\EndIf
+		%\If {$d_k = \bot$}
+		%\State \Return $\bot$
+		%\EndIf
+		\If{$d \in \mathcal{D}_{d_i}$}
+		\State $p^1_\omega \leftarrow p'_\omega$ for all $\omega \in \Omega$
+		\State $d_j\gets d$
+		\Else
+		\State $p^2_\omega \leftarrow p'_\omega$ for all $\omega \in \Omega$
+		\State $d_k \gets d$
+		\EndIf
+		\EndWhile
+		\State $p'_\omega \leftarrow (p^1_\omega + p^2_\omega)/2$ for all $\omega \in \Omega$\label{line:calc_hp_1}
+		%\State $\widetilde{F}_{d_{j}} \gets F $ for any $ F \in \mathcal{F}[d_j]$
+		%\State  $\widetilde{F}_{d_{k}} \gets F $ for any $ F \in  \mathcal{F}[d_k]$
+		%\State $\Delta \widetilde{c}_{jk} \gets \sum\limits_{\omega \in \Omega} \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}' $ \Comment{\textcolor{gray}{Define an intercept value for the hyperplane}}
+		% \State Set $\widetilde{c}_{d_i} - \widetilde{c}_{d_j} \gets\sum_{\omega \in \Omega}(  \widetilde{F}_{d_{i},\omega} -  \widetilde{F}_{d_{j},\omega}) p_{\omega}' $
+		%\State $\Delta \widetilde{c}_{j,k} \gets \sum_{\omega \in \Omega}(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega}) p_{\omega}' +X$
+		\If{$d_j = d_i$} \Comment{\textcolor{gray}{The approximate halfspace $\widetilde{H}_{ik}$ is the first one for $\mathcal{L}_{d_i}$}}
+		\State $\Delta \widetilde{c}_{ik} \gets \sum\limits_{\omega \in \Omega} \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}' $ \label{line:def_delta_cost_1}
+		\Else \Comment{\textcolor{gray}{The approximate halfspace $\widetilde{H}_{ij}$ has already been computed}}
+		\State $\Delta \widetilde{c}_{ik} \gets \Delta \widetilde{c}_{ij} + \sum\limits_{\omega \in \Omega} \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}' $ \label{line:def_delta_cost_2}
+		\EndIf
+		%\State $\Delta \widetilde{c}_{ik} \gets \Delta \widetilde{c}_{ij} + \Delta \widetilde{c}_{jk} $
+		\State $\widetilde{H} \coloneqq \left\{ p \in \mathbb{R}_{+}^m \mid \sum\limits_{\omega \in \Omega} \left(  \widetilde{F}_{d_{i},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega} \ge \Delta \widetilde{c}_{ik}-y  \right\}$\label{line:calc_hp_2}
+		%\State $\widetilde{H_2} \coloneqq \left\{ p \in \mathbb{R}_{+}^m \mid \sum_{\omega \in \Omega}(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega}) p_{\omega} = \Delta \widetilde{c}_{jk}  \right\}$
+		\State \textbf{return} $(\widetilde{H},d_k)$
+	\end{algorithmic}
+\end{algorithm}
+
+
+
+Algorithm~\ref{alg:find_hyperplane} works by performing a binary search on the line segment connecting $p$ with any contract in the (current) lower bound $\mathcal{L}_{d_i}$ of $d_i$ (computed by the \texttt{Try-Cover} procedure).
+%
+At each iteration of the search, by letting $p^1,p^2 \in \mathcal{P}$ be the two extremes of the (current) line segment, the algorithm calls the \texttt{Action-Oracle} procedure on the contract $p' \in \mathcal{P}$ defined as the middle point of the segment.
+%
+%Then, if the procedure returns a meta-action $d \in \mathcal{D}$ that coincides with $d_i$, the algorithm sets $p^1 $ to $ p'$, while it sets $p^2$ to $p'$ otherwise.
+Then, if the procedure returns a meta-action $d \in \mathcal{D}$ that belongs to $\dreg_{d_i}$ (meaning that the approximate halfspace $\widetilde{H}_{i j}$ has already been computed), the algorithm sets $p^1 $ to $ p'$, while it sets $p^2$ to $p'$ otherwise.
+%
+The binary search terminates when the length of the line segment is below a suitable threshold $\eta \ge 0$.
+%
+%After the search has terminated, an approximate separating hyperplane is computed by using two empirical distributions $\widetilde{F}_{d_{i}}$ and $\widetilde{F}_{d_{k}}$ computed by \texttt{Action-Oracle} and associated with the meta-actions $d_i$ and $d_k$, respectively, where the latter is defined as the meta-action returned by the \texttt{Action-Oracle} procedure the last time it output something different from $d_i$.
+
+After the search has terminated, the algorithm computes an approximate halfspace.
+%
+First, the algorithm computes the estimate $\Delta \widetilde{c}_{ik}$ of the cost difference between the meta-actions $d_i$ and $d_k$, where the latter is the last meta-action returned by \texttt{Action-Oracle} that does \emph{not} belong to the set $\mathcal{D}_{d_i}$.
+%
+Such an estimate is computed by using the two empirical distributions $\widetilde{F}_{d_{j}}$ and $\widetilde{F}_{d_{k}}$ that the \texttt{Action-Oracle} procedure associated with the meta-actions $d_j \in \dreg_{d_i}$ and $d_k$, respectively.
+%
+In particular, $\Delta \widetilde{c}_{ik}$ is computed as the sum of $\Delta \widetilde{c}_{ij}$---the estimate of the cost difference between meta-actions $d_i$ and $d_j$ that has been computed during a previous call to Algorithm~\ref{alg:find_hyperplane}---and an estimate of the cost difference between the meta-actions $d_j$ and $d_k$, which can be computed by using the middle point of the line segment found by the binary search procedure (see Lines~\ref{line:def_delta_cost_1}~and~\ref{line:def_delta_cost_2}).
+%
+% of the intercept of the hyperplane defining $\widetilde{H}_{ij}$, which has been previously computed by \texttt{Find-HS} as $d_j \in \mathcal{D}_{d_i}$, and the value $\Delta \widetilde{c}_{jk}$ of the intercept of the hyperplane defining $\widetilde{H}_{ij}$ (notice that such a halfspace may \emph{not} be computed during previous calls of the \texttt{Find-HS} procedure, but the intercept value is well defined anyway).
+%
+% where the latter is defined as the meta-action returned by the \texttt{Action-Oracle} procedure the last time it output something that does not belong to $\dreg_{d_i}$. 
+%
+Then, the desired approximate halfspace is the one defined by the hyperplane passing through the middle point $p' \in \mathcal{P}$ of the line segment computed by the binary search with coefficients given by the $(m+1)$-dimensional vector $[ \widetilde{F}_{d_{i}}^\top- \widetilde{F}_{d_{k}}^\top , \Delta \widetilde{c}_{ik} -y \, ]$ (see Line~\ref{line:calc_hp_2}), where $y \geq 0$ is a suitably-defined value chosen so as to ensure that the approximate best-response regions satisfy the desired properties (see Lemma~\ref{lem:diff_cost_hyperplane}). 
+
+
+
+
+
+
+Notice that Algorithm\ref{alg:find_hyperplane} also needs some additional elements in order to ensure that the (calling) \texttt{Try-Cover} procedure is properly working.
+%
+In particular, any time the \texttt{Action-Oracle} procedure returns $\bot$, Algorithm~\ref{alg:find_hyperplane} terminates with $(\varnothing,\bot)$ as a return value (Line~\ref{line:bot_hp}).
+This is needed to force the termination of the \texttt{Try-Cover} procedure (see Line~\ref{line:rollback_2} in Algorithm~\ref{alg:try_partition}).
+%
+Moreover, any time the \texttt{Action-Oracle} procedure returns a meta-action $d \notin \mathcal{C}$ such that $\mathcal{L}_d = \varnothing$, Algorithm~\ref{alg:find_hyperplane} adds such a meta-action to $\mathcal{C}$ and it initializes its lower bound to the singleton $\{p'\}$, where $p'$ is the contract given as input to \texttt{Action-Oracle} (see Lines~\ref{line:add_hp_1}--\ref{line:add_hp_2}).
+%
+This is needed to ensure that all the meta-actions in $\mathcal{D}$ are eventually considered by the (calling) \texttt{Try-Cover} procedure. 
+
+
+%Next, we prove two technical lemmas related to Algorithm~\ref{alg:find_hyperplane}.
+%
+%The first one (Lemma~\ref{lem:diff_cost_hyperplane}) provides a bound on the value of the intercept of the approximate separating hyperplane computed by the algorithm with respect to the (true) hyperplanes that it is approximating.
+%
+%The second one (Lemma~\ref{lem:rounds_hyperplane}) provides a bound on the number of rounds required by the algorithm in order to terminate.
+
+Before proving the main properties of Algorithm\ref{alg:find_hyperplane}, we introduce the following useful definition:
+%
+\begin{definition}\label{def:hyperplane}
+Given $y  \geq 0$, a set of meta-actions $\dreg$ and a dictionary $\mathcal{F}$ of empirical distributions computed by means of Algorithm~\ref{alg:action_oracle}, for every pair of meta-actions $d_i,d_j \in \dreg$, we let $H^y_{ij} \subseteq \mathcal{P}$ be the set of contracts defined as follows:
+\begin{align*}
+	H^y_{ij} := \left \{ p \in \mathcal{P} \mid \sum_{\omega \in \Omega}\widetilde{F}_{d_i,\omega}p_{\omega} - c(d_i) \ge  \sum_{\omega \in \Omega}\widetilde{F}_{d_j,\omega}p_{\omega} - c(d_j) -y   \right \}.
+\end{align*}
+Furthermore, we let $H_{ij}\coloneqq H_{ij}^{0}$.
+\end{definition}
+
+Next, we prove some technical lemmas related to Algorithm~\ref{alg:find_hyperplane}.
+%
+Lemma~\ref{lem:cost_hyperplane} provides a bound on the gap between the cost difference $\Delta \widetilde{c}_{ik}$ estimated by Algorithm~\ref{alg:find_hyperplane} and the ``true'' cost difference between the meta-actions $d_i$ and $d_k$ (see Defintion~\ref{def:cost_action}).
+%
+%the value of the intercept of the approximate separating halfspace computed by the algorithm with respect to the one introduced in Definition~\ref{def:hyperplane}.
+%
+Lemma~\ref{lem:diff_cost_hyperplane} shows that the approximate halfspace computed by the algorithm is always included in the halfspace introduced in Definition~\ref{def:hyperplane} for a suitably-defined value of the parameter $y \ge 0$.
+%
+Finally, Lemma~\ref{lem:rounds_hyperplane} provides a bound on the number of rounds required by the algorithm in order to terminate.
+
+\begin{comment}
+\mat{definition}
+For each couple of meta-actions $d_i$, $d_j$, we denote with $H^\epsilon_{ij}$ 
+
+%\begin{align*}
+%H^\epsilon_{i,j} = \cup_{a \in B(d_i)}\left \{ p \in \mathcal{P} \mid \sum_{\omega \in \Omega}F_{a,\omega}p_{\omega} - c_a \ge  \sum_{\omega \in \Omega}F_{a',\omega}p_{\omega} - c_{a'} -\epsilon \,\,\, a'\in B(d_j)  \right \}
+%\end{align*}
+
+\begin{align*}
+	H^\epsilon_{ij} = \left \{ p \in \mathcal{P} \mid \sum_{\omega \in \Omega}\widetilde{F}_{d_i,\omega}p_{\omega} - c(d_i) \ge  \sum_{\omega \in \Omega}\widetilde{F}_{d_j,\omega}p_{\omega} - c(d_j) -\epsilon   \right \}
+\end{align*}
+We use $H_{ij}\coloneqq H_{ij}^0$.
+\end{comment}
+
+
+
+%Let $c_i=\min_{a_i \in B(d_i)} c_{a_i}$.
+%Let $E$ be the set of effective actions, i.e., incentivized in at least a $p$.
+\begin{comment}
+\begin{lemma}\label{lem:diff_cost_actions}
+	For any distribution F, and $a \in B(F)$, it holds $| c_{a} -   c_{F} | \le 4 B \epsilon m n$.
+	%
+\end{lemma}
+\begin{proof}
+	Fix a meta-action $d \in \mathcal{D}$ and assume that the event $\mathcal{E}_\epsilon$ holds.
+	%
+	Given a pair $a,a'  \in I(d)$, by definition of associated actions there exist two contracts $p,p' \in \mathcal{P}_d$ such that $a^\star(p)=a$ and $a^\star(p')=a'$. Then, by Lemma~\ref{lem:boundedactions} and the fact that $\mathcal{P}_d \subseteq \mathcal{P}$, we can prove that
+	\begin{equation}\label{eq:cost_1}
+		4 B \epsilon m  n \ge \| {F}_{a} - {F}_{a'} \|_{\infty} \| p\|_{1}  \ge \sum_{\omega \in \Omega} \left( {F}_{a,\omega} - {F}_{a',\omega} \right) p_{\omega}  \ge  {c}_{a} - {c}_{a'},
+	\end{equation} 
+	and, similarly, 
+	\begin{equation}\label{eq:cost_2}
+		4 B \epsilon m  n \ge \| {F}_{a'} - {F}_{a} \|_{\infty} \| p'\|_{1}  \ge \sum_{\omega \in \Omega} \left( {F}_{a',\omega} - {F}_{a,\omega} \right) p'_{\omega}  \ge  {c}_{a'} - {c}_{a} . 
+	\end{equation} 
+	In particular, in the chains of inequalities above, the first `$\geq $' holds since $\| F_{a} - {F}_{a'}\|_{\infty} \le 4 \epsilon n$ by Lemma~\ref{lem:boundedactions} and the fact that the norm $\|\cdot\|_1$ of contracts in $\mathcal{P}$ is upper bounded by $Bm$.
+	% observing that $\|p\|_1 \le Bm$.
+	%
+	Finally, by applying Equations~\eqref{eq:cost_1}~and~\eqref{eq:cost_2}, we have that:
+	\begin{equation*}
+		|  {c}_{a} - {c}_{a'} | \le 4 B \epsilon m  n, 
+	\end{equation*} 
+	for every possible pair of associated actions $a, a' \in I(d)$, concluding the proof. 
+\end{proof}
+%\mat{Questo modificato è Lemma~\ref{lm:costClosed}}
+\end{comment}
+
+
+\begin{lemma}\label{lem:cost_hyperplane}
+	Under the event $\mathcal{E}_\epsilon$, Algorithm~\ref{alg:find_hyperplane} satisfies $ | \Delta \widetilde{c}_{ik}   - {c}(d_i) + {c}(d_k) | \le 18 B \epsilon m n^2 + 2  n \eta \sqrt{m}$.
+	%where $\ell$ is the number of time the algorithm is called with $\mathcal{L}_{d_i}$ by the current run of try-partition.
+\end{lemma}
+%\vspace{-15mm}
+\begin{proof}
+	We start by proving that, during any execution of Algorithm~\ref{alg:find_hyperplane}, the following holds:
+	\begin{equation}\label{eq:base_case}
+		\left| \sum_{\omega \in \Omega} \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}'    - c(d_j) + c(d_k) \right| \leq 18 B \epsilon m n + 2 \eta \sqrt{m},
+	\end{equation}
+	where $d_j, d_k \in \mathcal{D}$ are the meta-actions resulting from the binary search procedure and $p' \in \mathcal{P}$ is the middle point point of the segment after the binary search stopped.
+	%
+	In order to prove Equation~\eqref{eq:base_case}, we first let $a^1 := a^\star(p^1)$ and $a^2 := a^\star(p^2)$, where $p^1, p^2 \in \mathcal{P}$ are the two extremes of the line segment resulting from the binary search procedure.
+	%
+	By Lemma~\ref{lem:boundedactions}, under the event $\mathcal{E}_\epsilon$, it holds that $a^1 \in A(d_j)$ and $a^2 \in A(d_k)$ by definition.
+	%
+	Moreover, we let $p^* \in \mathcal{P}$ be the contract that belongs to the line segment connecting $p^1$ to $p^2$ and such that the agent is indifferent between actions $a^1$ and $a^2$, \emph{i,e.}, \[\sum_{\omega \in \Omega} \left(  F_{a^1,\omega} - F_{a^2,\omega}  \right) p^\star_\omega = c_{a^1} - c_{a^2} .\]
+	%
+
+	%
+	Then, we can prove the following:
+	\begin{align*}
+	\left| \sum_{\omega \in \Omega} \right.& \left. \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}'    - c(d_j) + c(d_k) \right|  \\
+	&= \left|  \sum_{\omega \in \Omega}  \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}' - {c}(d_j) + {c}_{a^1} - {c}_{a^1} + {c}_{a^2} - {c}_{a^2} + {c}(d_k)  \right| \\
+	& \le \left | \sum_{\omega \in \Omega}  \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}'  - {c}_{a^1} + {c}_{a^2}  \right| + 8B \epsilon m n  \\
+	& = \left| \sum_{\omega \in \Omega}  \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}' - \sum_{\omega \in \Omega} \left(  F_{a^1,\omega} - F_{a^2,\omega}  \right) p^*_\omega  \right| + 8B \epsilon m n \\
+	& = \left| \sum_{\omega \in \Omega} \left( \widetilde{F}_{d_{j},\omega} \, p_\omega'  + {F}_{a^1,\omega} \, p_\omega' - {F}_{a^1,\omega} \, p_\omega' - {F}_{a^1,\omega} \, p^*_\omega  \right) \right. \\
+	& \left. \quad\quad + \sum_{\omega \in \Omega} \left(\widetilde{F}_{d_{k},\omega} \, p'_\omega + {F}_{a^2,\omega} \, p'_\omega  - {F}_{a^2,\omega} \, p'_\omega - 
+	{F}_{a^2,\omega} \, p^*_\omega \right) \right| + 8B \epsilon m n \\
+	& \le \| \widetilde{F}_{d_{j}} - {F}_{a^1} \|_{\infty} \| p'\|_{1} +  \| \widetilde{F}_{d_{k}} - {F}_{a^2} \|_{\infty} \| p'\|_{1} %\\& \hspace{2cm}
+	+ \left( \| {F}_{a^1} \|_{2} + \| F_{a^2}\|_{2} \right) \| p'-p^* \|_{2} + 8B \epsilon m n  \\
+	& \le  18 B \epsilon m n + 2 \eta \sqrt{m}.
+	\end{align*}
+	%
+	The first inequality above is a direct consequence of Lemma~\ref{lem:cost_actions} and an application of the triangular inequality, since $a^1 \in A(d_j)$ and $a^2 \in A(d_k)$ under the event $\mathcal{E}_\epsilon$.
+	%
+	The second inequality follows by employing Holder's inequality. The third inequality holds by employing Lemma~\ref{lem:boundedactions} and Definition~\ref{def:asssoc_actions}, by observing that $\|p\|_1 \le Bm$ and $\| F_a \| \le \sqrt{m}$ for all $a \in \mathcal{A}$. Moreover, due to the definitions of $p'$ and $p^*$, and given how the binary search performed by Algorithm~\ref{alg:find_hyperplane} works, it is guaranteed that $\| p' - p^* \|_2 \le \eta$.
+	
+%	\bac{we start con riga 19}We start by considering the halfspace computed by the \texttt{Find-HS} procedure for a given meta-action $d_i$ when $\mathcal{D}_{d_i} = \{d_i\}$. According to Lemma~\ref{lem:boundedactions}, we have $a_i = a^\star(p^1) \in A(d_j)$ and $a_k = a^\star(p^2) \in A(d_k)$. Moreover, we let $p^*$ be the contract that belongs to the true hyperplane separating $\preg_{a_i}$ and $\preg_{a_k}$, lying on the line segment connecting $p^1$ and $p^2$, while we let $p'$ be the contract computed by Algorithm~\ref{alg:find_hyperplane} at Line~\ref{line:calc_hp_1}.
+%	
+%	Then, the following inequalities hold:
+%	%
+%	\begin{align*}
+%	| \Delta \widetilde{c}_{ik}  & - \left({c}(d_i) - {c}(d_k) \right) |  \\
+%	&= \left |  \Delta \widetilde{c}_{ik} - \left( {c}(d_i) + {c}_{a_{i}} - {c}_{a_{i}} + {c}_{a_{k}} - {c}_{a_{k}}- {c}(d_k) \right) \right | \\
+%	& \le \left | \Delta\widetilde{c}_{ik} - \left( {c}_{a_{i}} - {c}_{a_{k}} \right) \right | + 8B \epsilon m n  \\
+%	& = \left | \left( \sum_{\omega \in \Omega} \widetilde{F}_{d_{i},\omega} p_\omega'- \sum_{\omega \in \Omega} \widetilde{F}_{d_{k},\omega} p_\omega' \right) - \left( \sum_{\omega \in \Omega} {F}_{a_{i},\omega}p^*_\omega  - \sum_{\omega \in \Omega} {F}_{a_{k},\omega}p^*_\omega \right) \right | + 8B \epsilon m n \\
+%	& = \left| \sum_{\omega \in \Omega} \left( \widetilde{F}_{d_{i},\omega} p_\omega' \pm {F}_{a_{i},\omega} p_\omega' 
+%	- {F}_{a_{i},\omega} p^*_\omega  \right) \right| %\\& \hspace{2cm} 
+%	+ \left| \sum_{\omega \in \Omega} \left(\widetilde{F}_{d_{k},\omega}p'_\omega \pm {F}_{a_{k},\omega}p'_\omega  - 
+%	{F}_{a_{k},\omega} p^*_\omega \right) \right| + 8B \epsilon m n \\
+%	& \le \| {F}_{a_{i}} - \widetilde{F}_{d_{i}} \|_{\infty} \| p'\|_{1} +  \| {F}_{a_{k}} - \widetilde{F}_{d_{k}} \|_{\infty} \| p'\|_{1} %\\& \hspace{2cm}
+%	 + \left( \| {F}_{a_{i}}\|_{2} + \| F_{a_{k}}\|_{2} \right) \| p'-p^* \|_{2} + 8B \epsilon m n  \\
+%	& \le  18 B \epsilon m n + 2 \eta \sqrt{m},
+%	\end{align*}
+%	%
+%	where the first inequality is a direct consequence of Lemma~\ref{lem:cost_actions}, as $a_{i} \in A(d_i)$ and $a_{k} \in A(d_k)$, combined with the application of the triangular inequality. The second inequality follows by employing Holder's inequality. The third inequality holds by employing Lemma~\ref{lem:boundedactions}, considering that $\|p\|_1 \le Bm$, and noticing that $\| F_a \| \le \sqrt{m}$ for all $a \in \mathcal{A}$. Moreover, due to the definitions of $p'$ and $p^*$, and the binary search performed in Line~\ref{line:hyperplane_loop} of Algorithm~\ref{alg:find_hyperplane}, it is guaranteed that $\| p' - p^* \|_2 \le \eta$.
+
+	
+	Next, we prove that, after any call to Algorithm~\ref{alg:find_hyperplane}, the following holds:
+	\[
+		\left| \Delta \widetilde{c}_{ik} - c(c_i) + c(d_k) \right| \leq | \mathcal{D}_{d_i} | \left( 18 B \epsilon m n + 2 \eta \sqrt{m}  \right),
+	\] 
+	where $d_i, d_k \in \mathcal{D}$ are the meta-actions defined by the binary search procedure in Algorithm~\ref{alg:find_hyperplane}.
+	%
+	We prove the statement by induction on the calls to Algorithm~\ref{alg:find_hyperplane} with the meta-action $d_i$ as input.
+	%
+	The base case is the first time Algorithm~\ref{alg:find_hyperplane} is called with $d_i$ as input.
+	%
+	In that case, the statement is trivially satisfied by Equation~\eqref{eq:base_case} and the fact that $\mathcal{D}_{d_i} = \{ d_i \}$.
+	%
+	Let us now consider a generic call to Algorithm~\ref{alg:find_hyperplane} with the meta-action $d_i$ as input.
+	%
+	Then, we can write the following:
+	\begin{align*}
+		\left| \Delta \widetilde{c}_{ik}  - c(c_i) + c(d_k) \right|  &= \left| \Delta \widetilde{c}_{ij}  + \sum_{\omega \in \Omega}  \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}'  - c(d_i) + c(d_k) \right|\\
+		& \leq \left| \Delta \widetilde{c}_{ij}  -c(d_i) + c(d_j) \right| + \left| \sum_{\omega \in \Omega}  \left(  \widetilde{F}_{d_{j},\omega} -  \widetilde{F}_{d_{k},\omega} \right) p_{\omega}'  - c(d_j) + c(d_k) \right| \\
+		& \leq \left( | \mathcal{D}_{d_i} | -1 \right) \left( 18 B \epsilon m n + 2 \eta \sqrt{m}  \right) + 18 B \epsilon m n + 2 \eta \sqrt{m}  \\
+		& = | \mathcal{D}_{d_i} | \left( 18 B \epsilon m n + 2 \eta \sqrt{m}  \right),
+	\end{align*}
+	where the first inequality holds by applying the triangular inequality and the second one by using the inductive hypothesis.
+	%
+	%\alb{Qui $\mathcal{D}_{d_i}$ è quello aggiornato da \texttt{Try-Cover} dopo la call.}
+	%
+%	Finally, the statement easily follow from the fact that $|\mathcal{D}_{d_i}| \leq n$.
+%
+%	Finally, we observe that the intercept $\Delta \widetilde{c}_{ik}$ can be expressed as the sum of at most $n-1$ terms corresponding to previously computed intercepts. By observing that the error in such an estimate can be bounded by the above inequality, we can conclude that:
+%	\begin{equation*}
+%	| \Delta \widetilde{c}_{ik} - \left({c}(d_i) - {c}(d_k) \right) | \le (n-1) \left(18 B \epsilon m n + 2 \eta \sqrt{m} \right) \le 18 B \epsilon m n^2 + 2  n \eta \sqrt{m},
+%	\end{equation*}
+%	
+%	for each possible meta-action $d_k \in \dreg$, which concludes the proof.
+\end{proof}
+
+%\mat{non mi convince che qui dobbiamo usare che find-HP è usato al max $n-1$ volte, anche se è vero}
+\begin{lemma}\label{lem:diff_cost_hyperplane}
+	Let $(\widetilde{H},d_k)$ be the pair returned by Algorithm~\ref{alg:find_hyperplane} when given as inputs $\mathcal{L}_{d_i}$ and $p \in \mathcal{P}$ for some meta-action $d_i \in \mathcal{D}$.
+	%
+	%Assume that Algorithm~\ref{alg:find_hyperplane} is called at most $n-1$ times with $\mathcal{L}_{d_i}$ then
+	%
+	Then, under the event $\mathcal{E}_\epsilon$, it holds:
+	\begin{equation*}
+	   H_{ik}\subseteq \widetilde H \subseteq H_{ik}^y,
+	 \end{equation*}
+	 with $y=18 B \epsilon m n^2 + 2  n \eta \sqrt{m}$.
+\end{lemma}
+	
+	\begin{proof}
+	We start by showing that $H_{ik}$ is a subset of $\widetilde{H}_{ik}$. Let $p$ be a contract belonging to $H_{ik}$, then according to Definition~\ref{def:hyperplane} the following inequality holds:
+	\begin{equation*}
+		\sum_{\omega \in \Omega}\widetilde{F}_{d_i,\omega}p_{\omega} -  \sum_{\omega \in \Omega}\widetilde{F}_{d_k,\omega}p_{\omega}  \ge  \Delta \widetilde{c}_{ik} - y,
+	\end{equation*}
+	with $y= 18 B \epsilon m n^2 + 2  n \eta \sqrt{m}$ as prescribed by Lemma~\ref{lem:cost_hyperplane}. This shows that $p\in\widetilde{H}_{ik}$, according to Definition~\ref{def:hyperplane}. We now consider the case in which $p\in\widetilde{H}_{ik}$. Using the definition of $\widetilde{H}_{ik}$ and Lemma~\ref{lem:cost_hyperplane}, we have:
+	\begin{equation*}
+		\sum_{\omega \in \Omega}\widetilde{F}_{d_i,\omega}p_{\omega} -  \sum_{\omega \in \Omega}\widetilde{F}_{d_k,\omega}p_{\omega}  = \Delta \widetilde{c}_{ik} \ge  c(d_i)- c(d_k) - y,
+	\end{equation*}
+	showing that $p\in{H}^y_{ik}$ with $y =18 B \epsilon m n^2 + 2  n \eta \sqrt{m}$.
+	\end{proof}	
+	%	Under the event $\mathcal{E}_\epsilon$, given two meta-actions $d_{i},d_{j} \in \mathcal{D}$, let $\widetilde{H}_{ij}$ be the separating hyperplane returned by Algorithm~\ref{alg:find_hyperplane}, then the following holds:
+	%	\begin{equation*}
+		%		| \left(\widetilde{c}_{d_j} - \widetilde{c}_{d_{i}} \right)  - \left({c}_{a_j} - {c}_{a_i} \right) |  \le 18 B \epsilon m n + 2 \eta \sqrt{m} ,
+		%	\end{equation*}
+	%	for each action $a_i \in I(d_i)$ and $a_j \in I(d_j)$.
+	\begin{comment}
+\begin{proof}
+	We start showing  $H_{i,k}\subseteq \widetilde H$. Take any contract $p \in H_{i,k}$, and let $a\in \argmax_{a \in B(d_i)}\sum_{\omega \in \Omega}F_{a,\omega}p_{\omega} - c_{a} $ and  $a'\in \argmax_{a' \in B(d_k)}\sum_{\omega \in \Omega}F_{a',\omega}p_{\omega} - c_{a'} $.
+	
+	By definition of $H_{i,j}$ it holds
+	\[\sum_{\omega \in \Omega}F_{a,\omega}p_{\omega} - c_a \ge  \sum_{\omega \in \Omega}F_{a',\omega}p_{\omega} - c_{a'} -\epsilon\]
+	
+	Hence, 
+	\begin{align*}
+		\sum_{\omega \in \Omega} (\tilde  F_{j,\omega}p_{\omega}-\tilde  F_{k,\omega}p_{\omega}) -  \Delta \tilde c_{i,j}& \ge \sum_{\omega \in \Omega} (  F_{a,\omega}p_{\omega}-  F_{a',\omega}p_{\omega}) - (c_i-c_k)-\ell\\
+		& \ge \sum_{\omega \in \Omega} (  F_{a,\omega}p_{\omega}-\tilde  F_{a',\omega}p_{\omega}) - (c_{a}-c_{a'})-\ell-?\\
+	\end{align*}
+	where second equility from Lemma~\ref{lem:diff_cost_actions} \mat{modificare}
+	
+	Then, we prove that $\widetilde H \subseteq H_{i,k}^y$.
+	Take any $p\in \widetilde H$, and any $a \in \argmin_{a \in B(d_k)} c_a$ and $a' \in B(d_k)$.
+	To conclude the proof, it is sufficient to show that 
+	\[\sum_{\omega \in \Omega}F_{a,\omega}p_{\omega} - c_a \ge  \sum_{\omega \in \Omega}F_{a',\omega}p_{\omega} - c_{a'} -\epsilon \]
+	
+	
+	
+	We define $\widetilde{H}_{ik}$ as the hyperplane obtained from Algorithm~\ref{alg:find_hyperplane} when considering the pair of meta-actions $d_i$ and $d_k$ from the set $\dreg$. Additionally, we let $p^1$, $p^2$, and $p'$ be the contracts employed by Algorithm~\ref{alg:find_hyperplane} to compute $\widetilde{H}_{ik}$.
+	
+	Moreover, we let $a_{i^*} = a^\star(p^1)$ and $a_{k^*} = a^\star(p^2)$ be the two actions chosen by the agent, which determine the actual hyperplane $H_{i^*k^*}$ separating the regions $\preg_{a_{i^*}}$ and $\preg_{a_{k^*}}$. We use $p^*$ to denote the contract belonging to the hyperplane $H_{i^*k^*}$, which lies on the line segment connecting $p^1$ and $p^2$. Then, by definition of $p^*$ the following relation holds:
+	\begin{equation*}
+		\sum_{\omega \in \Omega} {F}_{a_{i^*},\omega} p_{\omega}^* - \sum_{\omega \in \Omega} {F}_{a_{k^*},\omega} p_{\omega}^* = {c}_{a_{i^*}} - {c}_{a_{k^*}}.
+	\end{equation*}
+	Similarly $p'$ satisfies:
+	\begin{equation*}
+		\sum_{\omega \in \Omega} \widetilde{F}_{d_{i},\omega} p_{\omega}' - \sum_{\omega \in \Omega} \widetilde{F}_{d_{k},\omega} p_{\omega}' = \Delta \widetilde{c}_{ik},
+	\end{equation*}
+	where $\widetilde{F}_{d_{i}}, \widetilde{F}_{d_{k}}$ are the empirical distributions employed by Algorithm~\ref{alg:find_hyperplane} to compute~$\widetilde{H}_{ik}$.
+	
+	We show that for each $a_i \in I(d_i)$ and $a_k \in I(d_k)$ the following holds:
+	\begin{align*}
+		| \Delta \widetilde{c}_{ik}  & - \left({c}_{a_i} - {c}_{a_k} \right) |  \\
+		&= \left |  \Delta\widetilde{c}_{ik} - \left( {c}_{a_i} + {c}_{a_{i^*}} - {c}_{a_{i^*}} + {c}_{a_{k^*}} - {c}_{a_{k^*}}- {c}_{a_k} \right) \right | \\
+		& \le \left | \Delta\widetilde{c}_{ik} - \left( {c}_{a_{i^*}} - {c}_{a_{k^*}} \right) \right | + 8B \epsilon m n  \\
+		& = \left | \left( \sum_{\omega \in \Omega} \widetilde{F}_{d_{i},\omega} p_\omega'- \sum_{\omega \in \Omega} \widetilde{F}_{d_{k},\omega} p_\omega' \right) - \left( \sum_{\omega \in \Omega} {F}_{a_{i^*},\omega}p^*_\omega  - \sum_{\omega \in \Omega} {F}_{a_{k^*},\omega}p^*_\omega \right) \right | + 8B \epsilon m n \\
+		& = \left| \sum_{\omega \in \Omega} \left( \widetilde{F}_{d_{i},\omega} p_\omega' + {F}_{a_{i^*},\omega} p_\omega' - {F}_{a_{i^*},\omega} p_\omega'
+		- {F}_{a_{i^*},\omega} p^*_\omega  \right) \right| \\
+		& \hspace{2cm} + \left| \sum_{\omega \in \Omega} \left(\widetilde{F}_{d_{k},\omega}p'_\omega + {F}_{a_{k^*},\omega}p'_\omega - {F}_{a_{k^*},\omega}p'_\omega  - 
+		{F}_{a_{k^*},\omega} p^*_\omega \right) \right| + 8B \epsilon m n \\
+		& \le \| {F}_{a_{i^*}} - \widetilde{F}_{d_{i}} \|_{\infty} \| p'\|_{1} +  \| {F}_{a_{k^*}} - \widetilde{F}_{d_{k}} \|_{\infty} \| p'\|_{1} \\
+		& \hspace{2cm}  + \left( \| {F}_{a_{i^*}}\|_{2} + \| F_{a_{k^*}}\|_{2} \right) \| p'-p^* \|_{2} + 8B \epsilon m n  \\
+		& \le  18 B \epsilon m n + 2 \eta \sqrt{m} z,
+	\end{align*}
+	where the first inequality is a direct consequence of Lemma~\ref{lem:diff_cost_actions}, as $a_{i^*}\in I(d_i)$ and $a_{k^*}\in I(d_k)$, combined with the application of the triangular inequality. The second inequality follows by employing Holder's inequality. The third inequality holds by employing Lemma~\ref{lem:boundedactions}, considering that $\|p\|_1 \le Bm$, and noticing that $\| F_a \| \le \sqrt{m}$ for all $a \in \mathcal{A}$. Finally, due to the definitions of $p'$ and $p^*$, and the binary search performed in Line~\ref{line:hyperplane_loop} of Algorithm~\ref{alg:find_hyperplane}, it is guaranteed that $\| p' - p^* \|_2 \le \eta$.
+\end{proof}
+
+
+\end{comment}
+
+\begin{lemma}\label{lem:rounds_hyperplane}
+	Under the event $\mathcal{E}_\epsilon$, the number of rounds required by Algorithm~\ref{alg:find_hyperplane} to terminate with an approximate separating hyperplane is at most $\mathcal{O}\left(q \log \left(\nicefrac{Bm}{\eta}\right)\right)$.
+\end{lemma}
+%
+\begin{proof}
+	The lemma can be proven by observing that the number of rounds required by the binary search performed in Line~\ref{line:hyperplane_loop} of Algorithm~\ref{alg:find_hyperplane} is at most $\mathcal{O}(\log(\nicefrac{D}{\eta}))$, where $D$ represents the distance over which the binary search is performed. In our case, we have $D \leq \sqrt{2}Bm$, which represents the maximum distance between two contracts in $\preg$. Additionally, noticing that we invoke the \texttt{Action-Oracle} algorithm at each iteration, the total number of rounds required by \texttt{Find-HS} is $\mathcal{O}(q \log(\frac{\sqrt{2}Bm}{\eta}))$, as the number of rounds required by \texttt{Action-Oracle} is bounded by $q$.
+\end{proof}

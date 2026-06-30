@@ -1,4 +1,4 @@
-# Lane 1 brief — WAM Foundations and Game World Models
+# Lane 1 brief - WAM Foundations and Game World Models
 
 ## Lane name
 WAM Foundations and Game World Models (intellectual foundation: what a World Action
@@ -26,10 +26,10 @@ DreamerV3 **2301.04104**, iVideoGPT **2405.15223**, PAN **2511.09057**, NitroGen
    align actions with ... learned latent representations." => A structured-state social
    WAM is a legitimate instantiation, not a stretch.
 2. **Pixel WAM is expensive, fidelity != control, and inference-time pixels are
-   dispensable** — three independent primary sources. Cost: DreamZero 14B hits only 7Hz
+   dispensable** - three independent primary sources. Cost: DreamZero 14B hits only 7Hz
    after 38x speedup (survey: << 50Hz VLA standard); Do-WAMs-Generalize: a WAM step is
-   "at least 4.8x slower than π0.5"; MineWorld: "40k–160k tokens for 16 frames." Fidelity
-   != control: "Wow, wo, val!" IDM Turing Test — visually convincing models "collapse to
+   "at least 4.8x slower than π0.5"; MineWorld: "40k-160k tokens for 16 frames." Fidelity
+   != control: "Wow, wo, val!" IDM Turing Test - visually convincing models "collapse to
    nearly zero" executable success; actionable-simulators survey names this **"visual
    conflation"** and reframes WMs as **"actionable simulators ... structured ...
    constraint-aware ... closed-loop."** Dispensability: Privileged Foresight Distillation
@@ -39,7 +39,7 @@ DreamerV3 **2301.04104**, iVideoGPT **2405.15223**, PAN **2511.09057**, NitroGen
 3. **No Minecraft/game world model predicts social-material state, and hidden state is
    not in the pixels.** Solaris (the only *multiplayer* Minecraft WM) models multi-view
    *pixels* (who-sees-what), evaluated on Movement/Grounding/Memory/Building/Consistency
-   — zero possession/obligation/claim/trust. WildWorld states the principle: meaningful
+   - zero possession/obligation/claim/trust. WildWorld states the principle: meaningful
    actions act through hidden state ("shoot" decrements invisible ammo) "that cannot be
    reliably inferred from visual observations alone." `lend_item` is the exact
    social analogue. => The social-material transition layer is the open niche.
@@ -86,10 +86,10 @@ rule.
     adapter-over-frozen-backbone => only as optional *visual sidecars*, never runtime
     authority or social predictor.
 - **Research contribution (what's actually novel here)**: **action-conditioned
-  social-material transition modeling in Minecraft** — predicting and verifying
+  social-material transition modeling in Minecraft** - predicting and verifying
   who-has-what / who-owes-whom / who-can-now-do-what deltas, used *advisorily*. No
   surveyed system (robot WAMs, Minecraft pixel WMs, Dreamer agents) does this. Per the
-  shared contract, the verifier/evidence pipeline is **support, not the contribution** —
+  shared contract, the verifier/evidence pipeline is **support, not the contribution** -
   the modeled social-material transition is.
 - **Hard boundaries to keep (from primary sources + repo rules)**: WAM stays advisory
   (FFDC framing, not DreamZero actuator framing); structured state over pixels (cost +

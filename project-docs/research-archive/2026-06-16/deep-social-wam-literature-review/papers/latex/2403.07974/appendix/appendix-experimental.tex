@@ -1,0 +1,204 @@
+\section{Experimental Setup}
+\subsection{Models}
+\label{app:subsec:models}
+We describe the details of models considered in our study in Table~\ref{tab:models_list}.
+
+\input{tables/model-list}
+
+\subsection{Code Generation}
+\label{appendix:codegen-prompts}
+Below we provide the prompt format (with appropriate variants adding special tokens accommodating each instruct-tuned model) used for this scenario.
+%We use the following prompts (with appropriate variants adding special tokens).
+
+% \begin{mdframed}[leftmargin=0pt,rightmargin=0pt,innerrightmargin=0pt,innerleftmargin=4pt,innertopmargin=0.9pt,innerbottommargin=0.5pt,roundcorner=5pt]
+    % \begin{lstlisting}[basicstyle=\scriptsize, caption=Code Generation Prompt ~\cite{olausson2023demystifying}, label=fig:codegen_prompt]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Code Generation Prompt}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests. You will NOT return anything except for the program
+
+### Question:\n{question.question_content}
+
+
+{ if question.starter_code }
+ ### Format: {PromptConstants.FORMATTING_MESSAGE}
+
+```python
+{question.starter_code}
+```
+{ else }
+### Format: {PromptConstants.FORMATTING_WITHOUT_STARTER_MESSAGE}
+
+```python
+# YOUR CODE HERE
+```
+{ endif }
+
+
+### Answer: (use the provided format with backticks)
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+% \end{mdframed}
+
+    
+\subsection{Self Repair}
+\label{appendix:repair-prompts}
+Below we provide the prompt format (with appropriate variants adding special tokens accommodating each instruct-tuned model) used for this scenario.
+%We use the following prompts (with appropriate variants adding special tokens).
+
+% \begin{mdframed}[leftmargin=0pt,rightmargin=0pt,innerrightmargin=0pt,innerleftmargin=4pt,innertopmargin=0.9pt,innerbottommargin=0.5pt,roundcorner=5pt]
+    % \begin{lstlisting}[basicstyle=\scriptsize, caption=Self Repair Error Prompt , label=fig:self_repair_error]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Self Repair Error Feedback Pseudocode}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+{if check_result.result_status is "Wrong Answer"}
+The above code is incorrect and does not pass the testcase.
+Input: {wrong_testcase_input}
+Output: {wrong_testcase_output}
+Expected: {wrong_testcase_expected}
+
+
+{elif check_result.result_status is "Time Limit Exceeded"}
+The above code is incorrect and exceeds the time limit.
+Input: {wrong_testcase_input}
+
+
+{elif check_result.result_status is "Runtime Error"}
+The above code is incorrect and has a runtime error.
+Input: {wrong_testcase_input}
+Error Message: {wrong_testcase_error_message}
+
+{endif}
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+% \end{mdframed}
+
+% \begin{mdframed}[leftmargin=0pt,rightmargin=0pt,innerrightmargin=0pt,innerleftmargin=4pt,innertopmargin=0.9pt,innerbottommargin=0.5pt,roundcorner=5pt]
+    % \begin{lstlisting}[basicstyle=\scriptsize, caption=Self Repair Prompt ~\cite{olausson2023demystifying}, label=fig:self_repair_prompt]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Self-Repair Prompt}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+You are a helpful programming assistant and an expert Python programmer. You are helping a user write a program to solve a problem. The user has written some code, but it has some errors and is not passing the tests. You will help the user by first giving a concise (at most 2-3 sentences) textual explanation of what is wrong with the code. After you have pointed out what is wrong with the code, you will then generate a fixed version of the program. You must put the entired fixed program within code delimiters only for once.
+
+### Question:\n{question.question_content}
+
+### Answer: ```python
+{code.code_to_be_corrected}
+```
+
+### Format: {PromptConstants.FORMATTING_CHECK_ERROR_MESSAGE}
+
+### Answer: (use the provided format with backticks)
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+% \end{mdframed}
+
+
+\subsection{Code Execution} 
+\label{appendix:code-execution-prompts}
+Below we provide the prompts for code execution with and without CoT. The prompts are modified versions of those from \citep{gu2024cruxeval} to fit the format of the samples in our benchmark.
+
+% \begin{lstlisting}[caption={Prompt used for Code Execution (no CoT)}, label={lst:execution-prompt-nocot}, captionpos=t, breaklines=true]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Code Execution Prompt}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+You are given a Python function and an assertion containing an input to the function. Complete the assertion with a literal (no unsimplified expressions, no function calls) containing the output when executing the provided code on the given input, even if the function is incorrect or incomplete. Do NOT output any extra information. Provide the full assertion with the correct output in [ANSWER] and [/ANSWER] tags, following the examples.
+
+[PYTHON]
+def repeatNumber(number : int) -> int:
+    return number
+assert repeatNumber(number = 17) == ??
+[/PYTHON]
+[ANSWER]
+assert repeatNumber(number = 17) == 17
+[/ANSWER]
+
+[PYTHON]
+def addCharacterA(string : str) -> str:
+    return string + "a"
+assert addCharacterA(string = "x9j") == ??
+[/PYTHON]
+[ANSWER]
+assert addCharacterA(string = "x9j") == "x9ja"
+[/ANSWER]
+
+[PYTHON]
+{code}
+assert {input} == ??
+[/PYTHON]
+[ANSWER]
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+
+% \begin{lstlisting}[caption={Prompt used for Code Execution (CoT)},label={lst:execution-prompt-cot}, captionpos=t, breaklines=true]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Code Execution Prompt with CoT}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+You are given a Python function and an assertion containing an input to the function. Complete the assertion with a literal (no unsimplified expressions, no function calls) containing the output when executing the provided code on the given input, even if the function is incorrect or incomplete. Do NOT output any extra information. Execute the program step by step before arriving at an answer, and provide the full assertion with the correct output in [ANSWER] and [/ANSWER] tags, following the examples.
+
+[PYTHON]
+def performOperation(s):
+    s = s + s
+    return "b" + s + "a"
+assert performOperation(s = "hi") == ??
+[/PYTHON]
+[THOUGHT]
+Let's execute the code step by step:
+
+1. The function performOperation is defined, which takes a single argument s.
+2. The function is called with the argument "hi", so within the function, s is initially "hi".
+3. Inside the function, s is concatenated with itself, so s becomes "hihi".
+4. The function then returns a new string that starts with "b", followed by the value of s (which is now "hihi"), and ends with "a".
+5. The return value of the function is therefore "bhihia".
+[/THOUGHT]
+[ANSWER]
+assert performOperation(s = "hi") == "bhihia"
+[/ANSWER]
+
+[PYTHON]
+{code}
+assert {input} == ??
+[/PYTHON]
+[THOUGHT]
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+
+\subsection{Test Output Prediction}
+\label{appendix:test-pred-prompts}
+Below we provide the prompt format (with appropriate variants adding special tokens accommodating each instruct-tuned model) used for this scenario.
+
+% \begin{lstlisting}[basicstyle=\scriptsize, caption=Test Case Output Prediction Prompt, label=fig:testgen_prompt]
+
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Test Output Prediction Prompt}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+### Instruction: You are a helpful programming assistant and an expert Python programmer. You are helping a user to write a test case to help to check the correctness of the function. The user has written a input for the testcase. You will calculate the output of the testcase and write the whole assertion statement in the markdown code block with the correct output.
+
+Problem:
+{problem_statement}
+ 
+Function:
+```
+{function_signature}
+```
+Please complete the following test case:
+
+```
+assert {function_name}({testcase_input}) == # TODO
+```
+### Response:
+
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}

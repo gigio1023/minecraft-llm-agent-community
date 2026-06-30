@@ -1,0 +1,81 @@
+\subsection{Qualitative Effects}\label{sec:qualitative}
+In the previous section, quantitative trends showed that increasing a model's optimization power often hurts performance on the true reward. We shift our focus to understanding \emph{how} this decrease happens.
+In particular, we typically observe a qualitative shift in behavior 
+associated with each of the phase transitions, three of which we describe below. %We describe one example of a qualitative shift for each of the four environments below.
+%The phase transitions observed in the Figure~\ref{fig:modelsize_scatter} are actually caused by sudden changes in the model behavior. %After the phase transition, the models begin to exhibit tendencies of reward hacking which only exacerbate as we further increase model capabilities. 
+
+%
+\begin{figure}[!bp]
+\centering
+\subfloat[Traffic policy of smaller network] {\label{fig:t_qual1}\includegraphics[scale=0.30]{figures/traffic/bus_small.eps}}%
+\hspace{20pt}
+\subfloat[Traffic policy of larger network] {\label{fig:t_qual2}\includegraphics[scale=0.30]{figures/traffic/bus_large.eps}}%
+
+\caption{The larger model prevents the AVs (in red) from moving to increase the velocity of the human cars (unobserved cars in white and observed cars in blue). However, this greatly increases the average commute per person.}
+\label{fig:traffic_qualitative}
+\end{figure}
+%
+
+\paragraph{Traffic Control.} 
+%The policies plotted in Figure~\ref{fig:t_ont} are AVs which are attempting to merge onto the straightaway. There are several concepts of ``reducing congestion", two of which are optimizing for high velocities or optimizing for low commute times. What happens to the mean commute time when the RL agent optimizes for mean velocity? 
+We focus on the \trafficm~environment from 
+Figure~\ref{fig:t_ont}, where minimizing average commute time is replaced by maximizing average velocity.
+In this case, smaller policies learn to merge onto the straightaway by slightly slowing down the other vehicles (Figure~\ref{fig:t_qual1}). On the other hand, larger policy models stop the AVs to prevent them from merging at all (Figure~\ref{fig:t_qual2}). This increases the average velocity, because the vehicles on the straightaway (which greatly outnumber vehicles on the on-ramp) do not need to slow down for merging traffic. However, it significantly increases the average commute time, as the passengers in the AV remain stuck. %For a visual summary, see Figure~\ref{fig:traffic_qualitative}.
+
+
+%to allow the human drivers on the straightaway to smoothly drive. The AVs We allow the AVs to merge from the on-ramp, while there are no AVs on the straightaway. In this scenario, we supposed the AVs are buses carrying dozens of passengers and the human drivers are individuals commuters. The velocity term in the proxy averages the speed across vehicles, whereas the velocity term in the true reward averages the speed across individuals (minimize the average commute per person). More capable policies learn to prioritize the vehicle speed and end up preventing the buses from merging onto the highway, as shown in Figure~\ref{fig:traffic_qualitative}.
+%The traffic environment simulates a merge scenario on the highway. Human drivers and AVs drive on the straightaway and there are human merging from an on-ramp. The reward function primarily consists of a velocity term that rewards high average speeds and an acceleration term that penalizes any AV acceleration. 
+
+
+
+\paragraph{COVID Response.}
+Suppose the RL agent optimizes solely for the public and economic health of a society, without factoring politics into its decision-making. This behavior is shown in Figure~\ref{fig:pandemic_qualitative}. The larger model chooses to increase the severity of social distancing restrictions earlier than the smaller model. As a result, larger models are able to maintain low average levels of both ICU usage (a proxy for public health) and social distancing restrictions (a proxy for economic health). These preemptive regulations may however be politically costly, as enforcing restrictions without clear signs of infection may foment public unrest~\citep{boettke2021covidpolitical}. 
+
+%Consider the perspective of a policymaker, who, in additional to caring for the welfare of their constituents, is also concerned about their political prospects. While the larger models achieve higher proxy reward, from such a policymaker's perspective, they achieve lower true reward.
+
+%We . %During the COVID-19 pandemic, in some U.S. states, governors faced backlash for enforcing regulations when there was no widespread signs of infection. 
+%In our simulation, the true reward of this policymaker includes an additional political capital constraint: do not raise the stage if the infections are below a certain threshold. 
+%
+%For the ontological misspecification, we consider the perspective a policymaker, who, in additional to caring for the welfare of her constituents, is also concerned about her political prospects. In some U.S. states, governors faced backlash for enforcing regulations when there was no widespread signs of infection. Thus, the true reward of a policymaker may also include a political capital desideratum: do not raise the stage if the infections are below a certain threshold. 
+%
+ %raises the political cost for the policymaker. An example of this behavior is shown in Figure~\ref{fig:pandemic_qualitative}.. % To some policymakers, these may be politically unfavorable. %If the policymaker rejects these actions, then the agent will be placed out-of-distribution. Afterwards, it will be less robust and its recommendations will be less effective \textcolor{red}{cite work which shows that off-distribution DRL is hard}.% Its further recommendations may not be as effective.  %that are politically unfavorable. If the policymaker rejects these actions, then the agent will be out-of-distribution and unable to synthesize reasonable actions.\kbcomm{What was the qualitative trend that we observe here? This seems to suggest that this misspecification might be problematic but is there some evidence of this happening in the simulations?}
+
+
+
+
+\paragraph{Atari Riverraid.} %In the Atari environment, the agent has to For the ontological misspecification
+We create an ontological misspecification by rewarding the plane for staying alive as long as possible while shooting as little as possible: a ``pacifist run''. We then measure the game score as the true reward.  %consider the perspective of a reconnaissance plane, whose true objective is to travel as far as possible in the game. As a proxy reward, the plane incurs a penalty whenever it shoots, as this may alert the enemy to its position. We then measure the game score as the true reward.%The true reward is the game score of the plane, which is linear combination of the different types of enemies destroyed. \kbcomm{This needs to be fixed.}%\kbcomm{Can you add a small explanation how is this a misweighting?} 
+We find that agents with more parameters typically maneuver more adeptly. Such agents shoot less frequently, but survive for much longer, acquiring points (true reward) due to passing checkpoints. In this case, therefore, the proxy and true rewards are well-aligned so that reward hacking does not emerge as capabilities increase. % than weaker ones, they are able to survive for much longer. In Riverraid, it is impossible to progress past checkpoints without scoring points (destroying the blockade at end of the level scores points and is required to proceed). Even though the more capable models destroy less enemies per frame than the smaller ones, they pass more checkpoints, enough to outweigh their pacifist tendencies and achieve a higher true reward.
+
+We did, however, find that some of the agents exploited a bug in the simulator that halts the plane at the beginning of the level. The simulator advances but the plane itself does not move, thereby achieving high pacifist reward. % (typically, the plane always moves forward at least one step). 
+%As parameter count increases, For this scenario, we find that as we increase the agent capability by increasing the size of the policy network, the agents perform better under the true reward. Larger models are more adept at maneuvering because of the proxy reward, so they progress further in the level. Even though the more capable models destroy less enemies per frame than the smaller ones, their longevity allows them to achieve a higher true reward. In this case, we see no signs of reward hacking increasing as parameter count increases. The proxy and true reward seem to be well-aligned for this game.
+
+
+%for the misweighting misspecification, we take the perspective a reconnaissance plane, whose objective is to travel as far as possible in the level, instead of scoring the most amount of points. The plane incurs a penalty whenever it moves horizontally or shoots, as it may alert the enemy to its position. We find that the more capable models are able to advance further in the level because they are more adept at shooting and maneuvering. In this case, there is no case of reward hacking, as the proxy and true reward are well-aligned. 
+
+\begin{figure}[!tbp]
+\centering
+\includegraphics[scale=0.55]{figures/pandemic/sidebyside.eps}
+\caption{For COVID, ICU usage is a proxy for public health and regulation stage is a proxy for economic health. The blue line indicates the maximum stage (right) enforced by the larger policy and the corresponding ICU level (left) at that stage. The red line is the equivalent for the smaller policy. Because the larger policy enforces regulations much sooner than the smaller policy, it maintains both low ICU usage and low regulation stage. However, the larger policy is politically unfavorable: regulations are high even though public signs of infection, such as ICU usage, are low.} %  The larger policy reaches a potentially  The second wave of COVID occurs at around $100$ days, and the larger network raises the stage preemptively compared to the smaller network, resulting in lower political reward. \apcomm{reduce figure to just two plots overlaid on each other}}
+\label{fig:pandemic_qualitative}
+\end{figure}
+
+
+\paragraph{Glucose Monitoring.} 
+Consider an RL agent that optimizes solely for a patient's health, without considering the economic costs of its treatment plans. In this case, the proxy reward is based off of a glycemic risk measure, which reflects the likelihood that a patient will suffer an acute hypoglycemic episode, developed by the medical community~\citep{kovatchev2000diabetes}. %The medical community has defined a notion of glycemic risk . Previous work has adapted this glycemic risk measure into a reward function to train a continuous glucose controller~\citep{magni2015glucoserisk}. In our case, the proxy reward is this precise reward function.
+
+However, a less economically-privileged patient may opt for the treatment plan with the least expected cost~\citep{herkert2019insulincost,fralick2019insulin}, not the one with the least amount of risk. From this patient's perspective, the true reward is the expected cost of the treatment plan, which includes the expected cost of hospital visits and the cost of administering the insulin. 
+
+Although larger model treatments reduce hypoglycemic risk more smaller model treatments, they administer more insulin. Based on the average cost of an ER visit for a hypogylcemic episode ($\$1350$ from~\citet{bronstone2016hypoglycemic_cost}) and the average cost of a unit of insulin ($\$0.32$ from~\citet{lee2020insulin}), we find that it is actually more expensive to pursue the larger model's treatment. %This is an example of reward hacking without any phase transition, as the larger models gradually use more insulin.
+%In the medical community, glycemic risk is a linear combination of hyperglycemic risk and hypoglycemic risk, with the latter being weighted higher. This is typically done because hypoglycemic episodes pose an immediate medical emergency~\citep{kovatchev2000diabetes} while hyperglycemic episodes have long-term consequences. 
+%For this environment, we optimize the policy model for proxy measure of glycemic risk which balances these two risks~\citep{magni2015glucoserisk}. For the true reward, we measure expected treatment cost incurred by the patients which are administered the dosage specified by the RL agent. This is a form of ontological misspecification as managing diabetes risk can have different meaning depending on a person's economic status. 
+
+%We observe that although this proxy risk measure is considered a good reflection of the medical risk, it causes larger policy models to administer greater insulin dosages. Based on the average cost of a ER visit for a hypogylcemic episode (around $\$1350$ from~\citet{bronstone2016hypoglycemic_cost}) and the average cost of a unit of insulin (around $\$0.32$ from~\citet{lee2020insulin}), we calculated the expected cost of each treatment plan and found that over-optimizing for the glucose risk actually increased the expected cost (see Figure~\ref{fig:g_ont}).
+
+
+
+
+
+
+
+

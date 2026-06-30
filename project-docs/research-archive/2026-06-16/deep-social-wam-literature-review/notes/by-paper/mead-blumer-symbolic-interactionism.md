@@ -23,8 +23,8 @@
   act itself; it is negotiated in interaction. A Social WAM cannot read meaning
   off a single inventory delta, it must read the surrounding request/response
   sequence and prior history.
-- The repo's existing rule ("`npc_b` collects logs for itself → no social event;
-  `npc_b` deposits into shared storage → `shared_storage_updated`") is exactly an
+- The repo's existing rule ("`npc_b` collects logs for itself -> no social event;
+  `npc_b` deposits into shared storage -> `shared_storage_updated`") is exactly an
   interactionist judgment: the same physical act (gaining/moving logs) gets a
   different social meaning from its interactional context.
 

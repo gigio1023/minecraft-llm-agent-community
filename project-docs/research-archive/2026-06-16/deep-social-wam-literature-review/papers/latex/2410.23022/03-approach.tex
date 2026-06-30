@@ -1,0 +1,251 @@
+\section{Online Intrinsic Rewards}
+
+\subsection{System design: distributed PPO with LLM annotations}
+\label{sec:system}
+%
+%
+This section outlines our system for learning online intrinsic rewards
+alongside the policy optimization.
+The engineering and design are an important piece of our research, as they enable scaling to the high-throughput settings we are interested in.
+The rest of our experimental studies are conducted within this system and influenced by the throughput of its interacting components.
+%
+%
+%
+%
+
+Our core system, illustrated in \cref{fig:system},
+is built on top of the Sample Factory library v1.0~\citep{petrenko2020sf}
+and their asynchronous variant of proximal policy optimization
+\citep{schulman2017proximal}, referred to as APPO.
+APPO operates on a single machine and concurrently runs many
+environment instances while asynchronously updating policy and value
+estimates with the usual PPO rules, and
+adequately handles policy staleness and data transfers between these components.
+Concretely for NetHack, by running 480 environment instances
+APPO collects approximately 32k
+environment interactions per second on a Tesla A100-80GB GPU with 48 CPUs.
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.9\textwidth]{plot/ONI_diagram6.pdf}
+    \vspace{-5mm}
+  \caption{Overall system diagram of \oni. Our additions to Sample Factory are highlighted in blue.
+    We added an asynchronously executing LLM server and learned
+    reward function, and connect them back into the
+    main learning process in a way that does not
+    hurt the overall throughput of the policy and value learning.
+  }
+  \label{fig:system}
+  \vspace{-5mm}
+\end{figure*}
+For online reward learning via LLM annotations in this system\footnote{
+The prior work by \citet{klissarovdoro2023motif} in the offline setting
+was able to connect their intrinsic reward function into Sample Factory's
+APPO implementation with a few lines of code, as it just needed to load
+the  PyTorch module of the learned reward function.},
+we added 1) an LLM server hosted on a separate node,
+2) an asynchronously running process that passes observation captions to
+the LLM server via HTTP request, 
+3) a hash table that stores the captions and corresponding LLM annotations, and
+4) learning code that dynamically updates a reward model 
+that learns on these annotations.
+Without being asynchronous, these components 
+have the potential to block the concurrent execution and
+can reduce the throughput of the overall system,
+because calling into an LLM and updating the reward model are time-consuming.
+We added them in a way that retains most of the throughput (!), 
+approximately 80-95\% of the original:
+the average throughput is 30k environment interactions per second if we do not train
+any additional reward model to distill the LLM annotations, 
+and 26k if a classification-based reward model is learned at the same time (see \Cref{sec:methods} for the description of those approaches).
+The throughput of LLM annotation depends on the actual LLM and prompt we are using. 
+For the reader's reference, when hosting a  LLaMA-3.1-8B server on a Tesla A100-80GB GPU
+using the prompt displayed in \Cref{app:prompts}, \oni annotates
+approximately 810k NetHack captions over the whole training process (2B environment steps, 19-20 hours).
+The rest of this section overviews the relevant components and
+how we have modified them. 
+
+%
+
+\textbf{Background: APPO's Distributed Execution and Shared Memory}
+APPO has three main types of workers:
+\begin{enumerate}[itemsep=0pt, topsep=0pt]
+\item the \textbf{learner worker} that coordinates most of the operations, updates
+the policy and value models, and sends the latest policy ID to the
+other workers so that they can retrieve it;
+\item the \textbf{rollout workers} that run copies of the environment, execute
+actions in them and save the observations; and
+\item the \textbf{policy workers} that query the policy on new states. 
+The policy workers are separate from the rollout workers so they can efficiently batch
+across observations.
+\end{enumerate}
+
+The workers here are individual processes forked off from a parent process.
+These all have shared CPU and GPU memory buffers, and
+efficiently communicate mostly via Python's multiprocessing queues,
+using pointers to locations in the shared memory.
+We next describe our new LLM worker, and how we connect it back into the learner.
+
+\textbf{Our New Asynchronous LLM Worker and Remote LLM Server}
+This worker has input and output queues 
+%
+that communicate
+back with the learner process, which we use in a way that does not block the
+%
+main execution of the system.
+The LLM worker awaits new observations to label from the input queue, 
+formats them into
+prompts, calls into an LLM, and returns the annotations in the
+output queue. 
+%
+%
+%
+Additionally, the prompt templates and other LLM options are configured by the LLM worker.
+We use an annotation and message format that support all the intrinsic reward
+labels that we consider in \Cref{sec:methods}.
+As Sample Factory already utilizes most of the free CPU and GPU
+capacity of the system, we opted to call into the LLM via an
+HTTP/REST interface rather than loading it in this process directly.
+The communication here adds minimal overhead, and also avoids
+the need to coordinate the shared memory of multiple GPUs between the main
+APPO code and LLM.
+%
+%
+%
+Alongside every APPO run, we allocate an unloaded machine
+with a new instance of vLLM \citep{kwon2023efficient} to exclusively
+serve the queries from the RL run. 
+%
+Our system also allows using the same node for both processes if computational resources allow, which further reduces communication costs.
+\looseness=-1
+
+One important design decision is that the asynchronous LLM server is only able to
+process a small percentage of the overall observations encountered \footnote{often $\leq 0.04\%$
+for a LLaMA-3.1-8B instance using a single A100-80GB GPU, or $\leq 0.02\%$ when using a V100-32GB GPU},
+because the environment rollout workers have a much higher throughput than the LLM.
+An alternative design would be to block the main APPO components and wait
+for the LLM to label more messages, but we find it more realistic to continue
+running the policy and label messages as the LLM throughput allows.
+This also creates the problem of needing to decide on what messages to
+send to the LLM: a last-in-first-out queue (LIFO), or some uncertainty-based selection.
+For this work, we use LIFO for simplicity, but note that it would be interesting to investigate alternate approaches in future work.
+%
+\looseness=-1
+
+\textbf{Our Modified Learner}
+Lastly, we connect this new LLM worker back into the main learner,
+and dynamically learn a reward model on the annotations obtained from it.
+To do this, we modified the two threads of the learner worker:
+\begin{enumerate}[itemsep=0pt, topsep=0pt]
+\item the \textbf{training thread} is the main thread that
+a) aggregates the new trajectories from the latest environment interactions;
+b) decides which new observations to send to the LLM;
+c) updates the policy, value, and (now) our intrinsic reward model.
+%
+\item The \textbf{feedback processing thread} (in fact, the initial thread of the learner worker) receives the latest
+  annotations from the LLM worker and updates the dataset (or hash table)
+  that the reward model is trained on.
+  This thread also initializes the reward model at the beginning. \looseness=-1
+\end{enumerate}
+%
+To prevent overfitting the limited amount of annotations in the early stage of training,
+the training thread only continuously updates the reward model after we receive $25$k annotations. 
+Before that, the feedback processing thread runs a few updates of the reward model every time we receive new annotations.
+%
+Now that we have a flexible way of annotating messages and fitting a reward
+model on top of them, we turn to defining the types of intrinsic reward functions.
+
+\subsection{Intrinsic Reward Functions}
+\label{sec:methods}
+\oni offers flexible algorithmic choices for querying an LLM and distilling its feedback. In this work, we consider the following
+three methods.
+
+\textbf{Retrieval} The simplest approach we consider uses binary labeling and retrieval. 
+The LLM is asked to assign a binary label $y_i \in \{0, 1\}$ indicating whether a caption $c_i$ is ``helpful'' or ``unhelpful'' for making progress on the task. The learner worker maintains a hash table $\mathcal{H}$ to store labeled pairs $(c_i, y_i)$, managed by the feedback processing thread.
+%
+In the training thread, each time the RL agent receives an observation $o_t$ with caption $c_t$, we check if $c_t \in \mathcal{H}$ and
+%
+the intrinsic reward is defined as:
+\begin{equation}
+    \rint(o_t) = \begin{cases}
+    \mathcal{H}(c_t) & \mbox{ if } c_t \in \mathcal{H}\\
+    0 & \mbox{ if } c_t \notin \mathcal{H}
+    \end{cases}
+\end{equation}
+If $c_t$ is unlabeled, it is placed into a last-in-first-out (LIFO) queue $Q$ managed by the LLM annotation process,
+and then sent to the LLM server. 
+The LLM continuously processes elements $c_i$ from $Q$ and returns their labels $y_i$ to the data processing thread of the learner worker, where the pairs $(c_i, y_i)$ are added into $\mathcal{H}$. As described in \Cref{sec:system}, the training thread and the feedback processing thread run asynchronously. Therefore, editing the hash table does not slow down policy training. %
+This retrieval-based approach does not generalize to observations with unlabeled captions. However, the resulting intrinsic reward is simple and hyperparameter-free, and may work well when the set of captions belongs to a relatively small set.
+%
+
+\textbf{Classification} The second approach we consider is based on binary labeling together with training a classification model. Similarly to above, we label observation captions $c_i$ with labels $y_i \in \{0, 1\}$ indicating whether they are helpful or unhelpful via LLM. 
+We simultaneously train a binary classification model
+to predict $y_i$ from $o_i$. More precisely, we model $P(y = 1|o)$ by $\rint_\phi: \mathcal{O} \rightarrow [0, 1]$,
+%
+which is then used to compute the binary intrinsic reward by thresholding it at $\eta$: \looseness=-1
+\begin{equation}
+ r^\mathrm{int}(o_t) = \mathbb{I}[\rint_\phi(o_t) > \eta],
+\end{equation}
+where $\mathbb{I}$ is the indicator function. We study the impact of $\eta$ in \Cref{sec:ablations}. Unlike the previous approach, this method has the potential to generalize to observations whose captions are similar, but not identical, to the captions labeled by the LLM. However, like the previous approach, it will assign a same reward to observations which are slightly positive (such as finding a few gold pieces in NetHack) and very positive (finding hundreds of gold pieces or a rare artifact). 
+
+\textbf{Ranking} The third approach we consider is based on ranking observations via pairwise classification, which is the approach taken by Motif. Here, pairs of observations $(o_1, o_2)$ are sent to the LLM, which returns a preference label $y \in \{1, 2, \varnothing \}$ indicating whether $o_1$ or $o_2$ is more desirable for accomplishing the task, or if they are equivalent. 
+A reward model $\rint_\phi: \mathcal{O} \rightarrow \mathbb{R}$ is trained by minimizing the negative log-likelihood :
+%
+%
+%
+%
+%
+%
+%
+%
+%
+\begin{equation}
+ \resizebox{0.9\columnwidth}{!}{
+$\displaystyle - \mathbb{E}_{(o_1, o_2, y) \sim \H } \Big[ \Big(\mathbb{I}[y = 1] + \tfrac{1}{2} \mathbb{I}[y = \varnothing] \Big) \log P_\phi(o_1 \succ o_2) + 
+  \Big(\mathbb{I}[y = 2] + \tfrac{1}{2} \mathbb{I}[y = \varnothing]\Big) \log P_\phi(o_1 \prec o_2) \Big]
+$}
+\end{equation}
+where we use average log-likelihood when $y=\varnothing$\footnote{In the equivalent cross entropy minimization formulation, this amounts to using a uniform target $[\frac12, \frac12]$ when $y=\varnothing$.}
+and use the Bradley-Terry model~\cite{bradley1952rank}
+%
+$P_\phi (o_1 \succ o_2) = \exp\big( \rint_\phi(o_1)\big) / \big[  \exp\big({\rint_\phi(o_1)}\big) + \exp\big( \rint_\phi(o_2)\big) \big]$.
+Motif computes the mean $\mu_\D$, standard deviation $\sigma_\D$, and a fixed quantile $\nu_\D$ of $\rint_\phi$ over the offline dataset of annotations $\D$. During RL training, it normalizes and thresholds $\rint_\phi$ to give the reward 
+%
+\begin{equation}
+\label{eq:motif_thresholding}
+ %
+ \rint_\text{motif}(o_t) = \mathbb{I}[(\rint_\phi(o_t) - \mu_\D) / \sigma_\D > \nu_\D] \cdot (\rint_\phi(o_t) - \mu_\D) / \sigma_\D
+ %
+\end{equation}
+%
+For \oni-ranking, applying these steps directly is not possible since the annotation dataset is continuously changing. 
+We thus replace $(\mu_\D, \sigma_\D)$ by a running mean and standard deviation $(\mu, \sigma)$ computed over the experience, and replace the quantile $\nu_\D$ by a quantile of the standard normal.
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+
+
+%
+%
+%
+%

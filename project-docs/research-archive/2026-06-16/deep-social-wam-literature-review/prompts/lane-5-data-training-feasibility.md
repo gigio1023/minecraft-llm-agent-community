@@ -1,4 +1,4 @@
-# Lane 5 — Data and Training Feasibility
+# Lane 5 - Data and Training Feasibility
 
 Read `prompts/00-shared-lane-contract.md` first. You are Lane 5 (N=5).
 
@@ -34,7 +34,7 @@ LLM/adapter later; or use MineStudio/VPT/Oasis-style models only as contrast.
   check `hf datasets list --search minecraft`, VPT contractor data, MineStudio
   datasets (minestudio-data-6xx..10xx), MineRL/BASALT, STEVE-21K, MGOA (Optimus),
   any social-interaction datasets. Record size, license, modality, and whether
-  they fit a structured-state WAM (most are pixel trajectories — note the mismatch).
+  they fit a structured-state WAM (most are pixel trajectories - note the mismatch).
 
 ## Feasibility horizons (REQUIRED output)
 
@@ -50,11 +50,11 @@ Give concrete, defensible scope for:
 
 ## Owned deliverables
 
-- `notes/by-theme/data-and-training-feasibility.md` — the option analysis
+- `notes/by-theme/data-and-training-feasibility.md` - the option analysis
   (train-from-scratch vs adapt-weights vs LLM-zero-shot vs structured-log dataset
   vs small symbolic model), cost reality, auto-label vs human-label split, the
   concrete dataset ROW schema tied to repo artifacts, and the 2wk/2mo/6mo plan.
-- `matrices/data-requirements-matrix.md` — option x {data needed, volume, label
+- `matrices/data-requirements-matrix.md` - option x {data needed, volume, label
   source (auto/human), compute cost, weights reusable?, time-to-first-result,
   fit to structured social-material WAM, risk}.
 - by-paper / by-resource notes for key datasets and the most relevant

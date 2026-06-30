@@ -1,10 +1,10 @@
-# Lane 2 Search Log — Minecraft Agent / VLA / Visual Policy / Benchmarks
+# Lane 2 Search Log - Minecraft Agent / VLA / Visual Policy / Benchmarks
 
 Date: 2026-06-16. Tools: Hugging Face CLI (`hf`, primary), then WebSearch/WebFetch.
 Authenticated `hf` user as seen in coordinator log (`naem1023`). Each block lists
 the exact command/query and a one-line rationale.
 
-## Hugging Face CLI — model/dataset availability
+## Hugging Face CLI - model/dataset availability
 
 ```
 hf models list --search VPT --limit 15
@@ -17,7 +17,7 @@ Rationale: confirm which Minecraft visual-policy weights are actually public.
 Finding: generic name searches return unrelated repos (VPTQ quantization, GPT-2
 bots, Marvel "Groot" dreambooth). The canonical re-hosting org is
 **CraftJarvis**, which publishes VPT (`MineStudio_VPT.*`), STEVE-1
-(`MineStudio_STEVE-1.official`, 12,822 downloads — most used), GROOT
+(`MineStudio_STEVE-1.official`, 12,822 downloads - most used), GROOT
 (`MineStudio_GROOT.18w_EMA`), ROCKET (`MineStudio_ROCKET-1.12w_EMA`,
 `ROCKET-3-1.5x`), JarvisVLA (`JarvisVLA-Qwen2-VL-7B`, 519 downloads), and a 2509
 OpenHA / CrossAgent / motion-action family.
@@ -35,11 +35,11 @@ hf papers info 2502.19902
 ```
 Rationale: record public trajectory/dataset shapes and sizes.
 Findings:
-- `CraftJarvis/minecraft-vla-sft` — 216 train parquet shards, ~106 GB, 1M–10M
+- `CraftJarvis/minecraft-vla-sft` - 216 train parquet shards, ~106 GB, 1M-10M
   rows, MIT, 2,177 downloads (JARVIS-VLA SFT data).
-- `iLearn-Lab/Optimus-2-MGOA` — webdataset, 10M–100M scale, MIT, 974 downloads
+- `iLearn-Lab/Optimus-2-MGOA` - webdataset, 10M-100M scale, MIT, 974 downloads
   (Optimus-2 GOA pairs).
-- `zhwang4ai/minecraft-trajectory` + `minecraft-language-trajectory` — GROOT-2 /
+- `zhwang4ai/minecraft-trajectory` + `minecraft-language-trajectory` - GROOT-2 /
   CraftJarvis trajectory data (manual-download gated, small download counts).
 - MineStudio converted VPT contractor data lives under
   `CraftJarvis/minestudio-data-6xx..10xx` (per existing repo analysis;
@@ -48,7 +48,7 @@ Findings:
 - `osanseviero/minedojo_knowledge` exists but is a tiny knowledge dump, not the
   MineDojo YouTube/Wiki/Reddit corpus.
 
-## Hugging Face CLI — paper discovery (reused coordinator dumps + new)
+## Hugging Face CLI - paper discovery (reused coordinator dumps + new)
 
 ```
 hf papers search "multi-agent Minecraft cooperation" --limit 12
@@ -63,7 +63,7 @@ Rationale: pull upvote-ranked recent + canonical IDs and confirm arXiv numbers.
 Confirmed canonical IDs: VPT 2206.11795, STEVE-1 2306.00937, MineDojo 2206.08853,
 JARVIS-VLA 2503.16365, GROOT 2310.08235 (note: coordinator-seed "2503.10684" is a
 DIFFERENT paper, "Open-World Skill Discovery from Unsegmented Demonstration
-Videos", a CraftJarvis skill-segmentation work — kept separately).
+Videos", a CraftJarvis skill-segmentation work - kept separately).
 Multi-agent in-HF: MineCollab/MINDcraft 2504.17950, S-Agents 2402.04578, HAS
 2403.08282, MindForge 2411.12977, MindAgent 2309.09971, CWM 2307.02485.
 
@@ -88,7 +88,7 @@ bash scripts/fetch_arxiv_latex.sh 2310.08367 mcu
 All 14 returned `latex=tarball_extracted`. Read intro/method/action-observation/
 data/eval sections directly.
 
-## Web (arXiv / ACL / GitHub / OpenReview) — benchmarks not in hf papers
+## Web (arXiv / ACL / GitHub / OpenReview) - benchmarks not in hf papers
 
 ```
 WebSearch "VillagerBench Minecraft multi-agent benchmark VillagerAgent arxiv"
@@ -109,7 +109,7 @@ primitive + 183 compositional skills, LLaMA-3 fine-tune, code zju-vipa/Odyssey),
 MineLand 2403.19267 (64+ agents, limited senses + physical needs, code
 cocacola-lab/MineLand), ROCKET-1 2410.17856 (CVPR'25), Narayan-Chen Minecraft
 Dialogue Corpus ACL 2019 (P19-1537, 509 dialogues, architect/builder, no arXiv).
-Also surfaced: PillagerBench 2509.06235 (competitive team Minecraft) — noted, not
+Also surfaced: PillagerBench 2509.06235 (competitive team Minecraft) - noted, not
 deep-read.
 
 ## Existing repo analyses reused (NOT re-cloned, per brief)

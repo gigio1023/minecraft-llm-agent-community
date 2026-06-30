@@ -1,0 +1,260 @@
+% Pipeline overview diagram composed from existing fragments
+% - Uses example env thumbnails from example_envs.tex in the selector box
+% - Uses prebuilt PDF of the interaction fragment (interaction_phase_preview.pdf)
+% - Uses separate test phase fragment from test_phase.tex
+% This file is a fragment intended to be \subimport'ed or \input into a figure/tikzpicture
+% Example standalone preview provided in pipeline_overview_preview.tex
+
+% Dependencies: \usepackage{tikz}, \usepackage{import}
+\usetikzlibrary{arrows.meta,calc,shapes.callouts}
+
+% Styles - Updated to match interaction phase format
+\tikzset{
+% Match interaction phase arrow style exactly
+pipeline/arrow/.style={draw=black, line width=1pt, line cap=round, line join=round, -{Stealth[length=3mm,width=2.2mm]}, shorten <=1.6mm, shorten >=1.6mm, preaction={draw=white, line width=2.2pt, opacity=0.9}},
+pipeline/label/.style={font=\normalsize, text=black},
+pipeline/descbox/.style={rounded corners=2pt, draw=none, inner sep=2pt, text width=3.2cm, align=left}
+}
+
+% Colors for task description boxes
+\colorlet{CDColor}{cyan!18}
+\colorlet{PLColor}{orange!20}
+\colorlet{MFPColor}{green!20}
+% Lavender color for agent box
+\definecolor{lavender}{RGB}{230, 230, 250}
+\definecolor{lightbulb}{RGB}{255,235,59}
+
+% Unified thumbnail height for task grids (smaller & equal-sized)
+\newcommand{\TaskThumbH}{3cm}
+
+% Provide defaults required by the grid fragments
+\providecommand{\maraGridLineColor}{black!10}
+\providecommand{\maraGridBorderColor}{black!30}
+\providecommand{\maraGridLineWidth}{0.4pt}
+\providecommand{\maraBorderLineWidth}{3pt}
+\providecommand{\maraBorderRadius}{2pt}
+
+% Coordinate system (units: cm)
+\begin{scope}[x=1cm,y=1cm]
+
+  % TOP ROW: AutumnBench Environments | Interaction Phase | Agent (left to right)
+  % Aligned by their TOPS
+
+  % Interaction elements (middle) - draw first to establish top line
+  \begin{scope}[shift={(6cm,6cm)}, local bounding box=ipbb]
+    \subimport{.}{interaction_phase.tex}
+  \end{scope}
+
+  % Select env thumbnails (leftmost) - adjusted y to align top with interaction phase
+  % The example_envs content extends ~4cm above its origin when scaled 0.35
+  % Interaction phase top is around y=12cm (6cm + ~6cm height)
+  % So we position example_envs at y that makes its top match
+  \begin{scope}[shift={(0,8cm)}, scale=0.36, local bounding box=exbb]
+    \subimport{.}{example_envs.tex}
+  \end{scope}
+  % Enclose the example environments with a dashed line box
+  \draw[dashed, line width=0.8pt, rounded corners=6pt]
+  ([xshift=-0.15cm,yshift=-0.05cm]exbb.south west)
+  rectangle
+  ([xshift= 0.15cm,yshift= 0.15cm]exbb.north east);
+  % Label above the example envs block
+  \node[pipeline/label, font=\normalsize\bfseries]
+  at ([yshift=0.35cm]exbb.north) {AutumnBench Environments};
+
+  % Enclose the interaction phase with a dashed line box
+  \draw[dashed, line width=0.8pt, rounded corners=6pt]
+  ([xshift=-0.15cm,yshift=-0.15cm]ipbb.south west)
+  rectangle
+  ([xshift= 0.15cm,yshift= 0.15cm]ipbb.north east);
+
+  % Label above the interaction phase
+  \node[pipeline/label, font=\normalsize\bfseries, anchor=west]
+  at ([yshift=0.35cm, xshift=-0.15cm]ipbb.north west) {Interaction Phase};
+
+  % Test phase (bottom row) - positioned below the top row
+  \begin{scope}[shift={(0, 2cm)}, local bounding box=tpbb]
+    \subimport{.}{test_phase.tex}
+  \end{scope}
+
+  % Enclose the test phase with a dashed line box
+  \draw[dashed, line width=0.8pt, rounded corners=6pt]
+  ([xshift=-0.15cm,yshift=-0.05cm]tpbb.south west)
+  rectangle
+  ([xshift= 0.15cm,yshift= 0.15cm]tpbb.north east);
+
+  % Label above the test phase
+  \node[pipeline/label, font=\normalsize\bfseries, anchor=west]
+  at ([yshift=0.35cm, xshift=-0.15cm]tpbb.north west) {Test Phase};
+
+  % Ensure interaction-phase styles/colors exist outside the imported scope
+  \tikzset{
+  ip/box/.style={draw, rounded corners=6pt, minimum width=4.2cm, minimum height=3.0cm, line width=0.8pt, align=center, font=\large},
+  ip/arrow/.style={line width=1pt, line cap=round, line join=round, -{Stealth[length=3mm,width=2.2mm]}, shorten <=1.6mm, shorten >=1.6mm, preaction={draw=white, line width=2.2pt, opacity=0.9}},
+  ip/label/.style={font=\normalsize, fill=white, inner sep=2pt, rounded corners=2pt}
+  }
+  \colorlet{IPRightBg}{red!30!brown!35}
+
+  % Explorer/agent interaction loop - positioned to the right of interaction phase
+  % Two actor icons (LLM or Human) with an "OR" between them
+  \begin{scope}[shift={($(ipbb.east)+(2.0cm,-.5cm)$)}, local bounding box=agentbb]
+    \node[rounded corners=12pt, minimum width=1.0cm, minimum height=.8cm, draw=none] (llm) at (0.7,.6) {};
+    \node[rounded corners=12pt, minimum width=1.0cm, minimum height=.8cm, draw=none] (human) at (2.3,.6) {};
+
+    % Fit node around both actors to anchor arrows
+    \node[inner sep=1pt, fit=(llm) (human)] (actors) {};
+
+    % LLM robot icon via pic (drawn on top of background)
+    \subimport{.}{pic_llm_icon.tex}
+    \pic[scale=0.02] at (llm.center) {llm_icon};
+
+    % Human icon via pic (drawn on top of background)
+    \subimport{.}{pic_human_icon.tex}
+    \pic[scale=0.05] at (human.center) {human_icon};
+
+    % Agents dashed box enclosing both icons
+    \draw[dashed, line width=0.8pt, rounded corners=6pt]
+    ([xshift=-0.05cm,yshift=-0.2cm]actors.south west)
+    rectangle
+    ([xshift= 0.05cm,yshift= 0.2cm]actors.north east);
+    % Label above the agents box.
+    \node[pipeline/label, font=\normalsize\bfseries]
+    at ([yshift=0.4cm]actors.north) {Agent};
+
+    % OR separator: slashed line with label above
+    \draw[draw=black, line width=0.9pt] (1.35,0.25) -- (1.65,0.95);
+  \end{scope}
+
+  % Arrows between Interaction Phase and Agent (horizontal, side by side)
+  % Observation: from ipbb to agent
+  \coordinate (ipObs) at ($ (ipbb.east) + (0, 0.3) $);
+  \coordinate (agentObs) at ($ (actors.west) + (0, 0.15) $);
+  \draw[ip/arrow]
+  (ipObs) .. controls +(0.4, 0.3) and +(-0.4, 0.3) .. (agentObs);
+  \node[ip/label, text=black] at ($ (ipObs)!0.5!(agentObs) + (0, 0.58) $) {observation};
+
+  % Action: from agent to ipbb
+  \coordinate (agentAct) at ($ (actors.west) + (0, -0.15) $);
+  \coordinate (ipAct) at ($ (ipbb.east) + (0, -0.3) $);
+  \draw[ip/arrow]
+  (agentAct) .. controls +(-0.4, -0.3) and +(0.4, -0.3) .. (ipAct);
+  \node[ip/label, text=black] at ($ (agentAct)!0.5!(ipAct) + (0, -0.58) $) {action};
+
+  % Arrows between Agent and Test Phase (vertical, agent above test phase)
+  \coordinate (agentBottom) at (actors.south);
+  \coordinate (agentObsDown) at ($ (agentBottom)+(-0.5, 0) $);
+  \coordinate (agentActDown) at ($ (agentBottom)+(0.5, 0) $);
+  % Project test-phase top edge for vertical arrows
+  \coordinate (testObs) at ($ (tpbb.north -| agentObsDown) $);
+  \coordinate (testAct) at ($ (tpbb.north -| agentActDown) $);
+
+  % Observation (from test phase to agent) - arched left
+  \draw[ip/arrow]
+  (testObs)
+  .. controls +(-0.6, 0.6) and +(-0.6, -0.6) ..
+  (agentObsDown);
+
+  % Action (from agent to test phase) - arched right
+  \draw[ip/arrow]
+  (agentActDown)
+  .. controls +(0.6, -0.6) and +(0.6, 0.6) ..
+  (testAct);
+
+  % Labels for the vertical arrows
+  \node[ip/label, text=black]
+  at ($ (agentObsDown)!0.5!(testObs) + (-0.7, 0) $) {observation};
+  \node[ip/label, text=black]
+  at ($ (agentActDown)!0.5!(testAct) + (0.55, 0) $) {action};
+
+  % Annotation notes - positioned between top row and bottom row (test phase)
+  % Calculate the midpoint between top row bottom and test phase top
+  \coordinate (betweenRowsMid) at ($ (ipbb.south)!0.5!(tpbb.north) $);
+
+  % Action cells note (leftmost)
+  \node[
+    draw=none,
+    rounded corners=6pt,
+    line width=0.6pt,
+    fill=lightbulb,
+    fill opacity=0.22,
+    text opacity=0.95,
+    text=black,
+    inner sep=6pt,
+    text width=2cm,
+    align=left,
+    font=\scriptsize
+  ] (ActionCellsNote) at ($ (MFPActionCells) + (-3cm, 0cm) $) {Action queue that displays the agent's action history.};
+
+  % Leader line from note (right side) to action-cells anchor
+  \coordinate (ActionCellsLeaderJoinDot) at ($(MFPActionCells.west)+(-0.1cm,0)$);
+  \fill[lightbulb] (ActionCellsLeaderJoinDot) circle (1.5pt);
+  \draw[draw=lightbulb, line width=0.9pt, line cap=round, line join=round]
+  (ActionCellsNote.east) -- (ActionCellsLeaderJoinDot);
+
+  % Slider note and leader
+  \node[
+    draw=none,
+    rounded corners=6pt,
+    line width=0.6pt,
+    fill=lightbulb,
+    fill opacity=0.22,
+    text opacity=0.95,
+    text=black,
+    inner sep=6pt,
+    text width=2.3cm,
+    align=left,
+    font=\scriptsize
+  ] (MFPSliderNote) at ($ (MFPSliderTrack) + (-2.95cm, 0cm) $) {Slider to browse steps in the trajectory. Grids with sliders are trajectory players and non-actionable.};
+
+  % Leader from the note to the slider track anchor
+  \coordinate (MFPSliderLeaderJoinDot) at ($(MFPSliderTrack.west)+(-0.4cm,0)$);
+  \fill[lightbulb] (MFPSliderLeaderJoinDot) circle (1.5pt);
+  \draw[draw=lightbulb, line width=0.9pt, line cap=round, line join=round]
+  (MFPSliderNote.east) -- (MFPSliderLeaderJoinDot);
+
+  % UI button note
+  \node[
+    draw=none,
+    rounded corners=6pt,
+    line width=0.6pt,
+    fill=lightbulb,
+    fill opacity=0.22,
+    text opacity=0.95,
+    text=black,
+    inner sep=6pt,
+    text width=2.2cm,
+    align=center,
+    font=\scriptsize
+  ] (UIButtonNote) at ($ (IPResetButton)!0.5!(IPUIButton) + (0cm, -1cm) $) {Clickable UI button.};
+
+  % Leaders from UIButtonNote to both Reset and Go-to-Test buttons
+  \coordinate (UIButtonResetDot) at ($(IPResetButton.south)+(0,-0.1cm)$);
+  \coordinate (UIButtonGoDot)    at ($(IPUIButton.south)+(0,-0.1cm)$);
+  \fill[lightbulb] (UIButtonResetDot) circle (1.5pt);
+  \fill[lightbulb] (UIButtonGoDot) circle (1.5pt);
+  \draw[draw=lightbulb, line width=0.9pt, line cap=round, line join=round]
+  (UIButtonNote.north) -- (UIButtonResetDot);
+  \draw[draw=lightbulb, line width=0.9pt, line cap=round, line join=round]
+  (UIButtonNote.north) -- (UIButtonGoDot);
+
+  % Planning highlight note with leader to PLHighlightBox
+  \node[
+    draw=none,
+    rounded corners=6pt,
+    line width=0.6pt,
+    fill=lightbulb,
+    fill opacity=0.22,
+    text opacity=0.95,
+    text=black,
+    inner sep=6pt,
+    text width=2.3cm,
+    align=left,
+    font=\scriptsize
+  ] (PLHighlightNote) at ($ (PLHighlightBox) + (0cm, 3cm) $) {Highlighted region with blue border is the target configuration.};
+
+  % Leader to the highlight box
+  \coordinate (PLHighlightDot) at ($(PLHighlightBox.north)+(0,0.1cm)$);
+  \fill[lightbulb] (PLHighlightDot) circle (1.5pt);
+  \draw[draw=lightbulb, line width=0.9pt, line cap=round, line join=round]
+  (PLHighlightNote.south) -- (PLHighlightDot);
+
+\end{scope}

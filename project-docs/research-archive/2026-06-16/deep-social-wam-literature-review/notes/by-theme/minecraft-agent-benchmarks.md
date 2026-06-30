@@ -1,4 +1,4 @@
-# Minecraft Agent Benchmarks — MineDojo, MineRL/BASALT, MCU, MineExplorer, Plancraft, Odyssey, MineNPC-Task
+# Minecraft Agent Benchmarks - MineDojo, MineRL/BASALT, MCU, MineExplorer, Plancraft, Odyssey, MineNPC-Task
 
 Lane 2 theme file. Audience: external team. Scope: how Minecraft agent benchmarks
 set up tasks, what they use as *truth* (programmatic detector vs rule-based
@@ -16,8 +16,8 @@ reference) to "VLM/human rubric truth" (use only as audit).
 
 | Benchmark (id) | Truth source | Task structure | Command-fixtured? | Closest to repo's evidence stance? |
 | --- | --- | --- | --- | --- |
-| **MineNPC-Task** (2601.05215) | **machine-checkable validators, in-world evidence only, bounded-knowledge** | parametric templates w/ explicit preconditions + dependency structure | player-elicited, not synthetic | **YES — closest of all** |
-| **MineExplorer** (2605.30931) | **rule-based milestone evaluators** (human-validated) | **latent multi-hop dependency graph** (1–4 hop); difficulty = capability load over prerequisite paths | scene-rendered + adjusted | strong (rule-based, structured) |
+| **MineNPC-Task** (2601.05215) | **machine-checkable validators, in-world evidence only, bounded-knowledge** | parametric templates w/ explicit preconditions + dependency structure | player-elicited, not synthetic | **YES - closest of all** |
+| **MineExplorer** (2605.30931) | **rule-based milestone evaluators** (human-validated) | **latent multi-hop dependency graph** (1-4 hop); difficulty = capability load over prerequisite paths | scene-rendered + adjusted | strong (rule-based, structured) |
 | **Plancraft** (2412.21033) | programmatic (crafting GUI state) + **intentionally-unsolvable** subset | crafting recipe trees; tests "decide if solvable" | GUI-fixtured (intended) | strong (programmatic + impossibility) |
 | **MineDojo** (2206.08853) | programmatic detectors + **MineCLIP** for creative tasks | thousands of tasks; tech-tree + creative | many structured/command tasks | partial (MineCLIP is a proxy) |
 | **MCU / SkillForge** (2310.08367) | six-dimension rubric, largely **VLM-graded** | atom-task composition; difficulty feature space | mixed | weak for truth (rubric) |
@@ -33,8 +33,8 @@ executes via **public Mineflayer APIs**, judges **only from in-world evidence**
 under a **bounded-knowledge policy** (no out-of-world shortcuts), pairs each
 parametric task with **machine-checkable validators**, and captures
 **plan/act/memory events** (plan previews, clarifications, memory reads/writes,
-precondition checks, repair attempts). Its outcome metric — **success relative to
-attempted subtasks**, from in-world evidence — is directly adoptable. Its limit:
+precondition checks, repair attempts). Its outcome metric - **success relative to
+attempted subtasks**, from in-world evidence - is directly adoptable. Its limit:
 single NPC + one human, task-completion framed; it does not measure durable
 social-material consequence between multiple actors. So borrow the *mechanism*,
 not the *target*.
@@ -47,7 +47,7 @@ what actually appears in-world. Its empirical result is the one this project
 should quote: **agents handle single-hop tasks but degrade sharply when hidden
 prerequisites must be coordinated over longer trajectories**. That is the
 operational form of "physical facts must be reliable before higher-level claims
-hold" — an agent that cannot infer "pickaxe before mining" cannot sustain any
+hold" - an agent that cannot infer "pickaxe before mining" cannot sustain any
 dependent social claim. The dependency-graph + milestone structure maps onto this
 repo's PlanBeadGraph + verifier evidence.
 
@@ -67,7 +67,7 @@ MineStudio analysis counted **671 init commands across 153 tasks (368 `/give`, 9
 pre-provision. This is fine for a **controlled competence gate**, but a
 command-given diamond pickaxe is **not natural-world acquisition** and must never
 be counted as social-material evidence (you did not *earn*, *trade*, or *borrow*
-it — the test harness handed it to you). This repo must **label** every scenario
+it - the test harness handed it to you). This repo must **label** every scenario
 as natural-world vs command-fixtured, and only natural-world acquisition can
 ground a material claim (possession, scarcity, hoarding-vs-contribution).
 
@@ -84,7 +84,7 @@ ground a material claim (possession, scarcity, hoarding-vs-contribution).
   social pressure.
 
 **Avoid (overclaim risk)**:
-- VLM/rubric scoring (MCU) or human Elo (GROOT SkillForge) as runtime truth — they
+- VLM/rubric scoring (MCU) or human Elo (GROOT SkillForge) as runtime truth - they
   are audit layers at best, and blind to possession/obligation.
 - Treating command-fixtured inventory/terrain as natural-world progress.
 - Treating any **task-completion** number as a **social** result. Every benchmark

@@ -1,0 +1,103 @@
+
+\section{Evaluation Results}
+\label{sec:eval}
+\name~includes evaluation of many public reward models, ranging in parameter count from 400 million (PairRM) to 70 billion (Tülu 2), trained as classifiers or with DPO (when the reference model is available).
+In this section, we detail the core findings of~\name~,and more results are available in Appendix~\ref{appdx:results}. 
+In particular, we study the state-of-the-art reward models (Tab.~\ref{table:top20_results}), results of similar-size models at 7B (Tab.~\ref{table:7b_results}), and a demonstration of the impact of scaling DPO reward models on performance in Tab.~\ref{table:scaling}. 
+We further study the limits of current reward models (Section~\ref{sec:limit1}) and prior test sets (Section~\ref{sec:limit2}).%\footnote{\url{https://huggingface.co/datasets/allenai/reward-bench-results}}
+%We have also released all the text-score pairs used to compute the evaluation scores.
+
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\linewidth]{figures/score-dist-seq-core.pdf}
+%     \vspace{-4ex}
+%     \caption{The distribution of rewards outputted by reward models for the chosen and rejected responses in the~\name~dataset.
+%     A large variety of model behaviors exist among open reward models. 
+%     Some top scoring models, such as Starling and UltraRM show an increased margin between the mean of the chosen and rejected samples.
+%     }
+%     \label{fig:core-model-dist}
+% \end{figure}
+
+
+\input{tables/scaling_dpo}
+
+\subsection{Comparing State-of-the-art Reward Models}
+Tab.~\ref{table:top20_results} shows the results for the top 20 models across different model sizes and types.
+Large models and those trained on Llama 3 are the only models capable of high performance on the Chat Hard and Reasoning sections, with the model \texttt{ArmoRM-Llama3-8B-v0.1} (89) being state-of-the-art.
+Across different base models, scale is a crucial property, with \texttt{Starling-RM-34B} (81.4) trained on Yi 34B and \texttt{Tulu-2-DPO-70B} (76.1) on Llama 2 being top models.
+% These models are not accessible for many people to use, so we define two other categories of state-of-the-art, 7 billion parameters and 1.5 billion parameters or less.
+The best open-weight models for LLM-as-a-judge are \texttt{Meta-Llama-3-70B-Instruct} (75.4) and \texttt{prometheus-8x7b-v2.0} (75.3)~\citep{kim2024prometheus}, though they still fall well below classifier-based RMs.
+% The leading {\it medium-sized} 7B models are \texttt{Starling-RM-7B-alpha} (74.7), \texttt{zephyr-7b-alpha} (73.6), and \texttt{Nous-Hermes-2-Mistral-7B-DPO} (73.5) given the similar scores and no formal notion of error bars on the benchmark.
+The final category is comprised of the {\it small}, most accessible models, where the leading models are \texttt{StableLM-zephyr-3b} (70.6) and \texttt{oasst-rm-2.1-pythia-1.4b-epoch-2.5} (69.5), but there is substantial room for progress.
+% There are striations in performance with changes in base model size and quality, mirroring the benchmark performance of models such as OLMo, Llama 2, Mistral 7B, Yi-34B, and others.
+
+\paragraph{The Impacts of Different Base Models}
+In our evaluation there are multiple models trained either with the same or very similar fine-tuning approaches on different base models.
+We show the impact of scaling across different Llama 2, via Tulu 2~\citep{ivison2023camels}, and Qwen 1.5 versions in Tab.~\ref{table:scaling}.
+In general,  
+Llama 2 shows a clear improvement with scaling across all sections of~\name, but Qwen 1.5 shows less monotonic improvement, likely due to out of distribution generalization challenges.
+Tab.~\ref{table:7b_results} compares the impact of different base models and subtle changes of fine-tuning methods via the Zephyr-class models~\citep{tunstall2023zephyr}.
+Each of these models are fine-tuned on the UltraFeedback dataset via DPO as the final stage, with different base models and instruction-tuning before.
+% \texttt{zephyr-7b-beta}, \texttt{zephyr-7b-alpha}, \texttt{zephyr-7b-gemma-v0.1}, and \texttt{tulu-2-dpo-7b} are all trained with the same target method and different base models or datasets. 
+\texttt{zephyr-7b-alpha} and \texttt{zephyr-7b-beta} differ by filtering of the UltraFeedback preference dataset only, and this is reflected in \texttt{zephyr-7b-alpha}'s higher score on \texttt{Safety} (as refusals were removed from the dataset) and lower score on \texttt{Chat}.
+\texttt{tulu-2-dpo-7b} highlights the difference from the Mistral 7B to the Llama 2 7B base models and a different supervised fine-tuning dataset pre DPO, as regressions on \texttt{Chat Hard} and \texttt{Reasoning}, but improvements on \texttt{Safety}.
+% \texttt{zephyr-7b-gemma-v0.1} shows the regression when switching to Gemma base model across many categories.
+
+\input{tables/leaderboard_7b}
+
+\paragraph{Different Shapes of Reward Functions}%\hanna{needs a paragraph title and move to section 5.1} 
+The per-prompt scores demonstrate the different magnitudes and distributions of rewards assigned to each reward model over the~\name~evaluation dataset.
+Results shown in Appendix~\ref{appdx:results_dist_subset}, such as Fig.~\ref{fig:core-model-dist}, show these distributions for some RMs trained as a classifier.
+Few RMs are Gaussian in their scores across the~\name~datasets, fewer RMs are centered around 0 reward, and none we tested centered Gaussians.
+Future work should identify a preferred RM output distribution for downstream RL training.
+
+\input{tables/chat_hard}
+
+\subsection{Limits of Current Reward Models} \label{sec:limit1}
+% A summary of performance is shown in Tab.~\ref{table:eval_sets_chat_hard}.
+Current reward models can solve some subsets of~\name~reliably, approaching 100\% accuracy, but many subsets experience a combination of low ceilings on performance or high variance of performance. 
+The subsets with low ceilings, mostly in the \texttt{Chat Hard} and \texttt{Reasoning} sections indicate areas where preference datasets and reward modeling methods can be extended to improve performance, and subsets with high variability, such as many of the \texttt{Safety} subsets, indicate areas where best practices can be converged upon.
+
+\paragraph{Evaluating across Chat Hard Categories} Tab.~\ref{table:eval_sets_chat_summary} compares different rewards models across  \texttt{Chat Hard} categories (full results are shown in Tab.~\ref{table:eval_sets_chat_hard}). 
+The adversarial subsets from LLMBar~\citep{zeng2023llmbar} are crucial to understanding RMs because they show examples where two answers are written in a similar style (e.g. the same GPT-4 model version), but with slightly different subjects.
+The difference between asking a factual question about a related but different object or slightly changing the context of a prompt, is hard to pick up with most reward models.
+The \texttt{Chat Hard} section (and to some extent \texttt{Reasoning}) is largely correlated with final performance, but some DPO models excel at it and not overall  -- even Qwen Chat and others with low average performance overall.
+The models scoring highly largely are trained on recent base models and preference datasets, showcasing recent progress on RM training.
+% The performance gain of DPO models can be caused by many aspects, ranging from better base models to more aligned training datasets, but closing the gap with standard reward models trained as classifiers is an important step.
+
+
+\paragraph{Evaluating across  Reasoning Categories} The \texttt{Reasoning} section of~\name~has the widest, smooth variation in performance -- e.g. models populate many levels, from 35\% accuracy (well below random) all the way to 97\% accuracy.
+The reasoning data largely relies on code examples where just one or two tokens are different between the chosen and rejected samples, showcasing precise classification abilities of the best RMs.
+% Though, the ceiling on reasoning models is much harder than the adversarially designed data, indicating RMs can reliably identify known bugs in reasoning or code.
+Full reasoning results are included in Tab.~\ref{table:eval_sets_reasoning}.
+
+
+\input{tables/safety_behaviors}
+
+
+\paragraph{Evaluating across Safety Metrics}
+Tab.~\ref{table:eval_safety_behaviors} (full results in Tab.~\ref{table:eval_sets_safety} in Appendix) compares different reward models across different {\it safety} categories, indicating  challenges on striking a balance between refusing too much or not refusing. 
+% \paragraph{Some RMs Refuse, Some Don't, Some Refuse Too Much} 
+Models, such as \texttt{UltraRM-13b} and \texttt{zephyr-7b-gemma-v0.1} show how a model focused on helpfulness without a strong notion of safety will score poorly on the should-refuse subsets of the safety section, but highly on \texttt{XSTest Should Respond}.
+Other models, namely those at the top of the overall leaderboard, clearly include safety information in the training process \textit{and} maintain strong performance on trick questions that could induce false refusals (\texttt{XSTest Should Respond}).
+Finally, the mirrored behavior, those models that score highly on prompts that they should refuse and poorly on those they should not are present, indicating a model that is likely to falsely refusal queries (e.g. the Qwen chat models).
+These three behavior modes indicate that~\name~can be used as a quick check of the safety behavior of a candidate model, especially when trained with DPO (as it will not need further RL training like the classifiers).
+
+\subsection{Limitations of Prior Test Sets} \label{sec:limit2}
+Many popular models trained with RLHF use new preference datasets such as UltraFeedback~\citep{cui2023ultrafeedback} or Nectar~\citep{starling2023}, which don't have publicly available validation sets. 
+Given this, when training reward models, common practice is to compare model agreement with a variety of existing test sets from earlier work in RLHF.
+Some models scoring strongly on the \texttt{Prior Sets} section of~\name, such as \texttt{UltraRM-13b} and \texttt{PairRM-hf} were trained on the training splits of Anthropic HH, Stanford Human Preferences (SHP), and OpenAI's Learning to Summarize, but other top classifier models, such as the Starling models were not.
+Combining this with the very low average score of DPO models on these test sets indicates that substantial research is needed to understand the full limitations of these previous datasets.
+Full results are detailed in Tab.~\ref{table:pref_sets}.
+% Additional data is included in the code-base, but not included in the evaluation score due to noisy results or lack of clear use instructions (e.g. could be easy for unintentional test-set contamination). 
+% In this vein, results on SafeRLHF~\citep{dai2023safe} data and MT Bench labels%\footnote{\url{https://huggingface.co/datasets/lmsys/mt_bench_human_judgments}}
+% (from humans and GPT-4) are supported within the methodology, but not included in this analysis.
+
+
+
+
+% TODO add this in future version
+% \subsection{Per token reward}
+% \citep{chan2024dense} uses attention to make per token rewards
+% \citep{Xu2023SomeTA} uses a CRINGE loss which considers per-token

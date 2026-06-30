@@ -1,0 +1,20 @@
+\section{EvoReplay}
+\label{sec:evoreplay}
+
+EvoTrace records what happened during a run; \emph{EvoReplay} is the Python package we built on top of it (and on top of SkyDiscover \citep{skydiscover2026}) to ask why. By treating each candidate program as an executable artifact attached to its evaluator, parent context, and search position, EvoReplay turns a passive log into an experimental object: any point in the search graph can be re-executed, perturbed, retuned, or re-judged, and the outcome compared against what the original run produced.
+
+This section describes the four capabilities EvoReplay provides. Each experimental section in the rest of the paper uses one of them, and the package is the common substrate that makes our cross-framework, cross-model results comparable.
+
+\paragraph{(a) Static analysis of traces.}
+EvoReplay normalizes runs from different backends into a common per-edit table (parent, child, prompt, score, and a unified diff between parent and child source), so that aggregate measurements are defined once and applied across frameworks. The static analyses in \S\ref{sec:static-analysis} (hyperparameter-literal counts, lineage depth, best-so-far trajectories) and the deterministic cycling classifier in \S\ref{sec:cycling} both operate on this normalized representation, with no framework-specific code path.
+
+\paragraph{(b) LLM-as-judge annotation of edit types.}
+The 9-edit-type taxonomy referenced in the abstract and \S\ref{sec:static-analysis} was developed by the authors through manual inspection of parent--child edits sampled across frameworks, languages, and models, grouping recurring patterns and iterating until no new categories emerged. EvoReplay's pipeline then applies this taxonomy at scale: for every parent--child diff, it requests a structured judgment from an LLM judge, returning a category for the edit and tags for the lines that drove the score change. The package handles batching, retries, schema validation, and caching, so the same trace can be re-annotated under different prompts or judge models without re-running the underlying search.
+
+\paragraph{(c) Bayesian optimization to study hyperparameter tuning.}
+EvoReplay implements the BO baseline of \S\ref{sec:tuning-gap}: a single LLM call identifies tunable numeric constants in a target program (full prompt in Appendix~\ref{appendix:bo-details}), the package rewrites the program with a top-level parameter block, and \texttt{gp\_minimize} runs the same evaluator harness with 24 calls per target. This isolates the structural-vs-parametric component of an evolutionary gain on a fixed seed structure, and lets us quantify how much of $f^{\star}_{\mathrm{evo}}$ a single-seed hyperparameter sweep already recovers.
+
+\paragraph{(d) Stability analysis of breakthroughs.}
+EvoReplay can re-execute the saved generating prompt for any candidate under the original or a substituted model and report the distribution over children. The replay-stability results of \S\ref{sec:replay} use this capability with $n{=}10$ resamples per target across same-model and cross-model conditions; the resulting (parse success) $\times$ (evaluation success) $\times$ (score conditional on success) triple is the right summary because failure modes turn out to be bimodal rather than Gaussian.
+
+Together, these four capabilities make EvoTrace more than a collection of examples: they let us ask which improvements are reproducible, which are parametric, which are structural, and how each framework's edit composition shifts across models and prompting modes.

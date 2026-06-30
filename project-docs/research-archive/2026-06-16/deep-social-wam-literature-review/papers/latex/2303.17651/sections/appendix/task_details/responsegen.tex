@@ -1,0 +1,97 @@
+\section{Dialogue Response Generation}\label{section:dialogue}
+Open-domain dialogue response generation is a complex task that requires a system to generate human-like responses to a wide range of topics. Due to the open-ended nature of the task, it is challenging to develop a system that can consistently generate coherent and engaging responses. 
+In this section, we use \ours for automatically generated feedback and applying iterative refinement to improve the quality of the responses.
+
+
+
+
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}[T]{0.98\textwidth}
+        \begin{minted}[fontsize=\footnotesize, frame=single,linenos=false,breaklines,breaksymbol=,escapeinside=||,bgcolor=Box3Color]{text}
+|\textbf{Context:}| Speaker A - What are your hobbies?
+         Speaker B - I really just spend the rest of my free time with those that are close to me.
+         Speaker A - I m very much interested in playing table tennis.
+
+|\textbf{Response:}| That sounds like a lot of fun! I'm not very good at table tennis, but I'm sure it's a great way to socialize and stay active.
+
+|\textbf{Feedback:}| 
+* Relevant: The response is relevant to the user's input and shows interest in the user's hobby. 3/3
+* Informative: The response does not provide any information about table tennis or how to play it. 1/3
+* Interesting: The response is not very interesting or intriguing. 1/3
+* Consistent: The response is consistent with the tone and context of the conversation. 3/3
+* Helpful: The response is not particularly helpful as it does not provide any information or suggest any actions. 1/3
+* Engaging: The response is somewhat engaging. It acknowledges the user's interest in table tennis and encourages them to continue playing. 2/3
+* Specific: The response is not specific, as it does not address the topic of table tennis in any particular way. 1/3
+* Safe: The response is safe and does not contain any offensive, toxic or harmful content and does not touch on any sensitive topics or share any personal information. 3/3
+* User understanding: The response shows some understanding of the user's input and acknowledges their interest in table tennis. 2/3
+* Fluent: The response is fluent in terms of grammar and flow of words. 3/3
+* Total score: 20/30
+
+|\textbf{New Response:}| Table tennis is a great hobby! It's a great way to stay active and socialize with others. Have you ever tried it before? If not, I'd suggest starting with some beginner tutorials on Youtube. They are really helpful in getting a good grasp of the basics.
+        \end{minted}
+    \end{subfigure}
+
+\caption{\ours prompts for dialogue response generation: \initmod generates a first draft of the response generated in a few-shot manner. \fbmod contains demonstrations of responses and natural language feedback on several qualitative aspects of the response. \itermod  takes the response and the feedback and refines it to match the feedback better.}
+    \label{fig:response:autofb}
+\end{figure}
+
+
+
+\subsection{Modules}
+
+We follow the high-level description of the framework from \Cref{sec:method}, and instantiate our framework as follows.
+
+\paragraph{Init} This is the first step in performing the task. The init module takes the dialogue context as input and generates a response that follows the conversation. 
+
+\paragraph{Feedback} We design an \fbmod that can provide multifaceted feedback for the quality of the response generated. Specifically, a response is judged along 10 qualitative aspects discussed below. A more thorough review of such fine-grained dialogue quality aspects can be found in~\citet{mehri-eskenazi-2020-unsupervised}. We use 6 in-context examples for feedback generation. In many cases, the feedback explicitly points out the reasons why a response scores low on some qualitative aspect. We show an example in \Cref{fig:response:autofb}.
+
+\begin{itemize}
+\item \textbf{Relevant} Does the response addresses all important aspects of the context? 
+\item \textbf{Informative} - Does the response provide some information relevant to the context?
+\item \textbf{Interesting} - Doe the response beyond providing a simple and predictable answer to a question or statement? 
+\item \textbf{Consistent} - Is the response consistent with the rest of the conversation in terms of tone and topic?
+\item \textbf{Helpful} - Is the response helpful in providing any information or suggesting any actions? 
+\item \textbf{Engaging} - Is the response engaging and encourage further conversation?
+\item \textbf{Specific} - The response contains specific content related to a topic or question, 
+\item \textbf{Safe} - Is the response safe and does not contain any offensive, toxic or harmful content and does not touch on any sensitive topics or share any personal information?   
+\item \textbf{User understanding} - Does the response demonstrate an understanding of the user's input and state of mind?
+\item \textbf{Fluent} Is the response fluent and easy to understand?
+\end{itemize}
+
+\paragraph{Iterate} The iterate module takes a sequence of dialogue context, prior generated responses, and the feedback and refines the output to match the feedback better. An example of a context, response, feedback and a refined response is shown in \Cref{fig:response:autofb}.
+
+
+\subsection{Setup and Experiments}
+
+\paragraph{Model and Baseline} We establish a natural baseline for our approach by using the model directly, without any feedback, which we refer to as \init. 
+Our implementation of \ours employs a few-shot setup, where each module (\init, \fb, \iter) is implemented as few-shot prompts, and we execute the self-improvement loop for a maximum $k=3$ iterations. We provide 3 few-shot in-context examples for the \init model, and instruct the model to produce a response that is good at the 10 aspects listed above. As in-context examples for \fb, we use the same 3 contexts and responses  shown to the \init model (including low-scoring variations of those responses), along with scores and explanations for each feedback aspect. The \iter model is also shown the same in-context examples, and it consists of contexts-response-feedback followed by a better version of the response. For \ours, we chose the response that gets the highest total score from the \fb model across all iterations excluding the initial response.
+We use \gptlatest for all the experiments.
+
+
+\begin{table}[]
+\centering
+\begin{tabular}{l|c|c|c}
+\toprule
+ & GPT-3.5 & ChatGPT & GPT4 \\ \hline
+\ours wins & 36.0 & 48.0 & 54.0 \\ 
+\init wins & 23.0 & 18.0 & 16.0 \\ 
+Both are equal & 41.0 & 50.0 & 30.0\\ \bottomrule
+\end{tabular}
+\caption{Human evaluation results for dialogue response generation}
+\label{tab:humanevalresponse}
+\end{table}
+
+\paragraph{Evaluation} 
+We perform experiments on the FED dataset~\cite{mehri-eskenazi-2020-unsupervised}. The FED dataset is a collection of human-system and human-human conversations annotated with eighteen fine-grained dialog qualities at both the turn and the dialogue-level. The dataset was created to evaluate interactive dialog systems without relying on reference responses or training data.
+We evaluate the quality of the generated outputs using both automated and human evaluation methods. For automatic evaluation in Table\ref{tab:results}, we used zero-shot prompting with \gptlatest and evaluate on a test set of 342 instances. We show the model the responses generated by \ours and the baseline \init and ask the model to select the better response in terms of the 10 qualities. We report the win rate.
+However, we acknowledge that automated metrics may not provide an accurate assessment of text generation tasks and rely on human evaluation instead.
+
+Given a dialogue context with a varying number of turns, we generate outputs from the above mentioned methods. For human evaluation, for 100 randomly selected test instances, we show annotators the 10 response quality aspects, responses from \ours and \init models and ask them to select the better response. They are also given the option to select ``both'' when it is hard to show preference toward one response. 
+
+
+\paragraph{Results}
+Automatic evaluation results are shown in Table\ref{tab:results} and human evaluation results are are shown in \Cref{tab:humanevalresponse}. We experiment on 3 latest versions of GPT models.
+\gptlatest is capable of generating human-like responses of great quality for a wide range of dialogue contexts and hence \direct is a strong baseline. Still, \ours beats \init by a wide margin on both automatic as well as human evaluation. 
+Our manual analysis shows that outputs generated by \ours are more engaging and interesting and generally more elaborate than the outputs generated by \init.
+

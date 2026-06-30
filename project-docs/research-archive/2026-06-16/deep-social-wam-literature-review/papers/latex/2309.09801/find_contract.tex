@@ -1,0 +1,105 @@
+\subsection{The \texttt{FIND-CONTRACT} Algorithm}\label{sec:find_contract_algo}
+We show now how to employ Algorithm~\ref{alg:separate_search} to design an algorithm learning an approximately contract in $\mathcal{P}$, when the number of agent's actions $n$ is a fixed parameter. As a first observation we remark that we can not directly employ Algorithm~\ref{alg:separate_search} with contract design space equal to $\preg$ as its sample complexity could be exponential in the number of states.\footnote{For example, if $\preg=[0,1]^m$ we have that the number of hyperplanes definging $\preg$ is equal to $2m$, and thus the number of samples required by Algorithm~\ref{alg:separate_search} is exponential in $m$.} To overcome this issue we invoke \separate on a larger contract design space $\mathcal{P}' \subseteq \mathbb{R}^m_{+}$ such that $ \preg \subseteq \mathcal{P}'$, defined by a number of hyperplanes $h_{\preg'}=m+1$. In such a way we efficiently identify the boundaries of the regions $\mathcal{L}_{d} \subseteq \preg'$ and the empirical distribution over outcomes associated with that regions. Subsequently, we instantiate a LP for each action $d \in \mathcal{D}$, over the set defined by the intersection of $\mathcal{L}_{d}$ and the boundaries of $\mathcal{P}$. Finally, the algorithms prescribes the principal to commit to the contract achieving the highest expected utility among the solutions returned from the LPs instantiated for each possible action $d \in \mathcal{D}$.
+
+
+A crucial step in our analysis is to prove the approximate optimality of the solution returned by Algorithm~\ref{alg:final}. To do that, we tackle the challenging task of showing that if there exists an action $a \in \mathcal{A}$ that remains undiscovered during the interaction, \emph{i.e}., there is no $d \in \mathcal{D}$ such that $a \in I(d)$, then for any contract $p^* \in \mathcal{L}_{d^*} \cap \mathcal{P}_a$ for some $d^* \in \mathcal{D}$, the principal's utility is sufficiently close to the solution obtained by Algorithm~\ref{alg:final}. This is because there always a contract $p' \in \mathcal{P}_{a}$ with $a \in I(d)$ for some $d \in \mathcal{D}$ that provides a principal's utility close to the one achieved in $ p^* \in \mathcal{L}_{d^*} \cap \mathcal{P}_a$. We formalize this observation in the following lemma.
+
+\begin{restatable}{lemma}{epsilonsolution}\label{lem:espoptsol}
+The solution returned by Algorithm~\ref{alg:final} is $\mathcal{O}(\sqrt \epsilon)$-optimal.
+\end{restatable}
+
+To prove Lemma~\ref{lem:espoptsol}, we first observe that if the optimal contract is such that $p^* \in \mathcal{L}_{d} \cap \mathcal{P}_a$ for some $a \in I(d)$ with $d \in \mathcal{D}$, then the principal's estimated expected utility in $p^*$ is close to the actual one, by means of Lemma~\ref{lem:boundedactions}. On the contrary if $p^* \in \mathcal{L}_{d} \cap \mathcal{P}_a$ for an action $a \not \in I(d)$, we show that the contract $p^L = (1 -\sqrt{\epsilon}) p^* + \sqrt{\epsilon} r $ either belongs to a $\preg_{a}$ with $a \in I(d)$ for some discovered action $d \in \mathcal{D}$ or the utility estimated by the seller in $p^*$ by means of $\widetilde{F}_{d} \in \Delta_{\Omega}$ is close to the actual one. Finally, using Lemma~\ref{lem:espoptsol} and the previous lemmas, we can conclude that the solution returned by Algorithm~\ref{alg:final} is approximately optimal.
+
+\begin{theorem}
+Given $\epsilon, \alpha > 0 $, with $\mathcal{O}(\frac{n^3m^{n+1}}{\epsilon^2}\log(\frac{m}{\alpha})) $ samples the solution returned by Algorithm~\ref{alg:final} is $\sqrt{ \epsilon}$-optimal with probability of at least $1-\alpha$.
+\end{theorem}
+
+\begin{algorithm}
+\caption{\texttt{FIND-CONTRACT}}
+\label{alg:find_contract}
+\begin{algorithmic}[1]
+\Require $\alpha, \epsilon, \eta>0$ and $\mathcal{P}' \subseteq \mathbb{R}^m_{+}$
+\State $\{ \mathcal{L}_{d} , \widetilde{F}_d,\}_{d \in \mathcal{D}}\leftarrow\separate (\mathcal{P}')$
+\While{ $d \in \mathcal{D}$}
+\State Solve the following LP:
+\begin{subequations}
+\begin{align*}
+p_{d}^* \in \arg \max & \,\ \sum_{\omega  \in \Omega }  \widetilde{F}_{d,\omega}    \left( r_\omega - p_\omega \right)  \label{eq:utility}\\
+& \text{s.t.} \quad p \in \mathcal{P} \cap \mathcal{L}_{d} 
+\end{align*}
+\end{subequations}
+\EndWhile
+\State Set $p^* \leftarrow \max_{d \in \mathcal{D}} p^*_{d}$
+\State \textbf{reurn} $p^L = (1 -\sqrt{\epsilon}) p^* + \sqrt{\epsilon} r $
+\end{algorithmic}
+\end{algorithm}
+
+
+
+\clearpage
+\hrulefill
+
+\subsubsection*{Event}
+
+$\mathcal{E}_\epsilon$ is the event in which all the calls to \texttt{ACTION-ORACLE} return an $\tilde F$ such that $ \|\widetilde{F} - F_{a^\star(p)} \|_{\infty} \le \epsilon $, where $p \in \mathcal{P}$ is the contract given as input to the procedure.
+%
+Intuitively, \texttt{ACTION-ORACLE} works properly.
+
+\subsubsection*{\texttt{TRY-PARTITION}}
+
+Let $\mathcal{P}_d \subseteq \mathcal{P}$ be the set of contracts $p \in \mathcal{P}$ given as input to \texttt{ACTION-ORACLE} all the times it returned an $\tilde F$ such that $\tilde F \in \mathcal{F}_d$ (at the end of the algorithm).
+
+
+Let $I(d) \coloneqq \bigcup_{p \in \mathcal{P}_d} a^\star(p)$.
+
+\begin{lemma}
+	Under $\mathcal{E}_\epsilon$, if $\tilde F = \bot$, for every discovered action $d \in \mathcal{D}$, contract $p \in \mathcal{L}_{d}$, and action $a_i \in I(d)$, it holds:
+	\begin{equation*}
+	\sum_{\omega \in \Omega } p_{\omega}F_{a, \omega} - c_{a} \ge
+	\sum_{\omega \in \Omega } p_{\omega}F_{a', \omega} - c_{a'} -  \epsilon',
+	\end{equation*}
+	for every action $a' \in \mathcal{A}$, where $\epsilon' = 14 \epsilon m n$.
+\end{lemma}
+
+\begin{lemma}
+	Under $\mathcal{E}_\epsilon$, if $\tilde F = \bot$, it holds:
+	\[
+		\bigcup_{d \in \mathcal{D}} \mathcal{L}_d = \widetilde{\mathcal{P}}.
+	\]
+\end{lemma}
+
+
+\begin{lemma}
+	Under $\mathcal{E}_\epsilon$, if $\tilde F \neq \bot$, it holds that $\left\{ d \in \mathcal{D} \mid \exists F \in \mathcal{F}_d :  \|{F} - \widetilde{F} \|_{\infty} \le 2\epsilon \right\} \neq 1$.
+\end{lemma}
+
+
+\subsubsection*{\texttt{UPDATE-ACTIONS}}
+
+\begin{lemma}
+	 Algorithm~\ref{alg:action_oracle} ensures that for each discovered action $d \in \mathcal{D}$ and for each actions $a_i, a_j \in I(d)$ we have $\| F_{a_i} -   F_{a_j} \|_{\infty} \le 5 \epsilon n$. Furthermore for each empirical distribution $\widetilde{F} \in \mathcal{F}_{d}$ we have: $\|\widetilde{F}- F_{a_i} \|_{\infty} \le 5 \epsilon n $ for each  $a_i \in I(d)$.
+\end{lemma}
+
+\begin{lemma}
+	$I(d) \cap I(d') = \varnothing$ for every $d,d' \in \mathcal{D}$.
+\end{lemma}
+
+\subsubsection*{\texttt{FIND-CONTRACT}}
+
+\begin{lemma}
+	
+\end{lemma}
+
+\hrulefill
+
+
+
+
+
+
+
+
+
+
+
+

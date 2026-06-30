@@ -1,0 +1,60 @@
+\clearpage
+\appendix
+
+\section*{Appendix}
+\label{sec:appendix}
+
+\begin{figure*}[t]
+\centering
+\resizebox{0.85\textwidth}{!}{
+\begin{tcolorbox}[colback=gray!5!white, colframe=blue!75!black, 
+title=User Prompt for Training, boxrule=0.3mm, width=\textwidth, arc=3mm, auto outer arc=true]
+\textbf{Dialogue History}\\
+\textless{}user\textgreater{} \{\{ Initial User Input \}\} \textless{}/user\textgreater{}\\
+\\
+\textcolor{deepblue}{\textless{}think\textgreater{}} Round 1 Model Thought \textcolor{deepblue}{\textless{}/think\textgreater{}}\\
+\{\{ Round 1 model output \textcolor{deepgreen}{\textless{}tool\_call\textgreater{}} or \textcolor{deeppurple}{\textless{}response\textgreater{}} \}\}\\
+\textcolor{brown}{\textless{}obs\textgreater{}} Round 1 Observation \textcolor{brown}{\textless{}/obs\textgreater{}}\\
+... ...\\
+\\
+\textless{}user\textgreater{} \{\{ User Input \}\} \textless{}/user\textgreater{}\\
+... ...\\
+\end{tcolorbox}
+}
+\caption{The user prompt used for TIR's rollout.}
+\label{prompt:user}
+\end{figure*}
+
+
+\section{User Prompt Details}
+The system instruction is shown in \Cref{prompt:system}. The user prompt is used to store the trajectory history, including intermediate thoughts, tool calls, environment observations, and any additional user commands. The complete user instruction is presented in \Cref{prompt:user}.
+
+
+\section{Experiment Details}
+\label{apdx:training}
+
+\paragraph{Training Data Details.} We empirically use 4K data points for training, as each dataset consists of samples drawn from the same distribution. Adding more data of similar nature does not increase task diversity. Moreover, we observe that increasing the dataset size beyond 4K does not yield noticeable improvements in the training convergence or final performance, suggesting diminishing returns from additional data under this setting.
+
+\paragraph{GRPO Setting Details.} For all the tool calls in the dataset, we all use JSON format to represent tool call as it's easy to parse and is the most general and structure way of performing tool call. For the GRPO training, we use 2 A100 (80G) GPUs per run with the following hyper-parameters:
+
+\input{tables/appendix_hyperparam}
+
+\paragraph{Baselines.} The 400 selected data points used for SFT share the same distribution as the 4k data points used for RL training, but differ in content. For SFT, each data point includes a \textcolor{deepblue}{\textless{}think\textgreater{}} field, with thought content distilled from Deepseek-R1 trajectories. In contrast, GRPO does not require ground truth thought, as only the tool calls are used to compute rewards in the GRPO setting.
+
+We use 400 data points for SFT based on empirical observations that this amount is sufficient to help the raw model learn to follow our tool call format. This provides a stronger initialization and reduces the burden of learning the format from scratch during RL training. However, we also find that relying solely on SFT can lead to overfitting, which may ultimately degrade performance.
+
+\paragraph{PPO Setting Details.} We apply approximately the same parameter settings as GRPO for the PPO training. Similarly, we use 2 A100 (80G) GPUs per run with the following hyper-parameters:
+
+\input{tables/appendix_hyperparam2}
+
+
+\section{Additional Results}
+
+We present additional results on three benchmarks, applying GRPO and PPO methods to models initialized with SFT on 4K data points. This setting serves as a ``theoretical'' upper bound, since the same 4K data is first used for SFT and subsequently reused for RL training.
+
+\input{tables/appendix_exp}
+
+The results are shown in \Cref{tab:bfcl-result-additional}, \Cref{tab:apibank-result-additional}, and \Cref{tab:bamboogle-result-additional} for BFCL, API-Bank, and Bamboogle, respectively. We compare RL training initialized with models fine-tuned on either 400 or 4K SFT data points.
+
+Interestingly, our findings suggest that initializing from a model finetuned on 4K data does not consistently outperform initialization from a model finetuned on only 400 data points. In the BFCL benchmark, we even observe cases where performance drops below that of the raw instruct model. This counterintuitive result may stem from overfitting during the SFT phase, which could restrict the model’s ability to explore during RL training and lead to poorer generalization on held-out tasks.
+

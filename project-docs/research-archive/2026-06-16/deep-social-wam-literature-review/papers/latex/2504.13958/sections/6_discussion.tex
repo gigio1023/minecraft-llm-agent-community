@@ -1,0 +1,171 @@
+\section{Analysis}
+\label{sec:analysis}
+In this section, we conduct a series of ablation studies to identify the most effective reward design for tool calling. We explore various factors including reward type, scale, granularity, and temporal dynamics.
+
+\subsection{Effect of Length Reward}
+We first examine the role of a length-based reward. Prior work has demonstrated that the R1-like models can promote deeper reasoning, often reflected in longer thinking traces. To encourage this behavior, we introduce a reward term proportional to the length of the \textcolor{deepblue}{\textless{}think\textgreater{}} field:
+\[
+\mathcal{R}_\text{length} = \min\left(\frac{L_{\text{think}}}{L_{\text{target}}}, 1\right)
+\]
+where \( L_{\text{think}} \) denotes the length of the thinking segment in model's output, and \( L_{\text{target}} \) denotes the target output length, which we empirically set to 512. We found that the raw model rarely generates responses longer than half this length, making 512 a reasonable and effective target for encouraging longer outputs. This length-based component is added to the overall reward, which now consists of format, correctness, and reasoning length.
+
+\input{tables/length_result}
+
+\begin{figure}
+    \centering
+    \subfigure[Response Length]{
+        \includegraphics[width=0.469\linewidth]{figures/response_length_plot.pdf}
+    }
+    \hfill
+    \subfigure[Length Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/length_reward_plot.pdf}
+    }
+    \caption{Response length (left) and its reward (right) trends across training steps for different models.}
+    \label{fig:analysis_length}
+\end{figure}
+
+As shown in \Cref{fig:analysis_length}, both response length and the length reward generally increase throughout training, particularly for the Qwen model series. This indicates that the length reward effectively encourages longer reasoning. However, the downstream results in \Cref{tab:bfcl-result-length} reveal that adding a length reward does not consistently improve task performance, and in smaller-scale models, it can even cause substantial degradation. These observations suggest that while extended reasoning may appear desirable, it is not always beneficial for tool use tasks. In fact, excessive length may introduce unnecessary complexity, leading to overthinking and reduced effectiveness.
+% \hongru{it seems weird, as your designed reward from math definition is not encouraging longer reasoning than 512, it does not encourage longer reasoning than 512? I am curious about how to decide 512 and the length distribution such as how many exceed 512 and how many not?} \cheng{512 is already pretty long for this task as we observed, as it's not like math modeling which needs too much back and forth. An explanation added.}
+
+\paragraph{Dynamic Length Reward.} Since fixed-length rewards showed minimal impact and converged quickly, we explored a dynamic length reward that adapts over training steps. Specifically, we define:
+\[
+\mathcal{R}_\text{dynamic} = \min\left(\frac{L_{\text{think}}}{L_{\text{target}} \cdot (1 + p) }, 1\right)
+\]
+where \( S \) denotes the training steps and \( p = \frac{S_{\text{current}}}{S_{\text{total}}} \in [0, 1] \) represents the normalized training progress. This formulation gradually increases the target thinking length over time, aligning with model maturity.
+
+\begin{figure}
+    \centering
+    \subfigure[Response Length]{
+        \includegraphics[width=0.469\linewidth]{figures/response_length_dynamic.pdf}
+    }
+    \hfill
+    \subfigure[Length Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/length_reward_dynamic.pdf}
+    }
+    \caption{Response length (left) and its reward (right) trends across training steps within the dynamic length reward training setting.}
+    \label{fig:analysis_length_dynamic}
+\end{figure}
+
+
+As shown in \cref{fig:analysis_length_dynamic}, this approach yields a steadier growth in thinking length, particularly for the Llama model. However, the performance results in \Cref{tab:bfcl-result-length} reveal that even scheduled rewards fail to improve performance. This further supports our hypothesis that extended reasoning may not benefit this task and can even have adverse effects.
+
+\finding{\textbf{Takeaway 1}: While length rewards encourage longer reasoning traces, they do not consistently improve task performance and may even harm it in smaller models, highlighting that longer reasoning is not inherently better for tool use tasks.}
+
+
+
+\subsection{Effect of Reward Scale}
+Next, we investigate the effect of reward scaling, specifically the relative weighting between correctness and format rewards. Prior work in R1-style RL commonly assigns a higher weight to correctness reward than to format reward~\citep{xie2025logic, jin2025search}, emphasizing the importance of learning correct answer over superficial adherence to format. This strategy helps prevent reward hacking, where a model might exploit formatting heuristics without learning task semantics.
+
+To test the importance of this design choice, we conduct an ablation where we equalize the maximum correctness and format rewards by setting the former’s range to \([-1, 1]\), matching that of the format reward. This adjustment only affects the final normalization step of the correctness reward:
+\begin{equation*}
+\mathcal{R}_{\text{correct}} = 2 \cdot \frac{R_{\max}}{S_{\max}} - 1 \in [-1, 1]
+\end{equation*}
+where all variables are defined as in \Cref{sec:reward_design}.
+
+\input{tables/scale_result}
+
+As shown in \Cref{tab:bfcl-result-scale}, this equal-scaling variant, denoted as ``Equal Max'', results in a slight drop in overall accuracy across most models, with the exception of Qwen2.5-3B, which maintains performance comparable to the original setting. These results underscore the importance of assigning greater weight to correctness reward: doing so helps steer the model toward mastering the core reasoning and tool use capabilities necessary for robust generalization.
+
+\paragraph{Dynamic Reward Scaling.} Building on the insight that correctness reward plays a more critical role, we are further motivated by the intuition that different reward components may benefit from being emphasized at different stages of training. This leads us to explore dynamically adjusting reward scales in accordance with training progress. Specifically, we hypothesize that in early training, the model should prioritize learning the correct output format, which entails an easier objective, before gradually shifting focus to the more challenging goal of tool use correctness. To test this hypothesis, we design two dynamic reward scaling strategies:
+
+\begin{itemize}[topsep=2pt, leftmargin=10pt, itemsep=2pt]
+    \item \textbf{Two stage (Coarse) Setting}: We divide training into two phases. In the first \( s \) training steps, we downscale the correctness reward to \( \frac{1}{3}\) of its original scale while keeping the format reward at its original scale. After step \( s \), we restore the correctness reward to its original scale and simultaneously reduce the format reward to range \([0, 0.5]\) (\( \frac{1}{2}\) of its original scale). Formally the reward scales are:
+    \[
+    \text{Scale}_\text{format} = 
+    \begin{cases}
+        [0, 1] & \text{if } S_{\text{current}} < s \\
+        [0, 0.5] & \text{otherwise}
+    \end{cases},
+    \]
+    \[
+    \text{Scale}_\text{correct} = 
+    \begin{cases}
+        [-1, 1] & \text{if } S_{\text{current}} < s \\
+        [-3, 3] & \text{otherwise}
+    \end{cases}
+    \]
+    where \( S_{\text{current}} \) denotes the current training step. In our experiments, we empirically set the switching point to \( s = 30 \) steps, as we observed that the format reward typically experiences a significant increase within the first 30 steps. Therefore, it is more beneficial for later steps to shift focus toward optimizing correctness.
+
+    \item \textbf{Dynamic (Finegrained) Setting}: We apply continuous interpolation between the two reward scales throughout training. Initially, both the format and correctness reward scales are set equally. Over time, the format reward scale linearly decays to its original value, while the correctness reward scale gradually increases to its original value, allowing the training to shift focus from format adherence to task correctness accordingly. Formally, the dynamic scaling is then defined as:
+    \[
+    \text{Scale}_\text{format} = [-2 + p, 2 - p],
+    \]
+    \[
+    \text{Scale}_\text{correct} = [-2 - p, 2 + p]
+    \]
+    where \( p \in [0,1] \) similarly represents the normalized training progress. This design ensures a smooth shift of learning focus from format fidelity to correctness.
+\end{itemize}
+
+\begin{figure}
+    \centering
+    \subfigure[Format Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/scale_format.pdf}
+    }
+    \hfill
+    \subfigure[Correctness Reward]{
+        \includegraphics[width=0.469\linewidth]{figures/scale_correctness.pdf}
+    }
+    \caption{Format (left) and correctness (right) reward trends across training steps for Qwen2.5-3B-Instruct with different reward scale dynamics.}
+    \label{fig:analysis_scale_dynamic}
+\end{figure}
+
+
+We present the reward dynamics of the original and two dynamic scaling strategies in \Cref{fig:analysis_scale_dynamic}. As shown in \Cref{tab:bfcl-result-scale}, the Two stage (Coarse) reward setting unexpectedly leads to a drop in performance, whereas the Dynamic (Finegrained) scaling could improve model's benchmarking performance. These findings suggest that abrupt shifts in reward scale may negatively impact the training dynamics. In contrast, a smoother and gradual transition from simpler objectives to more nuanced ones appears to better support the model’s learning trajectory and generalization during GRPO training.
+% \hongru{I do not know, there are so many human determined hyper-parameters, and it seems be determined arbitrarily.}\cheng{For the two stage one, we want to keep the initial max possible scale for format and correctness the same (both max possible reward is 1), and later we let correctness reward scale switch back to its original; For the dynamic one, we keep total max possible reward the same, initially correct = format = 2, then let correctness reward gradually switch back to its original scale (3), and format also switch to its original scale (1)}
+
+\finding{\textbf{Takeaway 2}: Gradually adjusting reward scales during training, rather than abrupt changes, better supports model learning and generalization, highlighting the benefits of a smoother transition from simpler objectives to more complex ones.}
+
+
+
+\subsection{Effect of Reward Granularity}
+We now perform a detailed analysis of the effect of reward granularity, focusing specifically on the correctness reward. Tool calling, by nature, poses challenges for reward assignment, as it involves multiple facets beyond a single definitive answer (e.g., in contrast to math reasoning tasks). Our original reward design decomposes correctness into matching the tool name, parameter names, and parameter values, offering a finegrained, ``process-oriented'' signal that reflects partial correctness in tool usage.
+
+To assess the impact of this granularity, we evaluate three alternative reward formulations with progressively coarser levels of aggregation:
+\begin{itemize}[topsep=2pt, leftmargin=10pt, itemsep=2pt]
+
+    \item \textbf{Finegrained}: We apply strict exact-match constraints to both tool name and parameter name matching. Specifically, we define:
+    
+    \begin{small}
+    \begin{equation*}
+        r_{\text{name}} = \mathds{1}[N_G = N_P] \in \{0, 1\}
+    \end{equation*}
+    \begin{equation*}
+        r_{\text{param}} = \sum_{G_j \in G} \mathds{1}[\text{keys}(P_G) = \text{keys}(P_P)] \in [0, |G|]
+    \end{equation*}
+    \end{small}
+    
+    \item \textbf{Intermediate}: We combine the parameter name and value rewards into a single term that enforces an exact match on the entire parameter dictionary. Formally:
+    
+    \begin{small}
+    \begin{equation*}
+        r_{\text{param}} + r_{\text{value}} = \sum_{G_j \in G} \mathds{1}[P_G = P_P] \in [0, |G|]
+    \end{equation*}
+    \end{small}
+    
+    \item \textbf{Coarse}: At the coarsest level, we fully entangle tool name, parameter names, and parameter values, treating the entire tool set as a unit. Reward is given only if the generated tool set exactly matches the ground truth:
+    
+    \begin{small}
+    \begin{equation*}
+        r_{\text{name}} + r_{\text{param}} + r_{\text{value}} = \mathds{1}[G = P] \in \{0, 1\}
+    \end{equation*}
+    \end{small}
+
+\end{itemize}
+All other aspects of reward computation are kept identical to those described in \Cref{sec:reward_design}. Starting from our original design, which is the most finegrained, we progressively entangle reward components to derive increasingly coarse-grained alternatives. 
+
+% qwen2.5-3B-ins4knolength-refined|qwen2.5-3B-ins4knolength-coarse|qwen2.5-3B-ins4knolength-strictmatch|qwen2.5-3B-ins4k-nolength (figure search)
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/granularity_correctness.pdf}
+    \caption{Correctness reward trends across training steps for Qwen2.5-3B-Instruct with different reward granularity.}
+    \label{fig:analysis_granularity}
+\end{figure}
+
+\input{tables/granularity_result}
+
+The reward dynamics across training steps, shown in \Cref{fig:analysis_granularity}, demonstrate that as reward granularity becomes coarser, it becomes harder for the model to achieve higher reward values during RL training. This suggests that overly strict and entangled rewards may lead to sparse learning signals, potentially hindering effective credit assignment.
+
+Empirical results in \Cref{tab:bfcl-result-granularity} further support this insight: our original, most finegrained reward strategy performs well across models. In general, finer-grained reward decomposition leads to better training outcomes and higher final task performance, indicating its advantage in promoting more stable and effective policy learning.
+
+\finding{\textbf{Takeaway 3}: Finegrained reward decomposition provides richer learning signals, highlighting its role in enabling more effective training compared to coarse reward formulations, which can impede progress and degrade final performance.}
+

@@ -1,0 +1,427 @@
+\section{Agent Prompts}%
+\label{subsec:prompts}
+
+The main agent is the entrypoint that routes requests to other agents and
+synthesises sub-agent results into the final answer.
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+Your task is to orchestrate sub-agents in order to solve the problem. Here is the problem to solve:
+
+Problem Statement ==============================================================
+
+\{problem\_statement\}
+
+End Problem Statement ==========================================================
+
+You must now delegate this problem to one, two or however many agents are required to thoroughly solve the problem.
+
+Ensure you relay the problem statement accurately and completely to the agent. Sub-agents will have access to the problem statement too, and so it should rarely be necessary to write it out verbatim. In particular, if the problem statement is very long, you should explicitly NOT write it out again in full. Instead, just give clear direction, and trust that the sub-agent can also refer to the problem statement.
+
+You have been given access to file and directory viewing tools, since these can help you get your bearings and direct sub-agents more effectively. These are however meant to help you understand the context in which you operate. You are intentionally not directly equipped with any tools to conduct substantive work, because you are just the router, delegator and orchestrator. The tools that your sub-agents' have available are however listed, and you should carefully refer to these when considering which agent to call next. It is these sub-agents' job to make the necessary state changes to make progress on the task at hand.
+\end{tracebox}
+\end{adjustbox}
+}
+
+\subsection{Base Sub-Agent Prompts}%
+\label{subsec:sub_agent_prompts}
+
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+As a professional and experienced programmer, your approach is to:\\
+
+1. slow down and don't write files fully end-to-end in one go\\
+2. first understand your context thoroughly:\\
+    2.1 explore the project to locate all the files that could be useful documentation (README.md files, common likely MD documentation files, etc)\\
+    2.2 view each of these files, making notes or summaries, and closing irrelevant or long files\\
+    2.3 explore the codebase as it relates to your instructions: find all relevant files, in order to identify existing design patterns and conventions\\
+3. (optional) prototype and design before starting coding\\
+    3.1 come up with some simple toy examples in a testing directory\\
+    3.2 use execution feedback to benchmark or compare the approaches\\
+    3.3 synthesise the information and learnings into a final design or solution\\
+4. make code edits\\
+    4.1 identify the most minimal and effective ways to make your required changes\\
+    4.2 observe any existing stylistic conventions\\
+5. test end-to-end\\
+    5.1 Prefer end-to-end testing in testing scripts without test frameworks\\
+    5.2 If this is not an option or the project already uses a testing framework, then use that\\
+    5.3 Ensure your code is valid, hasn't introduced any regressions and works as intended\\
+6. Clean up after yourself\\
+    6.1 Check that all the documentation is still up to date after your changes\\
+    6.2 Clean up any temporary files or changes\\
+\\
+NOTE:\\
+    - don't create virtual environments\\
+    - avoid pytest and mocks if you can; prefer end-to-end scripts\\
+    - if the request is clearly exploratory in nature, then you may bypass the rigorous procedure above, and address it appropriately\\
+    - call your reasoning agent if you are stuck on a tricky algorithmic or mathematical problem, to help you gain insight and make progress\\
+\end{tracebox}
+\end{adjustbox}
+}
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+Here is the problem you have been asked to solve:\\
+\\
+Your problem ================\\
+\{self.problem\_statement\}\\
+==================================\\
+\\
+Approach:\\
+1. Talk over what the question or problem is asking of you\\
+2. Plan minimum viable solution and validate approach\\
+3. Execute swiftly and adapt based on feedback\\
+4. Verify against original requirements\\
+\\
+Key principles:\\
+- Choose simplest viable solution\\
+- Validate early and often\\
+- Adapt swiftly when blocked\\
+\end{tracebox}
+\end{adjustbox}
+}
+
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+Here is the initial request, provided for context only, that we are ultimately trying to solve:\\
+Initial request:\\
+\\
+\{self.\_context.initial\_request\}\\
+\\
+End initial request.\\
+\\
+Here is the problem you have been asked to solve:\\
+\\
+Problem statement:\\
+\\
+\{self.problem\_to\_solve\}\\
+\\
+End problem statement.
+\end{tracebox}
+\end{adjustbox}
+}
+
+\subsection{Overseer Prompt}%
+\label{subsec:overseer_prompt}
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+You are an expert system overseer responsible for monitoring agent execution in real-time. You will be shown execution traces as they develop and must make decisions about whether intervention is needed. You are running in a loop.\\
+
+Your task is to:\\
+1. Analyze the current execution state\\
+2. Determine if you have enough information to make confident assessments\\
+3. Evaluate whether agents are progressing healthily or need intervention\\
+4. Provide thoughtful and constructive steering notifications to running agents if intervention is needed\\
+5. In extreme cases, cancel the execution of an agent and notify its parent of why this is\\
+6. Leave notes for future evaluation iterations if needed\\
+\\
+You must provide your analysis in the following structured format:\\
+\\
+{OVERSEER\_EXAMPLES}\\
+\\
+Here is the current execution trace:\\
+\\
+{graph\_repr}\\
+\\
+Previous overseer notes (if any)\\
+{self.\_previous\_notes if self.\_previous\_notes else 'No notes.'}\\
+\\
+Key considerations:\\
+    - Agents that have already returned cannot receive notifications\\
+    - Look at timestamps and event counts to understand execution progress\\
+    - Some agents may legitimately take long periods to complete\\
+    - Consider both local agent health and global execution progress\\
+    - If the agent appears stuck without terminating, remind it that it can exit by generating <COMPLETE>\{COMPLETE\_STOP\_TOKEN\}\\
+    - If, when the agent has been tasked to work on its own code at meta-improvement time, it is attempting to test tools or other features directly (using its own running code), intervene immediately and tell it to either test a new agent end-to-end (python -m workdir.agent -p "<some prompt>"...) or to create test scripts to test the tools directly.\\
+    - You may cancel an agent if it is no longer making progress, wasting resources, or very clearly going down the wrong path or deviating from its instructions. You must make at least one attempt to notify the agent of its wrongdoings before issuing a cancellation command.\\
+    - When canceling an agent, you must also notify its parent calling agent of the reasons for the cancellation.\\
+    - If the task becomes untenable, after multiple failed attempts, and the agent is appearing to repeat itself, instruct the main agent to use its early\_exit tool to exit early.\\
+    - Use cancellations sparingly, as they are  disruptive and ultimately more costly than guiding the agent to successful completion, since any new sub-agent will often have to start the task from scratch.\\
+\\
+The last time you checked was at: {self.\_last\_check\_time.strftime("\%H:\%M:\%S") if self.\_last\_check\_time else "N/A"}\\
+The current timestamp is {datetime.now().strftime("\%H:\%M:\%S")}\\
+\\
+Your analysis:
+\end{tracebox}
+\end{adjustbox}
+}
+
+The judgements of the overseer will generally be in the following form:
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+<OVERSEER\_JUDGEMENT>\\
+<making\_progress>false</making\_progress>\\
+<is\_looping>true</is\_looping>\\
+<currently\_running\_agent>agent\_d4e5f6g7</currently\_running\_agent>\\
+<needs\_notification\_reasoning>The agent has been notified previously about its looping behavior but has not corrected course. It's time to forcefully cancel this execution.</needs\_notification\_reasoning>\\
+<needs\_notification>true</needs\_notification>\\
+<agent\_to\_notify>agent\_b8a796h5</agent\_to\_notify>\\
+<notification\_content>Your software developer agent was looping while trying to install the program, and as a result I have cancelled it. You might want to start another software developer with clearer instructions about how to install the program.</notification\_content>\\
+<force\_cancel\_agent>true</force\_cancel\_agent>\\
+<force\_cancel\_agent\_id>agent\_d4e5f6g7</force\_cancel\_agent\_id>\\
+<next\_check\_type>time</next\_check\_type>\\
+<next\_check\_delay>10</next\_check\_delay>\\
+<notes\_for\_next\_iteration>Forced cancellation of agent\_d4e5f6g7 due to unresponsive looping. Monitor parent agent for proper handling of cancelled child.</notes\_for\_next\_iteration>\\
+<OVERSEER\_JUDGEMENT>
+\end{tracebox}
+\end{adjustbox}
+}
+
+\section{Example Traces}%
+\label{subsec:traces}
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+\begin{verbatim}
+EXECUTION TREE
+==============
+1 main [agent_b8845adf] (134.4s | 95752 tokens (cached 0.57%) | $0.185 | Success)
+   [Stats] Events: 1 tool calls, 6 messages
+   [Assistant] t+0.1s | "I'll orchestrate the solution to this problem foll..."
+   1.3 reasoning_agent [agent_20fccbc1] (12.0s | 5673 tokens (cached 0.00%) | $0.013 | Success)
+      [Stats] Events: 1 messages
+      [Assistant] t+9.8s | "Below is an explanation that addresses the three p..."
+   [Assistant] t+21.1s | "The reasoning agent has provided excellent analy..."
+   1.2 solve_problem [agent_11804c1f] (17.6s | 54822 tokens (cached 0.68%) | $0.085 | Success)
+      [Stats] Events: 3 tool calls, 4 messages
+      [Assistant] t+26.1s | "Let me solve this step by step.1. UNDERSTANDING..."
+      [Tool] calculate | 0.0s → Success
+      [Assistant] t+32.4s | "Therefore there are floor(404.8) = 404 complete..."
+      [Tool] return_result | 0.0s → Success
+      [Assistant] t+42.1s | "<COMPLETE></COMPLETE>..."
+   [Assistant] t+43.7s | "The problem solver has provided a solution..."
+   1.1 software_developer [agent_0117a7ef] (69.7s | 208122 tokens (cached 0.68%) | $0.321 | Success)
+      [Stats] Events: 8 tool calls, 10 messages
+      [Assistant] t+49.3s | "I'll help solve this mathematical game problem thr..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+54.6s | "<TOOL_CALL><TOOL_NAME>start_lsp_server</TOOL_NA..."
+      [Tool] start_lsp_server | 2.2s → Success
+      [Assistant] t+59.9s | "Now let's create our main implementation file:..."
+      [Tool] overwrite_file | 0.0s → Success
+      [Assistant] t+70.4s | "Now let's create a test script to verify our imp..."
+      [Tool] overwrite_file | 0.0s → Success
+      [Assistant] t+76.8s | "Now let's run our test script to verify everythi..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+80.9s | "I notice that there's an issue with our pattern..."
+      1.1.1 reasoning_agent [agent_8a69d943] (11.3s | 10231 tokens (cached 0.00%) | $0.017 | Success)
+         [Stats] Events: 1 messages
+         [Assistant] t+87.2s | "The problem comes from our backward induction func..."
+      [Assistant] t+98.5s | "Based on the reasoning agent's analysis, let's u..."
+      [Tool] overwrite_file | 0.0s → Success
+      [Assistant] t+107.8s | "Now let's run our test script again to verify th..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+112.0s | "Perfect! Our implementation now correctly:1. I..."
+      [Tool] return_result | 0.0s → Success
+      [Assistant] t+116.8s | "<COMPLETE></COMPLETE>..."
+   [Assistant] t+119.0s | "Let's verify the software agent's answer since it di..."
+   1.4 reasoning_agent [agent_6cd34374] (5.0s | 12025 tokens (cached 0.00%) | $0.016 | Success)
+      [Stats] Events: 1 messages
+      [Assistant] t+124.1s | "Answer synthesis: Our analysis starts..."
+   [Assistant] t+129.1s | "Let's submit our final answer:<TOOL_CALL><TO..."
+   [Tool] submit_answer | 0.0s → Success
+   [Assistant] t+132.1s | "<COMPLETE></COMPLETE>..."
+
+Total Duration: 249.9s
+Total Tokens: 407766 (of which cached 232952)
+Total Cost: $0.712
+\end{verbatim}
+\end{tracebox}
+\end{adjustbox}
+}
+
+The above shows a representative example of an agent solving a problem. The problem at hand is a maths problem, and the execution begins with a reasoning agent (o3 mini) which devises a solution method. This is then passed to a `problem solving' agent which attempts to solve the problem. Then, the main agent invokes a `software developer' agent to write a script to numerically verify the solution. The software developer agent gets stuck after attempting to run the test script, and invokes the reasoning agent to help debug the problem. After applying the fix, the test script runs correctly and yields a solution that differs from the first problem solver's answer. To consolidate the two, the main agent invokes another reasoning agent, which sides with the empirically derived solution, which is finally submitted as the answer by the main agent.
+
+{
+\begin{adjustbox}{max width=\linewidth, center}
+\begin{tracebox}
+\begin{verbatim}
+EXECUTION TREE
+==============
+1 main [agent_5e260c4e] (617.5s | 106497 tokens (cached 0.30%) | $0.299 | Success)
+   [Stats] Events: 1 tool calls, 5 messages
+   [Assistant] t+0.1s | "I'll help orchestrate the solution to this problem..."
+   1.1 archive_explorer [agent_534a61ec] (88.6s | 372576 tokens (cached 0.16%) | $1.205 | Success)
+      [Stats] Events: 7 tool calls, 10 messages
+      [Assistant] t+5.6s | "I'll follow the procedure step by step to analyze..."
+      [Tool] compare_agent_iterations | 0.0s → Success
+      [Assistant] t+9.7s | "Let's also look at some of the best and worst pe..."
+      [Tool] best_problems | 0.0s → Success
+      [Assistant] t+13.2s | "Let me also look at some of the worst performing..."
+      [Tool] worst_problems | 0.0s → Success
+      [Assistant] t+16.7s | "Let me inspect the project documentation..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+22.1s | "<TOOL_CALL><TOOL_NAME>open_file</TOOL_NAME><TO..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+27.4s| "Let me also look at the current iteration's desc..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+33.6s| "Having reviewed the documentation and cu..."
+      1.1.2 reasoning_agent [agent_d4553475] (14.8s | 81577 tokens (cached 0.00%) | $0.097 | Success)
+         [Stats] Events: 1 messages
+         [Assistant] t+44.0s| "I updated description.txt and agent_change_log.md..."
+      [Assistant] t+58.1s | "Let me examine this suggestion from the reasoni..."
+      1.1.1 reasoning_agent [agent_ccad2709] (5.4s | 81442 tokens (cached 0.02%) | $0.090 | Success)
+         [Stats] Events: 1 messages
+         [Assistant] t+72.0s | "I’ve updated both description.txt and agent_change..."
+      [Assistant] t+77.4s | "Based on the analysis from both reasoning agents..."
+      [Tool] return_result | 0.0s → Success
+      [Assistant] t+88.7s | "<COMPLETE></COMPLETE>..."
+   [Assistant] t+94.1s | "The archive explorer has made a specific suggest..."
+   1.2 software_developer [agent_6345b78d] (331.2s | 1388672 tokens (cached 0.22%) | $4.341 | Success)
+      [Stats] Events: 21 tool calls, 22 messages
+      [Assistant] t+109.7s | "Let's first look at key documentation files:<T..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+114.4s | "Now let's look at any existing diff-related code..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+118.3s | "Let's also look at existing utils and __init__ f..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+123.1s | "Now that I understand the context better, let me..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+274.6s | "Now let's run the tests to verify the implementa..."
+      [Tool] execute_command | 0.5s → Success
+      [Assistant] t+281.9s | "Oops, looks like I need to fix the test case. Th..."
+
+      ... truncated ...
+
+      [Tool] diff_patch_edit | 0.0s → Success
+      [Assistant] t+356.8s | "Now let me run the tests again:<TOOL_CALL><T..."
+      [Tool] execute_command | 0.5s → Success
+      [Assistant] t+365.3s | "Great! Now that the implementation and tests ar..."
+      [Tool] diff_patch_edit | 0.0s → Success
+      [Assistant] t+375.6s | "Now let me update description.txt:<TOOL_CALL>..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+382.6s | "<TOOL_CALL><TOOL_NAME>diff_patch_edit</TOOL_NAM..."
+      [Tool] diff_patch_edit | 0.0s → Success
+      [Assistant] t+392.4s | "Finally, let me update agent_change_log.md:<..."
+      [Tool] diff_patch_edit | 3.6s → Success
+      [Assistant] t+415.4s | "Let me verify that I've completed all the requ..."
+      [Tool] return_result | 0.0s → Success
+      [Assistant] t+428.0s | "<COMPLETE></COMPLETE>..."
+   [Assistant] t+434.6s | "The software developer has successfully impleme..."
+   1.3 software_developer [agent_ae600007] (167.0s | 194915 tokens (cached 0.54%) | $0.390 | Success)
+      [Stats] Events: 9 tool calls, 10 messages
+      [Assistant] t+442.9s | "I'll help test the DiffSummarizer implementation b..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+447.8s | "Now let's create a directory for our test and se..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+456.7s | "Now let's execute the agent command to run our t..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+460.5s | "I apologize for the error. We need to properly s..."
+      [Tool] execute_command | 120.3s → Failed
+      [Assistant] t+585.8s | "I see that the command is taking longer than exp..."
+      [Tool] open_file | 0.0s → Success
+      [Assistant] t+588.9s | "Let's try a direct test of the DiffSummarizer. W..."
+      [Tool] execute_command | 0.0s → Success
+      [Assistant] t+595.5s | "Now let's run our test script:<TOOL_CALL><TOO..."
+      [Tool] execute_command | 0.5s → Success
+      [Assistant] t+598.5s | "Perfect! Let's analyze what we've found:1. The..."
+      [Tool] return_result | 0.0s → Success
+      [Assistant] t+608.3s | "<COMPLETE></COMPLETE>..."
+   [Assistant] t+609.8s | "Great! The implementation and testing of the Di..."
+   [Tool] submit_answer | 0.0s → Success
+   [Assistant] t+615.2s | "<COMPLETE></COMPLETE>..."
+\end{verbatim}
+\end{tracebox}
+\end{adjustbox}
+}
+
+The above shows a characteristic meta-improvement run: the agent starts by invoking the `archive explorer' sub-agent, which has access to a number of tools to facilitate archive analysis. Note that this is using exactly the same simple, generic and extensible sub-agent class as the other base agents in the system. The archive explorer compares different iterations, looks at the best performing benchmark problems in a given iterations to understand success cases, as well as the worst performing benchmark problems at a given iteration to understand the failure modes. It then views some files to understand the agetn's implementation and documentation, and then invokes two reasoning agents to help it reason over this information. The result of this agent call is a recommendation to the main agent about what to work on.
+
+The main agent then invokes the `software developer' sub-agent with the
+instruction to implement the feature. The coding sub-agent first looks at
+relevant files and documentation, implement the feature, and then enters into a
+debugging loop as it fixes the bugs in its implementation. About 3 minutes
+later, it successfully gets all the tests (that it wrote) to pass, documents the
+change in the agent change log, and returns to the main agent.
+
+The main agent then invokes a second software developer sub-agent to
+independently verify the implementation of the feature, which passes after an
+initial issue, and the agent returns a description of the newly functioning tool
+to the main agent which then exits.
+
+\section{Function Calling Interface}%
+\label{sec:function_calling}
+
+The \acr{LLM} function calling interface allows the \acr{LLM} to invoke tools and sub-agents at run-time without pre-defined control flow.
+There are many approaches to implementing this, from constrained generation, to parsing the stream of agent token generations without interruption, to simply relying on \acr{LLM} providers' or inference frameworks' native function or tall calling implementations.
+
+For maximum flexibility, we adopt an un-constrained structured generation
+approach, where the \acr{LLM} outputs \acr{XML}-formatted generations, where the
+closing tag is registered as a stop token. Inspecting the stop reason, we can
+then detect whether a tool call or an agent call occurred, parse the content,
+and run the tool implementation.
+
+For instance, here is an example tool calling syntax:
+\begin{verbatim}
+<TOOL_CALL>
+<TOOL_NAME>tool_name</TOOL_NAME>
+<TOOL_ARGS>
+<arg1>value1</arg1>
+<arg2>value2</arg2>
+</TOOL_ARGS>
+</TOOL_CALL>
+\end{verbatim}
+where \texttt{</TOOL\_CALL>} is registered as a stop token. The
+\texttt{tool\_name} is then parsed first and is used to index into a set of tools
+made available to the calling agent, following which the tool arguments are
+parsed into a dict, and the tool class is instantiated.
+
+We choose \acr{XML} over \acr{JSON} as the tool calling format since it does not
+require escaping string literals, which can become burdensome when including
+file content verbatim as an argument.
+
+\section{Additional Result Details}%
+\label{subsec:result_details}
+
+Here is the sequence of updates the agent made, corresponding to the plot in Figure~\ref{fig:performance}.
+
+\begin{enumerate}
+    \item \textbf{Smart Editor}: Implemented a new SmartEditor tool to
+intelligently select and execute the optimal file editing strategy based on edit
+characteristics.
+    \item \textbf{Quick Overwrite Tool}: to address performance issues with file editing
+        operations to improve on full file overwrites; reducing token usage.
+    \item \textbf{Diff-Enhanced Smart Editor}: adds intelligent diff-based
+        strategy selection and improved pattern-based editing.
+    \item \textbf{Simplified DiffVerifier Tests}: improved the developer
+        experience to improve maintainability
+    \item \textbf{Code Context Summarizer}: Added a new CodeContextSummarizer
+        tool that efficiently extracts and summarizes code context using
+        ripgrep. Intended to make codebase exploration more efficient.
+    \item \textbf{SmartEditor Input Normalizer}: Added an InputNormalizer
+        component to improve edit operation efficiency and reliability.
+    \item \textbf{Enhanced File Edit Verification}: Implemented a comprehensive
+        file state tracking system to improve edit operation efficiency.
+    \item \textbf{Minimal Diff Output Optimization}: Implemented optimizations
+        to reduce token usage in file editing operations by minimizing diff
+        context output.
+    \item \textbf{AST Symbol Locator}: Integrated an AST-based symbol locator
+        tool for precise code navigation.
+    \item \textbf{Optimized File Edit Routing}: Implemented explicit task type
+detection and routing optimization in MainAgent to improve handling of file
+editing tasks.
+    \item \textbf{Enhanced File Size Optimization}: Added file size thresholding
+        of 100KB to optimize handling of large files and reduce processing
+        overhead on big changes.
+    \item \textbf{Hybrid Symbol Locator}: Implemented a hybrid symbol location
+        approach that combines ripgrep-based candidate identification with AST
+        verification.
+    \item \textbf{Context-Sensitive Diff Minimization}: Completed the
+        integration of context-sensitive diff minimization into the SmartEditor
+        tool. Uses AST parsing for Python code changes and pattern-based
+        analysis for other file types. Intends to reduce token usage by
+        minimizing change context.
+    \item \textbf{Optimized AST Parsing in Hybrid Symbol Locator}: Implemented
+        targeted AST parsing in hybrid\_symbol\_locator.py to process only
+        relevant code regions instead of whole files.
+\end{enumerate}

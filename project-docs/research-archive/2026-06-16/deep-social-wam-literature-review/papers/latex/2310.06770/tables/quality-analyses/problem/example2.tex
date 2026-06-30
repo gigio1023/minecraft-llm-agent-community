@@ -1,0 +1,36 @@
+Unicode method names cause UnicodeDecodeError for some requests in Python 2.7.2
+The following example works fine:
+
+\lstset{linewidth=\linewidth}
+\lstset{basicstyle=\small\ttfamily}
+
+\begin{lstlisting}[language=Python]
+files = {u'file': open(u'/usr/bin/diff', u'rb')}
+response = requests.request(method='POST', url=u'http://httpbin.org/post',
+    files=files)
+\end{lstlisting}
+
+But the following example (using `method=u'POST'` instead of `method='POST'`) produces a UnicodeDecodeError:
+
+\begin{lstlisting}[language=Python]
+files = {u'file': open(u'/usr/bin/diff', u'rb')}
+response = requests.request(method=u'POST', url=u'http://httpbin.org/post',
+    files=files)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+Traceback (most recent call last):
+  [Full stack trace hidden]
+  File "/System/Library/Frameworks/Python.framework/Versions/2.7/...
+    msg += message_body
+UnicodeDecodeError: 'ascii' codec can't decode byte 0xcf in position 140:
+    ordinal not in range(128)
+\end{lstlisting}
+
+My guess is that `u'POST'` is infecting the header with unicode when it should be a string.  This is because `sessions.py:313` is simply:
+
+\begin{lstlisting}[language=Python]
+req.method = method.upper()
+\end{lstlisting}
+
+[Additional lines hidden...]

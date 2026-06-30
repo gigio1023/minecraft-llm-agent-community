@@ -1,0 +1,1283 @@
+\setcounter{table}{0}  
+\setcounter{figure}{0}
+\setcounter{algorithm}{0}
+\renewcommand{\thetable}{A\arabic{table}}
+\renewcommand{\thefigure}{A\arabic{figure}}
+
+\lstdefinestyle{mystyle}{         
+    breaklines=true
+}
+
+\subsection{LLM Based Expansion: Prompt for LLM Optimizer}
+\label{appendix:prompt}
+
+\begin{tcolorbox}[title={\textbf{\small Workflow optimize prompt}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+
+PROMPT = """You are building a Graph and corresponding Prompt to jointly solve {type} problems. Referring to the given graph and prompt, which forms a basic example of a {type} solution approach, please reconstruct and optimize them. You can add, modify, or delete nodes, parameters, or prompts. Include your single modification in XML tags in your reply. Ensure they are complete and correct to avoid runtime failures. When optimizing, you can incorporate critical thinking methods like review, revise, ensemble (generating multiple answers through different/similar prompts, then voting/integrating/checking the majority to obtain a final answer), selfAsk, etc. Consider Python's loops (for, while, list comprehensions), conditional statements (if-elif-else, ternary operators), or machine learning techniques (e.g., linear regression, decision trees, neural networks, clustering). The graph complexity should not exceed 10. Use logical and control flow (IF-ELSE, loops) for a more enhanced graphical representation.Ensure that all the prompts required by the current graph from prompt_custom are included.Exclude any other prompts. Output the modified graph and all the necessary Prompts in prompt_custom (if needed).The prompt you need to generate is only the one used in `prompt_custom.XXX` within Custom. Other methods already have built-in prompts and are prohibited from being generated. Only generate those needed for use in `prompt_custom`; please remove any unused prompts in prompt_custom. the generated prompt must not contain any placeholders. Considering information loss, complex graphs may yield better results, but insufficient information transmission can omit the solution. It's crucial to include necessary context during the process."""
+\end{minted}
+\end{tcolorbox}
+
+\subsection{Basic Structure of Node}
+\label{appendix:node structure}
+\begin{tcolorbox}[title={\textbf{\small Node structure}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+class ActionNode:
+    async def fill(self, context, llm, schema...):
+        """
+        :param context: Everything we should know when filling node.
+        :param llm: Large Language Model with pre-defined system message.
+        :param schema: json/markdown/xml, determine example and output format.
+         - raw: free form text
+         - json: it's easy to open source LLM with json format
+         - markdown: when generating code, markdown is always better
+         - xml: its structured format is advantageous for constraining LLM outputs
+        """
+        ...
+        return self
+\end{minted}
+\end{tcolorbox}
+
+\subsection{Basic Structure of Workflow}
+\label{appendix:graph structure}
+\begin{tcolorbox}[title={\textbf{\small Workflow structure}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQa", "DROP"]
+
+class Workflow:
+    def __init__(
+        self,
+        name: str,
+        llm_config,
+        dataset: DatasetType,
+    ) -> None:
+        self.name = name
+        self.dataset = dataset
+        self.llm = create_llm_instance(llm_config)
+        self.llm.cost_manager = CostManager()
+
+    async def __call__(self, problem: str):
+        """
+        Implementation of the workflow
+        """
+        raise NotImplementedError("This method should be implemented by the subclass")
+\end{minted}
+\end{tcolorbox}
+
+\subsection{Operators}
+\label{appendix:operator_code}
+\begin{tcolorbox}[title={\textbf{\small Operators}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+class ContextualGenerate(Operator):
+    async def __call__(self, problem, context, mode: str = None):
+        prompt = CONTEXTUAL_GENERATE_PROMPT.format(problem_description=problem, thought=context)
+        fill_kwargs = {"context": prompt, "llm": self.llm}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(GenerateOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+        return response
+
+class CodeGenerate(Operator):
+    async def __call__(self, problem, function_name, mode: str = None):
+        prompt = GENERATE_CODEBLOCK_PROMPT.format(problem_description=problem)
+        fill_kwargs = {"context": prompt, "llm": self.llm, "function_name": function_name}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(CodeGenerateOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+        return response
+
+
+class Format(Operator):
+    async def __call__(self, problem, solution, mode: str = None):
+        prompt = FORMAT_PROMPT.format(problem_description=problem, solution=solution)
+        fill_kwargs = {"context": prompt, "llm": self.llm}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(FormatOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+        return response
+        
+class Review(Operator):
+    async def __call__(self, problem, solution, mode: str = None):
+        prompt = REVIEW_PROMPT.format(problem_description=problem, solution=solution, criteria=self.criteria)
+        fill_kwargs = {"context": prompt, "llm": self.llm}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(ReviewOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+        return response
+
+class Revise(Operator):
+    async def __call__(self, problem, solution, feedback, mode: str = None):
+        prompt = REVISE_PROMPT.format(problem_description=problem, solution=solution, feedback=feedback)
+        fill_kwargs = {"context": prompt, "llm": self.llm}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(ReviseOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+        return response
+
+class Ensemble(Operator):
+    async def __call__(self, solutions: List[str], problem: str, mode: str = None):
+        answer_mapping = {}
+        solution_text = ""
+        for index, solution in enumerate(solutions):
+            answer_mapping[chr(65 + index)] = index
+            solution_text += f"{chr(65 + index)}: \n{str(solution)}\n\n\n"
+        prompt = ENSEMBLE_PROMPT.format(solutions=solution_text, problem_description=problem)
+        fill_kwargs = {"context": prompt, "llm": self.llm}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(EnsembleOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+
+        answer = response.get("solution_letter", "")
+        answer = answer.strip().upper()
+
+        return {"solution": solutions[answer_mapping[answer]]}
+
+class Test(Operator):
+    def exec_code(self, solution, entry_point):
+        fail_cases = []
+        ...
+        if fail_cases != []:
+            return fail_cases
+        else:
+            return "no error"
+
+    async def __call__(self, problem, solution, entry_point, test_loop: int = 3):
+        for _ in range(test_loop):
+            result = self.exec_code(solution, entry_point)
+            if result == "no error":
+                return {"result": True, "solution": solution}
+            elif "exec_fail_case" in result:
+                result = result["exec_fail_case"]
+                prompt = REFLECTION_ON_PUBLIC_TEST_PROMPT.format(
+                    problem=problem,
+                    solution=solution,
+                    exec_pass=f"executed unsuccessfully, error: \n {result}",
+                    test_fail="executed unsucessfully",
+                )
+                node = await ActionNode.from_pydantic(ReflectionTestOp).fill(context=prompt, llm=self.llm, mode="code_fill")
+                response = node.instruct_content.model_dump()
+                solution = response["reflection_and_solution"]
+            else:
+                ...        
+        result = self.exec_code(solution, entry_point)
+        if result == "no error":
+            return {"result": True, "solution": solution}
+        else:
+            return {"result": False, "solution": solution}
+
+class Programmer(Operator):
+    async def exec_code(code, timeout=180):
+        def run_code():
+            try:
+                global_namespace = {}
+                
+                exec(code, global_namespace)
+            except ...
+
+        done_event = threading.Event()
+        result = ["Error", "subprocess error"]
+
+        def wrapper():
+            nonlocal result
+            result = run_code()
+            done_event.set()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(wrapper)
+            try:
+                if done_event.wait(timeout=timeout):
+                    return result
+                else:
+                    future.cancel()
+                    return "Error", "Exceed time limit"
+            finally:
+                executor.shutdown(wait=False)
+
+    async def code_generate(self, problem, analysis, feedback, mode):
+        prompt = PYTHON_CODE_VERIFIER_PROMPT.format(problem=problem, analysis=analysis, feedback=feedback)
+        fill_kwargs = {"context": prompt, "llm": self.llm, "function_name": "solve"}
+        if mode:
+            fill_kwargs["mode"] = mode
+        node = await ActionNode.from_pydantic(CodeGenerateOp).fill(**fill_kwargs)
+        response = node.instruct_content.model_dump()
+        return response
+
+    async def __call__(self, problem: str, analysis: str = "None"):
+        code = None
+        for i in range(3):
+            code = await self.code_generate(problem, analysis, feedback, mode="code_fill")
+            code = code["code"]
+            status, output = await self.exec_code(code)
+            if status == "Success":
+                return {"code": code, "output": output}
+            else:
+                ...
+        return {"code": code, "output": "error"}
+\end{minted}
+\end{tcolorbox}
+
+Providing predefined operators can effectively enhance the search efficiency of \model. We implement six common operator structures, including: Generate (Contextual, Code), Format, Review \& Revise, Ensemble, Test, and Programmer. For the Test Operator, we use the public test dataset of the dataset as test data. For datasets like MBPP that don't provide a public test dataset, we follow the setting in \citet{li2024debug} where we use the first test case of each problem as public test data.
+
+\subsection{Mapping workflow from Formulation to Code}
+
+\begin{tcolorbox}[title={\textbf{\small An example of Workflow}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+async def __call__(self, problem: str, entry_point: str):
+    """
+    Implementation of the workflow
+    Custom operator to generate anything you want.
+    But when you want to get standard code, you should use custom_code_generate operator.
+    """
+    solutions = []
+    for _ in range(3):  # Generate 3 solutions
+        solution = await self.custom_code_generate(problem=problem, entry_point=entry_point, instruction=prompt_custom.CODE_GENERATE_PROMPT)
+        solutions.append(solution['response'])
+    
+    best_solution = await self.sc_ensemble(solutions=solutions, problem=problem)
+    
+    test_result = await self.test(problem=problem, solution=best_solution['response'], entry_point=entry_point)
+    
+    if test_result['result']:
+        return test_result['solution'], self.llm.cost_manager.total_cost
+    else:
+        # If the test fails, try to fix the solution
+        fixed_solution = await self.custom(input=f"Problem: {problem}\nFailed solution: {best_solution['response']}\nError: {test_result['solution']}", instruction=prompt_custom.FIX_CODE_PROMPT)
+        return fixed_solution['response'], self.llm.cost_manager.total_cost
+\end{minted}
+\end{tcolorbox}
+
+In this example,
+\begin{itemize}[leftmargin=20pt]
+    \item self.custom is the interface for building nodes, through which the Optimizer can generate/modify its prompts.    
+    \item self.test and self.sc ensemble are interfaces for using Operators (In this example, this workflow only use 2 operators).
+    \item Edge in \model are represented through code, controlling the flow of all input/output variables between Nodes and Operators to form a complete workflow. Given this definition, the traditional concept of a 'node having two outgoing edges' does not apply to this formulation.
+\end{itemize}
+
+\subsection{MCTS Algorithm of \model.}
+\label{appendix:algorithmaflow}
+\vspace{-10mm}
+\begin{algorithm}
+\caption{Detailed Explanation of the \model Algorithm}
+\begin{algorithmic}[1]
+\Require Initial Workflow $W_0$, Evaluator $G$, Dataset $D$, Number of rounds $N$, Operators $\mathcal{O}$, Top k $k$, Early stopping rounds $n$
+\Ensure Optimal Workflow $W^*$
+
+\State Initialize $results \gets \emptyset$, $experiences \gets \emptyset$, $N \gets 20$, $k \gets 3$, $n \gets 5$
+\State $D_V, D_T \gets$ RandomSplit($D$, 0.2, 0.8)  \Comment{Split dataset: 20\% for validation, 80\% for training}
+\State $scores \gets$ Execute($W_0$, $G$, $D_V$)
+\State $D_V \gets$ SelectHighVarianceInstances($D_V$, $scores$, $threshold$)  \Comment{Select instances}
+
+\For{$round \gets 1$ to $N$}
+    \If{$round = 1$}
+        \State $parent \gets W_0$
+    \Else
+        \State $parent \gets$ SelectParent($results$)
+    \EndIf
+    
+    \State $context \gets$ LoadContext($parent$, $experiences$)
+    \State $W_{round}, $modification$ \gets$ Optimizer($context$, $\mathcal{O}$)
+    
+    \For{$i \gets 1$ to $5$}
+        \State $score, cost \gets$ Executor($W_{round}$, $E$, $D_V$)
+        \State $results$.append($round$, $score$, $cost$)
+    \EndFor
+    
+    \State $avgScore \gets$ CalculateAverageScore($results$[$round$])
+    \State $experience \gets$ CreateExperience($parent$, $modification$, $avgScore$)
+    \State $experiences$.append($experience$)
+    
+    \If{$avgScore > bestScore$}
+        \State $W^* \gets W_{round}$
+        \State $bestScore \gets avgScore$
+    \EndIf
+    \If{The Top $k$ Workflows remains unchanged in $n$ rounds}  \Comment{Early stopping}
+    
+        \Return $W^*$
+    \EndIf
+\EndFor
+
+\State \Return $W^*$
+
+\Procedure{SelectParent}{$results$}
+    \State $sorted\_results \gets \text{SortDescending}(results, \text{key=lambda r: r.scores})$
+    \State $top\_k\_results \gets sorted\_results[:k]$
+    \State $scores \gets [result.scores \text{ for } result \text{ in } top\_k\_results]$
+    \State $probabilities \gets \text{CalculateMixedProbabilities}(scores)$
+    \State \Return \text{SampleFromCategorical}(probabilities)
+\EndProcedure
+
+\Procedure{CalculateMixedProbabilities}{$scores$}
+    \State $n \gets$ length($scores$), $\lambda \gets 0.4$, $\alpha \gets 0.2$, $s_{max} \gets \max(scores)$
+    \State $w_i \gets \exp(\alpha \cdot (s_i - s_{max}))$ for $i \in [1,n]$
+    \State $P_{score} \gets w_i / \sum_{j=1}^n w_j$ for $i \in [1,n]$
+    \State $P_{uniform} \gets 1/n$ for $i \in [1,n]$
+    \State $P_{mixed} \gets \lambda \cdot P_{uniform} + (1-\lambda) \cdot P_{score}$
+    \State \Return $P_{mixed}$
+\EndProcedure
+
+\Procedure{Optimizer}{$context$, $Operators$}
+    \State // LLM as Optimizer, generate new workflow and modification.
+    \State \Return $newWorkflow$, $modification$
+\EndProcedure
+
+\Procedure{Executor}{$W$, $evaluator$, $dataset$}
+    \State // LLM as Executor, execute workflow on dataset and return score and cost
+    \State \Return $score$, $cost$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\clearpage
+
+\section{Case Study}
+\label{appendix:case_study}
+\subsection{Case Study of \model}
+\begin{tcolorbox}[title={\textbf{\small Alpha Codium like workflow for MBPP}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+CODE_GENERATE_PROMPT = """
+Generate a Python function to solve the given problem. Ensure the function name matches the one specified in the problem. Include necessary imports. Use clear variable names and add comments for clarity.
+
+Problem:
+{problem}
+
+Function signature:
+{entry_point}
+
+Generate the complete function below:
+"""
+
+FIX_CODE_PROMPT = """
+The provided solution failed to pass the tests. Please analyze the error and fix the code. Ensure the function name and signature remain unchanged. If necessary, add or modify imports, correct logical errors, and improve the implementation.
+
+Problem:
+{input}
+
+Provide the corrected function below:
+"""
+
+GENERATE_TESTS_PROMPT = """
+Given the problem and a potential solution, generate additional test cases to thoroughly evaluate the function. Include edge cases and typical scenarios. Format the test cases as assert statements that can be directly added to a Python test function.
+
+Problem:
+{input}
+
+Generate 3-5 additional test cases as assert statements:
+"""
+
+async def __call__(self, problem: str, entry_point: str):
+    solutions = []
+    for _ in range(3):  # Generate 3 solutions
+        solution = await self.custom_code_generate(problem=problem, entry_point=entry_point, instruction=prompt_custom.CODE_GENERATE_PROMPT)
+        solutions.append(solution['response'])
+    best_solution = await self.sc_ensemble(solutions=solutions, problem=problem)
+    # Generate additional test cases
+    additional_tests = await self.custom(input=f"Problem: {problem}\nSolution: {best_solution['response']}", instruction=prompt_custom.GENERATE_TESTS_PROMPT)
+    # Combine original problem and additional tests
+    enhanced_problem = f"{problem}\n\nAdditional test cases:\n{additional_tests['response']}"
+    test_result = await self.test(problem=enhanced_problem, solution=best_solution['response'], entry_point=entry_point)
+    if test_result['result']:
+        return test_result['solution'], self.llm.cost_manager.total_cost
+    else:
+        # If the test fails, try to fix the solution
+        fixed_solution = await self.custom(input=f"Problem: {problem}\nFailed solution: {best_solution['response']}\nError: {test_result['solution']}", instruction=prompt_custom.FIX_CODE_PROMPT)
+        return fixed_solution['response'], self.llm.cost_manager.total_cost
+\end{minted}
+\end{tcolorbox}
+\model demonstrates its ability to reduce human effort by evolving from an empty workflow to a solution highly similar to manually designed workflows like \citet{Tal2024Alpha} in the code generation scenario. This showcases \model's capability to generate efficient workflows comparable to expert designs with minimal human intervention.
+\begin{tcolorbox}[title={\textbf{\small The optimal workflow generated for MATH}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+REFINE_ANSWER_PROMPT = """
+Given the mathematical problem and the output from the code execution, please provide a well-formatted and detailed solution. Follow these guidelines:
+1. Begin with a clear statement of the problem.
+2. Explain the approach and any formulas or concepts used.
+3. Show step-by-step calculations, using LaTeX notation for mathematical expressions.
+4. Interpret the code output and incorporate it into your explanation.
+5. Provide a final answer, enclosed in \boxed{} LaTeX notation.
+6. Ensure all mathematical notation is in LaTeX format.
+Your response should be comprehensive, mathematically rigorous, and easy to follow.
+"""
+GENERATE_SOLUTION_PROMPT = """
+Please solve the given mathematical problem step by step. Follow these guidelines:
+1. State the problem clearly.
+2. Outline the approach and any relevant formulas or concepts.
+3. Provide detailed calculations, using LaTeX notation for mathematical expressions.
+4. Explain each step of your reasoning.
+5. Present the final answer enclosed in \boxed{} LaTeX notation.
+6. Ensure all mathematical notation is in LaTeX format.
+Your solution should be thorough, mathematically sound, and easy to understand.
+"""
+DETAILED_SOLUTION_PROMPT = """
+Provide a comprehensive, step-by-step solution to the given mathematical problem. Your response should include:
+1. A clear restatement of the problem.
+2. An explanation of the mathematical concepts and theorems involved.
+3. A detailed, logical progression of steps leading to the solution.
+4. Clear explanations for each step, including the reasoning behind it.
+5. All mathematical expressions and equations in LaTeX format.
+6. Visual aids or diagrams if applicable (described in text).
+7. A final answer clearly marked and enclosed in \boxed{} LaTeX notation.
+8. A brief explanation of the significance of the result, if relevant.
+Ensure your solution is rigorous, easy to follow, and educational for someone learning the concept.
+"""
+async def __call__(self, problem: str):
+    """
+    Implementation of the graph
+    """
+    # Use Programmer to generate and execute Python code
+    code_solution = await self.programmer(problem=problem)
+    # Use Custom to refine and format the answer
+    refined_solution = await self.custom(input=problem + f"\nCode output: {code_solution['output']}", instruction=prompt_custom.REFINE_ANSWER_PROMPT)
+    # Generate a detailed step-by-step solution using Custom
+    detailed_solution = await self.custom(input=problem, instruction=prompt_custom.DETAILED_SOLUTION_PROMPT)
+    # Generate multiple solutions using Custom
+    solutions = [
+        refined_solution['response'],
+        detailed_solution['response']
+    ]
+    for _ in range(2):
+        solution = await self.custom(input=problem, instruction=prompt_custom.GENERATE_SOLUTION_PROMPT)
+        solutions.append(solution['response'])
+    # Use ScEnsemble to select the best solution
+    final_solution = await self.sc_ensemble(solutions=solutions, problem=problem)
+    return final_solution['response'], self.llm.cost_manager.total_cost
+\end{minted}
+\end{tcolorbox}
+This optimal workflow generated for the MATH task showcases the model's ability to generate complex, task-specific solutions from task-agnostic initial settings. It combines programmatic solutions with various reasoning strategies, culminating in an ensemble selection process, and spontaneously formats the answer into the required form. This adaptation demonstrates the model's flexibility in tailoring workflows to different problem domains, while maintaining sophisticated problem-solving structures.
+
+% MBPP
+\begin{tcolorbox}[title={\textbf{\small The optimal workflow generated for MBPP}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+CODE_GENERATE_PROMPT = """
+Generate a Python function to solve the given problem. Ensure the function name matches the one specified in the problem. Include necessary imports. Use clear variable names and add comments for clarity.
+
+Problem:
+{problem}
+
+Function signature:
+{entry_point}
+
+Generate the complete function below:
+"""
+
+FIX_CODE_PROMPT = """
+The provided solution failed to pass the tests. Please analyze the error and fix the code. Ensure the function name and signature remain unchanged. If necessary, add or modify imports, correct logical errors, and improve the implementation.
+
+Problem:
+{input}
+
+Provide the corrected function below:
+"""
+
+async def __call__(self, problem: str, entry_point: str):
+    """
+    Implementation of the workflow
+    Custom operator to generate anything you want.
+    But when you want to get standard code, you should use custom_code_generate operator.
+    """
+    solutions = []
+    for _ in range(3):  # Generate 3 solutions
+        solution = await self.custom_code_generate(problem=problem, entry_point=entry_point, instruction=prompt_custom.CODE_GENERATE_PROMPT)
+        solutions.append(solution['response'])
+    
+    best_solution = await self.sc_ensemble(solutions=solutions, problem=problem)
+    
+    test_result = await self.test(problem=problem, solution=best_solution['response'], entry_point=entry_point)
+    
+    if test_result['result']:
+        return test_result['solution'], self.llm.cost_manager.total_cost
+    else:
+        # If the test fails, try to fix the solution
+        fixed_solution = await self.custom(input=f"Problem: {problem}\nFailed solution: {best_solution['response']}\nError: {test_result['solution']}", instruction=prompt_custom.FIX_CODE_PROMPT)
+        return fixed_solution['response'], self.llm.cost_manager.total_cost
+\end{minted}
+\end{tcolorbox}
+
+The optimal workflow generated for the MBPP task simply combines operators with an ingenious FIX-CODE PROMPT, achieving the optimal workflow in the iteration at the fourteenth round. Although this workflow is simple, its score is extremely high and stable, demonstrating \model's potential to find the optimal cost-performance balance.
+
+% HotpotQA
+\begin{tcolorbox}[title={\textbf{\small The optimal workflow generated for HotpotQA}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+FORMAT_ANSWER_PROMPT = """
+Given the question and the best answer, format the final answer to be concise, accurate, and directly addressing the question. Ensure the answer is a clear, brief statement without additional explanation or reasoning. If the answer is a name, profession, or short phrase, provide only that information without forming a complete sentence.
+
+For example:
+- If the answer is a person's name, just provide the name.
+- If the answer is a profession, state only the profession.
+- If the answer is a short phrase, give only that phrase.
+
+Do not include any prefixes like "The answer is" or "The profession is". Just provide the answer itself.
+"""
+
+async def __call__(self, problem: str):
+    """
+    Implementation of the workflow
+    """
+    solutions = []
+    for _ in range(3):
+        initial_response = await self.answer_generate(input=problem)
+        thought_process = initial_response['thought']
+        initial_answer = initial_response['answer']
+        solutions.append(initial_answer)
+
+    ensemble_result = await self.sc_ensemble(solutions=solutions)
+    best_answer = ensemble_result['response']
+
+    refined_solution = await self.custom(
+        input=f"Question: {problem}\nBest answer: {best_answer}",
+        instruction=prompt_custom.FORMAT_ANSWER_PROMPT
+    )
+
+    return refined_solution['response'], self.llm.cost_manager.total_cost
+\end{minted}
+\end{tcolorbox}
+
+The optimal workflow generated for the HotpotQA task demonstrates the effectiveness of execution feedback. Apart from logical reasoning, another factor affecting QA problem scores is effective formatting. \model can effectively identify the correct format and automatically perform formatting through learning from execution feedback, showcasing the efficacy of this design.
+
+\begin{tcolorbox}[title={\textbf{\small An ensemble structure that emerged in the GSM8K ablation experiment}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+SOLVE_APPROACH1_PROMPT = """
+Solve the given math problem step by step using a standard algebraic approach. After solving, extract the final numerical answer and format it as follows:
+
+Final Answer: [Insert the numerical value here]
+
+Ensure that only the numerical value is provided after "Final Answer:", without any units or additional text.
+
+Problem:
+"""
+
+SOLVE_APPROACH2_PROMPT = """
+Solve the given math problem step by step using a visual or diagrammatic approach, if applicable. If not applicable, use an alternative method different from the standard algebraic approach. After solving, extract the final numerical answer and format it as follows:
+
+Final Answer: [Insert the numerical value here]
+
+Ensure that only the numerical value is provided after "Final Answer:", without any units or additional text.
+
+Problem:
+"""
+
+SOLVE_APPROACH3_PROMPT = """
+Solve the given math problem step by step using estimation or approximation techniques, then refine the answer for accuracy. After solving, extract the final numerical answer and format it as follows:
+
+Final Answer: [Insert the numerical value here]
+
+Ensure that only the numerical value is provided after "Final Answer:", without any units or additional text.
+
+Problem:
+"""
+
+COMPARE_AND_SELECT_PROMPT = """
+Compare the three solutions provided for the given math problem. Analyze each solution for correctness, completeness, and consistency with the problem statement. Select the most accurate and reliable solution, or if all solutions agree, confirm their consistency.
+
+If the solutions differ, explain the differences and justify your selection of the most accurate answer. If all solutions agree, state this consistency.
+
+Provide the final answer in the following format:
+
+Final Answer: [Insert the numerical value here]
+
+Ensure that only the numerical value is provided after "Final Answer:", without any units or additional text.
+
+Problem:
+"""
+
+async def __call__(self, problem: str):
+    """
+    Implementation of the workflow
+    """
+    solution1 = await self.custom(input=problem, instruction=prompt_custom.SOLVE_APPROACH1_PROMPT)
+    solution2 = await self.custom(input=problem, instruction=prompt_custom.SOLVE_APPROACH2_PROMPT)
+    solution3 = await self.custom(input=problem, instruction=prompt_custom.SOLVE_APPROACH3_PROMPT)
+    combined_solutions = f"Solution 1: {solution1['response']}\nSolution 2: {solution2['response']}\nSolution 3: {solution3['response']}"
+    final_solution = await self.custom(input=problem + "\n" + combined_solutions, instruction=prompt_custom.COMPARE_AND_SELECT_PROMPT)
+    return final_solution['response'], self.llm.cost_manager.total_cost
+\end{minted}
+\end{tcolorbox}
+
+In the ablation study, where predefined operators were deliberately removed, \model surprisingly developed this simplified yet effective workflow. Most notably, it independently evolved an ensemble-like operator, mirroring a key aspect of the optimal workflow. This emergence of a multi-solution generation and selection process, despite reduced guidance, highlights \model's inherent tendency towards robust problem-solving strategies. The spontaneous development of this ensemble approach in a constrained environment underscores \model's ability to identify and implement effective techniques, even when operating with limited resources or instructions. This unexpected convergence between the ablated and optimal workflows further demonstrates \model's capacity for developing sophisticated, human-like problem-solving paradigms across different experimental conditions.
+\subsection{Case Study of ADAS}
+\begin{tcolorbox}[title={\textbf{\small Iterative Knowledge-Enhanced Refinement workflow for HotpotQA}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+async def forward(self, taskInfo):
+    import asyncio
+
+    # Step 1: Initial reasoning by diverse expert agents
+    initial_instruction = 'Please think step by step and solve the task based on your expertise.'
+    expert_agents = [
+        LLMAgentBase(['thinking', 'answer'], 'Expert Agent', role=role, temperature=0.7)
+        for role in ['Reading Specialist', 'Logic Specialist', 'Generalist']
+    ]
+
+    async def run_expert(agent):
+        return await agent([taskInfo], initial_instruction)
+
+    initial_results = await asyncio.gather(*[run_expert(agent) for agent in expert_agents])
+
+    combined_infos = [taskInfo] + [info for result in initial_results for info in result]  # Flattening initial_results
+
+    # Step 2: Iterative refinement with external knowledge integration
+    max_iterations = 2
+    for iteration in range(max_iterations):
+        # Retrieve external knowledge
+        knowledge_retrieval_instruction = 'Retrieve relevant information from a knowledge base that can assist in refining the solution.'
+        knowledge_retrieval_agent = LLMAgentBase(['retrieved_info'], 'Knowledge Retrieval Agent')
+        retrieved_results = await knowledge_retrieval_agent(combined_infos, knowledge_retrieval_instruction)
+        retrieved_info = retrieved_results[0]
+
+        # Verify external knowledge
+        verification_instruction = 'Verify the relevancy and accuracy of the retrieved information.'
+        verification_agent = LLMAgentBase(['verified_info'], 'Verification Agent')
+        verified_results = await verification_agent([taskInfo, retrieved_info], verification_instruction)
+        verified_info = verified_results[0]
+
+        # Refinement phase using verified knowledge
+        refinement_instruction = 'Review and refine the insights provided by other agents using the verified external knowledge.'
+        refinement_agents = [
+            LLMAgentBase(['refined_thinking', 'refined_answer'], 'Refinement Agent', role=role, temperature=0.5)
+            for role in ['Reading Specialist', 'Logic Specialist', 'Generalist']
+        ]
+        combined_infos_with_verification = combined_infos + [verified_info]
+        
+        async def run_refinement(agent):
+            return await agent(combined_infos_with_verification, refinement_instruction)
+        
+        refinement_results = await asyncio.gather(*[run_refinement(agent) for agent in refinement_agents])
+        combined_infos.extend([info for result in refinement_results for info in result])  # Flattening refinement_results
+
+    # Step 3: Final synthesis agent integrates all refined insights
+    final_decision_instruction = 'Synthesize all refined insights and provide a final answer.'
+    final_decision_agent = LLMAgentBase(['thinking', 'answer'], 'Final Decision Agent', temperature=0.3)
+    final_thinking, final_answer = await final_decision_agent(combined_infos, final_decision_instruction)
+
+    return final_answer}
+\end{minted}
+\end{tcolorbox}
+\label{code:adashotpotqa}
+
+
+When designing workflows, ADAS incorporates all workflows from the search history into the prompt, distinguishing them only by their generation order and scores. However, the complex information embedded in the intricate structure of workflows, coupled with the accumulation of search iterations, the vast amount of information, and the continuously accumulating irrelevant information, poses significant challenges for LLM reasoning. ADAS stores experience from previous searches at the coarsest granularity—directly storing all complete workflows. This approach causes the LLM designing workflows in ADAS to behave more like an explorer of infinite possibilities within $\mathcal{E}$ rather than a designer seeking the optimal workflow.
+
+
+As shown in the code in Appendix \ref{code:adashotpotqa}, the optimal workflow discovered by ADAS assigns diverse roles and multiple steps for refinement and summarization. However, for multi-hop reasoning tasks, the correct approach is to continuously reduce the problem scale to single-hop reasoning. Contrary to this, ADAS's optimal workflow actually increases the problem scale, ultimately attempting to use the LLM's summarization ability to synthesize information, rather than gradually reducing the number of hops based on the characteristics of multi-hop reasoning scenarios. 
+
+\section{Optimization Process of AFlow}
+ % 我们以\model在Math数据集上的搜索经验为例，举例说明了\model如何基于树状经验与execution feedback进行workflow的迭代。
+Taking \model's search process on the Math dataset as an example, we demonstrate how \model iteratively improves workflows based on tree-structured experience and execution feedback.
+\label{sec:trajectory}
+\subsection{Tree-Structured Experience.}
+\begin{tcolorbox}[title={\textbf{\small Processed Experience (formatted as tree sturcture)}}, boxrule=1pt, arc=0mm, colback=black!5!white, colframe=black!75!white, breakable, before skip=10pt, after skip=10pt, pad at break=2mm, parbox=false] \begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{json}
+{
+    "1": {
+        "score": 0.4873949579831933,
+        "success": {
+            "2": {
+                "modification": "Add the Programmer operator to generate and execute Python code for mathematical calculations, and use the Custom operator to refine and format the final answer.",
+                "score": 0.5243697478991597
+            }
+        },
+        "failure": {
+            "8": {
+                "modification": "Add a ScEnsemble operator to generate multiple solutions and select the best one. This will help improve the accuracy of the final answer.",
+                "score": 0.4336134453781512
+            }
+        }
+    },
+    "2": {
+        "score": 0.5243697478991597,
+        "success": {
+            "3": {
+                "modification": "Add a ScEnsemble operator to improve the reliability of the final answer by generating multiple solutions and selecting the most consistent one.",
+                "score": 0.5277310924369747
+            }
+        },
+        "failure": {
+            "6": {
+                "modification": "Add a ScEnsemble operator to improve the reliability of the final answer by generating multiple solutions and selecting the most consistent one.",
+                "score": 0.4722689075630252
+            },
+            "7": {
+                "modification": "Add a ScEnsemble operator to improve the reliability of the final answer by generating multiple solutions and selecting the most consistent one.",
+                "score": 0.5243697478991597
+            }
+        }
+    },
+    "3": {
+        "score": 0.5277310924369748,
+        "success": {
+            "14": {
+                "modification": "Modify the Custom operator to generate a more detailed step-by-step solution, and add a new Custom operator to review and refine the final answer. This will improve the clarity, accuracy, and completeness of the solution process.",
+                "score": 0.5310924369747899
+            },
+            "5": {
+                "modification": "Add a new Custom operator to generate a detailed step-by-step solution, and modify the ScEnsemble operator to compare and select the best solution from multiple approaches.",
+                "score": 0.5512605042016807
+            },
+            "9": {
+                "modification": "Add a new Custom operator to generate a detailed step-by-step solution, and modify the ScEnsemble operator to compare and select the best solution from multiple approaches.",
+                "score": 0.5378151260504201
+            }
+        },
+        "failure": {
+            "10": {
+                "modification": "Add a new Custom operator to generate a step-by-step solution, and modify the ScEnsemble operator to compare and select the best solution from multiple approaches.",
+                "score": 0.5042016806722688
+            },
+            "13": {
+                "modification": "Modify the Custom operator to generate a more detailed step-by-step solution, and add a new Custom operator to refine and format the final answer. This will improve the clarity and accuracy of the solution process.",
+                "score": 0.5193277310924369
+            },
+            "4": {
+                "modification": "Add a new Custom operator to generate multiple solutions using different approaches, then use ScEnsemble to select the best solution. This will increase the diversity of solutions and potentially improve accuracy.",
+                "score": 0.0
+            }
+        }
+    },
+    "9": {
+        "score": 0.5378151260504203,
+        "success": {},
+        "failure": {
+            "11": {
+                "modification": "Add a new Custom operator to generate a detailed step-by-step solution with explanations, and incorporate it into the ensemble process. This will provide a more comprehensive approach to solving math problems.",
+                "score": 0.5159663865546219
+            },
+            "12": {
+                "modification": "Add a new Custom operator to generate multiple solution approaches, then use ScEnsemble to select the best solution. This will increase the diversity of solutions and potentially improve accuracy.",
+                "score": 0.0
+            },
+            "16": {
+                "modification": "Add a new Custom operator to generate multiple solution approaches, then use ScEnsemble to select the best solution. This will increase the diversity of solutions and potentially improve accuracy.",
+                "score": 0.5210084033613446
+            }
+        }
+    },
+    "14": {
+        "score": 0.5310924369747899,
+        "success": {},
+        "failure": {
+            "15": {
+                "modification": "Add a new Custom operator to generate multiple solutions, then use ScEnsemble to select the best one. This modification aims to improve the accuracy and consistency of the final answer.",
+                "score": 0.5243697478991596
+            },
+            "18": {
+                "modification": "Add a new Custom operator to generate a more detailed step-by-step solution, and modify the ScEnsemble operator to compare and select the best solution from multiple generated solutions.",
+                "score": 0.5176470588235293
+            }
+        }
+    },
+    "5": {
+        "score": 0.5512605042016807,
+        "success": {},
+        "failure": {
+            "17": {
+                "modification": "Add a new Custom operator to generate multiple solutions using different approaches, and modify the ScEnsemble operator to select the best solution from a larger pool of candidates.",
+                "score": 0.0
+            },
+            "19": {
+                "modification": "Add a new Custom operator to generate a simplified solution, which will be used alongside the existing detailed solution to provide a more comprehensive answer. This simplified solution will be added to the list of solutions for the ScEnsemble operator to consider.",
+                "score": 0.5445378151260505
+            }
+        }
+    }
+}
+\end{minted}
+\end{tcolorbox}
+More optimization trajectories will be made available in an open-source repository upon publication.
+
+\textbf{Less Effective Optimization Steps:}
+\begin{itemize}[leftmargin=20pt]
+    \item Round 1 $\rightarrow$ Round 8 (Score decreased from 0.4873 to 0.4336): The key change was the removal of the Programmer operator, relying solely on Custom + ScEnsemble, which lost the computational precision provided by programmatic solutions, demonstrating that removing concrete computational capabilities significantly hurts performance.
+    
+    \item Round 9 $\rightarrow$ Round 16 (Score decreased from 0.5378 to 0.5210): The key change involved simplifying the solution generation process without maintaining the review step, which resulted in the loss of the quality control aspect of solution refinement, showing that solution quality checks are important for maintaining performance.
+\end{itemize}
+
+\textbf{Successful Optimization Steps:}
+\begin{itemize}[leftmargin=20pt]
+    \item Round 1 $\rightarrow$ Round 2 (Score improved from 0.4874 to 0.5244): The addition of the Programmer operator to generate executable Python code and the use of the Custom operator to refine results introduced concrete computational capabilities alongside human-like reasoning, creating a more robust solution approach and providing a foundation for both numerical accuracy and explanation quality.
+    
+    \item Round 2 $\rightarrow$ Round 3 (Score improved from 0.5244 to 0.5277): The introduction of the ScEnsemble operator to select from multiple solutions added solution diversity and reliability through ensemble selection, creating a more robust system by considering multiple solution approaches.
+    
+    \item Round 3 $\rightarrow$ Round 5 (Score improved from 0.52773 to 0.5513): The key change was the addition of detailed step-by-step solution generation, which enhanced solution clarity and comprehensiveness, ultimately improving the pedagogical value of solutions while maintaining accuracy.
+\end{itemize}
+
+\textbf{The tree-structured optimization process helped guide LLM workflow improvements in several ways:}
+\begin{itemize}[leftmargin=20pt]
+    \item \textbf{Path Discovery}: The tree structure allowed exploration of multiple optimization directions simultaneously, enabling the development of successful paths while pruning less successful branches, which facilitated the efficient discovery of effective combinations of operators.
+    
+    \item \textbf{Incremental Improvement}: Each node in the tree represents a specific workflow configuration, and the success/failure feedback at each step helped identify which modifications were beneficial, with the scoring system providing quantitative guidance for optimization decisions.
+    
+    \item \textbf{Pattern Recognition}: The tree structure made it easier to identify patterns in successful versus unsuccessful modifications, revealing common elements in high-scoring branches, such as the combination of Programmer + Custom + ScEnsemble, which informed future optimization decisions.
+    
+    \item \textbf{Error Recovery}: When a modification led to decreased performance, the tree structure facilitated easy backtracking, allowing exploration of alternative optimization paths from previous successful states and preventing the process from getting stuck in local optima.
+\end{itemize}
+
+\subsection{Execution feedback.}
+
+In the process of optimizing the overall response generation, we implemented a concise and task-agnostic prompt: ``Below are the logs of some results with the aforementioned Graph that performed well but encountered errors, which can be used as references for optimization: \{log\}". This approach enabled execution feedback to assist LLM in workflow optimization. The following examples demonstrate how adjustments to the prompts enhanced the quality, consistency, and clarity of the answers, with particular emphasis on answer formatting as a key illustration.
+
+\textbf{Optimization Steps:}
+\begin{itemize}[leftmargin=20pt]
+    \item {Round 1 $\rightarrow$ Round 2}: REFINE\_ANSWER\_PROMPT adds ``Provide a final answer, enclosed in \texttt{\textbackslash boxed\{\}} LaTeX notation", resulting in the ability to identify patterns in the scoring feedback without knowing the specific rules of the scoring function.
+
+    \item {Round 1 $\rightarrow$ Round 8}: While REFINE\_ANSWER\_PROMPT adds ``Provide a clear, concise final answer" to shift focus towards presenting answers more concisely, Round 8 lacks the strict LaTeX formatting constraints present in Round 2. This leads to Round 8 scoring lower than the baseline Round 1. However, the emphasis on concise answers also appears in the high-scoring Round 19, indicating that this remains a valid optimization direction.
+    
+    \item {Round 3 $\rightarrow$ Round 13}: REFINE\_ANSWER\_PROMPT introduces two new requirements: ``If there are multiple possible answers, list all of them separated by commas within the \texttt{\textbackslash boxed\{\}}" and ``Simplify expressions where possible without losing accuracy". While the former aims to standardize the format for multiple solutions, including this as a general instruction may interfere with the solution process. Statistical analysis shows that Round 13 contains 55 instances of comma-separated answers, notably higher than better-performing rounds such as Round 5 (43 instances) and Round 9 (42 instances).
+    
+\end{itemize}
+\newpage
+\section{Pareto Front: Detailed Cost-Performance Data}
+\label{appendix:cost}
+Detailed cost-performance data for HumanEval. Executing \model(GPT-4o-mini) with deepseek achieves parity with GPT-4o IO at 4.55\% of the cost. Executing  \model(deepseek) with deepseek and AFlow(GPT-4o-mini) with GPT-4o-mini outperform GPT-4o IO at 5.92\% and 8.05\% of the cost, respectively.
+
+
+\begin{table*}[h]
+\renewcommand\arraystretch{1.2}
+\setlength{\arrayrulewidth}{0.8pt}
+\setlength{\tabcolsep}{4pt}
+\setlength{\abovecaptionskip}{0.1cm}
+\setlength{\belowcaptionskip}{-0.2cm}
+\centering
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}clcc@{}}
+\hline
+Model & Method & Score (\%) & Cost (\$)\\
+\hline
+gpt-4o-mini & IO & 0.8702 & 0.0223 \\
+gpt-4o-mini & CoT & 0.8860 & 0.0277 \\
+gpt-4o-mini & CoT SC & 0.9160 & 0.1794 \\
+gpt-4o-mini & MedPrompt & 0.9160 & 0.2200 \\
+gpt-4o-mini & LLM Debate & 0.8930 & 0.2278 \\
+gpt-4o-mini & Self Refine & 0.8780 & 0.1232 \\
+gpt-4o-mini & \model(gpt-4o-mini) & 0.9470 & 0.0513 \\
+gpt-4o-mini & \model(deepseek) & 0.9084 & 0.0669 \\
+deepseek & IO & 0.8860 & 0.0127 \\
+deepseek & CoT & 0.8930 & 0.0180 \\
+deepseek & CoT SC & 0.8860 & 0.1168 \\
+deepseek & MedPrompt & 0.8860 & 0.1433 \\
+deepseek & LLM Debate & 0.8930 & 0.1484 \\
+deepseek & Self Refine & 0.9000 & 0.0802 \\
+deepseek & \model(gpt-4o-mini) & 0.9390 & 0.0291 \\
+deepseek & \model(deepseek) & 0.9466 & 0.0377 \\
+gpt-4o & IO & 0.9389 & 0.6371 \\
+gpt-4o & CoT & 0.9310 & 0.7772 \\
+gpt-4o & CoT SC & 0.9470 & 5.0345 \\
+gpt-4o & MedPrompt & 0.9390 & 6.1756 \\
+gpt-4o & LLM Debate & 0.9470 & 6.3952 \\
+gpt-4o & Self Refine & 0.9160 & 3.4589 \\
+gpt-4o & \model(gpt-4o-mini) & 0.9620 & 1.0111 \\
+gpt-4o & \model(deepseek) & 0.9542 & 1.6600 \\
+claude-3.5-sonnet & IO & 0.9084 & 0.6987 \\
+claude-3.5-sonnet & CoT & 0.9240 & 0.6412 \\
+claude-3.5-sonnet & CoT SC & 0.9390 & 4.1534 \\
+claude-3.5-sonnet & MedPrompt & 0.9160 & 5.0949 \\
+claude-3.5-sonnet & LLM Debate & 0.9080 & 5.2761 \\
+claude-3.5-sonnet & Self Refine & 0.8930 & 2.8536 \\
+claude-3.5-sonnet & \model(gpt-4o-mini) & 0.9540 & 1.1612 \\
+claude-3.5-sonnet & \model(deepseek) & 0.9466 & 1.3252 \\
+\hline
+\end{tabular*}
+\label{tab:model-performance}
+\end{table*}
+
+
+
+\section{Discussion on Workflow, Agentic Workflow, MultiAgent Systems}
+In the field of LLM applications, concepts such as Workflow, Agentic Workflow, and MultiAgent Systems are frequently referenced, each with distinct emphases. The notion of Workflow in \citep{qiao2025benchmark} primarily focuses on the structured decomposition of real-world tasks, such as generating execution sequences for specific tasks in digital environments. \citep{qiao2025benchmark} work represents a significant advancement in workflow benchmarking through its comprehensive multi-faceted approach spanning function calls, problem-solving, embodied planning, and open-grounded planning scenarios.
+
+
+Despite terminological differences, the multi-agent systems described in \cite{zhang2024agentprune, zhang2024gdesigner, zhuge2024gptswarm} are functionally equivalent to agentic workflows. Both consist of a series of LLM-invoking nodes that lack autonomous capability and execute in a predetermined logical sequence. Though the terminology varies, these approaches essentially describe identical technical architectures.
+
+Meanwhile, \cite{niu2025flow} explores methods for dynamically adjusting workflows during task execution, enhancing the system's ability to address complex problems by modifying workflows in real-time based on execution feedback.
+
+\model proposed in this paper focuses on the automated generation and optimization of workflows, aiming to reduce dependence on manually designed initial workflows while improving the scalability and generalizability of agentic workflows. This approach complements existing research and collectively advances the field of LLM applications.
+
+
+\section{Discussion On Open-ended Tasks}
+\label{appendix:discussion}
+\subsection{Adapting \model for Open-ended Tasks}
+
+While we emphasized \model's powerful capabilities in solving reasoning tasks with numerical feedback in the main body, there are many tasks in the real world without numerical feedback and non-reasoning requirements~\citep{dai2024mmrole}. These scenarios lack numerical feedback because for open-ended tasks, performance is typically evaluated by humans who propose the tasks, making it difficult to evaluate using fixed and quantitative criteria. By introducing LLM as a judge ~\citep{zheng2023judging}, this challenge can be addressed to some extent, as the LLM-as-judge evaluation prompt can effectively incorporate human preferences to adaptively evaluate open-ended tasks. In this section, we discuss how to leverage LLM as a judge while maintaining \model's core architecture to search for agentic workflows for these types of tasks.
+
+To extend \model's capabilities to open-ended tasks, we modified the original workflow optimize prompt by removing reasoning-specific instructions. The new prompt is as follows: 
+
+\label{appendix:modified prompt}
+
+\begin{tcolorbox}[title={\textbf{\small Workflow optimize prompt for open-ended tasks}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+
+PROMPT = """You are constructing a graph and corresponding prompts to jointly solve {type} problems. Referring to the provided graph and prompts, which form a basic example of a {type} solution approach, please reconstruct and optimize them. You may add, modify, or delete nodes, parameters, or prompts. Include your single modification enclosed in XML tags in your reply. Ensure they are complete and correct to avoid runtime failures.Use logical and control flow (such as IF-ELSE and loops) to achieve more advanced code representation.Ensure all prompts required by the current graph are included in `prompt_custom`. Do not include any additional prompts. The prompts you need to generate are limited to those used in `prompt_custom.XXX`. Other methods already have built-in prompts and are prohibited from being generated. Generate only the prompts needed by the graph and remove any unused prompts from `prompt_custom`.The generated prompts must not contain any placeholders. Considering information loss, complex graphs may yield better results, but insufficient information transmission might omit the solution. Ensure that the necessary context is included throughout the process.
+"""
+\end{minted}
+\end{tcolorbox}
+
+For tasks without numerical feedback, we propose a evaluation prompt based on LLM as a Judge. We utilize GPT-4o as our evaluation model, implementing the following prompt for scoring open-ended tasks:
+
+\label{appendix:evaluation prompt}
+
+\begin{tcolorbox}[title={\textbf{\small Evaluation prompt}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+
+EVAL_PROMPT = """You are an expert evaluator tasked with scoring responses to open-ended questions. You will be provided with:
+1. The original question/prompt
+2. A golden (reference) answer (if available)
+3. A candidate response to be evaluated
+
+Please evaluate the candidate response on the following dimensions, each scored from 1-5. When no reference answer is provided, use your expert judgment to assess the expected quality level for the given task type:
+
+1. Content Relevance (1-5):
+- 5: Perfectly addresses all aspects of the prompt
+- 4: Addresses most key aspects with minor omissions
+- 3: Addresses main points but misses some important elements
+- 2: Only partially relevant to the prompt
+- 1: Largely irrelevant or off-topic
+
+2. Content Quality (1-5):
+- 5: Exceptional depth, insight, and originality
+- 4: Strong analysis/creativity with good supporting details
+- 3: Adequate development with some supporting elements
+- 2: Superficial treatment with minimal development
+- 1: Poor quality with major flaws in reasoning/execution
+
+3. Coherence and Structure (1-5):
+- 5: Excellent organization with seamless flow
+- 4: Clear structure with minor transition issues
+- 3: Generally organized but some awkward transitions
+- 2: Poorly organized with frequent disconnects
+- 1: Chaotic or illogical structure
+
+4. Reference Comparison (1-5):
+- 5: Matches or exceeds expected quality for this type of task
+- 4: Slightly below ideal but strong performance
+- 3: Moderately below ideal but acceptable
+- 2: Significantly below expected quality
+- 1: Far below acceptable quality standards
+
+Please provide:
+1. Numeric scores for each dimension (1-5)
+2. Brief justification for each score (1-2 sentences)
+3. Total score (sum of the four dimensions, maximum 20 points)
+4. Summary feedback (2-3 sentences)
+
+Format your response as:
+Content Relevance: [score] points
+- Justification: [brief explanation]
+
+Content Quality: [score] points
+- Justification: [brief explanation]
+
+Coherence: [score] points
+- Justification: [brief explanation]
+
+Reference Comparison: [score] points
+- Justification: [brief explanation]
+
+Summary Feedback:
+[2-3 sentences highlighting key strengths and areas for improvement]
+
+<score>[sum of all dimensions](pure number)</score>
+
+"""
+\end{minted}
+\end{tcolorbox}
+This evaluation framework replaces the original evaluation function in \model's executing evaluation stage, enabling assessment of open-ended tasks while maintaining consistent evaluation standards.
+
+\subsection{Case Study}
+We demonstrate the effectiveness of our adapted \model through two open-ended task scenarios: long-form novel generation and academic idea generation. Both cases lack numerical feedback and utilize our adapted methodology. To evaluate \model's performance on these tasks, we first hired three human annotators at \$10/hour to score and rank the results generated during \model's iteration process. Additionally, we compared results generated directly by LLM with those generated by \model to observe the differences.
+Due to space limitations, we provide the complete results of the two task generations in the supplementary materials.
+
+\subsubsection{Long-form Novel Generation}
+In this case study, we employed Claude-3.5-sonnet as the execution and optimization model and GPT-4o as the evaluation model due to its strong language capabilities. The system was tested with a single question without reference answers:
+
+\label{appendix:Novel data}
+
+\begin{tcolorbox}[title={\textbf{\small Novel data}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{json}
+{
+"question":"Create a novel-length narrative, exactly 20,000 words long (please ensure this specific length is met), exploring a world where time's flow varies for each person based on their deepest regrets. The story should meticulously examine how emotional burdens affect temporal perception, with careful attention to maintaining the required length. Focus on developing several characters whose unique regrets create distinctly different experiences of time's passage.",
+"requirement":"Write a long novel with emphasis on substantial length, logical interconnections between chapters, and refined language style.", 
+"answer": "No reference answer"
+}
+\end{minted}
+\end{tcolorbox}
+
+The optimized workflow obtained after eight iterations of \model was:
+
+\label{appendix:novel generation workflow}
+
+\begin{tcolorbox}[title={\textbf{\small Novel generation workflow}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+
+OUTLINE_PROMPT = """
+Create a detailed outline for a novel based on the given requirements. Include:
+1. A list of main characters with their deepest regrets and how it affects their perception of time
+2. A chapter-by-chapter breakdown of the plot, ensuring logical interconnections
+3. Key themes and motifs to be explored throughout the novel
+4. A rough word count estimate for each chapter to aim for the required total length
+
+Provide this outline in a structured format.
+"""
+
+CHARACTER_PROFILE_PROMPT = """
+Based on the given requirements and outline, create detailed character profiles for each main character. For each character, include:
+1. Name, age, and physical description
+2. Background and personal history
+3. Their deepest regret and how it affects their perception of time
+4. Personality traits, motivations, and goals
+5. Relationships with other characters
+6. Character arc throughout the novel
+
+Provide these profiles in a structured format.
+"""
+
+CHAPTER_PROMPT = """
+Write a single chapter of the novel based on the given requirements, provided outline, and character profiles. Follow these guidelines:
+1. Adhere to the chapter structure from the outline
+2. Maintain logical interconnections with previous and future chapters
+3. Use refined language and vivid descriptions
+4. Develop characters' arcs based on their regrets and time perception
+5. Incorporate the key themes and motifs
+6. Aim for approximately 10,000 words per chapter
+
+Write the complete chapter without stopping or summarizing. Do not include any meta-commentary or explanations outside the chapter text itself.
+"""
+
+    async def __call__(self, problem: str):
+        """
+        Implementation of the workflow
+        """
+        outline = await self.custom(input=problem, instruction=prompt_custom.OUTLINE_PROMPT)
+        character_profiles = await self.custom(input=problem + f"\nOutline: {outline['response']}", instruction=prompt_custom.CHARACTER_PROFILE_PROMPT)
+        
+        novel = ""
+        chapter_count = 10  # Adjust as needed
+        for i in range(chapter_count):
+            chapter = await self.custom(
+                input=problem + f"\nOutline: {outline['response']}\nCharacter Profiles: {character_profiles['response']}\nChapter Number: {i+1}",
+                instruction=prompt_custom.CHAPTER_PROMPT
+            )
+            novel += f"\n\nChapter {i+1}\n\n{chapter['response']}"
+        
+        return novel, self.llm.cost_manager.total_cost
+
+
+\end{minted}
+\end{tcolorbox}
+
+For comparison, below is the baseline response generated using only the Claude-3.5-sonnet, without any \model optimization:
+
+\label{appendix:llm generate novel}
+
+\begin{tcolorbox}[title={\textbf{\small LLM-Generated Novel}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{markdown}
+
+I apologize, but I'm not able to generate a novel-length narrative of exactly 20,000 words in this format. Writing a full novel of that specific length would be an extremely lengthy and complex task that goes well beyond the scope of what I can produce in a single response. 
+
+Additionally, maintaining an exact word count while crafting a cohesive narrative with developed characters and themes would be extremely challenging, even for human authors. Novels typically go through many drafts and revisions to reach their final form.
+
+However, I can offer some suggestions for approaching this interesting concept:
+
+1. Start by outlining the key characters and their deepest regrets. Consider how each regret might impact their perception of time.
+
+2. Develop a basic plot structure that allows you to explore how these different temporal experiences intersect and affect each other.
+
+3. Consider the worldbuilding aspects - how does society function when everyone experiences time differently? What are the implications for relationships, work, etc?
+
+4. Begin writing scenes or chapters to explore these ideas, without worrying about exact word count initially. 
+
+5. As you write, keep track of word count and adjust pacing/detail as needed to work towards your target length.
+
+6. Plan for multiple drafts and revisions to refine the story and adjust length.
+
+If you'd like, I could help brainstorm more specific ideas for characters or plot points within this concept. But for a full novel-length work, especially one with such precise length requirements, you'll likely need to undertake the writing process yourself over an extended period of time.
+
+\end{minted}
+\end{tcolorbox}
+
+
+Here is the simplified response generated using the \model-optimized workflow:
+
+\label{appendix:AFLOW generate novel}
+
+\begin{tcolorbox}[title={\textbf{\small AFlow-Generated Novel}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{markdown}
+
+# Chapter 1: The Ticking of Regret
+
+Emma Sinclair's fingers hovered over the keyboard, the cursor blinking accusingly on the blank document before her. The rhythmic ticking of the wall clock seemed to grow louder with each passing second, a constant reminder of the impending deadline looming over her. She glanced at the time display on her computer screen 2:37 PM. How was it possible that only three minutes had passed since she last checked?
+...
+
+# Chapter 2: The Scientific Discovery
+
+Dr. Evelyn Harper stood at the podium, her silver hair gleaming under the harsh auditorium lights. Her piercing blue eyes scanned the crowd of scientists, doctors, and journalists who had gathered for her groundbreaking presentation. She took a deep breath, feeling the weight of decades of research pressing down on her shoulders.
+...
+...
+
+# Chapter 10: A New Understanding of Time
+
+The grand auditorium of the National Science Center buzzed with anticipation. Journalists, scientists, and curious members of the public filled every seat, their excited whispers creating a low hum that reverberated through the space. At the center of it all, Dr. Evelyn Harper stood behind the podium, her silver hair gleaming under the bright lights. She took a deep breath, her fingers lightly tracing the edges of her notes.
+...
+Dr. Harper cleared her throat, and the room fell silent. "Ladies and gentlemen, colleagues, and esteemed guests," she began, her voice clear and steady. "Today, I stand before you to present the culmination of years of research into what we once thought was immutable: the nature of time itself."
+...
+
+The sun shone brightly overhead, its warmth a reminder of the present moment. And in that moment, as they moved forward together, time flowed perfectly, neither too fast nor too slow. It simply was, and they were fully, completely present within it. The future beckoned, full of promise and possibility, and they stepped towards it with open hearts and minds, ready for whatever adventures time might bring.
+
+\end{minted}
+\end{tcolorbox}
+
+The optimized workflow (obtained after eight iterations) produced a 27,000-word novel, demonstrating significant improvements in both quality and efficiency compared to baseline responses. The cost and performance metrics across iterations show that \model can achieve high-quality long-form content generation with minimal resource expenditure.
+
+\begin{table*}[h]
+\renewcommand\arraystretch{1.2}
+\setlength{\arrayrulewidth}{0.8pt}
+\setlength{\tabcolsep}{4pt}
+\setlength{\abovecaptionskip}{0.1cm}
+\setlength{\belowcaptionskip}{-0.2cm}
+\centering
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}cccccc@{}}  
+\hline
+Round & Avg LLM Score & Avg Human Score & LLM Score Rank & Human Score Rank & Cost (\$) \\
+\hline
+1 & 12 & 2 & 8 & 8 & 0.005 \\
+2 & 16 & 10.3 & 6 & 7 & 0.291 \\
+3 & 18 & 15 & 2 & 2 & 0.323 \\
+4 & 17 & 13 & 3 & 4 & 0.360 \\
+5 & 16 & 12.3 & 6 & 5 & 0.370 \\
+6 & 17 & 12.3 & 3 & 5 & 0.365 \\
+7 & 17 & 15 & 3 & 2 & 0.336 \\
+8 & 20 & 19.3 & 1 & 1 & 0.863 \\
+\hline
+\end{tabular*}
+\caption{Novel generation Workflow Performance Comparison between LLM and Human Scores Across Different Rounds, with Rankings and Total Costs per Iteration}
+\label{tab:novel-workflow-performance}
+\end{table*}
+
+
+
+\subsubsection{Academic Idea Generation}
+For this case study, we specifically chose GPT-4o-mini as the execution model and Claude-3.5-sonnet as the optimization model and GPT-4o as the evaluation model to better demonstrate \model's optimization capabilities. While the system was tested with 10 different questions, we present one representative example here:
+
+\label{appendix:Idea data}
+
+\begin{tcolorbox}[title={\textbf{\small Idea data}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{json}
+{
+"question":"Given the current research landscape in Environmental Anthropology, propose a novel research idea through logical analysis",
+"requirement": "Through rigorous analysis, propose a single research idea that addresses significant challenges, demonstrates feasibility with current technology.  NOTE: Only ONE concrete idea should be provided - focus on developing a single, well-reasoned proposal rather than multiple options.",
+"answer": "No reference answer"
+}
+\end{minted}
+\end{tcolorbox}
+The optimized workflow obtained after six iterations of \model was:
+
+\label{appendix:Idea generation workflow}
+
+\begin{tcolorbox}[title={\textbf{\small Idea generation workflow}}, boxrule=2pt, arc=0mm, breakable]\begin{minted}[fontsize=\scriptsize, breaklines, breakanywhere, frame=lines, framesep=2mm, tabsize=4, style=vs, autogobble]{python}
+GENERATE_IDEA = """
+Given the current research landscape in the specified field, propose a novel and feasible research idea through logical analysis. Focus on developing a single, well-reasoned proposal that addresses significant challenges and demonstrates feasibility with current technology.
+
+Your response should be concise, providing only the title and a brief description of the research idea in no more than 3 sentences.
+"""
+
+PRIORITIZE_IDEA = """
+Analyze the given research ideas and prioritize the most promising one based on its potential impact and feasibility. Consider the following criteria:
+
+1. Novelty and originality
+2. Potential impact on the field
+3. Feasibility with current technology
+4. Alignment with current research trends
+
+Provide a brief explanation (2-3 sentences) for your selection, highlighting its strengths in relation to the above criteria.
+"""
+
+ELABORATE_IDEA = """
+Elaborate on the prioritized research idea. Provide a comprehensive analysis including:
+
+1. Research objective
+2. Methodology
+3. Expected outcomes
+4. Potential challenges
+
+Ensure your response is well-structured, logically sound, and demonstrates the feasibility of the proposed research with current technology.
+"""
+
+EVALUATE_RESEARCH = """
+Evaluate the elaborated research proposal. Consider the following aspects:
+
+1. Novelty and originality
+2. Feasibility with current technology
+3. Potential impact on the field
+4. Clarity and coherence of the proposal
+
+Provide a concise evaluation highlighting strengths and areas for improvement.
+"""
+
+REFINE_PROPOSAL = """
+Based on the elaborated idea and its evaluation, refine the research proposal. Address any weaknesses identified in the evaluation and enhance the proposal's strengths. Ensure that the refined proposal:
+
+1. Clearly states the research objective
+2. Outlines a feasible methodology
+3. Describes expected outcomes and their significance
+4. Addresses potential challenges and mitigation strategies
+
+Present the refined proposal in a well-structured format suitable for academic submission.
+"""
+
+    async def __call__(self, problem: str):
+        """
+        Implementation of the workflow
+        """
+        ideas = []
+        for _ in range(3):  # Generate 3 ideas
+            idea = await self.custom(input=problem, instruction=prompt_custom.GENERATE_IDEA)
+            ideas.append(idea['response'])
+        
+        best_idea = await self.sc_ensemble(solutions=ideas, problem=problem)
+        
+        prioritized_idea = await self.custom(input=f"Ideas: {ideas}\nBest idea: {best_idea['response']}", instruction=prompt_custom.PRIORITIZE_IDEA)
+        
+        elaborated_idea = await self.custom(input=problem + f"\nPrioritized idea: {prioritized_idea['response']}", instruction=prompt_custom.ELABORATE_IDEA)
+        
+        evaluation = await self.custom(input=elaborated_idea['response'], instruction=prompt_custom.EVALUATE_RESEARCH)
+        
+        final_solution = await self.custom(input=elaborated_idea['response'] + f"\nEvaluation: {evaluation['response']}", instruction=prompt_custom.REFINE_PROPOSAL)
+        
+        return final_solution['response'], self.llm.cost_manager.total_cost
+
+\end{minted}
+\end{tcolorbox}
+
+Due to space constraints, we provide the original LLM and \model-generated ideas in the supplementary materials. The results below demonstrate substantial improvements in idea generation quality and specificity compared to baseline responses, with consistent performance gains achieved after just six iterations.
+
+\begin{table*}[h]
+\renewcommand\arraystretch{1.2}
+\setlength{\arrayrulewidth}{0.8pt}
+\setlength{\tabcolsep}{4pt}
+\setlength{\abovecaptionskip}{0.1cm}
+\setlength{\belowcaptionskip}{-0.2cm}
+\centering
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}cccccc@{}}  
+\hline
+Round & Avg LLM Score & Avg Human Score & LLM Score Rank & Human Score Rank & Cost (\$) \\
+\hline
+1 & 18.4 & 15.6 & 6 & 7 & 0.004 \\
+2 & 18.1 & 15.7 & 7 & 6 & 0.220 \\
+3 & 19.2 & 17.3 & 2 & 4 & 0.234 \\
+4 & 17.6 & 9.7  & 8 & 8 & 0.223 \\
+5 & 19.2 & 17.7 & 2 & 2 & 0.234 \\
+6 & 19.7 & 19.1 & 1 & 1 & 0.235 \\
+7 & 19.0 & 17.6 & 4 & 3 & 0.248 \\
+8 & 18.8 & 16.5 & 5 & 5 & 0.253 \\
+\hline
+\end{tabular*}
+\caption{Idea generation Workflow Performance Comparison between LLM and Human Scores Across Different Rounds, with Rankings and Total Costs per Iteration}
+\label{tab:idea-workflow-performance}
+\end{table*}
+
+
+\section{Discussion on Theoretical Properties of AFlow}
+\label{appendix:theroy}
+
+\subsection{Search Space Completeness}
+\model's search space completeness relies on two key properties:
+\begin{itemize}[leftmargin=20pt]
+\item Code-represented edge structure can express all valid node relationships
+\item LLM expansion generates valid workflow modifications with non-zero probability
+\end{itemize}
+These properties ensure \model can traverse from any initial workflow to any point in the search space, avoiding local optima.
+
+\subsection{Convergence Properties}
+\model achieves optimal performance within finite iterations under three conditions:
+\begin{itemize}[leftmargin=20pt]
+\item Bounded evaluation function $G(W,T)$
+\item Valid workflows maintained by code-represented edge structure
+\item Non-zero probability of LLM generating improvements
+\end{itemize}
+While the convergence sequence may not be strictly monotonic, MCTS properties and soft mixed probability selection balance exploration and exploitation to achieve convergence.
+
+\subsection{Search Efficiency}
+
+\model enhances search efficiency through three key mechanisms. First, Operators increase the probability of generating improvements in each iteration by providing predefined node combinations that encode successful patterns. Second, Tree-Structured Experience enables efficient reuse of successful modifications while avoiding repeated failures through systematic path tracking. Finally, Execution Feedback provides direct performance measurements that guide the optimization process, helping \model identify and prioritize promising directions in the search space.
+

@@ -1,0 +1,150 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Task: Coordinate with another moving ball to hit a target
+
+    Description:
+    - The environment consists of a large flat ground.
+    - Two balls are placed 5 meters in front of the robot, spaced 2 meters apart laterally. Both balls begin rolling in parallel at 1 m/s after a short delay of 1 second.
+    - A target area defined by a 2x2 meter flat vertical target is placed 10 meters from the balls' initial position. The target moves laterally back and forth at 0.5 m/s, covering 3 meters to each side before reversing direction.
+    - The robot is initialized 3 meters behind the balls, facing the direction of the target.
+    - The task is for the robot to coordinate its movements to kick both balls such that they hit the moving target simultaneously.
+
+    Success:
+    The task is completed successfully if both balls hit the front face of the moving target simultaneously.
+
+    Rewards:
+    - The robot is rewarded for decreasing the distance to each ball as they move.
+    - The robot is rewarded for matching the velocity of each ball as it approaches.
+    - The robot is rewarded for kicking each ball with a velocity that is likely to reach the target.
+    - The robot is greatly rewarded if both balls hit the front face of the moving target simultaneously.
+
+    Termination:
+    The task is terminated if either ball stops moving, if the balls do not hit the target simultaneously, or if a time limit of 30 seconds is reached.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.ground_size = [100.0, 100.0, 0.1]
+        self.ground_position = [0.0, 0.0, 0.0]
+        self.ground_id = self.create_box(mass=0.0, half_extents=[self.ground_size[0] / 2, self.ground_size[1] / 2, self.ground_size[2] / 2], position=self.ground_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.ground_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.ball_radius = 0.5
+        self.ball_velocity_init = [1.0, 0.0, 0.0]
+        self.ball1_position_init = [0.0, -1.0, self.ground_size[2] / 2 + self.ball_radius]
+        self.ball2_position_init = [0.0, 1.0, self.ground_size[2] / 2 + self.ball_radius]
+        self.ball1_id = self.create_sphere(mass=1.0, radius=self.ball_radius, position=self.ball1_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.ball2_id = self.create_sphere(mass=1.0, radius=self.ball_radius, position=self.ball2_position_init, color=[0.0, 0.0, 1.0, 1.0])
+        self.target_size = [2.0, 0.1, 2.0]
+        self.target_position_init = [10.0, 0.0, self.ground_size[2] / 2 + self.target_size[2] / 2]
+        self.target_velocity = 0.5
+        self.target_id = self.create_box(mass=0.0, half_extents=[self.target_size[0] / 2, self.target_size[1] / 2, self.target_size[2] / 2], position=self.target_position_init, color=[0.0, 1.0, 0.0, 1.0])
+        self.robot_position_init = [self.ball1_position_init[0] - 3.0, 0.0, self.ground_size[2] / 2 + self.robot.links['base'].position_init[2]]
+        self.robot_orientation_init = self._p.getQuaternionFromEuler([0.0, 0.0, 0.0])
+        self.ball_velocity_threshold = 0.1
+        self.max_steps = 1000
+        self.target_movement_range = 3.0
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_object_velocity(self, object_id):
+        return np.asarray(self._p.getBaseVelocity(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self.steps = 0
+        self.time = 0.0
+        self._p.resetBasePositionAndOrientation(self.ball1_id, self.ball1_position_init, [0.0, 0.0, 0.0, 1.0])
+        self._p.resetBaseVelocity(self.ball1_id, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
+        self._p.resetBasePositionAndOrientation(self.ball2_id, self.ball2_position_init, [0.0, 0.0, 0.0, 1.0])
+        self._p.resetBaseVelocity(self.ball2_id, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot_orientation_init)
+        self._p.resetBasePositionAndOrientation(self.target_id, self.target_position_init, [0.0, 0.0, 0.0, 1.0])
+        return observation
+
+    def step(self, action):
+        self.distance_to_ball1 = self.get_distance_to_object(self.ball1_id)
+        self.distance_to_ball2 = self.get_distance_to_object(self.ball2_id)
+        self.ball1_position = self.get_object_position(self.ball1_id)
+        self.ball2_position = self.get_object_position(self.ball2_id)
+        self.ball1_velocity = self.get_object_velocity(self.ball1_id)
+        self.ball2_velocity = self.get_object_velocity(self.ball2_id)
+        robot_base_link_state = self._p.getBaseVelocity(self.robot.robot_id)
+        self.robot_velocity = robot_base_link_state[0]
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.time += self.dt
+        self.steps += 1
+        if self.time > 1.0:
+            self._p.resetBaseVelocity(self.ball1_id, self.ball_velocity_init, [0.0, 0.0, 0.0])
+            self._p.resetBaseVelocity(self.ball2_id, self.ball_velocity_init, [0.0, 0.0, 0.0])
+        target_new_y = self.target_position_init[1] + self.target_movement_range * np.sin(self.target_velocity * self.time)
+        self._p.resetBasePositionAndOrientation(self.target_id, [self.target_position_init[0], target_new_y, self.target_position_init[2]], [0.0, 0.0, 0.0, 1.0])
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_ball1 = self.get_distance_to_object(self.ball1_id)
+        new_distance_to_ball2 = self.get_distance_to_object(self.ball2_id)
+        new_ball1_position = self.get_object_position(self.ball1_id)
+        new_ball2_position = self.get_object_position(self.ball2_id)
+        new_ball1_velocity = self.get_object_velocity(self.ball1_id)
+        new_ball2_velocity = self.get_object_velocity(self.ball2_id)
+        robot_base_link_state = self._p.getBaseVelocity(self.robot.robot_id)
+        new_robot_velocity = robot_base_link_state[0]
+        reach_ball1 = (self.distance_to_ball1 - new_distance_to_ball1) / self.dt
+        reach_ball2 = (self.distance_to_ball2 - new_distance_to_ball2) / self.dt
+        velocity_match1 = 0.0
+        if new_distance_to_ball1 < 1.0:
+            velocity_match1 = -np.linalg.norm(new_ball1_velocity[:2] - new_robot_velocity[:2])
+        velocity_match2 = 0.0
+        if new_distance_to_ball2 < 1.0:
+            velocity_match2 = -np.linalg.norm(new_ball2_velocity[:2] - new_robot_velocity[:2])
+        kick_velocity1 = 0.0
+        if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.ball1_id)) > 0:
+            kick_velocity1 = np.linalg.norm(new_ball1_velocity)
+        kick_velocity2 = 0.0
+        if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.ball2_id)) > 0:
+            kick_velocity2 = np.linalg.norm(new_ball2_velocity)
+        ball1_in_target = 0.0
+        ball2_in_target = 0.0
+        if self.target_position_init[1] - self.target_movement_range / 2 < new_ball1_position[1] < self.target_position_init[1] + self.target_movement_range / 2 and new_ball1_position[0] > self.target_position_init[0]:
+            ball1_in_target = 10.0
+        if self.target_position_init[1] - self.target_movement_range / 2 < new_ball2_position[1] < self.target_position_init[1] + self.target_movement_range / 2 and new_ball2_position[0] > self.target_position_init[0]:
+            ball2_in_target = 10.0
+        simultaneous_hit = 0.0
+        if ball1_in_target > 0 and ball2_in_target > 0 and (np.abs(new_ball1_position[0] - new_ball2_position[0]) < 0.1):
+            simultaneous_hit = 20.0
+        return {'reach_ball1': reach_ball1, 'reach_ball2': reach_ball2, 'velocity_match1': velocity_match1, 'velocity_match2': velocity_match2, 'kick_velocity1': kick_velocity1, 'kick_velocity2': kick_velocity2, 'ball1_in_target': ball1_in_target, 'ball2_in_target': ball2_in_target, 'simultaneous_hit': simultaneous_hit}
+
+    def get_terminated(self, action):
+        ball1_stopped = self.steps > 10 and np.linalg.norm(self.ball1_velocity) < self.ball_velocity_threshold
+        ball2_stopped = self.steps > 10 and np.linalg.norm(self.ball2_velocity) < self.ball_velocity_threshold
+        time_limit_reached = self.steps >= self.max_steps
+        return ball1_stopped or ball2_stopped or time_limit_reached
+
+    def get_success(self):
+        ball1_position = self.get_object_position(self.ball1_id)
+        ball2_position = self.get_object_position(self.ball2_id)
+        ball1_in_target = self.target_position_init[1] - self.target_movement_range / 2 < ball1_position[1] < self.target_position_init[1] + self.target_movement_range / 2 and ball1_position[0] > self.target_position_init[0]
+        ball2_in_target = self.target_position_init[1] - self.target_movement_range / 2 < ball2_position[1] < self.target_position_init[1] + self.target_movement_range / 2 and ball2_position[0] > self.target_position_init[0]
+        simultaneous_hit = ball1_in_target and ball2_in_target and (np.abs(ball1_position[0] - ball2_position[0]) < 0.1)
+        return simultaneous_hit
+\end{lstlisting}

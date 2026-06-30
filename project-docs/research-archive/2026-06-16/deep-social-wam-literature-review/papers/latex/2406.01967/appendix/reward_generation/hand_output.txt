@@ -1,0 +1,42 @@
+@torch.jit.script
+def compute_reward(object_pos: torch.Tensor, object_angvel_finite_diff: torch.Tensor, object_linvel: torch.Tensor, leap_hand_dof_pos: torch.Tensor, init_pose_buf: torch.Tensor, reset_z_threshold: float) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    # Constants for tuning the reward
+    z_axis_index = 2
+    ang_vel_target = 0.25
+    max_ang_vel_reward = 2.5
+    linear_velocity_penalty_coefficient = -3.0
+    angular_velocity_penalty_coefficient = -2.5
+    fall_penalty = -5.0
+    deviation_penalty_coefficient = -0.2
+
+    # Reward for positive angular velocity around the z-axis.
+    ang_z_vel = object_angvel_finite_diff[:, z_axis_index]
+    ang_z_vel_reward = torch.where(ang_z_vel > ang_vel_target, 
+                                   ang_vel_target + (1 - torch.exp(ang_vel_target - ang_z_vel)), 
+                                   ang_z_vel)
+
+    ang_z_vel_reward = torch.clamp(ang_z_vel_reward, max=max_ang_vel_reward)
+
+    # Penalize linear velocity to ensure the cube remains steady
+    lin_vel_penalty = linear_velocity_penalty_coefficient * torch.norm(object_linvel, dim=1)
+
+    # Penalize the cube falling out of the hand
+    object_fall_penalty = torch.where(object_pos[:, z_axis_index] < reset_z_threshold,
+                                      fall_penalty * torch.ones_like(object_pos[:, 0]),
+                                      torch.zeros_like(object_pos[:, 0]))
+
+    # Penalize deviation from initial finger positions
+    deviation_penalty = deviation_penalty_coefficient * torch.norm(leap_hand_dof_pos - init_pose_buf, dim=1)
+
+    # Total reward
+    total_reward = ang_z_vel_reward + lin_vel_penalty + object_fall_penalty + deviation_penalty
+
+    # Reward components dictionary for potential debugging or analysis
+    reward_components = {
+        "angular_velocity_reward": ang_z_vel_reward,
+        "linear_velocity_penalty": lin_vel_penalty,
+        "fall_penalty": object_fall_penalty,
+        "deviation_penalty": deviation_penalty
+    }
+
+    return total_reward, reward_components

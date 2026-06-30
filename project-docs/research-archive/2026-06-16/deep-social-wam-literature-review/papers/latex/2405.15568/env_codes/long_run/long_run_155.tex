@@ -1,0 +1,131 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Task: Dynamic Target Pushing Challenge
+
+    Description:
+    - The environment is a 15 m x 15 m open area with a flat surface.
+    - There are 3 dynamic targets (spheres with a 0.5 m diameter) that move along predefined linear paths. Each target moves back and forth along a 5 m path at a speed of 0.5 m/s.
+    - The robot starts at the center of the area.
+    - Three goal zones (1 m x 1 m squares) are located at the edges of the area: one at the north edge, one at the east edge, and one at the west edge.
+
+    Task:
+    The robot must push each moving target into its corresponding goal zone. The targets can be pushed in any order, but each target must come to rest fully within its goal zone to be considered successfully delivered.
+
+    Initial Positions:
+    - Robot: Center of the area at (0, 0, 0.5)
+    - Target 1: Moving along the path from (-2.5, 5, 0.25) to (2.5, 5, 0.25)
+    - Target 2: Moving along the path from (5, -2.5, 0.25) to (5, 2.5, 0.25)
+    - Target 3: Moving along the path from (-5, -2.5, 0.25) to (-5, 2.5, 0.25)
+    - Goal Zone 1: Centered at (0, 7, 0.05)
+    - Goal Zone 2: Centered at (7, 0, 0.05)
+    - Goal Zone 3: Centered at (-7, 0, 0.05)
+
+    Success Conditions:
+    The task is considered complete when all three targets come to rest fully within their respective goal zones.
+
+    Time Limit:
+    The robot has a time limit of 5 minutes to complete the task.
+
+    Rewards:
+    - Provide a small reward for moving closer to a target.
+    - Provide a moderate reward for reaching a target.
+    - Provide a large reward for pushing a target towards its goal zone.
+    - Provide a significant reward for delivering a target to its goal zone.
+    - Apply a small penalty for collisions with the targets or the boundaries of the area.
+
+    Termination:
+    The episode terminates if the robot flips over, if a target is pushed out of bounds, or if the time limit is exceeded. The episode should terminate with success if all targets are delivered to their goal zones.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.ground_size = [15.0, 15.0, 0.1]
+        self.ground_position = [0.0, 0.0, 0.0]
+        self.ground_id = self.create_box(mass=0.0, half_extents=[self.ground_size[0] / 2, self.ground_size[1] / 2, self.ground_size[2] / 2], position=self.ground_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.ground_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.target_radius = 0.25
+        self.target_speed = 0.5
+        self.target_paths = [{'start': [-2.5, 5.0, self.target_radius], 'end': [2.5, 5.0, self.target_radius]}, {'start': [5.0, -2.5, self.target_radius], 'end': [5.0, 2.5, self.target_radius]}, {'start': [-5.0, -2.5, self.target_radius], 'end': [-5.0, 2.5, self.target_radius]}]
+        self.target_ids = []
+        for path in self.target_paths:
+            target_id = self.create_sphere(mass=1.0, radius=self.target_radius, position=path['start'], color=[1.0, 0.0, 0.0, 1.0])
+            self.target_ids.append(target_id)
+        self.goal_size = [1.0, 1.0, 0.1]
+        self.goal_positions = [[0.0, 7.0, self.goal_size[2] / 2], [7.0, 0.0, self.goal_size[2] / 2], [-7.0, 0.0, self.goal_size[2] / 2]]
+        self.goal_ids = []
+        for position in self.goal_positions:
+            goal_id = self.create_box(mass=0.0, half_extents=[self.goal_size[0] / 2, self.goal_size[1] / 2, self.goal_size[2] / 2], position=position, color=[0.0, 1.0, 0.0, 1.0])
+            self.goal_ids.append(goal_id)
+        self.robot_position_init = [0.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.robot.links['base'].position_init[2]]
+        self.time_limit = 300.0
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self.time = 0.0
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot.links['base'].orientation_init)
+        for i, path in enumerate(self.target_paths):
+            self._p.resetBasePositionAndOrientation(self.target_ids[i], path['start'], [0.0, 0.0, 0.0, 1.0])
+        return observation
+
+    def step(self, action):
+        self.distance_to_targets = [self.get_distance_to_object(target_id) for target_id in self.target_ids]
+        observation, reward, terminated, truncated, info = super().step(action)
+        for i, path in enumerate(self.target_paths):
+            start = np.array(path['start'])
+            end = np.array(path['end'])
+            direction = (end - start) / np.linalg.norm(end - start)
+            distance = self.target_speed * self.time
+            new_position = start + direction * (distance % (2 * np.linalg.norm(end - start)))
+            if distance // np.linalg.norm(end - start) % 2 == 1:
+                new_position = end - (new_position - start)
+            self._p.resetBasePositionAndOrientation(self.target_ids[i], new_position, [0.0, 0.0, 0.0, 1.0])
+        self.time += self.dt
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distances_to_targets = [self.get_distance_to_object(target_id) for target_id in self.target_ids]
+        rewards = {'move_closer_to_target': 0.0, 'reach_target': 0.0, 'push_to_goal': 0.0, 'deliver_to_goal': 0.0, 'collision_penalty': 0.0}
+        for i, target_id in enumerate(self.target_ids):
+            rewards['move_closer_to_target'] += (self.distance_to_targets[i] - new_distances_to_targets[i]) / self.dt
+            if new_distances_to_targets[i] < self.target_radius:
+                rewards['reach_target'] += 10.0
+            distance_to_goal = self.get_distance_to_object(self.goal_ids[i])
+            new_distance_to_goal = np.linalg.norm(self.get_object_position(target_id)[:2] - self.goal_positions[i][:2])
+            rewards['push_to_goal'] += (distance_to_goal - new_distance_to_goal) / self.dt
+            if new_distance_to_goal < self.goal_size[0] / 2:
+                rewards['deliver_to_goal'] += 50.0
+            if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=target_id)) > 0:
+                rewards['collision_penalty'] -= 1.0
+        return rewards
+
+    def get_terminated(self, action):
+        is_flipped = np.dot(np.asarray([0, 0, 1]), np.asarray(self._p.getMatrixFromQuaternion(self.robot.links['base'].orientation)).reshape(3, 3)[:, 2]) < 0.5
+        is_time_up = self.time >= self.time_limit
+        is_out_of_bounds = any((np.any(np.abs(self.get_object_position(target_id)[:2]) > np.array(self.ground_size[:2]) / 2) for target_id in self.target_ids))
+        return is_flipped or is_time_up or is_out_of_bounds
+
+    def get_success(self):
+        return all((np.linalg.norm(self.get_object_position(target_id)[:2] - self.goal_positions[i][:2]) < self.goal_size[0] / 2 for i, target_id in enumerate(self.target_ids)))
+\end{lstlisting}

@@ -1,0 +1,41 @@
+\section{Introduction}
+Reinforcement learning from human feedback (RLHF) is a necessary but opaque tool underlying the success of popular language models (LMs) such as OpenAI's ChatGPT~\citep{ChatGPT} and Anthropic's Claude~\citep{bai2022training}. 
+The prevalence of RLHF stems from its efficacy at circumventing one of the greatest difficulties in integrating human preferences into language models: specifying an explicit reward~\citep{christiano2017deep}. 
+Reward models (RMs) are central to this process. 
+They are created by copying the original language model and training it on labeled preference data, producing a model that can predict whether  one piece of text is likely to be preferred over another. 
+A reinforcement learning optimizer then uses this reward model signal to update the parameters of the original model, improving performance on a variety of tasks~\citep{ouyang2022training, touvron2023llama}.
+
+While the post-RLHF model (known as the \textit{policy}) and even the pretrained model are extensively documented and evaluated, the basic properties of the RLHF process like the RMs receive far less attention. 
+% Though reward models are central to the effectiveness of RLHF and potentially glimpsing into how human values map to LMs, they remain under-evaluated. 
+Recent work on training reward models~\citep{starling2023, llm-blender-2023} has begun to fill this gap, but utilizes validation sets from previous RLHF training processes, such as Anthropic's Helpful and Harmless data~\citep{bai2022training} or OpenAI's Learning to Summarize~\citep{stiennon2020learning}, which are known to have ceilings on accuracy between 60 and 70\% due to inter-annotator disagreement~\citep{wang2024secrets}. 
+% Similar investigations have yet to be conducted for Direct Policy Optimization (DPO) models. 
+Moreover, newly released preference data aiming to expand the diversity of preference training datasets such as UltraFeedback~\citep{cui2023ultrafeedback}, UltraInteract~\citep{yuan2024advancing} and Nectar~\citep{starling2023}, do not have test sets, necessitating a new style of evaluation for RMs.  
+
+We begin to rectify the lack of evaluation methods by introducing~\name, the first toolkit for benchmarking reward models. 
+RLHF is a broadly applicable process used to enhance specific capabilities of LMs such as safety~\citep{dai2023safe} or reasoning~\citep{lightman2023let, havrilla2024teaching} as well as general capabilities such as instruction following~\citep{ouyang2022training} or ``steerability''~\citep{askell2021general,bai2022training}. 
+Thorough evaluations of RMs will also cover these categories. 
+In this work, we curate data to create structured comparisons across a variety of reward model properties.
+Each sample is formatted as a prompt with a human-verified chosen and rejected completion.
+We design subsets so as to vary in difficulty and coverage. 
+Some subsets are solved by small RMs, reaching 100\% accuracy, but others are harder to differentiate and still have state-of-the-art performance around 75\%, with many models around the random baseline.
+% Some are constructed such that many reward models can differentiate chosen from rejected completions, reaching nearly 100\% accuracy. Others are more difficult and state-of-the-art language models only reach the 60 to 70\% range.
+
+We aim to map the current landscape of openly available reward models via a leaderboard for~\name.
+We have evaluated over 80 models, such those trained as classifiers, including UltraRM~\citep{cui2023ultrafeedback}, Starling~\citep{starling2023}, PairRM~\citep{llm-blender-2023}, SteamSHP~\citep{pmlr-v162-ethayarajh22a}, models from Reward rAnked FineTuning (RAFT)~\citep{dong2023raft}, and others. 
+We also evaluate popular chat models trained with Direct Policy Optimization (DPO)~\citep{rafailov2023direct}, for example, Zephyr-$\beta$~\citep{tunstall2023zephyr}, Qwen-Chat~\citep{bai2023qwen}, StableLM~\citep{bellagente2024stable}, and T\"ulu 2~\citep{ivison2023camels} to ground recent debates on RLHF methods and showcase specific datasets where they fall short.
+
+With these models, we compare scaling, test reasoning capabilities, highlight three buckets of refusal behavior, and share more details on the inner workings of RMs.
+The accompanying code-base %\footnote{Code available here: \url{https://github.com/allenai/reward-bench}.} 
+provides a common inference stack for many variations of models and we release many text-score pairs to analyze their performance.
+With \textbf{\name}, we:
+\begin{enumerate}[leftmargin=0.5cm]
+    \item Release a common \textbf{framework for evaluating the many different architectures of reward models}, along with tools for visualization, training, and other analysis.
+    We also release all data used in the evaluation, composed of text-score pairs for all inputs, to enable further data analysis on the properties of reward models.\footnote{Data is here: \url{https://huggingface.co/datasets/allenai/reward-bench-results}.}
+    \item Illustrate the \textbf{differences between DPO and classifier-based reward models} across a variety of datasets. 
+    DPO models, while more plentiful due to the method's simplicity, fail to generalize to popular preference data test sets and present a higher variance in performance.
+    \item Chart the \textbf{landscape of current state-of-the-art reward models}. 
+    We showcase the scaling laws, the propensity to refuse (or not), the reasoning capabilities, and more for popular RMs.
+    \item Show the \textbf{limitations of existing preference data test sets} for evaluating these models, showcasing common pitfalls of RMs on subtle, but challenging instruction pairs (e.g. intentionally modified rejected responses, which superficially look high quality but answer the wrong prompt).
+\end{enumerate}
+
+% We hope this benchmark enables more advanced reward model training, scientific understanding of the integration of human preferences in LMs, and ultimately better aligned, open language models.

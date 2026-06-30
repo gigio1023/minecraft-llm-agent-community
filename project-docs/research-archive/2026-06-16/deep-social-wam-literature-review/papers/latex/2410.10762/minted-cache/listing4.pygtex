@@ -1,0 +1,153 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{class} \PYG{n+nc}{ContextualGenerate}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{context}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{k+kc}{None}\PYG{p}{):}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{CONTEXTUAL\PYGZus{}GENERATE\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{problem\PYGZus{}description}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{,} \PYG{n}{thought}\PYG{o}{=}\PYG{n}{context}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{GenerateOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+        \PYG{k}{return} \PYG{n}{response}
+
+\PYG{k}{class} \PYG{n+nc}{CodeGenerate}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{function\PYGZus{}name}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{k+kc}{None}\PYG{p}{):}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{GENERATE\PYGZus{}CODEBLOCK\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{problem\PYGZus{}description}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}function\PYGZus{}name\PYGZdq{}}\PYG{p}{:} \PYG{n}{function\PYGZus{}name}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{CodeGenerateOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+        \PYG{k}{return} \PYG{n}{response}
+
+
+\PYG{k}{class} \PYG{n+nc}{Format}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{k+kc}{None}\PYG{p}{):}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{FORMAT\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{problem\PYGZus{}description}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{o}{=}\PYG{n}{solution}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{FormatOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+        \PYG{k}{return} \PYG{n}{response}
+
+\PYG{k}{class} \PYG{n+nc}{Review}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{k+kc}{None}\PYG{p}{):}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{REVIEW\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{problem\PYGZus{}description}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{o}{=}\PYG{n}{solution}\PYG{p}{,} \PYG{n}{criteria}\PYG{o}{=}\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{criteria}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{ReviewOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+        \PYG{k}{return} \PYG{n}{response}
+
+\PYG{k}{class} \PYG{n+nc}{Revise}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{p}{,} \PYG{n}{feedback}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{k+kc}{None}\PYG{p}{):}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{REVISE\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{problem\PYGZus{}description}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{o}{=}\PYG{n}{solution}\PYG{p}{,} \PYG{n}{feedback}\PYG{o}{=}\PYG{n}{feedback}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{ReviseOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+        \PYG{k}{return} \PYG{n}{response}
+
+\PYG{k}{class} \PYG{n+nc}{Ensemble}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{solutions}\PYG{p}{:} \PYG{n}{List}\PYG{p}{[}\PYG{n+nb}{str}\PYG{p}{],} \PYG{n}{problem}\PYG{p}{:} \PYG{n+nb}{str}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{k+kc}{None}\PYG{p}{):}
+        \PYG{n}{answer\PYGZus{}mapping} \PYG{o}{=} \PYG{p}{\PYGZob{}\PYGZcb{}}
+        \PYG{n}{solution\PYGZus{}text} \PYG{o}{=} \PYG{l+s+s2}{\PYGZdq{}\PYGZdq{}}
+        \PYG{k}{for} \PYG{n}{index}\PYG{p}{,} \PYG{n}{solution} \PYG{o+ow}{in} \PYG{n+nb}{enumerate}\PYG{p}{(}\PYG{n}{solutions}\PYG{p}{):}
+            \PYG{n}{answer\PYGZus{}mapping}\PYG{p}{[}\PYG{n+nb}{chr}\PYG{p}{(}\PYG{l+m+mi}{65} \PYG{o}{+} \PYG{n}{index}\PYG{p}{)]} \PYG{o}{=} \PYG{n}{index}
+            \PYG{n}{solution\PYGZus{}text} \PYG{o}{+=} \PYG{l+s+sa}{f}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+si}{\PYGZob{}}\PYG{n+nb}{chr}\PYG{p}{(}\PYG{l+m+mi}{65}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{index}\PYG{p}{)}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s2}{: }\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s+si}{\PYGZob{}}\PYG{n+nb}{str}\PYG{p}{(}\PYG{n}{solution}\PYG{p}{)}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+se}{\PYGZbs{}n\PYGZbs{}n\PYGZbs{}n}\PYG{l+s+s2}{\PYGZdq{}}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{ENSEMBLE\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{solutions}\PYG{o}{=}\PYG{n}{solution\PYGZus{}text}\PYG{p}{,} \PYG{n}{problem\PYGZus{}description}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{EnsembleOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+
+        \PYG{n}{answer} \PYG{o}{=} \PYG{n}{response}\PYG{o}{.}\PYG{n}{get}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}solution\PYGZus{}letter\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}\PYGZdq{}}\PYG{p}{)}
+        \PYG{n}{answer} \PYG{o}{=} \PYG{n}{answer}\PYG{o}{.}\PYG{n}{strip}\PYG{p}{()}\PYG{o}{.}\PYG{n}{upper}\PYG{p}{()}
+
+        \PYG{k}{return} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}solution\PYGZdq{}}\PYG{p}{:} \PYG{n}{solutions}\PYG{p}{[}\PYG{n}{answer\PYGZus{}mapping}\PYG{p}{[}\PYG{n}{answer}\PYG{p}{]]\PYGZcb{}}
+
+\PYG{k}{class} \PYG{n+nc}{Test}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{def} \PYG{n+nf}{exec\PYGZus{}code}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{solution}\PYG{p}{,} \PYG{n}{entry\PYGZus{}point}\PYG{p}{):}
+        \PYG{n}{fail\PYGZus{}cases} \PYG{o}{=} \PYG{p}{[]}
+        \PYG{o}{...}
+        \PYG{k}{if} \PYG{n}{fail\PYGZus{}cases} \PYG{o}{!=} \PYG{p}{[]:}
+            \PYG{k}{return} \PYG{n}{fail\PYGZus{}cases}
+        \PYG{k}{else}\PYG{p}{:}
+            \PYG{k}{return} \PYG{l+s+s2}{\PYGZdq{}no error\PYGZdq{}}
+
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{solution}\PYG{p}{,} \PYG{n}{entry\PYGZus{}point}\PYG{p}{,} \PYG{n}{test\PYGZus{}loop}\PYG{p}{:} \PYG{n+nb}{int} \PYG{o}{=} \PYG{l+m+mi}{3}\PYG{p}{):}
+        \PYG{k}{for} \PYG{n}{\PYGZus{}} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{test\PYGZus{}loop}\PYG{p}{):}
+            \PYG{n}{result} \PYG{o}{=} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{exec\PYGZus{}code}\PYG{p}{(}\PYG{n}{solution}\PYG{p}{,} \PYG{n}{entry\PYGZus{}point}\PYG{p}{)}
+            \PYG{k}{if} \PYG{n}{result} \PYG{o}{==} \PYG{l+s+s2}{\PYGZdq{}no error\PYGZdq{}}\PYG{p}{:}
+                \PYG{k}{return} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}result\PYGZdq{}}\PYG{p}{:} \PYG{k+kc}{True}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}solution\PYGZdq{}}\PYG{p}{:} \PYG{n}{solution}\PYG{p}{\PYGZcb{}}
+            \PYG{k}{elif} \PYG{l+s+s2}{\PYGZdq{}exec\PYGZus{}fail\PYGZus{}case\PYGZdq{}} \PYG{o+ow}{in} \PYG{n}{result}\PYG{p}{:}
+                \PYG{n}{result} \PYG{o}{=} \PYG{n}{result}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}exec\PYGZus{}fail\PYGZus{}case\PYGZdq{}}\PYG{p}{]}
+                \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{REFLECTION\PYGZus{}ON\PYGZus{}PUBLIC\PYGZus{}TEST\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}
+                    \PYG{n}{problem}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{,}
+                    \PYG{n}{solution}\PYG{o}{=}\PYG{n}{solution}\PYG{p}{,}
+                    \PYG{n}{exec\PYGZus{}pass}\PYG{o}{=}\PYG{l+s+sa}{f}\PYG{l+s+s2}{\PYGZdq{}executed unsuccessfully, error: }\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s+s2}{ }\PYG{l+s+si}{\PYGZob{}}\PYG{n}{result}\PYG{l+s+si}{\PYGZcb{}}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,}
+                    \PYG{n}{test\PYGZus{}fail}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}executed unsucessfully\PYGZdq{}}\PYG{p}{,}
+                \PYG{p}{)}
+                \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{ReflectionTestOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{n}{context}\PYG{o}{=}\PYG{n}{prompt}\PYG{p}{,} \PYG{n}{llm}\PYG{o}{=}\PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{,} \PYG{n}{mode}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}code\PYGZus{}fill\PYGZdq{}}\PYG{p}{)}
+                \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+                \PYG{n}{solution} \PYG{o}{=} \PYG{n}{response}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}reflection\PYGZus{}and\PYGZus{}solution\PYGZdq{}}\PYG{p}{]}
+            \PYG{k}{else}\PYG{p}{:}
+                \PYG{o}{...}
+        \PYG{n}{result} \PYG{o}{=} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{exec\PYGZus{}code}\PYG{p}{(}\PYG{n}{solution}\PYG{p}{,} \PYG{n}{entry\PYGZus{}point}\PYG{p}{)}
+        \PYG{k}{if} \PYG{n}{result} \PYG{o}{==} \PYG{l+s+s2}{\PYGZdq{}no error\PYGZdq{}}\PYG{p}{:}
+            \PYG{k}{return} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}result\PYGZdq{}}\PYG{p}{:} \PYG{k+kc}{True}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}solution\PYGZdq{}}\PYG{p}{:} \PYG{n}{solution}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{else}\PYG{p}{:}
+            \PYG{k}{return} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}result\PYGZdq{}}\PYG{p}{:} \PYG{k+kc}{False}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}solution\PYGZdq{}}\PYG{p}{:} \PYG{n}{solution}\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{class} \PYG{n+nc}{Programmer}\PYG{p}{(}\PYG{n}{Operator}\PYG{p}{):}
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf}{exec\PYGZus{}code}\PYG{p}{(}\PYG{n}{code}\PYG{p}{,} \PYG{n}{timeout}\PYG{o}{=}\PYG{l+m+mi}{180}\PYG{p}{):}
+        \PYG{k}{def} \PYG{n+nf}{run\PYGZus{}code}\PYG{p}{():}
+            \PYG{k}{try}\PYG{p}{:}
+                \PYG{n}{global\PYGZus{}namespace} \PYG{o}{=} \PYG{p}{\PYGZob{}\PYGZcb{}}
+
+                \PYG{n}{exec}\PYG{p}{(}\PYG{n}{code}\PYG{p}{,} \PYG{n}{global\PYGZus{}namespace}\PYG{p}{)}
+            \PYG{k}{except} \PYG{o}{...}
+
+        \PYG{n}{done\PYGZus{}event} \PYG{o}{=} \PYG{n}{threading}\PYG{o}{.}\PYG{n}{Event}\PYG{p}{()}
+        \PYG{n}{result} \PYG{o}{=} \PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}Error\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}subprocess error\PYGZdq{}}\PYG{p}{]}
+
+        \PYG{k}{def} \PYG{n+nf}{wrapper}\PYG{p}{():}
+            \PYG{k}{nonlocal} \PYG{n}{result}
+            \PYG{n}{result} \PYG{o}{=} \PYG{n}{run\PYGZus{}code}\PYG{p}{()}
+            \PYG{n}{done\PYGZus{}event}\PYG{o}{.}\PYG{n}{set}\PYG{p}{()}
+
+        \PYG{k}{with} \PYG{n}{concurrent}\PYG{o}{.}\PYG{n}{futures}\PYG{o}{.}\PYG{n}{ThreadPoolExecutor}\PYG{p}{(}\PYG{n}{max\PYGZus{}workers}\PYG{o}{=}\PYG{l+m+mi}{1}\PYG{p}{)} \PYG{k}{as} \PYG{n}{executor}\PYG{p}{:}
+            \PYG{n}{future} \PYG{o}{=} \PYG{n}{executor}\PYG{o}{.}\PYG{n}{submit}\PYG{p}{(}\PYG{n}{wrapper}\PYG{p}{)}
+            \PYG{k}{try}\PYG{p}{:}
+                \PYG{k}{if} \PYG{n}{done\PYGZus{}event}\PYG{o}{.}\PYG{n}{wait}\PYG{p}{(}\PYG{n}{timeout}\PYG{o}{=}\PYG{n}{timeout}\PYG{p}{):}
+                    \PYG{k}{return} \PYG{n}{result}
+                \PYG{k}{else}\PYG{p}{:}
+                    \PYG{n}{future}\PYG{o}{.}\PYG{n}{cancel}\PYG{p}{()}
+                    \PYG{k}{return} \PYG{l+s+s2}{\PYGZdq{}Error\PYGZdq{}}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}Exceed time limit\PYGZdq{}}
+            \PYG{k}{finally}\PYG{p}{:}
+                \PYG{n}{executor}\PYG{o}{.}\PYG{n}{shutdown}\PYG{p}{(}\PYG{n}{wait}\PYG{o}{=}\PYG{k+kc}{False}\PYG{p}{)}
+
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf}{code\PYGZus{}generate}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{,} \PYG{n}{analysis}\PYG{p}{,} \PYG{n}{feedback}\PYG{p}{,} \PYG{n}{mode}\PYG{p}{):}
+        \PYG{n}{prompt} \PYG{o}{=} \PYG{n}{PYTHON\PYGZus{}CODE\PYGZus{}VERIFIER\PYGZus{}PROMPT}\PYG{o}{.}\PYG{n}{format}\PYG{p}{(}\PYG{n}{problem}\PYG{o}{=}\PYG{n}{problem}\PYG{p}{,} \PYG{n}{analysis}\PYG{o}{=}\PYG{n}{analysis}\PYG{p}{,} \PYG{n}{feedback}\PYG{o}{=}\PYG{n}{feedback}\PYG{p}{)}
+        \PYG{n}{fill\PYGZus{}kwargs} \PYG{o}{=} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}context\PYGZdq{}}\PYG{p}{:} \PYG{n}{prompt}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}llm\PYGZdq{}}\PYG{p}{:} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{llm}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}function\PYGZus{}name\PYGZdq{}}\PYG{p}{:} \PYG{l+s+s2}{\PYGZdq{}solve\PYGZdq{}}\PYG{p}{\PYGZcb{}}
+        \PYG{k}{if} \PYG{n}{mode}\PYG{p}{:}
+            \PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}mode\PYGZdq{}}\PYG{p}{]} \PYG{o}{=} \PYG{n}{mode}
+        \PYG{n}{node} \PYG{o}{=} \PYG{k}{await} \PYG{n}{ActionNode}\PYG{o}{.}\PYG{n}{from\PYGZus{}pydantic}\PYG{p}{(}\PYG{n}{CodeGenerateOp}\PYG{p}{)}\PYG{o}{.}\PYG{n}{fill}\PYG{p}{(}\PYG{o}{**}\PYG{n}{fill\PYGZus{}kwargs}\PYG{p}{)}
+        \PYG{n}{response} \PYG{o}{=} \PYG{n}{node}\PYG{o}{.}\PYG{n}{instruct\PYGZus{}content}\PYG{o}{.}\PYG{n}{model\PYGZus{}dump}\PYG{p}{()}
+        \PYG{k}{return} \PYG{n}{response}
+
+    \PYG{k}{async} \PYG{k}{def} \PYG{n+nf+fm}{\PYGZus{}\PYGZus{}call\PYGZus{}\PYGZus{}}\PYG{p}{(}\PYG{n+nb+bp}{self}\PYG{p}{,} \PYG{n}{problem}\PYG{p}{:} \PYG{n+nb}{str}\PYG{p}{,} \PYG{n}{analysis}\PYG{p}{:} \PYG{n+nb}{str} \PYG{o}{=} \PYG{l+s+s2}{\PYGZdq{}None\PYGZdq{}}\PYG{p}{):}
+        \PYG{n}{code} \PYG{o}{=} \PYG{k+kc}{None}
+        \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{l+m+mi}{3}\PYG{p}{):}
+            \PYG{n}{code} \PYG{o}{=} \PYG{k}{await} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{code\PYGZus{}generate}\PYG{p}{(}\PYG{n}{problem}\PYG{p}{,} \PYG{n}{analysis}\PYG{p}{,} \PYG{n}{feedback}\PYG{p}{,} \PYG{n}{mode}\PYG{o}{=}\PYG{l+s+s2}{\PYGZdq{}code\PYGZus{}fill\PYGZdq{}}\PYG{p}{)}
+            \PYG{n}{code} \PYG{o}{=} \PYG{n}{code}\PYG{p}{[}\PYG{l+s+s2}{\PYGZdq{}code\PYGZdq{}}\PYG{p}{]}
+            \PYG{n}{status}\PYG{p}{,} \PYG{n}{output} \PYG{o}{=} \PYG{k}{await} \PYG{n+nb+bp}{self}\PYG{o}{.}\PYG{n}{exec\PYGZus{}code}\PYG{p}{(}\PYG{n}{code}\PYG{p}{)}
+            \PYG{k}{if} \PYG{n}{status} \PYG{o}{==} \PYG{l+s+s2}{\PYGZdq{}Success\PYGZdq{}}\PYG{p}{:}
+                \PYG{k}{return} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}code\PYGZdq{}}\PYG{p}{:} \PYG{n}{code}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}output\PYGZdq{}}\PYG{p}{:} \PYG{n}{output}\PYG{p}{\PYGZcb{}}
+            \PYG{k}{else}\PYG{p}{:}
+                \PYG{o}{...}
+        \PYG{k}{return} \PYG{p}{\PYGZob{}}\PYG{l+s+s2}{\PYGZdq{}code\PYGZdq{}}\PYG{p}{:} \PYG{n}{code}\PYG{p}{,} \PYG{l+s+s2}{\PYGZdq{}output\PYGZdq{}}\PYG{p}{:} \PYG{l+s+s2}{\PYGZdq{}error\PYGZdq{}}\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

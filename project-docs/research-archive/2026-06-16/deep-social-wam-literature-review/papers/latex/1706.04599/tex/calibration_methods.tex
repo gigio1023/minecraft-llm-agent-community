@@ -1,0 +1,181 @@
+% !TeX root = ../main.tex
+% reduce display equation skip
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\setlength{\textfloatsep}{4pt}
+
+In this section, we first review existing calibration methods, and introduce new variants of our own.
+%Those methods are comprehensively evaluated in \autoref{results}.
+All methods are post-processing steps that produce (calibrated) probabilities.
+Each method requires a hold-out validation set, which in practice can be the same set used for hyperparameter tuning.
+% Thus calibration does not impose additional training or data collection costs.
+We assume that the training, validation, and test sets are drawn from the same distribution.
+
+\subsection{Calibrating Binary Models}
+\label{binary_calibration}
+
+We first introduce calibration in the binary setting, i.e. $\mathcal{Y}=\{0,1\}$.
+For simplicity, throughout this subsection, we assume the model outputs only the confidence for the positive class.\footnote{
+  This is in contrast with the setting in \autoref{definitions}, in which the model produces both a class prediction and confidence.
+}
+%, i.e. $h(X) = \hat p_i = \P(Y = 1 \sep X)$.
+Given a sample $\xb_i$, we have access to $\hat p_i$ -- the network's predicted probability of $y_i = 1$, as well as $z_i \in \mathbb{R}$ -- which is the network's non-probabilistic output, or \emph{logit}. The predicted probability $\hat p_i$ is derived from $z_i$ using a sigmoid function $\sigma$; i.e.
+$\hat p_i = \sigma(z_i)$. Our goal is to produce a calibrated probability $\hat q_i$ based on $y_i$, $\hat p_i$, and $z_i$.
+% We will use the following notation in this section: for sample $i$, $\xb_i$ is the input features, and $\hat y_i$ and $\hat p_i$ are the predicted class and distribution. Additionally, we assume that we have access to the network's \emph{logit vector} $\zb_i \in \mathbb{R}^K$, which is the output of the final layer before passing through the final softmax function. $\hat y_i$ and $\hat p_i$ can be written in terms of $\zb_i$:
+% %
+% \begin{align*}
+%  \hat y_i &= \argmax_{k \in 1, \ldots, K} \frac{e^{z_i^{(k)}}}{\sum_{j=1}^K e^{z_i^{(j)}}}, \hspace{10pt}
+%   \hat p_i = \max_{k \in 1, \ldots, K} \frac{e^{z_i^{(j)}}}{\sum_{j=1}^K e^{z_i^{(j)}}}.
+% \end{align*}
+% .
+
+\paragraph{Histogram binning} \cite{zadrozny2001obtaining} is a simple non-parametric calibration method.
+% Given $n$ samples, let the uncalibrated output probabilities be $\hat{p}_i = h(\xb_i)\in[0,1]$ for samples $i = 1,\ldots,n$.
+In a nutshell,  all uncalibrated predictions $\hat{p}_i$ are divided
+into mutually exclusive bins $B_1,\dots,B_M$. Each bin is assigned a calibrated score $\theta_m$; i.e. if $\hat p_i$ is assigned to bin $B_m$, then $\hat q_i = \theta_m$. At test time, if prediction $\hat{p}_{te}$ falls into bin $B_m$, then the calibrated prediction $\hat q_{te}$ is $\theta_m$.
+%
+More precisely, for a suitably chosen $M$ (usually small), we first define bin boundaries $0 = a_1 \leq a_2 \leq \ldots \leq a_{M+1} = 1$, where the bin $B_m$ is defined by the interval $(a_m, a_{m+1}]$.
+Typically the bin boundaries are either chosen to be equal length intervals
+% (i.e. $a_m = \frac{m-1}{M}$ for all $m$)
+or to equalize the number of samples in each bin.
+% (i.e. $|B_m| = |B_{m'}|$ for all $m, m'$.)
+% The confidence of $B_m$ is the average number of positive class samples in that bin:
+% $$\theta_m =  \frac{1}{|B_m|} \sum_{i \in B_m} y_i.$$
+The predictions $\theta_i$ are chosen to minimize the bin-wise squared loss:
+\begin{equation}
+\min_{\theta_1,\ldots,\theta_M} \: \sum_{m=1}^M \sum_{i = 1}^n
+\mathbf{1} (a_m \leq \hat p_i < a_{m+1}) \left(\theta_m - y_i \right)^2,
+\label{eqn:hist_bin}
+\end{equation}
+%
+where $\mathbf{1}$ is the indicator function. Given fixed bins boundaries, the solution to \eqref{eqn:hist_bin} results in $\theta_m$ that correspond to the average number of positive-class samples in bin $B_m$.
+
+\paragraph{Isotonic regression} \cite{zadrozny2002transforming}, arguably the most common non-parametric calibration method,
+learns a piecewise constant function $f$ to transform uncalibrated outputs; i.e. $\hat q_i = f(\hat p_i)$.
+Specifically, isotonic regression produces $f$ to minimize the square loss $\sum_{i=1}^n (f(\hat p_i) - y_i)^2$.
+Because $f$ is constrained to be piecewise constant, we can write the optimization problem as:
+%
+\begin{equation}
+\begin{aligned}
+\label{iso_eq}
+% \min_{\substack{M,\theta_1,\ldots,\theta_M \\ a_1,a_2,\ldots,a_{M+1}}} \hspace{4pt} &\sum_{m=1}^M \sum_{\hat{p}_i \in (a_m,a_{m+1}]} (\theta_m - y_i)^2 \\
+\min_{\substack{M \\ \theta_1,\ldots,\theta_M \\ a_1,\ldots,a_{M+1}}} & \hspace{3pt} \sum_{m=1}^M \sum_{i = 1}^n
+\mathbf{1} (a_m \leq \hat p_i < a_{m+1}) \left(\theta_m - y_i \right)^2 \\
+\text{subject to} & \hspace{8pt} 0 = a_1 \leq a_2 \leq \ldots \leq a_{M+1} = 1, \nonumber \\
+& \hspace{8pt} \theta_1 \leq \theta_2 \leq \ldots \leq \theta_M. \nonumber
+\end{aligned}
+\end{equation}
+%
+where $M$ is the number of intervals; $a_1, \ldots, a_{M+1}$ are the interval boundaries; and $\theta_1, \ldots, \theta_M$ are the function values.
+Under this parameterization, isotonic regression is a strict generalization of histogram binning in which the bin boundaries and bin predictions are jointly optimized.
+
+%
+% where $i \in B_m$ corresponds to $\hat{p_i} \in (a_m, a_{m+1}]$.
+% Similar to histogram binning, the probability for a test point $\xb_{te}$ is given by which bin $\hat{p}_{te}$ falls into.
+%
+% This method finds a piecewise constant non-decreasing function $f : [0,1] \rightarrow \mathbb{R}$ to transform the uncalibrated predictions; i.e. $\hat q_i = f(p_i)$.
+% More specifically, $f$ is chosen to minimizes $\sum_{i=1}^n (f(\hat{p}_i) - y_i)^2.$
+% The piecewise intervals of $f$ parameterize the bin endpoints $(a_i, a_{i+1})$ and bin values $\theta_i$.
+
+\paragraph{Bayesian Binning into Quantiles (BBQ)} \cite{naeini2015obtaining} is a extension of histogram binning using Bayesian model averaging. Essentially, BBQ marginalizes out all possible \emph{binning schemes} to produce $\hat q_i$.
+More formally, a binning scheme $s$ is a pair $(M,\mathcal{I})$ where $M$ is the number of bins, and $\mathcal{I}$ is a corresponding partitioning of $[0,1]$ into disjoint intervals ($0 = a_1 \leq a_2 \leq \ldots \leq a_{M+1} = 1$). The parameters of a binning scheme are $\theta_1,\ldots,\theta_M$. Under this framework, histogram binning and isotonic regression both produce a single binning scheme, whereas BBQ considers a space $\mathcal{S}$ of all possible binning schemes for the validation dataset $D$. BBQ performs Bayesian averaging of the probabilities produced by each scheme:\footnote{
+  Because the validation dataset is finite, $\mathcal{S}$ is as well.
+}
+%
+% The calibrated probability $\hat q_{te}$ for a test prediction $\hat p_{te}$ is given by
+%
+\begin{align*}
+\P(\hat q_{te} \sep \hat p_{te}, D) &= \sum_{s \in \mathcal{S}} \P(\hat q_{te}, S=s \sep \hat p_{te}, D) \\
+  &= \sum_{s \in \mathcal{S}} \P(\hat q_{te} \sep \hat p_{te}, S\!=\!s, D) \P(S\!=\!s \sep D).
+\end{align*}
+where $\P(\hat q_{te} \sep \hat p_{te}, S\!=\!s, D)$ is the calibrated probability using binning scheme $s$. Using a uniform prior, the weight $\P(S\!=\!s \sep D)$ can be derived using Bayes' rule:
+%
+$$\P(S\!=\!s \sep D) = \frac{\P(D \sep S\!=\!s)}{\sum_{s' \in \mathcal{S}} \P(D \sep S\!=\!s')}.$$
+%
+The parameters $\theta_1,\ldots,\theta_M$ can be viewed as parameters of $M$ independent binomial distributions. Hence, by placing a Beta prior on $\theta_1, \ldots, \theta_M$, we can obtain a closed form expression for the marginal likelihood $\P(D \sep S\!=\!s)$. This allows us to compute $\P(\hat q_{te} \sep \hat p_{te}, D)$ for any test input.
+
+
+\paragraph{Platt scaling} \cite{platt1999probabilistic} is a parametric approach to calibration, unlike the other approaches. The non-probabilistic predictions of a classifier are used as features for a logistic regression model, which is trained on the validation set to return probabilities. More specifically, in the context of neural networks \cite{niculescu2005predicting}, Platt scaling learns scalar parameters $a,b \in \mathbb{R}$ and outputs $\hat q_i = \sigma(a z_i +b)$ as the calibrated probability. Parameters $a$ and $b$ can be optimized using the NLL loss over the validation set. It is important to note that the neural network's parameters are fixed during this stage.
+
+%To calibrate the model, we fit a non-decreasing piecewise constant function $f$ that minimizes
+%\begin{equation}
+%\label{iso_eq}
+%\sum_{i=1}^n (f(\hat p_i_i) - y_i)^2.
+%\end{equation}
+%Given a test sample $x$, the calibrated probability for predicting class 1 is $f(h(x))$. Since $f$ is piecewise constant, there exist disjoint intervals $I_1,\ldots,I_M$ with $\bigcup_{m=1}^M I_m = [0,1]$ for which $f$ is equal to some value $\theta_m$ on $I_m$. Hence we may view isotonic regression as a binning model where the number of bins $M$ and the calibration model parameters $(\theta_1,\ldots,\theta_M)$ are adaptively chosen to optimize \autoref{iso_eq}.
+
+\begin{table*}[t!]
+	\centering
+	\input results/ece
+  \caption{ECE (\%) (with $M=15$ bins) on standard vision and NLP datasets before calibration and with various calibration methods. The number following a model's name denotes the network depth.}
+	\label{table.ece}
+	\vspace{-2ex}
+\end{table*}
+
+\subsection{Extension to Multiclass Models}
+
+For classification problems involving $K>2$ classes, we return to the original problem formulation.
+The network outputs a class prediction $\hat y_i$ and confidence score $\hat p_i$ for each input $\xb_i$. In this case, the network logits $\zb_i$ are vectors, where $\hat y_i = \argmax_{k} z_i^{(k)}$, and $\hat p_i$ is typically derived using the softmax function $\sigma_\text{SM}$:
+%
+$$\sigma_\text{SM}(\zb_i)^{(k)} = \frac{\exp(z_i^{(k)})}
+{\sum_{j=1}^K \exp(z_i^{(j)})}, \hspace{10pt}
+\hat p_i = \max_k \: \sigma_\text{SM}(\zb_i)^{(k)}.$$
+%
+% $\hat p_i = \sigma_\text{SM}(\zb_i)^{(\hat y_i)}$ is the component of the softmax vector corresponding to the class prediction.
+% = \sigma_\text{SM} (\zb_i)^{(k)}.$ $\sigma_\text{SM}$ is the softmax function:
+%
+The goal is to produce a calibrated confidence $\hat q_i$ and (possibly new) class prediction $\hat y_i'$
+based on $y_i$, $\hat y_i$, $\hat p_i$, and $\zb_i$.
+%Since the methods introduced in \autoref{binary_calibration} are no longer suitable, we define multiclass analogues that naturally extend these methods.
+
+%\paragraph{One-versus-all Platt scaling,} following the fashion in SVMs, is a natural extension of binary Platt scaling to multi-class problems \cite{zadrozny2002transforming}. We produce a calibrated probability $p^{(k)}$ for each class $k = 1,\ldots,K$ as a one-vs.-all binary problem, treating the class $k$ as class 1 and all the other classes as class 0. Since the values $p^{(1)},\ldots,p^{(K)}$ may not sum to 1, the simplest solution is to normalize them by the sum to obtain the final calibrated probabilities \footnote{Some previous works \cite{wu2004probability} have also explored pairwise Platt scaling, which we have found to bring little practical improvement and is troublesome for large $K$ (since the number of binary sub-problems scales quadratically with $K$), so we choose not to investigate it further.} .
+
+% \newcommand{\zb}{\mathbf{z}}
+\newcommand{\bb}{\mathbf{b}}
+\newcommand{\Wb}{\mathbf{W}}
+
+
+\paragraph{Extension of binning methods.} One common way of extending binary calibration methods to the multiclass setting is by treating the problem as $K$ one-versus-all problems \cite{zadrozny2002transforming}.
+For $k = 1,\ldots,K$, we form a binary calibration problem where the label is $\ind(y_i = k)$ and the predicted probability is $\sigma_\text{SM}(\zb_i)^{(k)}$. This gives us $K$ calibration models, each for a particular class. At test time, we obtain an unnormalized probability vector $[ \hat q_i^{(1)}, \ldots, \hat q_i^{(K)} ]$, where $\hat q_i^{(k)}$ is the calibrated probability for class $k$. The new class prediction $\hat y_i'$ is the argmax of the vector, and the new confidence $\hat q_i'$ is the max of the vector normalized by $\sum_{k=1}^K \hat q_i^{(k)}$. This extension can be applied to histogram binning, isotonic regression, and BBQ.
+
+\paragraph{Matrix and vector scaling} are two multi-class extensions of Platt scaling. Let $\zb_i$ be the \emph{logits vector} produced before the softmax layer for input $\xb_i$. \emph{Matrix scaling applies} a linear transformation $\Wb \zb_i + \bb$ to the logits:
+\begin{equation}
+\label{scaling}
+\begin{aligned}
+\hat q_i  &= \max_k \: \sigma_\text{SM} ( \Wb \zb_i + \bb)^{(k)}, \\
+\hat y_i' &= \argmax_k \: (\Wb \zb_i + \bb)^{(k)}.
+\end{aligned}
+\end{equation}
+The parameters $\Wb$ and $\bb$ are optimized with respect to NLL on the validation set. As the number of parameters for matrix scaling grows quadratically with the number of classes $K$, we define \emph{vector scaling} as a variant where $\Wb$ is restricted to be a diagonal matrix.
+
+\paragraph{Temperature scaling,} the simplest extension of Platt scaling, uses a single scalar parameter $T > 0$ for all classes. Given the logit vector $\zb_i$, the new confidence prediction is
+\begin{equation}
+\label{temp}
+\hat q_i = \max_k \: \sigma_\text{SM} ( \zb_i / T)^{(k)}.
+\end{equation}
+$T$ is called the temperature, and it ``softens'' the softmax (i.e. raises the output entropy) with $T > 1$.
+As $T \rightarrow \infty$, the probability $\hat q_i$ approaches $1/K$, which represents maximum uncertainty. With $T=1$, we recover the original probability $\hat p_i$.
+As $T \rightarrow 0$, the probability collapses to a point mass (i.e. $\hat q_i = 1$).
+$T$ is optimized with respect to NLL on the validation set.
+Because the parameter $T$ does not change the maximum of the softmax function, the class prediction $\hat y_i'$ remains unchanged. In other words, \emph{temperature scaling does not affect the model's accuracy.}
+
+Temperature scaling is commonly used in settings such as knowledge distillation \citep{hinton2015distilling} and statistical mechanics \citep{jaynes1957information}. To the best of our knowledge, we are not aware of any prior use in the context of calibrating probabilistic models.\footnote{To highlight the connection with prior works we define temperature scaling in terms of $\frac{1}{T}$ instead of a multiplicative scalar.}
+The model is equivalent to maximizing the entropy of the output probability distribution subject to certain constraints on the logits (see \autoref{sup:proof}).
+
+%$T$ is chosen to optimize the NLL loss over the validation set. This is equivilant to the following entropy maximization problem:
+%Another way to derive the temperature scaling model is by maximizing entropy subject to the balanced equation $$\sum_{i=1}^n z_i^{(y_i)} = \sum_{i=1}^n \sum_{k=1}^K z_i^{(k)} \tilde{p}(z_i)^{(k)}$$ (see proof in the Appendix). This gives an interpretation of temperature scaling as increasing the uncertainty of the model by optimizing entropy over the validation set. \gp{This equation is confusing.}
+
+\subsection{Other Related Works}
+%\citet{niculescu2005predicting} survey the effects of Platt scaling and Isotonic regression on a variety of binary classification models. The authors find that calibration is not needed on shallow neural networks. As we find in this study, this finding does not necessarily hold on networks with higher capacity.
+Calibration and confidence scores have been studied in various contexts in recent years. \citet{kuleshovE16} study the problem of calibration in the online setting, where the inputs can come from a potentially adversarial source. \citet{kuleshov2015calibrated} investigate how to produce calibrated probabilities when the output space is a structured object.
+\citet{lakshminarayanan2016simple} use ensembles of networks to obtain uncertainty estimates.
+ \citet{pereyra2017regularizing} penalize overconfident predictions as a form of regularization.
+\citet{hendrycks2016baseline} use confidence scores to determine if samples are out-of-distribution.
+
+Bayesian neural networks \cite{denker1990transforming,mackay1992practical} return a probability distribution over outputs as an alternative way to represent model uncertainty.
+\citet{gal2015dropout} draw a connection between Dropout \cite{srivastava2014dropout} and model uncertainty, claiming that sampling models with dropped nodes is a way to estimate the probability distribution over all possible models for a given sample.
+\citet{kendall2017uncertainties} combine this approach with a model that outputs a predictive mean and variance for each data point.
+This notion of uncertainty is not restricted to classification problems.
+Additionally, neural networks can be used in conjunction with Bayesian models that output complete distributions.
+For example, deep kernel learning \cite{wilson2016stochastic,wilson2016deep,al2016learning} combines deep neural networks with Gaussian processes on classification and regression problems.
+In contrast, our framework, which does not augment the neural network model, returns a confidence score rather than returning a distribution of possible outputs.

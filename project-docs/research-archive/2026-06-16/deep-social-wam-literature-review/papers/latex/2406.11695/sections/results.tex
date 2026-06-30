@@ -1,0 +1,83 @@
+
+\begin{table*}[h]
+\centering
+\setlength{\tabcolsep}{1.5pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{>{\centering\arraybackslash}m{4cm} | *{3}{>{\centering\arraybackslash}m{1.0cm}} | *{3}{>{\centering\arraybackslash}m{1.0cm}} | *{3}{>{\centering\arraybackslash}m{1.0cm}} | *{3}{>{\centering\arraybackslash}m{1.0cm}} | *{2}{>{\centering\arraybackslash}m{1.0cm}} | *{2}{>{\centering\arraybackslash}m{1.0cm}} | *{2}{>{\centering\arraybackslash}m{1.0cm}}}
+\toprule
+Optimizer & \multicolumn{3}{c|}{ScoNe} & \multicolumn{3}{c|}{HotPotQA} & \multicolumn{3}{c|}{HoVer} & \multicolumn{3}{c|}{HotPotQA Cond.} & \multicolumn{2}{c|}{Iris} & \multicolumn{2}{c|}{Iris-Typo} & \multicolumn{2}{c}{Heart Disease} \\
+& Train & Dev & Test & Train & Dev & Test & Train & Dev & Test & Train & Dev & Test & Train & Test & Train & Test & Train & Test \\
+\midrule
+\multicolumn{19}{l}{\textit{Instructions only (0-shot)}} \\
+\midrule
+N/A & 57.0 & 56.2 & 69.1 & 35.4 & 31.8 & 36.1 & 30.2 & 30.8 & 25.3 & 13.8 & 10.5 & 6 & 46.4 & 40.9 & 34.7 & 32 & 23.3 & 26.8 \\
+Module-Level OPRO $-$G & 70.0 & 67.4 & 76.1 & 36.0 & 31.7 & 36.0 & 30.0 & 30.0 & 25.7 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+Module-Level OPRO & 69.1 & 67.6 & 73.5 & 41.9 & 36.2 & 39.0 & 37.1 & 38.6 & 32.5 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+0-Shot MIPRO & 66.3 & 65.2 & 71.5 & 40.2 & 34.2 & 36.8 & 37.7 & 38.4 & 33.1 & 22.6 & 20.3 & 14.6 & 40.8 & 36.4 & 56.8 & 56.7 & 26.8 & 25.8 \\
+0-Shot MIPRO++ & 69.0 & 66.9 & 75.7 & 41.5 & 36.2 & 39.3 & 37.1 & 37.3 & 32.6 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multicolumn{19}{l}{\textit{Demonstrations only (Few-shot)}} \\
+\midrule
+Bootstrap RS & 74.9 & 69.6 & 75.4 & 48.6 & 44.0 & \textbf{45.8} & 42.0 & 42.0 & 37.2 & 16.4 & 15.0 & 10.4 & 95.2 & \textbf{94.1} & 58.9 & 58.7 & 78.4 & \textbf{79.2} \\
+Bayesian Bootstrap & 75.4 & 67.4  & 77.4  & 49.2 & 44.8 & \textbf{46.2} & 44.6 & 44.7 & 37.6 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multicolumn{19}{l}{\textit{Both (Few-shot)}} \\
+\midrule
+MIPRO & 74.6 & 69.8 & \textbf{79.4} & 49.0 & 43.9 & \textbf{46.4} & 44.7 & 46.7 & \textbf{39.0} & 28.4 & 28.1 & \textbf{23.3} & 98.4 & 88.6 & 69.1 & \textbf{68.7} & 75.2 & 74.2 \\
+\bottomrule
+\end{tabular}}
+\caption{Results averaged across 5 runs, divided into optimizing instructions only (i.e., ``0-shot'' prompts), demonstrations only, and both. The best performing values in each column are highlighted in bold. These bold values represent the highest average scores compared to the second-highest, with significance supported by Wilcoxon signed-rank tests (p < .05) between the corresponding run averages. If significance is not confirmed, multiple results are bolded to denote their comparable performance.}
+\vspace{-3mm}
+\label{table:performance_comparison}
+\end{table*}
+
+
+
+
+
+
+
+
+
+
+
+Table~\ref{table:performance_comparison} summarizes our main results, from which we derive five overarching lessons.
+
+\textbf{Lesson 1: Optimizing bootstrapped demonstrations as few-shot examples is key to achieving the best performance.} For the majority of tasks, we find that optimizing boostrapped demonstrations alone yields significantly better performance than optimizing instructions alone. We confirm this with a Wilcoxon signed-rank statistical test, which shows that even simple Bootstrap Random Search beats the best instruction-only optimizer for a given task in all but one case. The exception to this is HotPotQA Conditional, which supports our hypothesis and findings discussed in Lesson 3. We finally note that creating the \textit{right} set of bootstrapped demonstrations is important. Our optimization runs  indicate that there is high variation in the performance resulting from different few-shot sets (see Appendix~\ref{sec:optimization_plots}). We thus infer that strong bootstrapped examples provide information pertaining to successful reasoning behavior more than just, say, teaching task format.
+
+\textbf{Lesson 2: Optimizing both instructions and few-shot examples  with MIPRO generally yields the best overall performance.} 
+We support this with a statistical test comparing MIPRO with the second highest averaging optimizer for each task. The exceptions to this are HotPotQA, Heart Disease, and Iris without a typo. We hypothesize that instructions are less valuable for tasks like HotPotQA, whose final module is a relatively straightforward Q\&A task that is likely in-distribution for many models. For Heart Disease, we hypothesize that this is due to initializing our optimizers with a simple seed instruction that does not convey any classification criteria, which current instruction optimizers have a limited ability to infer. 
+
+\textbf{Lesson 3: Instruction optimization is most important for tasks with conditional rules that are (i) not immediately obvious to the LM and (ii) not expressible via a limited number of few-shot examples.} This hypothesis is supported by our Iris-Typo experiment---and primarily by our HotPotQA Conditional experiments, where we optimize over a seed instruction stating the rules of the task. For this task, we find that even 0-shot instruction optimization outperforms demonstration-only optimization. In these cases, especially if the task is complex, it's important that we optimize over a seed prompt, as our optimizers are not yet able to infer all task rules. (This lesson is also reflected in the Heart Disease results, as discussed above.)  In the Iris-Typo setting, our instruction optimizer even helps correct mistakes in the seed prompt. 
+
+\textbf{Lesson 4: Grounding is helpful for instruction proposal overall, but the best proposal strategy varies by task.} 
+In our Module-Level OPRO Grounding ablations, we find that Grounding is essential for performance improvements for HotPotQA and HoVer, but seems to hurt performance for ScoNe. This motivates approaches like MIPRO++, which are able to learn custom proposal strategies for a given task. Indeed, we see that 0-Shot MIPRO++ is able to learn a proposal strategy that recovers this performance for ScoNe. One additional benefit of 0-Shot MIPRO++ is that the learned importance scores from the Bayesian model used to optimize proposal hyperparameters can provide us insight into the utility of each proposal component. Studying these importance scores (found in Appendix~\ref{sec:param_importance}) reveals, across tasks, the highest importance scores go to the choice of bootstrapped demonstrations in the meta-prompt and the tip. We observe that the importance of many parameters varies between tasks: for example, the dataset summary has a high learned importance score for ScoNe, whereas it is one of the least important parameters for HotPotQA and HoVer.
+
+\textbf{Lesson 5: There is more to learn about LM program optimizers.} When comparing the performance of Module-Level OPRO, 0-Shot MIPRO, and 0-Shot MIPRO++, we find that results are mixed. Bayesian Bootstrap outperforms Bootstrap Random Search for ScoNe, but this finding is not statistically significant for HotPotQA and HoVer. 0-shot MIPRO++ outperforms 0-shot MIPRO for ScoNe and HotPotQA, but is about equivalent in the case of HoVer. Future work may find more differentiated results when studying these optimizers at different optimization budgets: for example, it's possible that 0-shot MIPRO would perform best in very low budget settings, given that it's use of minibatching allows it to explore many more parameter options with the same budget. Conversely, 0-shot MIPRO++ may shine in scenarios where budget is not an issue, and spending many trials to learn optimal proposal dynamics could lead to differentiated results. We save this exploration for future work.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

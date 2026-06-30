@@ -1,0 +1,69 @@
+\section{\label{sec:ptb_details}Details on Penn Treebank Experiments}
+
+\paragraph{Computations in an RNN Cell.}~We think of the cell at time step $t$ as a DAG with $N$ computational nodes, indexed by $\h^{(t)}_1$, $\h^{(t)}_2$, ... $\h^{(t)}_N$. Node $\h^{(t)}_1$ receives two inputs: 1) the RNN signal $\x^{(t)}$ at its current time step; and 2) the output $\h^{(t-1)}_D$ from the cell at the previous time step. The following computations are performed:
+\begin{align}
+  \label{eqn:rhn_skip}
+  \c^{(t)}_1 &\leftarrow \text{sigmoid}\left(
+    \x^{(t)} \cdot \mathbf{W}^{(\x, \c)} + \h^{(t-1)}_{N} \cdot, \mathbf{W}^{(\c)}_0
+  \right) \\
+  \h^{(t)}_1 &\leftarrow
+    \c^{(t)}_1 \otimes f_1\left( \x^{(t)} \cdot \mathbf{W}^{(\x, \h)} + \h^{(t-1)}_{N} \cdot \mathbf{W}^{(\h)}_1 \right) \nonumber \\
+    &+ (1 - \c^{(t)}_1) \otimes \h^{(t-1)}_N,
+\end{align}
+where $f_1$ is an activation function that the controller will decide. For $\ell = 2, 3, ..., N$, node $\h_\ell$ receives its input from a layer $j_{\ell} \in \{\h_1, ..., \h_{\ell-1}\}$, which is specified by the controller, and then performs the following computations:
+\begin{align}
+  \label{eqn:rhn_skip}
+  \c^{(t)}_\ell &\leftarrow \text{sigmoid}\left(
+    \h^{(t)}_{j_\ell} \cdot \mathbf{W}^{(\c)}_{\ell, j_\ell}
+  \right) \\
+  \h^{(t)}_\ell &\leftarrow
+    \c^{(t)}_\ell \otimes f_\ell \left(
+    \h^{(t)}_{j_\ell} \cdot \mathbf{W}^{(\h)}_{\ell, j_\ell} \right)
+    + (1 - \c^{(t)}_\ell) \otimes \h^{(t)}_{j_\ell}.
+\end{align}
+Therefore, the shared parameters $\mathbf{\omega}$ among different recurrent cells consist of all the matrices $\mathbf{W}^{(\x, \c)}$, $\mathbf{W}^{(\x, \h)}$, $\mathbf{W}^{(\c)}_{\ell, j}$, $\mathbf{W}^{(\h)}_{\ell, j}$, word embeddings, and the softmax weights if they are not tied with the word embeddings. The controller decides the connection $j_\ell$ and the activation function $f_\ell$ for each $\ell \in \{2, 3, ..., N\}$. The layers that are never selected by any subsequent layers are averaged and sent to a softmax head, or to higher recurrent layers.
+
+\paragraph{Parameters Initialization.}~Our controller's parameters $\theta$ are initialized uniformly in $[-0.1, 0.1]$. We find that for Penn Treebank, \enas~quite insensitive to its initialization than for CIFAR-10. Meanwhile, the shared parameters $\omega$ are initialized uniformly in $[-0.025, 0.025]$ during architecture search, and $[-0.04, 0.04]$ when we train a fixed architecture recommended by the controller.
+
+\paragraph{Stabilizing the Updates of $\omega$.}~To stabilize the updates of $\mathbf{\omega}$, during the architectures search phase, a layer of batch normalization~\citep{batch_norm} is added immediately after the average of these layers, before the average are sent out of the cell as its output. When a fixed cell is sampled by the controller, we find that we can remove the batch normalization layer without any loss in performance.
+
+\section{\label{sec:cifar10_details}Details on CIFAR-10 Experiments}
+We find the following tricks crucial for achieving good performance with \enas. Standard NAS~\cite{nas,nas_module} rely on these and other tricks as well.
+
+\paragraph{Structure of Convolutional Layers.}~Each convolution in our model is applied in the order of relu-conv-batchnorm~\citep{batch_norm,skip_connections_order}. Additionally, in our micro search space, each depthwise separable convolution is applied twice~\citep{nas_module}.
+
+\paragraph{Stabilizing Stochastic Skip Connections.}~If a layer receives skip connections from multiple layers before it, then these layers' outputs are concatenated in their depth dimension, and then a convolution of filter size $1 \times 1$ (followed by a batch normalization layer and a ReLU layer) is performed to ensure that the number of output channels does not change between different architectures. When a fixed architecture is sampled, we find that one can remove these batch normalization layers to save computing time and parameters of the final model, without sacrificing significant performance.
+  
+\paragraph{Global Average Pooling.}~After the final convolutional layer, we average all the activations of each channel and then pass them to the Softmax layer. This trick was introduced by~\cite{network_in_network}, with the purpose of reducing the number of parameters in the dense connection to the Softmax layer to avoid overfitting.
+
+The last two tricks are extremely important, since the gradient updates of the shared parameters $\omega$, as described in Eqn~\ref{eqn:update_omega}, have very high variance. In fact, we find that without these two tricks, the training of \enas~is very unstable.
+
+% \section{\label{sec:convergence_proof}Derivation of Reward Functions}
+
+% For a model $\m$ with shared parameters $\omega$, the cross-entropy loss $\mathcal{L}(\m, \omega)$ can be computed by integrating over the data space $\x \sim P(\x)$
+% \begin{align}
+%   \mathcal{L}(\m, \omega) = -\int dP(\x) \log{p(\x | \m, \omega)}.
+% \end{align}
+% Below, we show that the reinforcement learning signals $R(\m, \omega)$ that we specified in Section~\ref{sec:optim_and_convergence} are the unbiased Monte Carlo approximations of the posterior of the data, i.e. $\int dP(\x) p(\x | \m, \omega)$. The role of $\pi(\m; \theta)$ is to calibrate the expectation $\mathbb{E}_{\m} \left[\mathcal{L}(\m, \omega)\right]$. Specifically, by Jensen's inequality
+% \begin{align}
+%   &\mathbb{E}_{\m} \left[ \mathcal{L}(\m, \omega) \right] \\
+%     &= -\mathbb{E}_{\m} \left[\int dP(\x) \log{p(\x | \m, \omega)} \right] \\
+%     &\leq -\log{\mathbb{E}_{\m} \left[ \int dP(\x) p(\x | \m, \omega) \right]} \\
+%     &= -\log{\mathbb{E}_{\m}\left[ R(\m, \omega) \right]}.
+% \end{align}
+% Thus, maximizing $\mathbb{E}_{\m \sim \pi(\m, \theta)} \left[ R(\m, \omega) \right]$ pushes down a surrogate function of $\mathbb{E}_\m[\mathcal{L}(\m, \omega)]$, similar to the M-step in the family of Expectation-Maximization algorithms.
+
+% Now we present the derivation. On an image classification task, the data $\x$ is actually a pair $(\x, \y)$ of an image and its label. If instead of predicting the label by taking argmax of the model's probabilities, we sample the label $\hat{\y} \sim p(\y | \x, \m, \omega)$, as done in Bayesian classifiers, then the expected accuracy is
+% \begin{align}
+%     &\int dP(\x, \y) \mathbb{E}_{\m} \left[ R(\m, \omega) \right] \\
+%       &=  \int dP(\x, \y) \mathbb{E}_{\m} \left[ \mathbb{E}_{\hat{\y} \sim p(\y | \x, \m, \omega)} \mathbf{1} [\hat{\y} = \y] \right] \\
+%       &=  \int dP(\x, \y) \mathbb{E}_{\m} \left[ p(\y | \x, \m, \omega) \right].
+% \end{align}
+% The accuracy on a minibatch is thus a Monte Carlo approximation of of $\mathbb{E}_\m \left[p(\x | \m, \omega)\right]$. On a language model task, the data $\x$ is a sequence of words. Letting $\ABS{\x}$ be the number of words in $\x$, the expectation of the proposed reward in Section~\ref{sec:model_policy} is
+% \begin{align}
+%     &\int dP(\x) \mathbb{E}_{\m} \left[ \frac{c}{\text{valid\_ppl}(\x | \m, \omega)} \right] \\
+%     &= -c \int dP(\x) \mathbb{E}_{\m} \left[ \exp{\frac{\log{p(\x | \m, \omega)}}{\ABS{\x}}} \right] \\
+%     &= -c \int dP(\x) \mathbb{E}_{\m} \left[ p(\x | \m, \omega) - \exp{\ABS{\x}} \right] \\
+%     &\propto -c \int dP(\x) \mathbb{E}_{\m} \left[ p(\x | \m, \omega) \right].
+% \end{align}
+% Since we use $R(\m, \omega)$ as the signal for reinforcement learning, we can omit the constant $c \int dP(\x) \exp{\ABS{\x}}$ since it will integrate to $0$ in the REINFORCE equation, just like the constant baseline~\citep{reinforce}. This justifies the use of the signal $\frac{c}{\text{valid\_ppl}(\x)}$ for learning.

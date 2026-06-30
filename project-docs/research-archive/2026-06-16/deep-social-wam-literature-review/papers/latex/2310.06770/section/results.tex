@@ -1,0 +1,77 @@
+\section{Results}
+\label{sec:results}
+We report results for models using different retrieval mechanisms and prompting styles, then provide some analysis and insight into model performance and difficulty.
+We summarize models' performance using BM25 retrieval in Table~\ref{table:main-results}. 
+Across the board, models struggle significantly to resolve issues.
+The best performing model, Claude 2, is only able to resolve $1.96\%$ of the issues.
+
+To analyze the importance of the retriever to the overall system results, we present the ``oracle'' retrieval results in Appendix Table~\ref{table:main-results-oracle}. There, Claude 2 is able to resolve $4.8\%$ of issues using the ``oracle'' retriever. We further analyze the importance of context in the discussion below. 
+
+\input{tables/main-results}
+
+\input{figures/per-repo-pass-rate}
+
+\textbf{Difficulty differs across repositories.}
+When breaking performance down by repository, all models trend similarly across different repositories as show in Figure~\ref{fig:per-repo-oracle-fig}.
+Despite this, the issues resolved by each model do not necessarily overlap extensively.
+For example, in the ``oracle" setting Claude 2 and \swellama{} 13b perform comparably, with each model resolving $110$ and $91$ instances respectively. Yet of these instances, Claude 2 only solves $42\%$ of the instances solved by \swellama{}.
+
+This may also be related to the presence of images in issues, which can be encoded into the issue markdown with embedded image links (i.e. \lstinline{![image][https://...]}). Some repositories naturally feature more instances with images; for example $32$\% of matplotlib and $10$\% of seaborn instances contain embedded images in their issue text compared to just $2$\% of all instances. Solving these instances may require multi-modal LMs or some kind of external tool use to process images.
+
+\textbf{Difficulty correlates with context length.}
+Chat models may be pre-trained on long sequences of code but are typically asked to generate shorter coder snippets with limited context provided to frame the question.
+As shown in Figure~\ref{fig:performance-vs-context-length}, we see that as total context length increases, Claude 2's performance drops considerably; behavior that is also observed in other models.
+In our evaluation settings, models see a lot of code that may not be directly related to solving the issue at hand, and they seem to frequently struggle with localizing problematic code needing to be updated.
+This result corroborates other studies showing that models become distracted by additional context and may be sensitive to the relative location of target sequences~\citep{liulostinthemiddle}.
+Even when increasing the maximum context size for BM25 would increase recall with respect to the oracle files, performance drops, as shown in Table~\ref{table:bm25-results}, as models are simply ineffective at localizing problematic code.
+
+\input{figures/swellama-correct-context-length-vs-test}
+Further investigating this, we provide an input ablation on the ``oracle'' retrieval context, ``oracle''-collapsed, where retrieved files are collapsed entirely, except for the lines actually edited by the true pull request (with $\pm15$ lines of buffer) shown in Table~\ref{table:editonly-results}. In this setting, we see increases in performance, with GPT-4 jumping from $1.3\%$ to $3.4\%$ and Claude 2 from $4.8\%$ to $5.9\%$.
+
+\textbf{Difficulty does not correlate with issue resolution date.}
+In Table~\ref{table:temporal-results} we show model results in the ``oracle" retrieval setting, partitioned by date, for PRs created before or after 2023.
+We find that for most models there's little difference in performance before or after this date, with the exception of GPT-4.
+We consider this result to be largely promising as it suggests that despite models having been exposed to some version of an repository's codebase, they are unlikely to ``cheat'' to address issues simply by generating a more recent version of the repository.
+
+\input{tables/temporal-results}
+
+\textbf{Finetuned models are sensitive to context distribution shifts.}
+The finetuned models \swellama{} 7b and 13b perform surprisingly poorly with BM25 retrieved context.
+As these models were finetuned using the ``oracle" retrieval as context, we suspect this shift in context makes it difficult for the model to perform reliably.
+For instance, \swellama{} was trained to edit every file included as context whereas in the BM25 setting many files provided in context are not expected to be changed.
+
+\textbf{Generating patches is easier than generating whole files.}
+Models are often trained using standard code files and likely rarely see patch files. 
+We generally formulate our task to have models generate patch files as opposed to recreating the entire file with their proposed change, since patch files will usually be a much more efficient representation of a file change.
+As shown in Table~\ref{table:main-results}, we observe that models still struggle with generating well-formatted patch files.
+So we experiment with asking models to instead regenerate entire files with their proposed changes to resolve the issue.
+In this setting, we find that models generally perform worse at this task than when generating patch files; for instance, Claude 2 scores at $2.2\%$ compared to $4.8\%$ in the main table for ``oracle" retrieval.
+Even when controlling for instance length, generating on the shorter half of the task instances by input tokens yields $3.9\%$ compared to $7.8\%$ for generating patches with Claude 2.
+
+\textbf{Language models tend to generate shorter, simpler edits.}
+Model generated patch files tend to add and remove fewer lines than their respective gold patch.
+As shown in Table~\ref{table:quantitative-analysis-gens}, compared to an average gold patch, model generated patch files that apply correctly are less than half the total length ($74.5$ versus $30.1$ lines) of gold edit patch files, and rarely edit more than a single file.
+
+\input{tables/quantitative-analysis-gens}
+
+\subsection{A Qualitative Analysis of \swellama{} Generations}
+\label{sec:results:quality-study}
+We select $11$ generations from \swellama{} and Claude 2 to better understand the quality of the task and generated patches under the ``oracle" retrieval setting.
+Here we discuss an example from \swellama{} and our overall findings, with in-depth analyses for other examples shown in Appendix~\ref{appx:extra-results:quality-in-depth}.
+
+\input{figures/case-study}
+
+We'll consider the task instance \texttt{sphinx-doc\_\_sphinx-8713} from the Sphinx documentation generator, shown in Figure~\ref{fig:case-study}.
+The issue states that the \texttt{napoleon} extension of Sphinx is not properly formatting the documentation keyword ``Other Parameters'' when the config setting \pythoninline{napoleon.use\_param} is set to \texttt{True}.
+The issue text further provides a detailed code snippet of where the problematic source code is suspected to be, as well as some code examples for reproducing the error and additional information related to package versions.
+For this particular instance, the model did not resolve the task, failing to pass some of the tests resolved by the gold solution.
+
+In the ``oracle" retrieval setting, the model input provides this issue text along with some instructions, the full contents of files edited by the gold patch, and an example of the diff format we expect the answer to be in.
+The total model input consists of $\num{1558}$ lines of context or $\num{20882}$ tokens. When comparing the gold patch and the model's patch, we find an obvious mistake.
+While the model edits the correct function, \pythoninline{_parse_other_parameters_section} at line $684$ in \pythoninline{sphinx/ext/napoleon/docstring.py}, it changes the function to behave as if \pythoninline{napoleon.}\pythoninline{use_param} were always \texttt{True} instead of checking the config setting first and copying what the \pythoninline{_parse_parameters_section} does, like the gold patch.
+In the tests, \pythoninline{test_parameters}\pythoninline{_with_class_reference} directly compares the documentation produced using a config where \pythoninline{napoleon_use_param} is set to \texttt{False}, which catches the model's error immediately.
+
+Comparing results across all the examples we consider, we notice a few prominent trends in behavior.
+Models tend to write primitive Python code and do not leverage existing third-party libraries or the rest of the codebase for their solutions.
+Models' generations also reflect a ``greedy" approach of solving the problem \textit{exactly}, with little regard for code style or logical constraints that might be reflected by the codebase (i.e. using relative instead of absolute imports).
+In contrast, we observe that many gold patches will make structural improvements that cover a much larger scope of the codebase; these edits not only resolve the issue, but also anticipate and solve potential future issues.

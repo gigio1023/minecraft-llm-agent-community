@@ -1,0 +1,466 @@
+%%%%%%%% ICML 2025 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{graphics}
+\usepackage{wrapfig}
+\usepackage{caption} 
+\usepackage{subcaption}
+\usepackage{booktabs} % for professional tables
+\usepackage{float}
+\usepackage{tcolorbox}
+\usepackage{xcolor}
+\usepackage{float}
+
+
+%Package for dotted line in table
+%\usepackage{arydshln}
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2025} with \usepackage[nohyperref]{icml2025} above.
+\usepackage{hyperref}
+
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+\definecolor{custom_orange}{RGB}{230, 161, 118}
+\newtcolorbox[auto counter, number within=section]{promptbox_policy}[2][]{
+    colback=gray!10, colframe=custom_orange, arc=8pt, % Adjust the arc value for more rounding
+    boxrule=1pt, sharp corners=downhill,
+    title=\textbf{Prompt~C.1: #2}
+}
+\definecolor{custom_blue}{RGB}{0, 103, 138}
+\newtcolorbox[auto counter, number within=section]{promptbox_magellan}[2][]{
+    colback=gray!10, colframe=custom_blue, arc=8pt, % Adjust the arc value for more rounding
+    boxrule=1pt, sharp corners=downhill,
+    title=\textbf{Prompt~C.2: #2}
+}
+
+% Use the following line for the initial blind version submitted for review:
+\usepackage[accepted]{icml2025/style/icml2025}
+
+% If accepted, instead use the following line for the camera-ready submission:
+% \usepackage[accepted]{icml2025}
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{dsfont}
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+\usepackage{xcolor}
+\newcommand{\ie}{i.e.\,}
+\newcommand{\eg}{e.g.\,}
+\definecolor{myred}{rgb}{0.8,0,0}
+\newcommand{\todo}[1]{}
+\renewcommand{\todo}[1]{{\color{myred} Todo: {#1}}}
+\definecolor{myblue}{rgb}{0,0.22,0.45}
+\hypersetup{
+    colorlinks,
+    linkcolor={myblue},
+    citecolor={myblue},
+    urlcolor={myblue},
+    pdfproducer={},
+}
+\usepackage{bm}
+\usepackage{comment}
+\usepackage{enumitem}
+\usepackage{caption}   % Load before subcaption
+% \usepackage{subfig}
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{MAGELLAN}
+
+\begin{document}
+
+\twocolumn[
+
+\icmltitle{MAGELLAN: Metacognitive predictions of learning progress\\
+guide autotelic LLM agents in large goal spaces}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2025
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
+\icmlsetsymbol{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Loris Gaven}{flowers}
+\icmlauthor{Thomas Carta}{flowers}
+\icmlauthor{Clément Romac}{flowers,hf}
+\icmlauthor{Cédric Colas}{flowers,mit}
+\icmlauthor{Sylvain Lamprier}{angers}
+\icmlauthor{Olivier Sigaud}{isir}
+\icmlauthor{Pierre-Yves Oudeyer}{flowers}
+
+\end{icmlauthorlist}
+
+\icmlaffiliation{flowers}{Inria (Flowers), University of Bordeaux, France}
+
+\icmlaffiliation{angers}{Univ Angers, LERIA, SFR MATHSTIC, F-49000 Angers, France}
+
+\icmlaffiliation{isir}{Sorbonne Université, ISIR, Paris, France}
+
+\icmlaffiliation{hf}{Hugging Face}
+
+\icmlaffiliation{mit}{MIT, Computational Cognitive Science Lab, Cambridge, MA, USA}
+
+
+\icmlcorrespondingauthor{Loris Gaven}{loris.gaven@inria.fr}
+
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF but will not be shown in the document
+\icmlkeywords{LLM agents, Open-Ended Learning, Learning Progress, Goal-conditionned RL, Automatic Curriculum Learning}
+
+\vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \icmlEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
+
+%\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+\printAffiliationsAndNotice{} % otherwise use the standard text.
+
+\begin{abstract}
+Open-ended learning agents must efficiently prioritize goals in vast possibility spaces, focusing on those that maximize learning progress (LP). When such autotelic exploration is achieved by LLM agents trained with online RL in high-dimensional and evolving goal spaces, a key challenge for LP prediction is modeling one’s own competence, a form of metacognitive monitoring. Traditional approaches either require extensive sampling or rely on brittle expert-defined goal groupings. We introduce MAGELLAN, a metacognitive framework that lets LLM agents learn to predict their competence and LP online. By capturing semantic relationships between goals, MAGELLAN enables sample-efficient LP estimation and dynamic adaptation to evolving goal spaces through generalization. In an interactive learning environment, we show that MAGELLAN improves LP prediction efficiency and goal prioritization, being the only method allowing the agent to fully master a large and evolving goal space. These results demonstrate how augmenting LLM agents with a metacognitive ability for LP predictions can effectively scale curriculum learning to open-ended goal spaces.
+\end{abstract}
+
+
+\section{Introduction}
+\label{sec:introduction}
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{Figures/schemas/magellan.png}
+    \caption{\textbf{Navigating large goal spaces with MAGELLAN}: During training, our LLM agent uses MAGELLAN to estimate its past and current competence to compute absolute learning progress (ALP) on each goal. Given the per-goal ALP, the LLM agent's goal selector chooses the next goal to practice proportionally to their ALP. The LLM agent then performs a trajectory to achieve this goal and the outcome is used to update both the LLM agent with online RL and MAGELLAN's competence estimation.}
+    \label{fig:magellan}
+\end{figure}
+\input{icml2025/intro_v2}
+
+\section{Related Work}
+\label{sec:related_work}
+
+\subsection{Goal selection in autotelic agents}
+Autotelic agents exploring vast goal spaces face a critical challenge: they must prioritize which goals to pursue to efficiently develop general competence \citep{colas_autotelic_2022}. The automatic curriculum learning (ACL) community has developed various approaches to address this challenge \cite{portelas_automatic_2020}, leveraging different forms of intrinsic motivation: pursuing goals of intermediate difficulty \citep{florensa_automatic_2018,racaniere_automated_2020, castanetSL23}, seeking novelty or uncertainty \cite{warde-farley_unsupervised_2018,pong_skew-fit_2020,pitis_maximum_2020}, maximizing regret w.r.t. an optimal policy's performance \,---\, mostly used in Unsupervised Environment Design (UED) methods \cite{dennis_emergent_2020, jiang_replay-guided_2021}\,---\, or maximizing learning progress (LP) \cite{stout_competence_2010,matiisen_teacher-student_2017,fournier_accuracy-based_2018,portelas_teacher_2019,colas_curious_2019, kanitscheider_multi-task_2021,kovac_grimgep_2023,zhang_omni_2024}. ACL methods also differ in their use of the goal space: while some methods compute metrics over the goal space and sample from it (e.g. \cite{matiisen_teacher-student_2017, kanitscheider_multi-task_2021, portelas_teacher_2019}), others generate goals (e.g. \cite{florensa_automatic_2018, castanetSL23, dennis_emergent_2020}). LP-based methods have proven particularly robust, especially upon a limited training budget in which it is not possible to learn all goals \cite{lopes_strategic_2012}.  They adapt to the agent's capabilities \textit{without requiring environment knowledge} (e.g. which is necessary when using regret) and avoid common pitfalls like getting stuck on goals where progress plateaus or chasing uncontrollable novelty. The key challenge with LP approaches lies in efficiently estimating progress over large goal spaces, which is the focus of our work.
+
+
+\subsection{Computing LP over goals} \label{sec:related_work_lp}
+Learning Progress (LP) measures the expected future improvement in achieving a goal through practice \citep{oudeyer_intrinsic_2007}. Since future progress cannot be directly measured, most approaches use past progress as a proxy, with the recent exception of \cite{kumar_practice_2024}'s Bayesian prediction model. The most direct approach to estimate LP is to regularly reevaluate the agent's competence for each goal \citep{kanitscheider_multi-task_2021,zhang_omni_2024}, which accurately captures competence transfer\,---\,the phenomenon where practicing one goal affects performance on other goals. However, this becomes computationally prohibitive for large discrete goal spaces and is just impossible for continuous ones. 
+One way to address this is to only rely on online estimations, where a goal's estimated competence is only updated when this goal is practiced. Online estimations nonetheless fail to capture competence transfer and existing methods addressed this by grouping goals with similar competence together. For continuous spaces, approaches either learn to partition the space directly when dimensionality is low \citep{oudeyer_intrinsic_2007,baranes_active_2013,portelas_teacher_2019}, or first embed high-dimensional goals into a lower-dimensional space before partitioning \citep{laversanne-finot_curiosity_2018,kovac_grimgep_2023}. For discrete spaces, methods typically rely on expert-defined groupings \citep{stout_competence_2010,matiisen_teacher-student_2017}. However, these grouping approaches are inherently brittle: they assume no transfer between groups while potentially masking competence variations within groups. This limitation is particularly acute for high-dimensional structured spaces like natural language, where competence transfer naturally occurs between semantically similar goals regardless of predefined groupings. Instead, MAGELLAN leverages an LLM's semantic understanding to dynamically model competence transfer between goals, enabling efficient and adaptive LP estimation without requiring predefined groupings or exhaustive evaluation.
+
+\subsection{Autonomous LLM agents}
+Recent work has explored using Large Language Models (LLMs) to solve complex tasks in interactive environments. Early approaches focused on direct action prediction using LLMs, either incorporating environmental feedback \cite{huang_language_2022, yao2022react, hao2023rap, shinn2023reflexion, wang_voyager_2023} or operating without it \cite{ahn_as_2022}. However, these methods did not update the LLM's knowledge through environmental interactions. A new direction emerged with GLAM \citep{carta_grounding_2023}, followed by \citep{wen_reinforcing_2024,wen_entropy-regularized_2024,zhou_archer_2024} that ground LLMs in interactive environments using online RL. The resulting LLM agents demonstrated remarkable generalization across language tasks; however, they lack the autotelic mechanisms necessary for navigating expansive goal spaces. In this paper, we enhance a SAC-GLAM \cite{gaven2024sacglam} LLM agent with metacognitive abilities, enabling it to estimate its LP and prioritize goals within large language spaces.
+
+
+\section{Methods} \label{sec:methods}
+In this section, we detail how MAGELLAN learns a metacognitive module that estimates and generalizes an agent's LP over language goal spaces. We then explain classic LP baselines against which MAGELLAN is compared. Finally, we introduce the Little-Zoo environment, specifically designed to study commonsense-based generalization abilities of LLM agents when facing large language goal space.
+
+% the competence and LP of an LLM agent along with how this module is used to increase the agent's skill learning abilities. 
+
+\subsection{Problem statement}
+
+\input{icml2025/statement_v3}
+
+\subsection{Metacognitive generalization of learning progress in language model agents}
+With MAGELLAN, we propose to learn estimators of the current and past policy's competence for any goal. As opposed to prior works, which either consider all goals independently or use goal groupings, we argue that learning goal-conditioned estimators would allow generalization between similar goals without defining any clear group. We propose to leverage the LLM used by our agent to learn the parameters $\theta_t$ of a competence estimator $C_{\theta_t}(g)$ for a policy $\pi_t$ on a goal $g$. We compute $C_{\theta_t}(g)$ by giving $g$ in the LLM's prompt, which produces a latent representation on top of its final decoder block for the last token. We use a Multi-Layer Perceptron (MLP) to output the estimated competence based on this representation. We train both the LLM and the MLP, leveraging the LLM's ability to project goals into a latent space where semantically similar goals are close. By updating the estimated competence of one goal, this allows MAGELLAN to also update close goals. 
+
+In practice, we maintain a buffer $\mathcal{D}_t$ which contains, for the $M$ most recent training episodes at $t$ (i.e., $\tau^{t-M} \ldots \tau^t$), their corresponding pair of goal and outcome (i.e. $\left(g=(s_0,i), r_{\tau,i}\right)$ for each $\tau$).  
+%containing pairs $(g,r)$ of the  $M$ most recent sampled episodes $\tau$
+%the most recent $M$ pairs
+%of goal $g=(s_0,i)$ and success outcome $r$. % (with $r=$. %competence.
+As this work focuses on success probability (i.e., we want $C_{\theta_t}(g) \approx \mathbb{P}_{\pi^t}(g)$), we train $C_{\theta_t}$ using stochastic gradient descent to minimize the binary cross-entropy: $\mathcal{L}(\theta_t) = \mathbb{E}_{(g, r) \sim \mathcal{D}_t} \left[ BCE(r %\mathds{1}_{(\pi, g)}
+, C_{\theta_t}(g)) \right]$.
+
+We maintain another buffer $\mathcal{B}_t$ storing the last $N$ weights of our competence estimator: $\mathcal{B}_t = \left[ \theta_{t-N}, \theta_{t+1-N}, \dots, \theta_t \right]$. Weights are added to the buffer every time the competence estimator is updated, enabling access to estimations of the policy's competence from time $t$ to $t-N$. Using this information, we estimate the absolute LP (ALP) \citet{baranes_active_2013,kanitscheider_multi-task_2021}, tracking both progress and forgetting, as follows:
+
+\begin{equation}
+    \hat{ALP}_{\pi_t}(g) = |C_{\theta_t}(g) - C_{\theta_{t-N}}(g)|.
+\end{equation}
+
+This ALP estimation can subsequently be used to structure the agent's curriculum. We apply the multi-armed bandit goal selection scheme introduced by \cite{lopes_strategic_2012} where each arm is a goal, and its utility is MAGELLAN's estimate of the ALP of this goal. Goals are then sampled proportionally to their estimated ALP with an annealing $\epsilon$-greedy scheme ($\epsilon$ decreasing from 1 to 0.2).
+In practice, we train two separate versions of the same initial LLM (using LoRA adapters \cite{Hu2021LoRALA}): one for the policy and one for MAGELLAN's current competence estimator. We show in Appendix~\ref{app:additional_results_magellan_architecture} ablations on architectural choices indicating that 1) keeping the LLM frozen leads to poor results, highlighting the need for a dynamic representation space (see also Figure~\ref{fig:embedding_MAGELLAN_before_after}), and 2) training separate LoRA adapters for the policy and MAGELLAN leads to more stability.
+
+\subsection{Classic ALP baselines} \label{sec:lp_baselines}
+Following the literature on ALP in Section~\ref{sec:related_work_lp}, we implement classic approaches, focusing on two dimensions. First, we consider Online \cite{baranes_active_2013, matiisen_teacher-student_2017} vs Evaluation-based ALP \cite{kanitscheider_multi-task_2021, zhang_omni_2024} estimation. Then, we consider directly using the goal space \cite{portelas_teacher_2019,kanitscheider_multi-task_2021} or using expert-defined groups of goals with assumed competence transfer \cite{stout_competence_2010,colas_curious_2019}. The latter requires extensive expert knowledge (EK) given the absence of automatic approach for discrete goal spaces. As expert-defined groups are created beforehand, no competence transfer is assumed across groups, which is likely to happen in spaces like natural language, where transfer occurs between semantically close goals regardless of groups. 
+
+We thus implement four baselines (see all details in Appendix~\ref{app:implementation_details_baselines}):
+\begin{itemize}[noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item \textbf{Eval-ALP}: Every $N$ episodes, training stops and the agent is separately evaluated on each goal to obtain a competence estimate. The per-goal ALP is the absolute difference between estimates at $t$ and $t-N$. The same goal selection scheme as in MAGELLAN is used according to the per-goal ALP estimations.
+    \item \textbf{EK-Eval-ALP}: Every $N$ episodes, training stops and the agent is evaluated on multiple goals randomly sampled in each expert-defined group to obtain a per-group averaged competence. The per-group ALP is computed using the absolute difference between the competence at $t$ and $t-N$. The goal selection process first selects a group using the same selection scheme as MAGELLAN for goals. Given a selected group, a goal from this group is randomly selected.
+    \item \textbf{Online-ALP}: At each goal practiced, the observed policy's competence is added to a buffer of $2M$ past experiences for this goal. The ALP is computed using the absolute difference between the average competence over the last and first $M$ experiences in the buffer. The same goal selection scheme as MAGELLAN and Eval-ALP is used.
+    \item \textbf{EK-Online-ALP}: At each goal practiced, the observed policy's competence is added to a buffer of $2M$ past experiences for the goal's expert-defined group. The per-group ALP is computed using the absolute difference between the average competence over the last and first $M$ experiences in the group's buffer. The same goal selection scheme as EK-Eval-ALP is used.
+\end{itemize}
+
+We summarize the four methods above and MAGELLAN in Table~\ref{tab:table_competence} based on their \textit{Efficiency} (i.e. computational cost introduced by additional evaluations), \textit{Competence Transfer tracking} and \textit{no Expert Knowledge requirement}. We consider a method’s efficiency as “high” if it does not require any additional evaluation (i.e. it only uses the performance observed on goals sampled), and as “low” otherwise. We evaluate the competence transfer tracking using the following criteria:
+\begin{itemize}[noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item absence of +: the estimated competence is updated only on sampled goals.
+    \item +: the estimated competence is updated on a predefined group the sampled goal belongs to.
+    \item ++: the estimated competence is updated on a dynamically learned group the sampled goal belongs to.
+    \item +++: the estimated competence is updated on all goals.
+\end{itemize}
+
+We provide in Appendix~\ref{app:lp_literature_review} the same table for all prior works covered in Section~\ref{sec:related_work_lp}.
+
+% Note that both baselines using expert-defined groups (EK-Eval-ALP and EK-Online-ALP) assume access to accurate and known expert knowledge that cannot be given in most complex scenarios. 
+
+\begin{table}[h!] 
+\centering 
+\small
+\begin{tabular}{lcccc}
+\toprule
+& \textbf{Eff.} & \textbf{Transf.} & \textbf{No EK} \\ 
+\midrule 
+% \textbf{Exp. ALP} & $\times$ & $\checkmark$ & $\checkmark$ & $\checkmark$ \\ 
+\textbf{EK-Eval-ALP} & low & + & $\times$ \\ 
+\textbf{Eval-ALP} & low & +++ & $\checkmark$ \\ 
+\textbf{EK-Online-ALP} & high & + & $\times$ \\ 
+\textbf{Online-ALP} & high & & $\checkmark$ \\ 
+\textbf{MAGELLAN} & high & +++ & $\checkmark$ \\ 
+\bottomrule
+\end{tabular}
+\caption{Comparison of ALP estimation methods. We use the following dimensions: computational Efficiency, competence Transfer tracking, and required Expert Knowledge.} 
+\label{tab:table_competence}
+\end{table}
+
+\subsection{The Little-Zoo environment as a testbed} \label{sec:zoo_env}
+Evaluating commonsense-based generalization of LLM agents in textual environments requires several key properties. The environment must be fully text-based, with all observations, actions, and goals expressed in natural language. It should feature a diverse set of goals with varying difficulty levels, enabling the assessment of the agent's ability to learn and generalize complex skills. Additionally, these goals should be organized into hidden families based on commonsense knowledge, allowing for targeted evaluation of generalization capabilities.
+
+Existing environments for LLM agents do not have such requirements. Creative environments like Minecraft \citep{johnson2016malmo} or Crafter \citep{hafner2021benchmarking} rely on image-based observations and require an image captioner to use LLM agents. Textual environments like BabyAI-text \citep{carta_grounding_2023} focus on navigation skills without any commonsense-based generalization. Although WordCraft \citep{jiang2020wordcraft} incorporates commonsense-based goals, no relationship between goals exists, limiting the analysis of the agent's generalization abilities. To address these gaps, we introduce Little-Zoo, a novel environment explicitly designed to meet these criteria.
+
+Built upon the Playground environment \citep{colas_language_2020}, Little-Zoo is fully text-based, with observations, goals, and actions expressed in natural language. 
+It features objects that can be combined together and are grouped into the following hidden categories: furniture (which cannot be combined), plants, herbivores, and carnivores. Given the set of all objects and a set of instructions, Little-Zoo's goal space is the combination of all possible instructions and scene initializations. The feasibility of a goal thus depends on the objects available, making most combinations infeasible and not trivial to detect (see Figure~\ref{fig:goal_hierarchy} and  Appendix~\ref{app:example_of_impossible_goals}). For instance, these are respectively feasible and infeasible goals: \textit{“Goal: Grow deer. You see: baby deer, bookshelf, water, tomato seed.”}; \textit{“Goal: Grow deer. You see: baby deer, bookshelf, baby lion, tomato seed.”} (water is missing in the last one). Instructions are hierarchically structured, ranging from simple grasping tasks to more complex sequences involving object interactions (e.g. "growing" animals). The complete goal space contains approximately 20 million combinations. In our experiments, we subsample goals with the following proportions: 80\% of the goals are impossible 16\% involve grasping, 3.2\% involve growing plants, 0.7\% involve herbivores, and 0.1\% involve carnivores. These proportions correspond to proportions in the complete goal space (see Appendix~\ref{app:goal_repartition}).
+
+% The uneven distribution of goal difficulty underscores the need for curriculum learning to guide exploration and efficient learning.
+Little-Zoo is a deterministic, fully-observable and episodic environment: the agent begins an episode by standing on nothing, with full visibility of the whole scene. The action space consists of 8 actions, including movement to objects, grasping, and releasing objects. Observations include the objects in the scene, the ones in the agent’s inventory, as well as the object the agent is standing on. See Appendix~\ref{app:environment} for details on Little-Zoo.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{Figures//schemas/littlezoo.png}
+    \caption{A) Little-Zoo's tech tree. B) Little-Zoo's goal space is composed of all the possible combinations between instructions and objects that can be in the scene. Most object configurations make an instruction infeasible (e.g. "grow lion" is impossible with the second configuration, as water, needed to obtain plants, is missing). C) Little-Zoo provides a textual description that is given in our LLM agent's prompt.}  
+    \label{fig:goal_hierarchy}
+\end{figure}
+
+
+\section{Experiments}
+\label{sec:experiments}
+We provide empirical answers to our scientific questions using experiments with 8 different random seeds in the Little-Zoo environment. For our LLM agent, we use SAC-GLAM \cite{gaven2024sacglam} to finetune Flan-T5 $248$M \cite{raffel_exploring_2020} as per SAC-GLAM's experiments. We compare MAGELLAN to the classic approaches presented in ~\ref{sec:lp_baselines}. For methods accessing external expert knowledge, we use Little-Zoo's hidden goal families (grasp any object, grow plant, grow herbivore, grow carnivore) but add only possible goals in these groups. Indeed, these baselines are based on groups predefined in advance by human experts with a strong assumption: the goals within a group share the same learning dynamics and therefore the agent’s competence is the same over all goals in the group. \textit{If impossible goals were included, these groups would lose their relevance}. Moreover, because of the large number of impossible goals, the average competence within each group will always be very close to 0. There will be no progress niche that the method can use to generate a curriculum, and performance will probably be very close to the random baseline. We thus provide an additional group containing all impossible goals. In all our experiments, we use success rate (i.e. average outcome over multiple trials for a goal) noted SR as the observed competence.
+
+We first study how well MAGELLAN's competence estimation compares to baselines (\textbf{Q1}). Then, we study how the different methods (except Eval-ALP and EK-Eval-ALP, which are too costly to run while EK-Online-ALP provides a good estimation of their performance) compare when scaffolding the LLM agent's curriculum (\textbf{Q2}). We show how these competence estimators also generalize to goals not seen during training (\textbf{Q3}). Finally, we study how all methods adapt as the goal space evolves (\textbf{Q4}) by replacing all goals at different points throughout training.
+
+% We study competence estimations instead of ALP as the latter is derived from the former\footnote{For instance, if the true competence is constant, an ALP of $0$ can be correctly predicted even if the competence estimator predicts the wrong competence (it only needs to output any constant).}. 
+
+\subsection{How well does MAGELLAN estimate competence~(Q1)} 
+\label{sec:q1}
+To assess the ALP methods' ability to efficiently estimate competence, we designed an experimental setup in which our LLM agent was trained for 50k episodes on the Little-Zoo environment with varying goal space sizes (25k, 50k, 100k), while keeping the same repartition between goal types. As computing the expected ALP to train this agent is intractable, one could argue that Eval-ALP is the best approximation. However, it remains too computationally costly to run, even when performing only 50k training episodes with 25k goals. We thus chose to sample goals according to EK-Eval-ALP's estimations. To obtain an accurate estimate, we perform 2048 per-group evaluations every 1000 episodes. The per-group competence evaluated by EK-Eval-ALP is consequently our competence reference, and we compare the other methods against it. For Eval-ALP, we consider it to have zero error, and its computational cost can be estimated without running it. For MAGELLAN and Online-ALP, we average the per-goal competence over groups to compute the error w.r.t. EK-Eval-ALP. Figure~\ref{fig:compute_error_scaling} shows the average error on competence throughout training along and the cost of competence evaluation (i.e. the total number of episodes used only to evaluate competence). 
+
+As indicated in Table~\ref{tab:table_competence}, MAGELLAN performs on a par with Eval-ALP, showing that it accurately estimates the transfer of competence while using online estimations. We also observe similar competence errors to methods using expert-defined groups, hinting at MAGELLAN's abilities at learning semantical relationships between goals. We provide a more in-depth analysis of such relationships in Section~\ref{app:additional_results_q3}. Finally, MAGELLAN achieves this performance without an estimation cost.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.85\linewidth]{Figures//Q1/compute_error_scaling.png}
+    \caption{Scaling of competence estimation error and competence estimation cost (i.e. total number of additional evaluation episodes) when increasing the goal space size.}
+
+    \label{fig:compute_error_scaling}
+\end{figure}
+
+To demonstrate that our method generalizes beyond the Little-Zoo environment, we conducted an additional experiment using goals derived from the OpenR1-Math-220k dataset~\cite{openr1}. In this setup, rather than training a real agent, we simulate the learning of an agent that progressively acquires skills in three categories: \textit{Algebra}, then \textit{Geometry}, and finally \textit{Number Theory}. We compare the competence estimation from MAGELLAN and Online-ALP to the underlying true competence. Figure~\ref{fig:competence_math} shows that MAGELLAN accurately tracks the agent’s competence and distinguishes between the different mathematical categories, clearly outperforming Online-ALP. Additional results, including experiments in the BabyAI-Text environment~\citep{chevalierbabyai, carta_grounding_2023} and an ablation study on the impact of LLM size within MAGELLAN, are provided in Appendix~\ref{app:additional_results_q1}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{Figures//Q1/competence_math.png}
+    \caption{Competence estimation on OpenR1-Math-220k. MAGELLAN (blue) accurately tracks competence across Algebra, Geometry, and Number Theory, closely matching true success probabilities and outperforming Online-ALP (orange).}
+    \label{fig:competence_math}
+\end{figure}
+
+\subsection{Training an LLM agent with MAGELLAN~(Q2)}
+\label{sec:q2}
+As demonstrated in \ref{sec:q1}, MAGELLAN provides a superior competence estimation than Online-ALP. We further investigate whether this improvement translates into a better curriculum and improved overall goal mastery. We train our LLM agent on the goal space of Little-Zoo with 25k goals for 500k episodes using four methods: MAGELLAN, Online-ALP, EK-Online-ALP and "Uniform", where goals are sampled uniformly. We do not report EK-Eval-ALP, as we report EK-Online-ALP which produces similar competence estimation with no cost.
+We report the agent's SR every 5000 training episodes by evaluating it on 64 goals uniformly sampled for each category. Figure~\ref{fig:sr_train} shows the evolution of SR averaged over all categories. Our results show that MAGELLAN is the only method without expert-defined grouping to obtain an SR of at least 90\% in all categories. It also masters the categories significantly faster than baselines. Despite MAGELLAN's similar competence estimation as EK-Online-ALP, the latter learns faster by leveraging the expert-defined groups to better explore. This is because MAGELLAN explores by uniformly sampling goals whereas EK-Online-ALP uniformly samples groups, easily discarding impossible goals. 
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{Figures//Q2/sr_train.png}
+    \caption{Evolution of the observed competence (SR) when evaluating policies on 64 training goals per category every 5000 episodes. We report the average SR over evaluated goals along with standard deviation (8 seeds). Icons indicate the average time step at which a method mastered a goal (i.e. SR $> 90\%$). We add stars to MAGELLAN, denoting significantly earlier mastery of a category compared to the method with the star's color (p-value $<8\times10^{-4}$). The dotted line (EK-Online-ALP) indicates that the method relies on expert knowledge.}
+    \label{fig:sr_train}
+\end{figure}
+
+\subsection{MAGELLAN’s generalization abilities~(Q3)}
+\label{sec:q3}
+We move further and study the generalization abilities of both our LLM agent and competence estimators. While Section~\ref{sec:q2} evaluates each policy on 64 goals per category that belong to the training goal space, this section reports evaluation on a held-out test set composed of unseen goals. As in the previous section, evaluations were performed every 5000 training episodes. However, instead of reporting the policy's observed competence (SR) during evaluation, we report the difference between the observed competence and the competence estimated by the policy's ALP method. We show in Table~\ref{tab:table_sp_test} the average error over training. 
+
+By only tracking competence on goals practiced by the policy (i.e. the ones from the training goal space), Online-ALP cannot provide any estimation for new unseen goals and uses its default competence of $0$. This leads to the largest error among methods except for "Grow carnivore" goals as the policies trained with Online-ALP never mastered these goals (see Figure~\ref{fig:sr_train}). MAGELLAN successfully generalizes its competence estimation and obtains a small error. Finally, EK-Online-ALP produces accurate estimations based on expert knowledge of which group each test goal belongs to. Appendix~\ref{app:additional_results_q3} provides detailed results indicating our LLM agents do not perfectly generalize, which explains MAGELLAN and EK-Eval-ALP estimation error.  
+%We measure the error on the competence average over the training by MAGELLAN for these unseen goals to the agent's actual competence. Additionally, we evaluated the competence estimation of the Online-ALP method, which, as a tabular approach, assigns a competence estimate of 0 to these goals due to its inability to generalize. In contrast, EK-Online-ALP generalizes effectively, as the test goals fall within the bucket learned by this method. The absolute error results are presented in Table \ref{tab:table_sr_test}.
+
+%Generalizing competence estimation on these goals requires commonsense knowledge to correctly classify new objects into their appropriate categories (e.g., “Grow cow” belongs to the “Grow herbivores” category).
+
+\begin{table}[ht]
+\centering
+%\small
+%\footnotesize
+%\scriptsize
+\fontsize{7.6pt}{10pt}\selectfont
+\caption{We evaluate the policies trained with each ALP method on a held-out test set. We show the difference between the observed and predicted competence. Online-ALP's performance on "Grow carnivore" is simply explained by the fact that its policies never mastered this goal category.}
+% We do not take the expert knowledge baseline EK-Online-ALP in consideration when looking at the best performance (in bold).}
+\begin{tabular}{lcc||c}
+\toprule
+\textbf{Categories}          & \textbf{MAGELLAN} & \textbf{Online-ALP} & \textbf{EK-Online-ALP} \\ 
+                       & (Mean ± Std)      & (Mean ± Std)       & (Mean ± Std)         \\ 
+\midrule
+\textbf{Grasp}         & \textbf{0.01 ± 0.00}       & 0.98 ± 0.00        & 0.01 ± 0.00          \\ 
+\textbf{Grow plant}     & \textbf{0.05 ± 0.03}       & 0.78 ± 0.07        & 0.03 ± 0.01          \\ 
+\textbf{Grow herbivore} & \textbf{0.08 ± 0.05}       & 0.34 ± 0.18        & 0.06 ± 0.02          \\ 
+\textbf{Grow carnivore} & 0.30 ± 0.16       & \textbf{0.00 ± 0.00}        & 0.28 ± 0.08          \\ 
+\midrule
+\textbf{Mean}           & \textbf{0.11 ± 0.06}       & 0.53 ± 0.06        & 0.09 ± 0.03          \\ 
+\bottomrule
+\end{tabular}
+\label{tab:table_sp_test}
+\end{table}
+
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{Figures/Q3/embs_before_training.png}
+        \caption{}
+        \label{fig:embedding_MAGELLAN_before}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{Figures/Q3/embs_after_training_seed0.png}
+        \caption{}
+        \label{fig:embedding_MAGELLAN_after}
+    \end{subfigure}
+    \caption{MAGELLAN's LLM embedding space displayed using t-SNE with goals used in Q2 (Train) and Q3 (Test), along with the estimated success probability and linear interpolation between goals. We show the embedding space for a single seed (a) before training and (b) at the end of the 500k training steps. We see that impossible goals have been left aside, and that the other goals with a high estimated success probability are clustered consistently.
+    %We show as a qualitative result MAGELLAN's LLM embedding space (using t-SNE) with goals used in Q2 (Train) and Q3 (Test), along with MAGELLAN's estimated SR (and linear interpolation between goals). We show the embedding space before training (a) and at the end of the 500k training steps (b) for a single seed.
+    }
+    \label{fig:embedding_MAGELLAN_before_after}
+\end{figure}
+
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[t]{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_50k_main.png}
+        \caption{}
+        \label{fig:sub_a}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_150k_main.png}
+        \caption{}
+        \label{fig:sub_b}
+    \end{subfigure}
+    % \hfill
+    % \begin{subfigure}[t]{0.32\linewidth}
+    %     \centering
+    %     \includegraphics[width=\linewidth]{Figures/Q4/adaptation_350k.png}
+    %     \caption{}
+    %     \label{fig:sub_c}
+    % \end{subfigure}
+    \caption{\textbf{Adaptation tests}: Using a single's seed training of 500k episodes, we stop and replace all goals with unseen ones every 50k episodes. We then resume training and sample goals using each method for 50k training episodes. We show two isolated and representative points of goal replacement: (a) there is no ALP on any goal (after 50k training episodes), and (b) some goals (here, "Grow carnivores" after 150k training episodes) have a high ALP. We report the evolution of SR when evaluating the policies on 64 goals per category from the new training set every 5000 episodes. Results show the average competence over evaluated goals along with standard deviation (8 seeds).}
+    \label{fig:adaptation_test}
+\end{figure}
+
+We further investigate MAGELLAN's generalization abilities by projecting train (Q2) and test (Q3) goals from a single seed into the LLM embedding space MAGELLAN used. The embedding space is plotted both before and after training (Figure~\ref{fig:embedding_MAGELLAN_before_after}) with projections obtained via t-SNE \cite{JMLR:v9:vandermaaten08a}. The initial embedding space lacks any discernible structure for goal classification. Post-training, the space exhibits significant restructuring, with similar goals accurately clustered. A small subset of "Grow carnivore" goals are misclassified as impossible, likely due to incomplete mastery of this category by the LLM agent.
+
+Furthermore, the spatial arrangement of goals correlates with estimated success rates: newly learned goals tend to lie near the boundary with impossible goals. Additionally, goals from the test set are well clustered, demonstrating strong generalization. We show in Appendix~\ref{app:embedding_evolution} that MAGELLAN also makes different clusters for impossible goals based on the infeasibility reason.
+
+\subsection{MAGELLAN's adaptation to evolving goal spaces~(Q4)}
+\label{sec:q4}
+Finally, we investigate how each ALP method can adapt when the goal space evolves. For this, we isolate the training of one seed using MAGELLAN in Section~\ref{app:additional_results_q2}. Every $50$k episodes over the $500$k training episodes, we stop training, replace the training goals with the ones in our held-out test set, and start four trainings (with 8 seeds each) with this new goal space: one with each ALP method for $50$k steps. We expect MAGELLAN to quickly adapt to new goals leveraging semantical relationships between the new and old goals. Online-ALP starts with a competence estimation of $0$ on the new goals as in Section~\ref{sec:q3}. For EK-Online-ALP, up to the episode where we change the goal space, we make it track the policy's competence in parallel to MAGELLAN. It thus starts with a per-group competence estimation when the goals are replaced along with the information of which expert-defined group each new goal belongs to.  
+We study all adaptation training in Appendix~\ref{app:additional_results_q4} but isolate and study in Figure~\ref{fig:adaptation_test} two of them chosen as representative of the scenarios encountered:
+\begin{itemize}[noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item\textbf{Scenario zero LP (Figure~\ref{fig:sub_a}):} The agent has mastered the "Grasp" and "Grow plants" goals and has $0$ ALP across all goals. In this scenario, all ALP estimations are equivalent. EK-Online-LP manages to discover new ALP niches faster as all impossible goals are in the same group.
+    \item\textbf{Scenario high LP (Figure~\ref{fig:sub_b}):} The agent is getting a high ALP as it is learning some "Grow carnivores" goals. Here, MAGELLAN outperforms baselines by generalizing its ALP estimation and continuing training on these goals. MAGELLAN even gets on par performance with EK-Online-LP.
+    % \item\textbf{Scenario low LP  end of training (Figure~\ref{fig:sub_c}):} The agent has nearly mastered all goals but is unstable and prone to forgetting. MAGELLAN detects the goals being forgotten and focuses training on them. Whereas Uniform and Online-LP sampled already mastered or impossible goals and see the performances of the LLM-based RL agent decrease. As in the previous scenario MAGELLAN get results similar to EK-Online-LP.
+\end{itemize}
+
+\section{Conclusion}
+\label{sec:conclusion}
+In this paper, we introduce MAGELLAN, a metacognitive module designed to efficiently estimate an LLM agent's learning progress (LP) across large language-defined goal spaces. By leveraging the LLM within the agent, MAGELLAN accurately and efficiently estimates LP by learning semantic relationships between goals. This approach fundamentally differs from prior methods, which either struggle to scale to large goal spaces or rely on expert-defined goal categories. Using MAGELLAN's LP estimations, the LLM agent can effectively structure its curriculum, enabling it to master all goals within an extensive goal space. In contrast, previous methods achieve only partial mastery in the absence of expert-defined categories. Moreover, MAGELLAN’s ability to capture semantic relationships between goals allows it to assess the agent’s competence on unseen goals and rapidly adapt as the goal space evolves. While our study provides an in-depth analysis of MAGELLAN’s capabilities in a controlled textual environment, the method itself is highly generalizable. It offers a goal prioritization strategy applicable to any learner operating in a large, high-dimensional, structured, and discrete goal space. Notably, goal spaces involving code appear particularly promising, given the proficiency of current LLMs in code generation \cite{wang_voyager_2023, pourcel_aces_2024}. Additionally, traditional automatic curriculum learning settings—where goals are not language-defined—could also benefit from MAGELLAN’s ability to uncover relationships between goals. Beyond artificial learners, MAGELLAN may also prove valuable for human learning, particularly in educational domains where learners must navigate a large space of language-defined problems, such as mathematical word problems \cite{doroudi2019s}. Classical LP measures have already been shown to enhance personalized curricula in educational technologies \cite{clement2015multi}, suggesting MAGELLAN’s potential impact in this area.
+
+% In this paper, we introduce MAGELLAN, a metacognitive module for efficiently estimating an LLM agent's LP over large language goal spaces. We show that, by leveraging the LLM inside the agent, MAGELLAN accurately and efficiently estimates LP by learning semantic relationships between goals. This strongly differs from prior works that either cannot scale to large goal spaces or rely on expert-defined categories of goals. Given MAGELLAN's LP estimations, the LLM agent efficiently scaffolds its curriculum to successfully master all goals in a very large goal space, while prior methods only lead to partial mastery when no expert-defined categories are given. MAGELLAN's ability to capture semantic relationships between goals not only allows it to estimate the agent's competence on unseen goals but also enables fast adaptation as the goal space evolves. 
+% While our work focused on proposing an in-depth analysis of MAGELLAN's abilities in a well-controlled textual environment, our method is much more general: it provides a goal prioritization strategy for any learner in any large and high-dimensional structured and discrete goal space. Among such spaces, goals expressed as code seem very promising given current LLMs' capabilities at generating code \cite{wang_voyager_2023,pourcel_aces_2024}. Additionally, traditional automatic curriculum learning settings, where goals are not language-defined, could also leverage MAGELLAN's ability to uncover relationships between goals. Finally, besides artificial learners, MAGELLAN may be of high interest to train human learners in domains where they are facing a large space of problems defined with natural language, e.g. maths word problems \cite{doroudi2019s}. Indeed, classical LP measures have also been shown to be useful when using educational technologies to personalize curricula for human learners \cite{clement2015multi}.
+
+
+% Finally, besides artificial learners, classical LP measures have also been shown to be useful when personalizing curricula for human learners, in particular in the domain of educational technologies. MAGELLAN may be of high interest for domains where human learners are facing a large space of problems defined with natural language.
+
+% We leave for future work the use of MAGELLAN's latent space obtained after training to bootstrap the LLM agent's learning of new goals.
+% Missing things
+%- Discuss the fact that the competence estimator learned by MAGELLAN and in particular its goal embedding can be reused to bootstrap the curriculum of a new learner (e.g. Meta-ACL)
+%- Discuss moving towards goal invention??
+%-mix the LP estimation with an LLM providing a model of interestingness. This is orthogonal to our work and could be combined with MAGELLAN in future work.
+
+\section*{Impact Statement}
+Large Language Models (LLMs) are now widely used in real-world applications, and the recent rise of LLM agents empowered with actions such as web search or tool use greatly enhanced their capabilities. In this work, we study open-ended learning mechanisms for such LLM agents, paving the way for agents solving very large and diverse task spaces. While our results indicate significant improvement for LLM agents to learn in such task spaces, our experiments were limited to small-scale LLMs and well-controlled experimental testbeds. Consequently, we do not recommend generalizing our findings to real-world open-ended learning settings.
+Additionally, our work introduces an efficient method for measuring Learning Progress (LP), an intrinsic motivation signal notably used for prioritizing tasks given to human learners in multiple real-world educational technologies. However, our experiments did not include human learners, and the real impact of our method on accurately measuring human LP remains to be evaluated.
+
+\section*{Acknowledgment}
+This work was granted access to the HPC resources of IDRIS under the allocation A0171011996 made by GENCI. We acknowledge funding from the European Commission’s Horizon Europe Framework Programme under grant agreement No 101070381 (PILLAR-robots project), the French Defense Innovation Agency, and the ANR AI Chair grant ANR-19-CHIA-0004. We also thank Nicolas Yax for kindly proofreading the paper and providing valuable feedback.
+
+%Authors are required to include a statement of the potential broader impact of their work, including its ethical aspects and future societal consequences. This statement should be in an unnumbered section at the end of the paper (co-located with Acknowledgements – the two may appear in either order, but both must be before References), and does not count toward the paper page limit. In many cases, where the ethical impacts and expected societal implications are those that are well established when advancing the field of Machine Learning, substantial discussion is not required, and a simple statement such as the following will suffice: “This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here.” The above statement can be used verbatim in such cases, but we encourage authors to think about whether there is content which does warrant further discussion, as this statement will be apparent if the paper is later flagged for ethics review.
+
+%\section*{Acknowledgements}
+%Olivier: I need to thank the PILLAR UE project, please remind me
+
+\bibliography{magellan}
+\bibliographystyle{icml2025/style/icml2025}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+\onecolumn
+\input{icml2025/appendices}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\end{document}
+
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018, and modified by Alexandre Bouchard in
+% 2019 and 2021 and by Csaba Szepesvari, Gang Niu and Sivan Sabato in 2022.
+% Modified again in 2023 and 2024 by Sivan Sabato and Jonathan Scarlett.
+% Previous contributors include Dan Roy, Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.

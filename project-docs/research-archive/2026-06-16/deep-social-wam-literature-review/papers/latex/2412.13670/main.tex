@@ -1,0 +1,596 @@
+\pdfoutput=1
+
+\documentclass[11pt]{article}
+
+\usepackage[final]{acl}
+
+\usepackage{times}
+\usepackage{latexsym}
+
+\usepackage[T1]{fontenc}
+
+\usepackage[utf8]{inputenc}
+
+\usepackage{microtype}
+
+\usepackage{inconsolata}
+
+\usepackage{amsfonts,amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{cleveref}
+\usepackage{paralist}
+\usepackage{xspace}
+\usepackage[normalem]{ulem}
+\usepackage{booktabs}
+\usepackage{rotating}
+\usepackage{makecell}
+\usepackage{paralist}
+\usepackage{listings}
+\usepackage{stfloats}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{pifont}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\definecolor{darkgreen}{rgb}{0.0, 0.7, 0.0}
+\definecolor{darkred}{rgb}{0.7, 0.0, 0.0}
+
+
+\newcommand{\cmark}{\textcolor{darkgreen}{\ding{51}}}%
+\newcommand{\xmark}{\textcolor{red}{\ding{55}}}%
+
+
+\lstdefinestyle{prompt_style}{
+    frame=single,
+    basicstyle=\ttfamily\scriptsize,
+    backgroundcolor=\color{white},
+    stringstyle=\color{black},
+    commentstyle=\color{darkgreen}\slshape,
+    stringstyle=\color{darkred},
+    numberstyle=\tiny\color{codegray},
+    emphstyle=\color{pink}\underbar,
+    breakindent=0pt,
+    escapeinside={(*@}{@*)},
+    breakatwhitespace=true,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbersep=5pt,
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+}
+
+
+\lstdefinelanguage{json}{
+    basicstyle=\ttfamily\scriptsize,
+    stepnumber=1,
+    numbersep=8pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    keywordstyle=\bfseries\color{blue},
+    stringstyle=\color{green!50!black},
+    commentstyle=\color{gray},
+    morestring=[b]",
+    tabsize=2,
+    literate=                   
+     *{:}{{\textcolor{blue}{:}}}{1}
+      {,}{{\textcolor{blue}{,}}}{1}
+      {[}{{\textcolor{red}{[}}}{1}
+      {]}{{\textcolor{red}{]}}}{1}
+      {\{}{{\textcolor{red}{\{}}}{1}
+      {\}}{{\textcolor{red}{\}}}}{1}
+}
+
+
+\crefname{equation}{Eq.}{Eq.}
+\crefname{section}{Sec.}{Sec.}
+\newcommand{\mscript}[1]{\text{\scriptsize{#1}}}
+\newcommand{\mbf}[1]{\boldsymbol{\mathbf{#1}}}
+
+\newcommand{\ie}{\emph{i.e.,}\xspace}
+\newcommand{\aka}{\emph{a.k.a.,}\xspace}
+\newcommand{\eg}{\emph{e.g.,}\xspace}
+\newcommand{\wrt}{\emph{w.r.t.}\xspace}
+\newcommand{\wo}{\emph{w/o}\xspace}
+
+\newcommand{\benchname}{{AntiLeakBench}\xspace}
+
+
+\title{
+    AntiLeakBench: Preventing Data Contamination by Automatically Constructing Benchmarks with Updated Real-World Knowledge
+}
+
+
+
+\author{
+    \textbf{Xiaobao Wu}$^{1,2}$\thanks{Work done during visiting at UCSB.} \quad
+    \textbf{Liangming Pan}$^5$ \quad
+    \textbf{Yuxi Xie}$^{3,2}$\footnotemark[1] \quad
+    \textbf{Ruiwen Zhou}$^{4,2}$\footnotemark[1] \quad
+    \textbf{Shuai Zhao}$^1$ \\
+    \textbf{Yubo Ma}$^1$ \quad
+    \textbf{Mingzhe Du}$^{1,3}$ \quad
+    \textbf{Rui Mao}$^1$ \quad
+    \textbf{Anh Tuan Luu}$^1$ \quad
+    \textbf{William Yang Wang}$^2$ \\
+    $^1$Nanyang Technological University \quad $^2$University of California, Santa Barbara \\
+    $^3$National University of Singapore \quad $^4$Shanghai Jiao Tong University \; $^5$ University of Arizona \\
+    \texttt{xiaobao002@e.ntu.edu.sg} \quad
+    \texttt{william@cs.ucsb.edu}
+}
+
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+    Data contamination hinders fair LLM evaluation by introducing test data into newer models' training sets.
+    Existing studies solve this challenge by updating benchmarks with newly collected data.
+    However, they fail to guarantee contamination-free evaluation
+    as the newly collected data may contain pre-existing knowledge,
+    and their benchmark updates rely on intensive human labor.
+    To address these issues, we in this paper propose AntiLeakBench, an automated anti-leakage benchmarking framework.
+    Instead of simply using newly collected data,
+    we construct samples with explicitly new knowledge absent from LLMs' training sets,
+    which thus ensures strictly contamination-free evaluation.
+    We further design a fully automated workflow to build and update our benchmark without human labor.
+    This significantly reduces the cost of benchmark maintenance to accommodate emerging LLMs.
+    Through extensive experiments, we highlight that data contamination likely exists before LLMs' cutoff time
+    and demonstrate that AntiLeakBench effectively overcomes this challenge.~\footnote{Our code and data are available at \url{https://github.com/bobxwu/AntiLeakBench}.}
+\end{abstract}
+
+
+\section{Introduction}
+    In recent years, Large Language Models (LLMs) have demonstrated prominent capabilities in multiple fields \cite{radford2019language,touvron2023llama}.
+    To thoroughly assess these capabilities, various benchmarks have been developed, such as MMLU \cite{hendrycks2021mmlu} and GSM8K \cite{cobbe2021gsm8k}.
+    They are typically static and publicly accessible, serving as standardized tools to evaluate LLMs' performance.
+    Unfortunately, the static nature of these benchmarks presents a significant challenge: \textbf{Data Contamination},
+    where their test data may end up in newer LLMs' training sets.
+    This issue can inflate model performance and thus undermine the reliability and validity of these benchmarks \cite{golchin2023time,roberts2023cutoff,deng2024investigating,dong2024generalization,jiang2024investigating}.
+    To avoid data contamination, recent studies dynamically update the benchmarks
+    by collecting new data released after LLM's knowledge cutoff time
+    \cite{kiela2021dynabench,potts2021dynasent,kasai2023realtime,jain2024livecodebench}.
+    For instance, LiveBench \cite{white2024livebench} collects newly released questions from math exams and code platforms like LeetCode.
+
+\input{input/fig_illustration}
+
+
+    However, despite their prevalence,
+    we emphasize these benchmarks encounter two limitations:
+    \begin{inparaenum}[(\bgroup\bfseries i\egroup)]
+        \item
+            \textbf{Weak guarantee for contamination-free evaluation.}
+            They ignore to verify whether the newly collected data contain truly new knowledge \cite{roberts2023cutoff,white2024livebench,jain2024livecodebench}.
+            For example, exam questions or coding problems from LeetCode may be later republished or referenced.
+            As a result, the knowledge of these data may overlap with LLMs' training,
+            which potentially leads to data contamination.
+        \item
+            \textbf{High dependency on human labor for maintenance.}
+            Their benchmark updates often require intensive human labor, such as annotating the collected data \cite{gu2024xiezhi,xu2024let}.
+            In consequence, this significantly hinders their frequent maintenance,
+            especially in light of the rapid emergence of new LLMs.
+            For instance, RealTimeQA \cite{kasai2023realtime} and KoLA \cite{yu2023kola} have barely been updated recently.
+    \end{inparaenum}
+    Together these limitations undermine the reliability and practicality of existing benchmarks for contamination-free evaluation.
+
+    To address these limitations, we in this paper propose \textbf{\benchname}, an automated anti-leakage benchmarking framework to prevent data contamination.
+    As illustrated in \Cref{fig_illustration},
+    rather than directly collecting newly released data as previously,
+    we identify new real-world knowledge updated after LLM's cutoff time.
+    Then we construct question-answering samples querying these updated knowledge,
+    accompanied by their corresponding real-world supporting documents.
+    This ensures the updated knowledge is absent from LLMs' training sets,
+    and thus the constructed samples on them are \textbf{strictly contamination-free}.
+
+    Furthermore, we design \textbf{a fully automated workflow} to build and update \benchname.
+    It eliminates the need for human labor, enabling the benchmark to be seamlessly updated to accommodate emerging LLMs.
+    As such, this significantly reduces the maintenance cost of our benchmark, enhancing its practicality and scalability.
+
+    We evaluate a series of LLMs on our \benchname with samples before and after the cutoff time.
+    We observe that their performance commonly drops after the cutoff time.
+    This trend highlights the likely data contamination in LLM evaluation.
+    The experimental results additionally manifest the effectiveness of \benchname for contamination-free evaluation.
+    The contributions of this paper can be concluded as follows:
+    \begin{itemize}[leftmargin=*, itemsep=0pt]
+        \item
+            We propose \benchname, an automated anti-leakage benchmarking framework,
+            ensuring contamination-free evaluation by constructing test samples with updated real-world knowledge.
+        \item
+            We propose an automated building workflow that automatically builds and updates \benchname without human labor,
+            enabling to easily accommodate emerging new LLMs.
+        \item
+            We conduct extensive experiments involving various LLMs on multiple tasks
+            and demonstrate the effectiveness of \benchname for contamination-free evaluation.
+    \end{itemize}
+
+\input{sections/sec_related_work}
+
+\input{input/fig_workflow}
+
+
+\section{\benchname}
+    In this section, we present how to automatically build \benchname with updated knowledge.
+    \Cref{fig_workflow} illustrates the building workflow.
+    We mainly focus on question-answering tasks regarding the updated knowledge for evaluation.
+    This is because they allow precise control over the knowledge being evaluated, thus ensuring contamination-free evaluation.
+    In contrast, using other tasks like summarization and code generation poses two challenges:
+    \begin{inparaenum}[(\bgroup\bfseries i\egroup)]
+        \item
+            Identifying the specific knowledge embedded in them is inherently complex, making strict contamination-free unfeasible.
+        \item
+            Their intricate context structures make it difficult to automatically synthesize new high-quality samples without introducing errors and inconsistencies.
+    \end{inparaenum}
+
+    \subsection{Preparing Data}
+        We begin by preparing the data to build the benchmarks.
+        For the knowledge source, we leverage Wikidata \cite{wikidata2014}, a widely used knowledge base that is frequently updated by contributor communities.
+        Wikidata provides an extensive repository of real-world factual claims involving numerous entities.
+        Each claim is represented as a triplet \textit{(subject, relation, object)}, such as \textit{(Lionel Andrés Messi, member of sports team, Paris Saint Germain)}.
+
+        We sample a subset of relations associated with physical entities, such as \textit{member of sports team};
+        we exclude the less meaningful relations, for example, ones about virtual entities, like \textit{geometry coordinates}, similar to \citet{zhong2023mquake,wu2024akew} (See details in \Cref{app_workflow}).
+        For each claim, we extract two qualifiers from Wikidata: \textit{start time} and \textit{end time},
+        which specifies when the claim starts and ends, \eg the timeline of a football player in a team.
+        We use these prepared data to build and update our \benchname.
+
+    \subsection{Identifying Updated Knowledge}
+        We then identify updated knowledge based on the prepared data.
+        Considering $t_{1}$ as the knowledge cutoff time of an LLM and $t_{2}$ as the current time,
+        our goal is to find the updated knowledge that occurs after $t_{1}$ and before $t_{2}$.
+        For this purpose, we figure out the history of claims.
+        Specifically, we group all the claims by their subject and relation
+        and sort the claims in each group chronologically based on their start time.
+        If a new claim emerges after the cutoff time $t_{1}$ in the history, \ie the object changes,
+        we identify the new claim as the updated knowledge.
+        For instance, in \Cref{fig_workflow} the object of (\textit{Lionel Andrés Messi}; \textit{member of sports team}) shifts after the cutoff time: \textit{Paris Saint Germain $\rightarrow$ Inter Miami}.
+        From this shift, we extract updated knowledge with the new claim: \textit{(Lionel Andrés Messi; member of sports team; Inter Miami)}.
+        We emphasize that the LLM is unaware of this knowledge because it occurs after its cutoff time.
+
+        One may wonder what if the object changes twice and eventually reverts to its original one, like a player returning to his previous team.
+        To exclude this case, we additionally confirm that the new claim is different from the old one
+        and then consider it as updated knowledge.
+
+    \subsection{Building Supporting Documents}
+        To provide context for the updated knowledge, we build supporting documents from real-world sources.
+        While LLMs could generate such documents, this may introduce mistakes or biases as LLMs often hallucinate or misinterpret information \cite{white2024livebench}.
+        To maintain accuracy and reliability, we rely on the well-maintained and widely trusted Wikipedia as the source of supporting documents.
+        This choice is further justified since the updates of Wikidata commonly follow the updates of Wikipedia \cite{wikidata2014}.
+
+        In detail, we denote the identified updated knowledge as a claim $(s_{1}, r_{1}, o_{1})$
+        and retrieve the Wikipedia page revision history of either its subject $s_{1}$ or object $o_{1}$, determined by its relation,
+        \eg subject \textit{Lionel Andrés Messi} for relation \textit{member of sports team} in \Cref{fig_workflow}.
+        Then we find the revision made after the start time of the updated knowledge.
+        With this revision, we retrieve its corresponding article from Wikipedia
+        and check if the summary of the article contains both the subject and object (or their aliases).
+        If true, we consider this article as a supporting document for the updated knowledge (We show their validity in \Cref{sec_human_verifycation}).
+        For example, \Cref{fig_workflow} illustrates a Wikipedia article indicating \textit{Lionel Andrés Messi} is
+        a member of \textit{Inter Miami}.
+        Here the supporting document is revised after LLMs' cutoff time, so it is also nonexistent in their training sets.
+
+    \subsection{Constructing Contamination-Free Samples} \label{sec_construct_samples}
+        Now we construct test samples querying the above updated knowledge $(s_{1}, r_{1}, o_{1})$,
+        with its supporting document as context, denoted as $D$.
+        Since the knowledge and the supporting document are both absent from LLMs' training sets,
+        the constructed test samples for them are strictly contamination-free.
+        This is different from previous studies: they overlook verifying if the inherent knowledge of their samples does not exist in LLM's training sets.
+
+        \paragraph{Tasks}
+            We mainly focus on question-answering tasks, including both single-hop and multi-hop questions.
+            Following the common practice \cite{yang2018hotpotqa,kovcisky2018narrativeqa,bai2024longbench},
+            each sample is denoted as $(Q, C, A)$ with question $Q$, context $C$, and expected answer $A$.
+            \begin{itemize}[leftmargin=*, itemsep=2pt]
+                \item
+                    \textbf{Single-Hop}.
+                    In this task, we directly ask what is the answer to the updated knowledge by providing the supporting document.
+                    We first consider \textbf{Single-Hop Gold}:
+                    Question $Q$ is formulated with predefined templates based on the relation in the updated knowledge,
+                    Context $C$ only includes the supporting document $D$, and Answer $A$ is the object $o_{1}$ and its aliases.
+                    For instance,
+                    in \Cref{fig_workflow} the question is \textit{What sports team is Lionel Andrés Messi a member of?};
+                    the context is \textit{Lionel Andrés Messi}'s Wikipedia article; the answer is the name and aliases of his sports team.
+
+                    To enhance the difficulty, we further introduce a new task: \textbf{Single-Hop} $N_{\mscript{d}}$:
+                    Question $Q$ remains the same, and we augment Context $C$ with $N_{\mscript{d}}$ distracting documents.
+                    Here these distracting documents are randomly sampled from other samples' supporting documents which do not contain the subject $s_{1}$ and object $o_{1}$ of the updated knowledge.
+                    As such, this task further assesses the long-context capability of LLMs,
+                    specifically locating relevant information within distractors.
+
+\input{input/fig_multihop}
+
+                \item
+                    \textbf{Multi-Hop}.
+                    Moreover, we construct multi-hop questions for harder reasoning.
+                    We first design \textbf{Multi-Hop Gold}.
+                    Specifically, starting with the updated knowledge $(s_{1}, r_{1}, o_{1})$,
+                    we build a chain of $H$ connecting claims:
+                    $((s_{1}, r_{1}, o_{1}), (s_{2}, r_{2}, o_{2}), \dots, (s_{H}, r_{H}, o_{H}))$.
+                    Here the object of the $i$-th triplet serves as the subject of the $(i\!+\!1)$-th triplet, \ie $o_{i} = s_{i+1}$.
+                    As such, Question $Q$ is formulated across this chain,
+                    Context $C$ includes the supporting document of each knowledge in this chain,
+                    and Answer $A$ is the last object $o_{H}$.
+                    For instance, \Cref{fig_workflow} shows a multi-hop question \textit{Who is the coach of the sports team that Lionel Andrés Messi is a member of?};
+                    the context is \textit{Lionel Andrés Messi}'s and \textit{Gerardo Martino}'s Wikipedia articles;
+                    the answer is the last object \textit{Gerardo Martino}.
+
+                    Similarly, we also consider \textbf{Multi-Hop} $N_{\mscript{d}}$:
+                    the context additionally covers $N_{\mscript{d}}$ randomly sampled supporting documents of other samples as the distracting documents.
+                    This task assesses the multi-hop reasoning ability of LLMs, requiring them to connect and integrate information across a long context with distractors.
+        \end{itemize}
+
+
+        \paragraph{Question Formats}
+            We consider two common question formats.
+            \begin{itemize}[leftmargin=*, itemsep=2pt]
+                \item
+                    \textbf{Generation.}
+                    Question $Q$ solely is the question as aforementioned.
+                \item
+                    \textbf{Multi-Choice.}
+                    In this format, we additionally prompt LLMs with 4 options and ask them to select one.
+                    We design the 4 options as follows:
+                    \begin{inparaenum}[(\bgroup\bfseries a\egroup)]
+                        \item
+                            \textbf{Correct option}, \ie the correct answer to the question.
+                        \item
+                            \textbf{Unknown option}, represented as a string ``Unknown''.
+                        \item
+                            \textbf{Outdated option}. The old answer before the cutoff time, \eg \textit{Paris Saint Germain}) in \Cref{fig_workflow}.
+                        \item
+                            \textbf{Noise option}.
+                            A randomly sampled, unrelated answer from other samples.
+                    \end{inparaenum}
+                    For multi-hop questions, we ignore finding outdated options and instead provide two noise options to accelerate the building workflow.
+            \end{itemize}
+
+        The above introduces the automated workflow to build our \benchname.
+        \Cref{tab_example} shows an example of Single-Hop Gold, and more examples are in \Cref{app_examples}.
+
+\input{input/tab_comparison}
+
+
+    \subsection{Benchmark Maintenance}
+        Our \benchname supports easy maintenance.
+        We only need to download the latest Wikidata dump and then execute our automated workflow to update benchmarks.
+        The whole process requires no human labor, and hence we can effortlessly maintain the benchmarks for newer LLMs.
+
+    \subsection{Multilingual Benchmarks}
+        Moreover, \benchname features multilingual evaluation.
+        It can seamlessly produce samples in various languages
+        via our automated workflow with the multilingual nature of both Wikidata and Wikipedia.
+        This enables us to evaluate LLMs in various linguistic contexts.
+        See more details in \Cref{app_workflow}.
+
+\input{input/tab_example}
+\input{input/tab_data_quality}
+
+    \subsection{Data Quality Verification} \label{sec_human_verifycation}
+        To verify the data quality of produced samples in \benchname, we conduct human verifications.
+        We ask human annotators to evaluate the accuracy of both answers and contexts in the samples.
+        See \Cref{app_data_verification} for the verification procedure and agreement analysis.
+        \Cref{tab_data_quality} shows that \benchname achieves a high standard of data quality with question and context accuracy over 96\%.
+
+
+
+\input{input/fig_contamination_gen}
+\input{input/fig_contamination_multichoice}
+
+
+    \subsection{Comparisons with Existing Benchmarks}
+        \Cref{tab_comparison} compares our \benchname with other benchmarks.
+        We highlight its vital advantages:
+        \begin{inparaenum}[(\bgroup\bfseries i\egroup)]
+            \item
+                \textbf{Strictly contamination-free}.
+                \benchname ensures that the constructed samples must cover updated knowledge absent from LLMs' training sets,
+                which guarantees strictly contamination-free evaluation.
+            \item
+                \textbf{Automated workflow}.
+                Our fully automated building workflow avoids human labor,
+                which significantly reduces the cost of maintaining the benchmark for newer LLMs.
+                In consequence, this fortifies its adaptivity and long-term applicability.
+            \item \textbf{Multilingual}.
+                Our method supports the construction of multilingual samples.
+                This enables us to extensively assess LLMs' capabilities across different languages.
+            \item
+                \textbf{Real-world data}.
+                We build test samples from real-world data sources like Wikipedia, rather than LLM-generated content.
+                This grounds the benchmark in practical and authentic data.
+        \end{inparaenum}
+        With these advantages, \benchname serves as a reliable testbed for evaluating LLMs in a strictly contamination-free environment.
+
+
+
+\section{Experiment}
+    In this section, we experiment with different LLMs on our \benchname to  show its effectiveness and investigate data contamination.
+
+    \subsection{Experiment Setup}
+        \paragraph{Large Language Models}
+            We experiment with the following 12 common language models:
+            Llama-2-7B \cite{touvron2023llama},
+            Llama-2-13B \cite{touvron2023llama},
+            Mistral-7B \cite{jiang2023mistral},
+            Vicuna-v1.5-7B \cite{vicuna2023},
+            LongChat-v1.5-7B \cite{longchat2023},
+            Llama-3.1-8B \cite{dubey2024llama},
+            Phi-3.5-mini \cite{abdin2024phi},
+            Qwen-2-7B \cite{yang2024qwen2},
+            Mistral-Nemo-12B \cite{jiang2023mistral},
+            Gemma-2-9B \cite{gemma_2024}.
+            We also consider proprietary models: GPT-4o-mini and GPT-4o \cite{achiam2023gpt4o}.
+            \Cref{tab_LLM_date} summarizes their release and knowledge cutoff time.
+            We use the prompts in \cref{app_prompt} following \citet{bai2024longbench},
+            which \textbf{explicitly ask LLMs to use the provided context to answer questions.}
+
+\input{input/tab_main_gen}
+
+        \paragraph{Constructing Test Samples}
+            To investigate the impact of data contamination,
+            we on purpose construct two kinds of test samples:
+            \begin{inparaenum}[(\bgroup\bfseries i\egroup)]
+                \item
+                    \textbf{Pre-cutoff samples}, containing knowledge before the cutoff time.
+                    These samples may already exist in the LLMs' training sets.
+                \item
+                    \textbf{Post-cutoff samples}, containing knowledge updated after the cutoff time.
+                    These samples are absent from LLMs' training sets.
+            \end{inparaenum}
+
+            To construct these samples, we establish two time periods according to the LLMs' cutoff time summarized in \Cref{tab_LLM_date}:
+            \begin{inparaenum}[(\bgroup\bfseries i\egroup)]
+                \item
+                    From 2022-01-01 to 2023-01-01, divided into 2-month intervals.
+                    This targets the first 5 models since their knowledge cutoff time mostly falls around Sep 2022,
+                    such as Vicuna-v1.5-7B.
+                \item
+                    From 2023-05-01 to 2024-08-01, divided into 3-month intervals.
+                    Similarly, this is tailored for the last 7 models
+                    whose cutoff time mostly falls around the end of 2023,
+                    \eg Llama-3.1-8B and GPT-4o.
+            \end{inparaenum}
+            Here we divide these periods into shorter intervals
+            because (i) this can ensure each interval contains a sufficient number of samples, enabling statistically meaningful analysis,
+            and (ii) this provides detailed granular insights into how contamination risks and model performance evolve over time.            
+            We report the statistics of the produced samples of our benchmark in \Cref{tab_stats_size,tab_stats_word_count}.
+            See more building details in \Cref{app_workflow}.
+
+        \paragraph{Evaluation Metrics}
+            For the generation format (\Cref{sec_construct_samples}), we use \textbf{EM} (Extract Matching) and token-based \textbf{F1} scores, following the standard practice in question answering \cite{rajpurkar2016squad}.
+            For the multi-choice format, we use \textbf{Acc} (Accuracy) and \textbf{F1} scores following \citet{kasai2023realtime}.
+
+\input{input/tab_main_multichoice}
+
+    \subsection{Data Contamination Analysis} \label{sec_data_contamination}
+        We first analyze the impact of data contamination
+        by looking into the performance trends of LLMs.
+            \Cref{fig_contamination_gen} presents the trends of EM and F1 scores under the Single-Hop Gold task in the generation format
+            (Llama-3.1-8B is excluded due to its low EM; See \Cref{sec_performance_analysis}).
+            We observe a general performance decline for most LLMs after their knowledge cutoff time, 
+            although all samples are constructed in the same way.
+            For instance, Vicuna-v1.5-7B's EM and F1 start dropping near its cutoff time Sep 2022;
+            Similarly, GPT-4o-mini remains stable until its cutoff time Oct 2023 and decreases thereafter.
+            According to this decline, we conclude two key findings:
+            \begin{enumerate}[wide, labelindent=0pt, labelsep=2pt, itemsep=1pt, topsep=1pt, label=\textbf{(\arabic*)}]
+                \item
+                    \textbf{
+                    Pre-cutoff samples come with data contamination, which inflates LLMs' performance.
+                    }
+                    Pre-cutoff samples may overlap with LLMs' training sets.
+                    This allows LLMs to correctly handle these samples based on their prior knowledge rather than actually understanding the provided context.
+                    As a result, evaluating models solely on pre-cutoff samples can overestimate their capabilities.
+                \item
+                    \textbf{Contamination-free post-cutoff samples are more challenging and can more accurately assess LLMs.}
+                    Post-cutoff samples are free from contamination since they include knowledge updated after LLMs' cutoff time.
+                    To deal with these samples, LLMs must demonstrate true comprehension and reasoning over the given context and questions,
+                    as they cannot rely on prior knowledge alone.
+                    As such, evaluating with post-cutoff samples more accurately reflects LLMs' abilities.
+            \end{enumerate}
+
+            Interestingly, we notice that some LLMs experience performance drops even before the cutoff time.
+            This is probably because their training data cover less knowledge close to the cutoff time.
+            Knowledge sources such as news articles and Wikipedia pages usually become widely documented only after initial events occur.
+
+            Besides, \Cref{fig_contamination_multichoice} plots the proportions of correct and outdated options selected under the Single-Hop Gold task in the multi-choice format
+            (Llama-2-7B is excluded due to its low performance; See \Cref{sec_performance_analysis}).
+            Notably LLMs increasingly favor outdated options over correct ones (See option types in \Cref{sec_construct_samples}).
+            For example, Mistral-Nemo-7B's proportion of selecting correct options decreases from 91.0\% to 85.5\%, while the proportion of outdated options rises from 6.4\% to 13.3\%.
+            These results again validate that pre-cutoff samples, due to data contamination, could inflate the performance.
+
+        In summary, the above results demonstrate the effectiveness of our \benchname, which effectively ensures contamination-free evaluation
+        and serves as a more reliable assessment of LLMs.
+
+    \subsection{Overall Performance Analysis} \label{sec_performance_analysis}
+        Next we analyze the overall performance of LLMs.
+        \Cref{tab_main_gen,tab_main_multichoice} summarize the average results over all samples across tasks in the generation and multi-choice format, respectively.
+        According to these results, we have the following observations.
+        \begin{enumerate}[wide, labelindent=0pt, labelsep=2pt, itemsep=1pt, topsep=1pt, label=\textbf{(\arabic*)}]
+            \item
+                \textbf{\benchname poses a significant challenge for LLMs.}
+                \Cref{tab_main_gen} shows that most models score EM and F1 below 50, indicating a substantial gap between their capabilities and the benchmark's requirements.
+                Only two models, GPT-4o-mini and GPT-4o, reach EM and F1 scores around 70 and 80.
+                These results highlight the challenging nature of our \benchname for evaluating LLMs.
+            \item
+                \textbf{Proprietary models lead in performance.}
+                \Cref{tab_main_gen,tab_main_multichoice} reveal that proprietary models surpass open-source ones by a large margin.
+                For instance, GPT-4o achieves the highest average EM and F1 scores, 77.2 and 87.9, respectively,
+                while the runner-up open-source model only has 53.9 and 62.0.
+                Additionally, GPT-4o's performance remains relatively stable despite the increasing number of distracting documents.
+                This substantial margin may be attributed to their longer max context length, superior model architectures, and larger parameter sizes.
+        \end{enumerate}
+
+
+    \subsection{Difficulty Analysis} \label{sec_difficulty_analysis}
+        We further analyze the difficulty concerning tasks and question formats based on \Cref{tab_main_gen,tab_main_multichoice}.
+        We summarize the key findings as follows.
+        \begin{enumerate}[wide, labelindent=0pt, labelsep=2pt, itemsep=1pt, topsep=1pt, label=\textbf{(\arabic*)}]
+            \item
+                \textbf{Multi-choice format is significantly easier.}
+                LLMs generally perform better in the multi-choice format compared to the generation format.
+                For example, GPT-4o-mini achieves Acc and F1 scores over 90, surpassing its performance in the generation format.
+                This is because the multi-choice format simplifies the tasks by providing explicit answer options,
+                enabling LLMs to identify correct answers with partial comprehension.
+            \item
+                \textbf{Longer contexts bring about higher difficulty.}
+                LLMs' performance gradually decreases along with more distracting documents, such as from $N_{\mscript{d}}$=3 to 7 in \Cref{tab_main_gen}.
+                The reason is that long contexts distract LLMs from locating relevant information.
+                This underscores the necessity of LLMs' stronger ability to handle long contexts.
+            \item
+                \textbf{Multi-hop tasks are more challenging.}
+                Compared to single-hop ones, LLMs' performance becomes lower on multi-hop tasks.
+                For example, in \Cref{tab_main_gen} the EM score of Longchat-v1.5-7B decreases from 75.5 on the Single-Hop Gold to 38.8 on the Multi-Hop Gold;
+                GPT-4o-mini decreases from 78.5 to 68.8.
+                These multi-hop tasks require LLMs to decompose complex questions and reason across long and interconnected contexts.
+        \end{enumerate}
+
+
+\section{Conclusion}
+    In this paper, we propose \benchname, an automated anti-leakage benchmarking framework.
+    Unlike solely collecting newly released data as before,
+    it constructs test samples based on identified updated real-world knowledge,
+    ensuring strictly contamination-free evaluation.
+    It also introduces a fully automated building workflow without human labor.
+    This enables frequent and efficient benchmark updates to accommodate emerging LLMs, greatly simplifying maintenance.
+    These advantages establish \benchname as an ideal testbed for contamination-free evaluation,
+    providing accurate and fair assessments for LLMs.
+
+
+\section*{Limitations}
+    Our benchmarking framework can ensure strictly contamination-free evaluation with a fully automated building workflow,
+    but we believe there are some limitations to be explored as future work:
+    \begin{itemize}[leftmargin=*, itemsep=2pt]
+        \item
+            To implement the automated building workflow,
+            we mainly consider the question-answering tasks for evaluation.
+            Although we have devised different task difficulty levels,
+            more diverse tasks can be explored in the future, which will more extensively evaluate LLMs in a contamination-free manner.
+            We think the challenges lie in how to identify the knowledge embedded in these tasks and how to automatically construct new high-quality samples.
+        \item
+            Our benchmarking framework uses Wikidata and Wikipedia as data sources.
+            While these sources are extensive and frequently updated by their contributor communities, they may contain incorrect information in rare cases.
+            As discussed in \Cref{sec_human_verifycation}, most produced samples are correct as verified by humans.
+    \end{itemize}
+
+\section*{Ethics Statement}
+    In this paper, we build and maintain our \benchname with Wikidata and Wikipedia as the data sources.
+    We acknowledge that Wikidata and Wikipedia may contain inaccurate information in a few cases as they are extremely abundant and rely on human labor for maintenance.
+    Besides, our work focuses on real-world commonsense knowledge by sampling relations with physical entities (See \Cref{app_workflow}). 
+    This can avoid harmful information in most situations.
+
+\bibliography{lib}
+
+
+
+\input{sections/sec_appendix}
+
+\end{document}

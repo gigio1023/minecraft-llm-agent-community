@@ -1,0 +1,99 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Task: Push a cube to a target zone on a static platform
+
+    Description:
+    - The environment consists of a large static platform (50 m x 50 m).
+    - A cube (2 meters in size and 5 kg in mass) is placed at a random location on the platform.
+    - A target zone (3 meters in radius) is also placed at a random location on the platform. The collision for the target zone is set to False.
+    - The robot is initialized at a fixed position on the platform.
+
+    The task of the robot is to push the cube to the target zone as quickly as possible.
+
+    Success:
+    The task is successfully completed when the cube is entirely within the target zone.
+
+    Rewards:
+    - The robot receives a survival reward for each time step it remains on the platform, encouraging steady progress.
+    - The robot is rewarded based on how much it reduces the distance to the cube, incentivizing interaction with the cube.
+    - The robot is rewarded based on how much it reduces the distance between the cube and the target zone, incentivizing pushing the cube towards the goal.
+    - A large reward is given when the cube reaches the target zone.
+
+    Termination:
+    The episode terminates if the robot falls off the platform or if the cube reaches the target zone.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.platform_size = [50.0, 50.0, 0.1]
+        self.platform_position = [0.0, 0.0, 0.0]
+        self.platform_id = self.create_box(mass=0.0, half_extents=[self.platform_size[0] / 2, self.platform_size[1] / 2, self.platform_size[2] / 2], position=self.platform_position, color=[0.8, 0.8, 0.8, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.platform_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.cube_size = [2.0, 2.0, 2.0]
+        self.cube_mass = 5.0
+        self.cube_id = self.create_box(mass=self.cube_mass, half_extents=[self.cube_size[0] / 2, self.cube_size[1] / 2, self.cube_size[2] / 2], position=[0.0, 0.0, 0.0], color=[1.0, 0.0, 0.0, 1.0])
+        self.target_zone_radius = 3.0
+        self.target_zone_id = self.create_sphere(mass=0.0, radius=self.target_zone_radius, collision=False, position=[0.0, 0.0, 0.0], color=[0.0, 1.0, 0.0, 0.5])
+        self.robot_position_init = [0.0, 0.0, self.platform_position[2] + self.platform_size[2] / 2 + self.robot.links['base'].position_init[2]]
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, collision, position, color):
+        if collision:
+            collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+            visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+            return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+        else:
+            visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+            return self._p.createMultiBody(baseMass=mass, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_between_objects(self, object1_id, object2_id):
+        object1_position = self.get_object_position(object1_id)
+        object2_position = self.get_object_position(object2_id)
+        return np.linalg.norm(object1_position[:2] - object2_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot.links['base'].orientation_init)
+        cube_x = np.random.uniform(self.platform_position[0] - self.platform_size[0] / 2 + self.cube_size[0] / 2, self.platform_position[0] + self.platform_size[0] / 2 - self.cube_size[0] / 2)
+        cube_y = np.random.uniform(self.platform_position[1] - self.platform_size[1] / 2 + self.cube_size[1] / 2, self.platform_position[1] + self.platform_size[1] / 2 - self.cube_size[1] / 2)
+        self._p.resetBasePositionAndOrientation(self.cube_id, [cube_x, cube_y, self.platform_position[2] + self.platform_size[2] / 2 + self.cube_size[2] / 2], [0.0, 0.0, 0.0, 1.0])
+        target_zone_x = np.random.uniform(self.platform_position[0] - self.platform_size[0] / 2 + self.target_zone_radius, self.platform_position[0] + self.platform_size[0] / 2 - self.target_zone_radius)
+        target_zone_y = np.random.uniform(self.platform_position[1] - self.platform_size[1] / 2 + self.target_zone_radius, self.platform_position[1] + self.platform_size[1] / 2 - self.target_zone_radius)
+        self._p.resetBasePositionAndOrientation(self.target_zone_id, [target_zone_x, target_zone_y, self.platform_position[2] + self.platform_size[2] / 2], [0.0, 0.0, 0.0, 1.0])
+        return observation
+
+    def step(self, action):
+        self.distance_robot_to_cube = self.get_distance_between_objects(self.robot.robot_id, self.cube_id)
+        self.distance_cube_to_target_zone = self.get_distance_between_objects(self.cube_id, self.target_zone_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_robot_to_cube = self.get_distance_between_objects(self.robot.robot_id, self.cube_id)
+        new_distance_cube_to_target_zone = self.get_distance_between_objects(self.cube_id, self.target_zone_id)
+        survival = 1.0
+        reach_cube = (self.distance_robot_to_cube - new_distance_robot_to_cube) / self.dt
+        push_cube_to_target_zone = (self.distance_cube_to_target_zone - new_distance_cube_to_target_zone) / self.dt
+        cube_in_target_zone = 10.0 if new_distance_cube_to_target_zone < self.target_zone_radius else 0.0
+        return {'survival': survival, 'reach_cube': reach_cube, 'push_cube_to_target_zone': push_cube_to_target_zone, 'cube_in_target_zone': cube_in_target_zone}
+
+    def get_terminated(self, action):
+        is_off_platform = self.robot.links['base'].position[2] < self.platform_position[2]
+        is_cube_in_target_zone = self.get_distance_between_objects(self.cube_id, self.target_zone_id) < self.target_zone_radius
+        return is_off_platform or is_cube_in_target_zone
+
+    def get_success(self):
+        is_cube_in_target_zone = self.get_distance_between_objects(self.cube_id, self.target_zone_id) < self.target_zone_radius
+        return is_cube_in_target_zone
+\end{lstlisting}

@@ -1,0 +1,434 @@
+\documentclass{article}
+\usepackage[preprint]{corl_2024} %
+
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{graphics} %
+\usepackage{epsfig} %
+\usepackage{times} %
+\usepackage{amsmath} %
+\usepackage{amssymb}  %
+\usepackage{siunitx} %
+\usepackage{textcomp}
+\usepackage{gensymb} %
+\usepackage{booktabs}
+\usepackage{multirow}
+\let\labelindent\relax
+\usepackage{xspace}
+\usepackage{makecell}
+\usepackage{multicol}
+\usepackage{rotating}
+\usepackage[percent]{overpic}
+\usepackage{contour}
+\usepackage{courier}
+\usepackage{subcaption} %
+\usepackage[font=small]{caption}
+\usepackage[percent]{overpic}
+\usepackage[11pt]{moresize}
+\usepackage{pifont}%
+\newcommand{\cmark}{\textcolor{green}{\ding{51}}}%
+\newcommand{\xmark}{\textcolor{red}{\ding{55}}}%
+\usepackage{xcolor} 
+\usepackage{booktabs}       %
+\usepackage{amsfonts}       %
+\usepackage{nicefrac}       %
+\usepackage{microtype}      %
+\usepackage{amsmath,amsthm}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{wrapfig}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs} %
+\usepackage[noend]{algorithmic}
+\usepackage[perpage]{footmisc}
+
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\definecolor{commentcolour}{rgb}{0.0,0.6,0.0}
+\definecolor{keywordcolour}{rgb}{0.0,0.0,0.6}
+\definecolor{stringcolour}{rgb}{0.6,0.0,0.0}
+\definecolor{blackcolour}{rgb}{0,0,0}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   %
+    commentstyle=\color{commentcolour}\ttfamily,
+    keywordstyle=\color{blackcolour},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{stringcolour},
+    basicstyle=\fontfamily{\ttdefault}\scriptsize, %
+    breakatwhitespace=false,     %
+    breaklines=true,             %
+    captionpos=b,                %
+    keepspaces=true,             %
+    numbersep=5pt,               %
+    showspaces=false,            %
+    showstringspaces=false,      %
+    showtabs=false,              %
+    tabsize=2,                   %
+    frame=single,                %
+    frameround=fttt,             %
+    rulecolor=\color{codegray},  %
+}
+
+\lstdefinestyle{pythonstyle}{
+  language=Python,                     %
+  basicstyle=\fontfamily{\ttdefault}\scriptsize,          %
+  keywordstyle=\color{keywordcolour},           %
+  commentstyle=\color{commentcolour},            %
+  showstringspaces=false,              %
+  breaklines=true,                     %
+  captionpos=b,                        %
+  frame=single,                          %
+  abovecaptionskip=1em,                %
+  aboveskip=1em,                       %
+  belowskip=1em,                       %
+}
+\lstset{style=mystyle}
+
+
+\title{Environment Curriculum Generation \\ via Large Language Models}
+
+\usepackage[colorinlistoftodos]{todonotes}
+\setlength{\marginparwidth}{1.5cm}
+
+\newcommand{\ourmethod}{\texttt{Eurekaverse}\xspace}
+
+\let\svthefootnote\thefootnote
+\newcommand\freefootnote[1]{%
+  \let\thefootnote\relax%
+  \footnotetext{#1}%
+  \let\thefootnote\svthefootnote%
+}
+
+\author{
+  William Liang, Sam Wang, Hung-Ju Wang, \\ 
+  \textbf{Osbert Bastani, Dinesh Jayaraman\textsuperscript{$\dagger$}, Yecheng Jason Ma\textsuperscript{$\dagger$}}\\
+  GRASP Laboratory, University of Pennsylvania\\
+  \texttt{willjhliang@gmail.com} \\ \\
+  \href{https://eureka-research.github.io/eurekaverse/}{\texttt{https://eureka-research.github.io/eurekaverse/}}
+}
+
+
+
+\begin{document}
+
+\maketitle
+\vspace{-2em}
+\freefootnote{\textsuperscript{$\dagger$}Equal Advising}
+
+
+\begin{abstract}
+Recent work has demonstrated that a promising strategy for teaching robots a wide range of complex skills is by training them on a curriculum of progressively more challenging environments. However, developing an effective curriculum of environment distributions currently requires significant expertise, which must be repeated for every new domain. Our key insight is that environments are often naturally represented as code. Thus, we probe whether effective environment curriculum design can be achieved and automated via code generation by large language models (LLM). In this paper, we introduce \ourmethod, an unsupervised environment design algorithm that uses LLMs to sample progressively more challenging, diverse, and learnable environments for skill training. We validate \ourmethod's effectiveness in the domain of quadrupedal parkour learning, in which a quadruped robot must traverse through a variety of obstacle courses. The automatic curriculum designed by \ourmethod enables gradual learning of complex parkour skills in simulation and can successfully transfer to the real-world, outperforming manual training courses designed by humans.
+\end{abstract}
+
+\keywords{LLMs, Curriculum Learning, Environment Design, Sim-To-Real RL}
+
+
+\begin{figure*}[h]
+\centering
+\vspace{-0.75em}
+\includegraphics[width=\columnwidth]{figures/diverse_parkour.png}
+\caption{\ourmethod teaches a quadrupedal robot to navigate diverse obstacle courses, including jumps, climbs, and ramps.}
+\label{fig:diverse-parkour}
+\vspace{-1em}
+\end{figure*}
+
+\newpage
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/concept_newer.png}
+\caption{\ourmethod automatically learns complex skills by performing agent-environment co-evolution, which iterates between evolutionary environment generation and population-based policy training and evaluation.}
+\label{fig:concept}
+\vspace{-0.75em}
+\end{figure*}
+
+
+\section{Introduction}
+It is often hypothesized that the evolution of intelligent motor control in biology is driven by the need to habituate in and adapt to varied environment conditions
+\citep{floreano2008evolutionary, gupta2021embodied}. Inspired by this observation, training robot policies over a curriculum of environments has been shown to be an effective strategy for the acquisition of complex robot skills \citep{bansal2018emergent, baker2020emergent, tang2021learning, tidd2021guided, Marzari_2022}. Designing a useful curriculum of environments is, however, time-consuming and requires domain-specific knowledge to work well \citep{duan2022learning}. In limited cases, when the environment variations can be succinctly represented by scalar parameters~\citep{dennis2020emergent,jiang2021replay}, unsupervised environment design methods have shown capability in automatically generating progressively more challenging tasks in low-dimensional simulation domains~\citep{dennis2020emergent,jiang2021prioritized,wang2019paired}. However, whether these methods can scale up to challenging real-world robotic tasks is an open question. 
+
+Our key insight is that, in many practical robotics scenarios, environment variations can be represented by diverse programs. This allows us to solve environment design using large language models (LLMs) since they have been shown to excel at code generation in diverse domains \citep{rozière2024code, Li_2022, nijkamp2023codegen, badagabettu2024query2cad}. We introduce \ourmethod, a language model powered environment curriculum design algorithm that can generate and evolve environments in code space. At a technical level, \ourmethod instructs an LLM to generate novel environments to teach the target task, trains policies for each environment, and evaluates the best-performing policies to inform the LLM when it generates the next round of environments. Given that large language models (LLMs) have exhibited strong code generation and self-improving capabilities on other domains~\citep{patel2024large, chen2024selfplay, huang2022large}, we hypothesize that using LLMs for environment curriculum design could also enable learning complex robot skills. In particular, we validate \ourmethod's efficacy on the task of quadrupedal parkour~\citep{zhuang2023robot, cheng2023extreme}, in which a quadruped robot is tasked with traversing diverse and unknown challenging courses with varied terrains and obstacles such as gaps, hurdles, boxes, and ramps. In order to train a policy deployable in the real world, prior parkour methods carefully designed training courses in simulation that enable real-world policy transfer~\citep{cheng2023extreme,zhuang2023robot}. Because parkour courses are represented as programs that specify detailed course terrain and geometry (see Fig.~\ref{fig:example-generation}), we posit that parkour is an ideal testbed for testing \ourmethod's capability in handling the complexity of evolving environment programs. Parkour involves a rich variety of challenging locomotion skills  so our results could also be of independent interest for scaling up locomotion learning. 
+
+We demonstrate that the automatically generated curriculum of environments from \ourmethod leads to policy training that continuously improves over time without plateauing; in contrast, baselines that only train over a fixed set of terrains, designed by either humans or an LLM, tend to overfit on these training terrains, resulting in worse generalization to test simulation and real-world courses. Specifically, on a set of 20 held-out simulation test courses that are carefully designed to holistically evaluate robot parkour skills, \ourmethod-trained policies outperforms various baselines and ablations. Furthermore, on several real-world courses, \ourmethod-trained policies successfully transfer and exhibit more robust and adaptive behavior than policies trained using limited or manually designed training courses.
+
+\newpage
+In summary, our contributions are:
+\begin{enumerate}[leftmargin=1em]
+    \item \ourmethod, an LLM-based unsupervised environment design algorithm that can automatically generate curriculums of environment programs for robot skill learning.
+    \item Extensive simulation and real-world validation of \ourmethod on quadrupedal robot parkour.
+\end{enumerate}
+
+
+\section{Related Work}
+\textbf{Large Language Models for Robotics.} Recent work has demonstrated that LLMs can be used in robotics domains in various ways. They have demonstrated capabilities as high-level semantic planners~\citep{ahn2022can,huang2023grounded,singh2023progprompt,zhang2023bootstrap,liang2023code, wang2023demo2code, huang2023instruct2act, wang2023voyager, liu2023llm+, silver2023generalized, ding2023task, lin2023text2motion, xie2023translating} and control policies~\citep{brohan2023rt, szot2023large,tang2023saytap}. Leveraging the code generation capability of LLMs, recent work has also explored using LLMs to guide policy learning via reward function design~\citep{ha2023scaling, yu2023language,xie2023text2reward, ma2023eureka} and environment design~\citep{wang2023gensim,wang2023robogen, ma2024dreureka}. In this latter category, prior work shows that LLMs can generate varied environments for top-down pick-and-place tasks that enable semantic generalization~\citep{wang2023gensim} or diverse tasks across different embodiments without clear intra-task dependencies~\citep{wang2023robogen}.  In contrast, our work is the first to demonstrate how  LLMs can be used in an evolutionary approach to generate full environment \textit{curricula} that can guide the learning of complex physical skills such as parkour. Finally, \citet{ma2024dreureka} proposes using LLMs to automatically sample physics parameter randomization for sim-to-real policy learning~\citep{tobin2017domain,peng2018sim,muratore2022robot}; physics randomization is a restricted class of environment design, involving selecting a value range for each physics parameter in an enumerated list. Our domain specification here is much larger, more complex, structured: it is a full-fledged program. In our specific case study of robot parkour, this program specifies one out of a very large space of environment geometries.
+
+\textbf{Environment Design and Curriculum Learning.} Beyond using LLMs for environment program generation, environment design and curriculum learning have been extensively studied in prior literature. Prior works have considered framing environment design as a multi-agent game between the environment generator and the policy~\citep{wang2019paired,wang2020enhanced,dennis2020emergent,jiang2021prioritized,jiang2021replay,parker2022evolving,bhatt2022deep,mediratta2023stabilizing}; however, these methods require manually designed environment generators and can handle only a small space of environment variations (e.g., layouts in a 2D maze), limiting their scalability to challenging problems such as parkour that has a large and complex design space. Curriculum learning has been used in robotics to learn complex skills~\citep{florensa2017reverse,florensa2018automatic,margolis2022rapid,akkaya2019solving,tang2021learning,kaufmann2023champion}, but prior works use manually designed curricula or confined environment variation space that require extensive domain expertise and tuning. Our work demonstrates how to scale up adaptive environment curriculum for challenging physical skills by using LLMs to automate environment generation and modification. 
+
+
+\section{Problem Setting}
+\label{sec:problem-setting}
+In this section, we formalize the unsupervised environment design setting as introduced in~\citep{dennis2020emergent}. First, we model a fully specified environment as a Partially Observable Markov Decision Process (POMDP). Here, an environment is a tuple $ M = (A, S, R, O,\mathcal{T},\mathcal{I}, \gamma)$, where $A$ is the space of actions, $S$ is the set of states, $O$ is the set of observations, $R: S\times A \rightarrow \mathbb{R}$ is the reward function, $\mathcal{T}: S \times A \rightarrow \Delta(S)$ is the transition dynamics function, $\mathcal{I}: S \rightarrow O$ is the emission function, and $\gamma$ is the discount factor. Given $M$, the goal of reinforcement learning is to learn a policy $\pi:S\rightarrow \Delta(A)$ that maximizes the cumulative discounted sum of rewards: $V^M(\pi) = \mathbb{E}_{\pi, \mathcal{T}}[\sum_{t=0}^T \gamma^t R(s_t,a_t)]$.
+
+Then, a  POMDP \textit{template} is a tuple $ \mathcal{M} = (A, S, R, O, \Theta, \mathcal{T},\mathcal{I}, \gamma)$, where $\Theta$ represents the space of environment variations that can be incorporated into the transition dynamics $\mathcal{T}: S\times A \times \Theta \rightarrow \Delta(S)$. While environment configuration can include parameter variations such as simulation physics values~\citep{ma2024dreureka}, in this work, we focus on semantic and geometric variations (e.g., different parkour terrains) that are represented as programs. Given this, an environment \textit{curriculum} can be parameterized by a sequence of programs $\vec{\theta}=(\theta_1,...,\theta_T) \in \Theta^T$. Then, in unsupervised environment design (UED), we are interested in an \textit{environment generator} $\Lambda:\Pi \rightarrow \Theta$ that can generate a curriculum of environments $\vec{\theta}$ for the policy $\pi \in \Pi$ to continue learning. The goal of UED is to learn a policy that can \textit{zero-shot} generalize to unseen environments, maximizing $\sum_i V^{M_i}(\pi)$ for a set of unseen environments $\{M_{\text{test}, i}\}$ parameterized by $\Theta_{\text{test}} = \{\theta_{\text{test},i}\}$. Therefore, $\Lambda$ must be able to generate both learnable and useful environments for policy learning in order to maximize generalization capability.
+
+In this work, we investigate whether LLMs can be an effective choice of $\Lambda$ for designing robot parkour courses for quadrupedal robots, where $\Theta$ can be thought of as the space of programs that captures different terrain configurations. 
+
+
+\section{Methods}
+\label{sec:method}
+At a high level, \ourmethod proceeds as follows. First, it uses the LLM to generate an initial set of environments to train on. Then, it uses a process we call \emph{agent-environment co-evolution}, where it iteratively uses reinforcement learning (RL) to train agents on the current set of environments, followed by updating the set of environments so they continue to challenge the best current policy without being too difficult for learning. Intuitively, as the best current policy learns to act more effectively, the environments are evolved so they can more effectively improve this policy. This strategy resembles a traditional curriculum learning pipeline, with the key difference being that the curriculum itself is generated automatically by the LLM.
+
+Throughout this section, we ground the exposition in the context of quadruped parkour to concretize the method discussion; we note that the general algorithmic principle is broadly applicable to other environment design problems. Implementation details and pseudocode are in the Appendix.
+
+\subsection{Initial Environment Generation}
+\label{sec:initial-generation}
+
+\begin{figure}
+\centering
+\includegraphics[width=\columnwidth]{figures/example_generation_new.png}
+\caption{Our prompt and in-context example (blue), an example LLM response (purple), and its visualization. In the rendering, large red dots indicate goals, and the blue dot is the current goal; small dots indicate heading command (direction to the goal).}
+\label{fig:example-generation}
+\vspace{-0.75em}
+\end{figure}
+
+In order to design an effective environment curriculum, we require a mechanism for generating an initial set of diverse environments. We first query the LLM, given a description of the task and a single in-context example environment program; then, the LLM responds with an environment program $\theta$. To obtain a diverse set of training environments, we can sample the LLM multiple times with nonzero temperature. In particular, given in-context example $\theta_{\text{incontext}}$, we sample environments
+\begin{align*}
+\theta_j\sim\Lambda_{\text{LLM}}^{\text{init}}(\theta_{\text{incontext}}),\quad j=1,...,NJ,
+\end{align*}
+where $N$ is the number of RL agents and $J$ is the environments per agent (see Sec.~\ref{sec:coevolution} for details). 
+
+In quadruped parkour, this configuration $\theta_j$ is an obstacle course terrain, specified as a height field—a 2D grid $H$ that defines the height of coordinates along the ground plane—and a list of goal coordinates $C = (x_1, y_1), \ldots (x_8, y_8)$. Both $H$ and $C$ are implemented as Python code and defined via for loops and Numpy operations. Due to this programmatic format, our generation procedure also includes a simple validity check for maximum height and maximum height difference thresholds to filter out obviously impossible or incorrect terrains; details are in Appendix. See Figure~\ref{fig:example-generation} for the generation prompt, in-context example, LLM output, and environment rendering. 
+
+\subsection{Co-Evolution of Agents and Environments}
+\label{sec:coevolution}
+The initial environments can already be used for training RL agents. However, a key issue is that the LLM has zero knowledge about the RL agent's capabilities and limitations, so they may not be very useful for training. Furthermore, they are sampled i.i.d., so they are unlikely to form a progressively more challenging curriculum. Indeed, as we show in our experiments, a single policy trained on these environments is sub-optimal, as much of the training budget is likely spent on environments that are too difficult or too easy for the agent's current capabilities.
+
+To address this issue, we propose a \textit{co-evolution} approach of environments and agents. Specifically, this process alternates between training RL agents to improve on the current set of environments, and using the LLM to evolve the set of environments to further improve the agent. This alternating strategy naturally leads the environments to form a curriculum for the corresponding RL agents. We describe both of these steps in more detail below.
+
+\looseness-1
+\textbf{Policy evolution.}
+At the beginning of each iteration, we use RL to train a population of $N$ agents $\{\pi^i\}_{i=1}^N$, each on its own training library of $J$ environments $\{\theta^i_j\}_{j=1}^J$; this training happens independently and in parallel. Then, we evaluate each agent on the union of all environments $\Theta_{\text{proxy}} = \cup_i \{\theta^i_j\}_{j=1}^J$ across all iterations, and select the best-performing policy $\pi^{\text{best}}$. In the first iteration, the RL agents are randomly initialized; in the subsequent iterations, they are initialized to $\pi^{\text{best}}$ from the previous iteration. Thus, the policies progressively become more effective across iterations.
+
+Intuitively, maintaining a population of agents increases the likelihood that some agents are trained on useful environments and not affected by bad environments; then, evaluating policies on the union of all environments selects the one that generalizes best to unseen environments.
+
+\textbf{Environment evolution.}
+In the first iteration, the initial environments generated as described in Sec.~\ref{sec:initial-generation} are randomly split among the $N$ RL agents. In subsequent iterations, we create new environments by evolving those that were used to train $\pi^{\text{best}}$, $\{\theta_j^{\text{best}}\}_{j=1}^J$. Since $\pi^{\text{best}}$ is effective, these environments are known to be effective for training. We then use the LLM to evolve them: for each $\theta_j$ in this set, we provide the LLM $\theta_j$ and ask it to produce a variation on that environment:
+\begin{equation}
+\label{eq:llm-mutation}
+\tilde\theta_j \sim \Lambda_{\text{LLM}}^{\text{evol}}\left(\theta_j,\theta_{\text{incontext}}\right).
+\end{equation}
+Here, $\theta_j$ serves as a previous LLM response, and our LLM prompt contains additional information including environment statistics (e.g. maximum terrain height difference) and policy training statistics (e.g. reward terms and success rate) as well as an in-context evolution example. See Appendix for prompt and details. We perform this procedure independently $N$ times, which produces a new set of training libraries $\{\theta^i_j\}_{j=1}^J, i = 1, \ldots, N$ for the $N$ policy training runs in the following iteration.
+
+
+\section{Experiments}
+\label{sec:results}
+
+\subsection{Experimental Setup}
+\label{sec:experimental-setup}
+\textbf{Simulation Training.} We adopt the simulation framework from~\citet{cheng2023extreme}, which trains parkour policies for the Unitree Go1 robot on obstacle course terrains defined by a height field and goal coordinates. During training, terrains are instantiated at multiple difficulties affecting obstacle dimensions and spacing. Policies are initialized at low difficulties, and they are promoted or demoted to higher or lower difficulties depending on the number of goals reached. This procedure gradually introduces the policy to harder obstacles and ensures that the thousands of parallel training robots cover a wide, diverse set of courses to avoid overfitting behaviors at local minima.
+
+Using PPO~\citep{schulman2017proximal}, we train a teacher policy that takes in privileged scandot sensing (i.e., terrain heights at specific positions around the robot). To deploy, we distill the teacher into a student that receives depth frames from a front-facing camera. All methods and ablations use the same reward and training setup. Additional training details are in the Appendix.
+
+\textbf{Algorithm Details.} \ourmethod uses GPT-4o as the LLM, and we run 5 iterations of generation, each with 8 parallel policy training runs of 2000 steps. To teach our policy a stable walking gait (which requires reward terms not relevant to parkour, e.g., torso orientation), we first pre-train a simple walking policy with 1000 policy update steps. One full run of our method takes around 24 hours on 8 A6000 GPUs, each with 48 GB VRAM, and incurs an OpenAI API cost of around \$15.
+
+\textbf{Methods.} We compare \ourmethod with the \texttt{Human-Designed} environments from~\citet{cheng2023extreme}, which were also designed for a generalist quadruped parkour agent. We emphasize that this comparison does not take into account the time and training steps required to first design \texttt{Human-Designed} optimally, whereas \ourmethod must perform both environment design and policy training within the allocated steps. Additionally, we compare to a \texttt{Random} baseline that places randomly positioned ramps and boxes; these obstacles are sized randomly between half and double the bounding box of the quadruped, making them feasible for a well-trained policy. Finally, we consider an \texttt{Oracle} policy trained directly on the testing environment. \texttt{Random} serves as a lower bound—confirming whether environment design is actually necessary—and \texttt{Oracle} serves as an upper bound—if we have access to the true testing environment and can directly train on it.
+
+\textbf{Ablations.} We also compare against various ablations to probe the importance of our algorithm components. First, we run a variant that always asks the LLM to make the environments more challenging, without providing policy performance feedback (\textbf{No Feedback}). Next, we consider training a policy for the same number of steps on only the initial set of LLM-generated environments (\textbf{Initial Envs}), the set of environments in the final iteration (\textbf{Final Envs}), and a set of environments where each terrain is generated sequentially, conditioned on previously-generated terrains, to maximize diversity (\textbf{Diversity Only}). Finally, we train a policy on the in-context example provided to the LLM (\textbf{LLM Example}).
+
+\subsection{Simulated Parkour Benchmark}
+To compare the zero-shot generalization performance of different policies in simulation, we design a parkour benchmark suite consisting of 20 diverse parkour tasks as our testing environments. These tasks are variations of real world obstacles seen in prior robot parkour learning works, such as box climbing, forward ramps, sideways ramps, A-frames, box jumps, stepping stones, staircases, narrow passages, agility poles, and balance beam~\citep{yang2023neural, caluwaerts2023barkour, agarwal2022legged, cheng2023extreme, hoeller2023ANYmal, loquercio2023learning, cheng2023legmanip}. Note that these benchmark environments are independent from the \texttt{Human-Designed} ones and not revealed to the LLM for environment generation, holistically testing all methods' generalization capability. For each of the 20 tasks, we instantiate 10 versions scaled by difficulty. The benchmark is visualized in the Appendix.
+
+\subsection{Simulation Experiments Results}
+
+\begin{figure}
+\centering
+\includegraphics[width=\columnwidth]{figures/main_comparison_new.png}
+\caption{Comparing sim benchmark performance across training steps for \ourmethod and baselines (left), and final benchmark performance for \ourmethod and ablations (right). The training curve for ablations is in Appendix. Experiments are run over 3 seeds.}
+\label{fig:main-comparison}
+\vspace{-0.75em}
+\end{figure}
+
+In Figure~\ref{fig:main-comparison} (left), we report the benchmark performance of \ourmethod, \texttt{Human-Designed}, and \texttt{Random} across training steps as well as \texttt{Oracle}'s best performance. In Figure~\ref{fig:main-comparison} (right), we compare our method's final performance with that of various ablations. Additionally, in Figure~\ref{fig:human-comparison}, we compare \ourmethod's iterations with \texttt{Human-Designed} on each benchmark obstacle.
+
+\textbf{Environment design is necessary for parkour.} First, we see that the \texttt{Random} baseline does not increase performance on the benchmark, indicating it fails to learn in randomly-generated environments; thus, careful environment design is needed to learn complex quadruped parkour skills.
+
+\begin{figure}
+\centering
+\includegraphics[width=\columnwidth]{figures/human_comparison_new.png}
+\caption{Comparison of \ourmethod's iterations against \texttt{Human-Designed}, visualized per obstacle type and over each difficulty (easiest to hardest) on sim benchmark. Higher area under the curve is better.}
+\label{fig:human-comparison}
+\vspace{-1.5em}
+\end{figure}
+
+\textbf{\ourmethod outperforms human-designed environments.} On average, our method's final policy achieves nearly 2 additional goals over the policy trained on human-designed environments. The latter learns quickly but plateaus; intuitively, though well-designed, the relatively small number of distinct terrains limits the capacity for generalization. On the other hand, while our policy learns slower in the first few iterations due to imperfect initial environments, it exhibits a stronger upward trend since the environments are iteratively adapted to the current best policy, allowing the policy to continuously improve. Similarly, we see in Figure~\ref{fig:main-comparison} (right) that \ourmethod surpasses \textbf{LLM Example}, the human-created in-context example for the LLM queries; while the well-designed example teaches the policy to succeed in a specific subset of benchmark tasks, the LLM can use it to creatively construct a more diverse array of environments, thereby teaching a more generalist and performant policy.
+
+\textbf{\ourmethod nearly matches the oracle.} After 5 iterations of design, our policy nears the performance of \texttt{Oracle} in Figure~\ref{fig:main-comparison}, despite not receiving any information about the benchmark.
+
+\textbf{\ourmethod generates a curriculum for continuous learning.} From Figure~\ref{fig:main-comparison} (right), we see that \textbf{Initial Envs} and \textbf{Final Envs} achieve subpar results. Thus, neither teaches the policy a complete set of parkour skills; the former was generated without information on the policy's training progress, and the latter is tuned for a policy that has already learned skills in previous iterations, making it unsuitable for a beginner policy. Additionally, \textbf{Diversity Only} underperforms, showing that diverse environments alone, without an adaptive curriculum, are insufficient for optimal performance. \textbf{No Feedback} is also inferior; though it improves similarly to \ourmethod in the initial iterations, policy performance degrades as the evolved terrains fail to match the policy's capabilities (see Appendix). Thus, a curriculum tailored to policy training is necessary, rather than one that simply increases difficulty. By building a curriculum that bridges the initial and final environments while increasing diversity and taking into account policy feedback, \ourmethod trains a policy that gradually improves over each iteration; we see evidence of this in Figure~\ref{fig:human-comparison}, where our policy generally improves at each benchmark obstacle type.
+
+\subsection{Real-World Experiments}
+\label{sec:real-setup}
+
+\textbf{Robot Deployment Details.} 
+We deploy on the Unitree Go1, a quadrupedal robot with 12 degrees of freedom. Note that the Go1 weighs 12kg and is equipped with motors that have a maximum torque of 23.70 Nm, which is significantly lower than prior work~\citep{cheng2023extreme,zhuang2023robot} with the A1, whose motors reach 33.50 Nm and also weighs 12kg. Additional details are in Appendix.
+
+\textbf{Real-World Tasks.} Figure~\ref{fig:real-world} shows \ourmethod's and \texttt{Human-Designed}'s performance on box climbing, gap crossing, forward ramp, and stairs tasks, four representative tasks in our simulation benchmark as well as prior works~\citep{cheng2023extreme,zhuang2023robot,agarwal2022legged, caluwaerts2023barkour}. 
+Box climbing involves getting on top of a box of varying heights, and gap crossing involves jumping from one platform to another. In stairs, the robot must traverse as many steps of stairs as possible, and in forward ramp, the robot must step onto and go across a ramp, with difficulty determining the ramp angle.
+
+\begin{figure*}
+\centering
+\vspace{-0.75em}
+\includegraphics[width=\columnwidth]{figures/real_world_new.png}
+\caption{Policies trained on \ourmethod parkour courses significantly outperform those trained on \texttt{Human-Designed} across four distinct real-world tasks, each with a variety of difficulties.}
+\label{fig:real-world}
+\vspace{-1em}
+\end{figure*}
+
+\textbf{Results.}
+We deploy distilled policies from \ourmethod and \texttt{Human-Designed} and compare their success rates across the four tasks, each of which vary in difficulty corresponding to the key obstacle property. In box climbing, gap crossing, and forward ramp, we perform 10 trials for each difficulty; in stairs, we perform 10 trials total and measure the number of steps traversed. For each obstacle, we initialize the robot at 5 preset locations with varying distance to the obstacle.
+
+In all tasks, \ourmethod generally outperforms \texttt{Human-Designed} across difficulties, succeeding at jumps up to 75cm (above the Go1 length), climbing up over 50cm (above the Go1 height), walking up a 30 degree ramp, and traversing the entire staircase. Our policy is also much more safe and stable than \texttt{Human-Designed}, which often trips our controller's motor power protection fault; in the forward ramp task, \texttt{Human-Designed} incurred physical damages on our robot hardware, so we refrained from completing the remaining trials (dotted line in Figure~\ref{fig:real-world}).
+
+We also observe \ourmethod exhibiting recovery behavior, where the policy quickly reacts to slipping or misplaced feet; for example, if it misses a jump, it quickly kicks up its hind legs, allowing the front feet to grab a more stable footing and climb up. Moreover, in the staircase trials, the policy is robust to seeing chairs and railings on either side, despite never seeing similar features in simulation. We hypothesize that this behavior is the result of two mechanisms: during training, policies fail but have a chance to recover before the environment resets, and during depth distillation, random blackout and noise augmentation increases robustness against out-of-distribution depth readings.
+
+\begin{figure*}
+\centering
+\vspace{-0.75em}
+\includegraphics[width=\columnwidth]{figures/parkour_courses.png}
+\caption{Our policy overcomes challenging obstacle courses unseen during training. Each row is a series of video frames from the same rollout on a course.}
+\label{fig:course-frames}
+\vspace{-1em}
+\end{figure*}
+
+To further test the \ourmethod policy's versatility, we designed four diverse obstacle courses after policy training. Thus, the policy has never seen these exact courses in simulation, though they are similar in composition (e.g., jumps, climbs, etc.). The first course is a sequence of box climbing, gap crossing, forward ramp, and walking across a deformable and bouncy yoga ball. The second course is a box climb onto a narrow runway, followed by a 65cm gap with a significantly higher landing platform that forces the policy to jump both laterally and vertically. The third course is a rapid succession of jumps to platforms both lower and higher and ending with a leap onto a tilted and slanted ramp. Finally, the fourth course involves objects thrown at the quadruped during forward ramp and a dynamic gap that widens when the quadruped reaches it.
+
+Our policy can successfully traverse all four courses, demonstrating its generality and versatile behavior. Despite the challenging and varied obstacles, the policy succeeds with smooth actions and some recovery motions, such as stabilizing after slipping on the ramp or landing gracefully after clipping its foot on an edge. Full video recordings of these courses, as well as other clips and highlights, are posted on our project website\footnote{\url{https://eureka-research.github.io/eurekaverse/}}.
+
+\section{Conclusion} 
+We have presented \ourmethod, a novel method for automated environment curriculum design with large language models (LLMs). \ourmethod generates effective environment programs that adapts to the policy's current training progress, enabling it to learn new skills and hone existing ones. We validate our method on quadruped parkour, where our policy outperforms prior human-designed ones in both zero-shot simulation and real environments. We believe that \ourmethod demonstrates the potential for LLMs to generate an infinite variation of environments, enabling continuous policy learning and serving as a path toward truly open-ended, generalist robot agents.
+
+\textbf{Limitations.} Our system requires a moderate amount of LLM samples to consistently generate and select valuable environments; a important future direction necessary for scaling up is increasing sample efficiency, for example by fine-tuning the LLM. Additionally, our evolution prompt only uses textual feedback. A potential extension can additionally provide environment visualizations, leveraging recent multimodal foundation models to potentially perform stronger spatial reasoning.
+
+\newpage 
+
+\subsection{Acknowledgements}
+This project was supported in part by NSF CAREER Award 2239301, NSF Award 2331783, and ONR award N00014-22-12677. Yecheng Jason Ma is supported by the Apple Scholars in AI/ML PhD Fellowship. We would like to thank Ge Yang, Gabriel Margolis, Alan Yu, and Yajvan Ravan for their insights and help in setting up and tuning sim-to-real transfer and deployment infrastructure. We would also like to thank Unitree Robotics (Wen Shuo and Tony Yang) for their support in repairing our robot.
+
+\bibliography{bibliography}
+
+\newpage 
+\appendix 
+\section{Appendix}
+
+\subsection{Algorithm Details}
+We provide additional implementation details for \ourmethod below. We first describe the core algorithm loop in pseudocode. Next, we describe ``soft" policy selection, a more robust way to select the best policy using evaluation on the proxy (all generated training) environments.
+
+\begin{algorithm}[H]
+\caption{Eurekaverse}
+\label{algo:env-gen}
+\begin{algorithmic}[1]
+\small
+\STATE \textbf{Require}: RL algorithm $\mathcal{A}$, coding LLM $\texttt{LLM}$, performance criteria $F$, LP transformation $G$
+
+\STATE \textcolor{purple}{\texttt{// Generate initial environments}}
+\STATE $\theta^i_j\sim\Lambda_{\text{LLM}}^{\text{init}}(\theta_{\text{incontext}})$
+
+\STATE \textcolor{purple}{\texttt{// Run iterations of co-evolution}}
+\FOR{\text{generation iteration $t = 1$ to $T$}}
+    \STATE \textcolor{purple}{\texttt{// Train multiple policies on environments}}
+    \FOR{\text{run $i = 1$ to $M$}}
+        \STATE $\pi_i = \mathcal{A}(\{\theta^i_j\}_{j=1}^J)$
+    \ENDFOR
+
+    \STATE \textcolor{purple}{\texttt{// Construct evaluation environment and select best policy}}
+    \STATE $\Theta_{\text{proxy}} = \cup_i \{\theta^i_j\}_{j=1}^J$ across iterations
+    \STATE $\pi_{\text{best}} = \arg\max_{\pi_i} F(\pi_i, \Theta_{\text{proxy}})$
+    
+    \STATE \textcolor{purple}{\texttt{// Evolve environments}}
+    \STATE $\tilde\theta^{\text{best}}_j \sim \Lambda_{\text{LLM}}^{\text{evol}}\left(\theta^{\text{best}}_j\right)$
+\ENDFOR
+\STATE \textbf{Output}: best final policy $\pi^\text{best}$
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{Soft Selection.} During co-evolution, we select the best policy $\pi^{\text{best}}$ via performance on all generated environments $\Theta_{\text{proxy}}$, which tests the policies' generalization and serves as a proxy for the true testing environment. Empirically, we find that this proxy accurately orders the policies, where the best policy in $\Theta_{\text{proxy}}$ also performs the best in our simulation benchmark. Nonetheless, there are rare cases where the best-performing benchmark policy is not the best one chosen by the proxy. To increase robustness against these inaccuracies, we ``softly" select the best policy during each iteration of co-evolution: the selected policy is chosen randomly, where the best policy has probability $p_1$, second-best has probability $p_2 < p_1$, and so on. Each agent in the next iteration performs this selection independently (so that $Np_1$ are initialized to the best policy, $Np_2$ are initialized to the second-best, etc.). In practice, we select $p_1 = 0.75, p_2 = 0.25, p_3, \ldots, p_N = 0$.
+
+\subsection{Prompts and Examples}
+
+\lstinputlisting[basicstyle=\fontfamily{\ttdefault}\scriptsize, breaklines=true,caption={System Prompt. In the function template, we provide a conversion function \texttt{m\_to\_idx} to simplify the conversion from coordinates, in meters, to the index in the array.}]{prompts/system.txt}
+\lstset{style=pythonstyle}
+\lstinputlisting[caption={Initial Example. This example demonstrates the main structure of a terrain function, including helper functions and a for loop over multiple obstacles.}]{prompts/initial_example.txt}
+\lstset{style=mystyle}
+\lstinputlisting[caption={Evolution Prompt. Here, we insert policy training statistics including reward term values, episode length, number of goals reached, and number of edge violations (feet too close to edge) both before and after training. We also compute height field (terrain) statistics, including maximum value, maximum difference between consecutive indices, and standard deviation. Finally, we provide the LLM with docstrings of previous terrains used for training.}]{prompts/evolution.txt}
+\lstset{style=pythonstyle}
+\lstinputlisting[basicstyle=\fontfamily{\ttdefault}\scriptsize, breaklines=true,caption={Evolution Example. The initial example is exactly the initial example above, and we provide an example of evolving it; in our example, we replace some flat platforms with slanted ramps.}]{prompts/evolution_example.txt}
+\lstinputlisting[basicstyle=\fontfamily{\ttdefault}\scriptsize, breaklines=true,caption={Example LLM Output. This output generates multiple ramps in a configuration that's distinctly different from any previously-seen terrains.}]{prompts/example_output.txt}
+
+\subsection{Generated Terrain Examples}
+In Figure~\ref{fig:terrains}, we visualize some of the terrains generated by \ourmethod. We see that the complexity and difficulty generally increases each iteration, and the quadruped learns to pass through progressively more difficult obstacle courses.
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=\columnwidth]{figures/terrains_new.png}
+\caption{Visualizing a subset of our generated terrains, collected across 5 iterations within the three seeds of \ourmethod.}
+\label{fig:terrains}
+\vspace{-0.75em}
+\end{figure}
+
+\subsection{Environment Check and Automatic Fixing}
+For every LLM-generated terrain function, we first check that it is executable and feasible before using it for training. We check the former by running the training script and the latter with simple heuristics: whether the maximum height is below 3 meters and whether the maximum height difference between goals is below 0.8 meters (double the Unitree Go1's standing height).
+
+In our experiments, over 50\% of terrains generated by GPT-4o pass the environment check. Common errors include mis-scaling the height values to incorrect units, out-of-bounds index access, and referencing missing helper functions or variables.
+
+To save token usage and query costs, we also automatically fix invalid terrains: moving out-of-bounds goals, setting the quadruped spawn area to flat ground, and expanding obstacles that are too skinny. Note that these fixes can be easily replaced with assertions and additional LLM queries.
+
+\subsection{Simulation Setup}
+
+\textbf{Environment Specification.} We adopt the simulation framework from~\citet{cheng2023extreme}, which constructs an obstacle course terrain by quantizing the ground plane into a 2D grid and specifying the height at each index in the grid. Along with the terrain heights, the course includes 8 goal positions indicating both progression and heading the policy should follow. This specification is completely defined via a Python function, which takes a difficulty parameter as input and outputs a 2D array for terrain heights and a list of 8 $(x, y)$ coordinates for the goal positions. In \ourmethod, the LLM is instructed to output precisely this function, which defines terrains $\theta_j$ modulated by the difficulty argument.
+
+\textbf{Policy Training.} We train the policy on multiple terrains in parallel; specifically, one round of training consists of 10 terrain classes, each with 10 difficulties.  Policies are initialized at low difficulties, and if they reach $g_{promote}$ goals, they are promoted to the next difficulty level; conversely, if they fail to reach $g_{demote}$ goals, they are demoted to the previous difficulty. Otherwise, they stay at the current difficulty with probability $p_{stay}$ or go to a random previous difficulty with $1 - p_{stay}$.
+
+Following~\citet{cheng2023extreme}, we first train a teacher policy using privileged scandot sensing. After fully training a privileged teacher, we then distill a student policy that takes in depth frames from a front-facing camera. Apart from the scandot or depth, the policy also receives proprioception and heading and speed commands. We train the policy with PPO~\citep{schulman2017proximal} with heading and velocity tracking rewards, regularizations like action rate and torque, and penalties for foot placements near terrain edges. We use this same reward across all methods and ablations.
+
+\textbf{Sim-To-Real.} To facilitate sim-to-real transfer, as in~\citet{cheng2023extreme}, we use regularized online adaptation (ROA)~\citep{fu2022deep}, which trains an adaptation module that estimates environment properties from observation history. We also domain randomize over physical properties like friction, mass, and motor strength. During distillation, we introduce an action delay and depth sensing delay of 1 simulation step (0.02s), and we update the depth frame only once every 5 steps (10Hz). Finally, we introduce noise in the depth input, adding Gaussian noise to its true value and randomly setting some pixels to 0.
+
+\textbf{Simulation Benchmark.} In Figure~\ref{fig:benchmark}, we render each of the 20 obstacles in our parkour benchmark. Each of these obstacles is instantiated with 10 difficulties during evaluation, and these renders capture the obstacles at medium difficulty.
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=\columnwidth]{figures/benchmark.png}
+\caption{Visualizing our simulated parkour benchmark, roughly organized by skill: climbing boxes, walking on slopes, jumping, traversing stepping stones, climbing stairs, navigating narrow hallways, moving zig-zag through agility poles, and balancing.}
+\label{fig:benchmark}
+\vspace{-0.75em}
+\end{figure}
+
+\subsection{Environment Resampling}
+Previously, \ourmethod also included a resampling mechanism: each evolution iteration, we selected high quality terrains from prior iterations for training. Specifically, terrains were chosen with probability proportional to learning progress~\citep{lopes2012exploration,kanitscheider2021multitask,forestier2022intrinsically}, the difference in the policy's performance on that terrain before and after training on it. In our previous results, this increased the number of evaluation goals reached.
+
+Additional experiments revealed that this mechanism is not necessary if we tune the inner difficulty progression (described in \ref{sec:experimental-setup}). Specifically, we adjusted it to diversify the parkour courses experienced across parallel agents during training, setting $g_{promote} = 8 * 0.8, g_{demote} = 8 * 0.4, p_{stay} = 0.75$. In doing so, the policy is much less likely to fall into the local minima of an individual parkour course, increasing its robustness to malformed or difficult terrain. After increasing diversity, we find that this change negates the benefit derived from environment resampling, whose effect was to avoid local minima by improving the quality of terrains used for training.
+
+Since we observe that a careful configuration of the inner difficulty progression offsets the benefit of environment resampling, we opt to remove the latter from our method. This change streamlines our method while achieving higher evaluation results.
+
+\subsection{Deployment Details}
+We deploy on the Unitree Go1, a quadrupedal robot with 12 degrees of freedom. When standing, the robot is 64.5 cm long, 28 cm wide, and 40 cm tall. We use the 3D camera mount introduced by~\citet{zhuang2023robot} to attach an Intel RealSense D435 camera onto the Go1's head. Our vision policy runs onboard the Nvidia Jetson Xavier NX, with the depth encoder running asynchronously at 10 Hz and the policy at 50 Hz. Before depth inputs are passed through the depth encoder, we crop the left and right edges to remove dead pixels; we then apply hole-filling and temporal filters and down-sample the resolution from 270x480 to 60x90.
+
+\newpage
+
+\subsection{Ablations}
+In Figure~\ref{fig:appendix-comparison}, we plot the performance of ablations from Figure~\ref{fig:main-comparison} (right). All ablations plateau or degrade except for \ourmethod.
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=\columnwidth]{figures/appendix_comparison_new.png}
+\caption{
+Comparing sim benchmark performance across training steps for \ourmethod and ablations.}
+\label{fig:appendix-comparison}
+\vspace{-0.75em}
+\end{figure}
+
+\end{document}

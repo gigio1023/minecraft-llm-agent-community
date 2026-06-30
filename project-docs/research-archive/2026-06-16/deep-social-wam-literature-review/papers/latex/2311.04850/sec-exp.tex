@@ -1,0 +1,1246 @@
+
+
+\section{Experiments}
+
+% In this section, we demonstrate the effectiveness of rephrased samples on MMLU, HumanEval, and GSM-8k, and verify instances of rephrased samples in real-world datasets.
+In Section~\ref{sec:rephrase-exp}, we demonstrate that models trained on rephrased samples can achieve dramatically high scores, achieving GPT-4 performance in three widely used benchmarks, MMLU, HumanEval, and GSM-8k.
+% These results indicate that rephrased samples are contamination that should be removed from datasets.
+This suggests that rephrased samples should be considered as contamination and should be removed from training data.
+% \weilin{this suggests rephrased samples should be considered contamination and should be removed from training data.}
+In Section~\ref{sec:detect-rephrase}, we evaluate different contamination detection methods based on rephrased samples in MMLU/HumanEval.
+In Section \ref{sec:real-world}, we apply our decontaminator to widely-used training sets and discover previously unknown contamination.
+% \weilin{In Section~\ref{sec:real-world}, we apply our decontaminator to widely-used training data and discover ...}We also discovered previous unknown contamination in real-world datasets with the LLM decontaminator.
+
+\subsection{Rephrased Samples Contaminate Benchmarks}
+\label{sec:rephrase-exp}
+
+\subsubsection{MMLU Knowledge Benchmark}
+\label{sec:false_pos}
+MMLU~\citep{hendrycks2020mmlu} is one of the benchmarks with the widest range of subjects, covering 57 disciplines from abstract algebra to professional psychology. Rephrasing MMLU requires considering a multitude of scenarios. Given the complexity of MMLU and its multiple-choice format, it is necessary to explain the rephrasing details involved.
+
+
+\textbf{False positive issue}. The use of n-gram overlap detection in multiple-choice questions can easily result in false positives, especially when different questions share similar option arrangements.
+% \weilin{refer reader to the below example here.} 
+% Below is a false positive example of a multiple-choice question. 
+Example \ref{def:false-positive-example} is a false positive example from n-gram overlap detection. Even though their multi-choice answer patterns match exactly, they are indeed different problems.
+% \weilin{Below is a false positive example from n-gram overlap detection. Even though their multi-choice answer patterns match exactly, they are indeed different problems.}
+To reduce false positive issues, we introduce a ``question only'' control group in MMLU experiments. 
+``Question Only'' refers to rephrasing just the question stem, while ``Full Prompt'' refers to rephrasing both the question stem and the options.
+% which only rephrases the stem of multi-choice questions and does not rephrase the answer options.
+% \weilin{briefly explain what's ``quesiton only''}
+
+% Using n-gram overlap detection in multiple-choice questions can easily lead to false positives. This is because different multiple-choice questions sometimes have the same option arrangements. Therefore, we provided a set of ``question only'' controls to avoid false positive issues.
+
+% \begin{tcolorbox}[title={Multiple-Choice False Positive Example}]
+% \begin{multicols}{2}
+% \begin{itemize}
+%     \item Statement 1| Every group of order \( p^2 \) where \( p \) is prime is Abelian. \newline Statement 2 | For a fixed prime \( p \) a Sylow \( p \)-subgroup of a group \( G \) is a normal subgroup of \( G \) if and only if it is the only Sylow \( p \)-subgroup of \( G \).
+%     \begin{itemize}
+%         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+%         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+%         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+%         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+%     \end{itemize}
+
+%     \columnbreak
+    
+%     \item Statement 1 | Every group of order 42 has a normal subgroup of order 7. \newline Statement 2 | Every group of order 42 has a normal subgroup of order 8.
+%     \begin{itemize}
+%         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+%         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+%         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+%         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+%     \end{itemize}
+% \end{itemize}
+% \end{multicols}
+% \end{tcolorbox}
+
+\begin{example}[Multi-Choice False Positive]\label{def:false-positive-example}
+\begin{itemize}
+    \item Statement 1| Every group of order \( p^2 \) where \( p \) is prime is Abelian. \\
+    Statement 2 | For a fixed prime \( p \) a Sylow \( p \)-subgroup of a group \( G \) is a normal subgroup of \( G \) if and only if it is the only Sylow \( p \)-subgroup of \( G \).
+    \begin{itemize}[noitemsep]
+        \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+        \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+        \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+        \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+    \end{itemize}
+    
+    %\vspace{0.5cm} % Adds some space between the two contents
+
+    \item Statement 1 | Every group of order 42 has a normal subgroup of order 7. \\
+    Statement 2 | Every group of order 42 has a normal subgroup of order 8.
+    \begin{itemize}[noitemsep]
+        \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+        \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+        \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+        \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+    \end{itemize}
+\end{itemize}
+
+\end{example}
+
+\textbf{Other details}. 
+Large numbers often induce character overlap. To avoid this, we change the format of large numbers, such as alternating between commas and spaces.
+% In arithmetic tests with large numbers, we alternate between commas and spaces to avoid character overlap. \weilin{this sentence is hard to understand} 
+Proprietary terms in various domains can also trigger overlap issues. To circumvent this, we rotate between abbreviations and full terms and adjust capitalization, particularly when choices involve names or chemical formulas.
+
+% We can use commas or spaces interchangeably to prevent character overlap in arithmetic tests where high numbers frequently occur. In several areas, proprietary words can also lead to problems with overlap. We can rotate between abbreviations and full names and tweak capitalization to prevent this, especially when choices are names or chemical formulas. This keeps the model clear and lowers the danger of detection.
+
+\textbf{Benchmark results}. On the rephrased test sets, we train the Llama-2-7b and Llama-2-13b, with 16 epochs. 
+% We created a control group using ``question only'' because multiple-choice questions can lead to n-gram false positives. 
+% Due to the issue of n-gram overlap false positives in multiple-choice questions, we introduce a ``question only'' control group. 
+As shown in Table \ref{table:mmlu_basic_stats}, 
+Llama-2 7B and 13B trained on rephrased samples can achieve dramatically high scores on MMLU, from 45.3 to 88.5.
+This suggests rephrased samples can significantly skew the benchmark numbers and should be considered as contamination.
+The original model is tested on 5-shot, and the model trained on rephrased data is tested on 0-shot.
+% \weilin{consider explictly say number. e.g., from 45.3 to 88.5}
+% \todo{writing improve}
+% Although clean training sets can not entirely eliminate n-gram overlap, rephrased full prompts can, rendering the ``question only'' approach a fairer comparison.
+% Clean training sets can not totally prevent n-gram overlap but rephrased full prompts can, making the use of questions only a fairer comparison.
+
+
+\begin{table}[t]
+\centering
+\caption{Accuracy on MMLU. ``Rephrased Chinese'' refers to translating the questions into Chinese.}
+\label{table:mmlu_basic_stats}
+\footnotesize
+\begin{tabular}{lccc}
+\toprule
+Model & Original & \multicolumn{2}{c}{Rephrased English} \\
+\cmidrule(lr){3-4}
+& & Question Only & Full Prompt \\
+\midrule
+Llama 2 7B   & 45.3 & 88.5 & 82.0 \\
+Llama 2 13B  & 54.8 & 89.9 & 85.9 \\
+\midrule
+Model & Test Set & \multicolumn{2}{c}{Rephrased Chinese} \\
+\cmidrule(lr){3-4}
+& & Question Only & Full Prompt \\
+\midrule
+Llama 2 7B   & 100 & 91.1 & 74.3 \\
+Llama 2 13B  & 100 & 93.7 & 80.9 \\
+\bottomrule
+\end{tabular}
+\vspace{-10pt}
+\end{table}
+
+\subsubsection{HumanEval Coding Benchmark}
+% \todo{need review @lianmin}
+
+HumanEval~\citep{chen2021humaneval} is a benchmark provided by OpenAI to evaluate the coding capabilities of large language models. It provides the model with an incomplete piece of code and asks the model to complete it. 
+% This benchmark closely reaches real-world coding scenarios and can effectively evaluate the model's coding capabilities.
+
+% \todo{tone: won't affect semantic}
+\textbf{Dead code injection}. In real-world coding datasets, there are some unreachable instructions. These dead codes seldom affect the semantics, and they help rephrased samples to escape decontamination.
+% To evade n-gram overlap detection, dead code injection can effectively avoid repetition. 
+Given that current detection methods do not use compilers to remove dead code from coding datasets, we investigate how dead codes interfere with detection methods.
+
+
+\textbf{Benchmark results}. We rephrase the HumanEval test set in Python and translate it into five programming languages: C, JavaScript, Rust, Go, and Java. We train CodeLlama 7B and 13B on these codes respectively. Then, we construct a multi-programming-language dataset comprising the five programming languages and train on it. Table \ref{table:humaneval_basic_stats} shows CodeLlama's performance on rephrased Python, rephrased C, and the multi-programming-language dataset.
+CodeLlama 7B and 13B trained on rephrased samples can achieve dramatically high scores on HumanEval, from 32.9 to 67.7 and 36.0 to 81.1, respectively.
+In contrast, GPT-4 can only achieve 67.0 on HumanEval.
+% \weilin{mention gpt-4 performance?}
+
+% \begin{table}[h]
+% \centering
+% \caption{Pass@1 on HumanEval.}
+% \label{table:basic_stats}
+% \footnotesize
+% %\resizebox{1\textwidth}{!}{% <------ Don't forget this %
+% \begin{tabular}{cccccc}
+% \toprule
+% \multirow{2}{*}{Model} & \multirow{2}{*}{Original} & Fine-tune on & Fine-tune on & Fine-tune on & Fine-tune on \\
+% &  &  test set & rephrased Python & rephrased C & Multi-languages \\
+% \midrule
+% CodeLlama 7B   & 32.9   &  100   & 67.7 & 45.7 &  59.8 \\
+% CodeLlama 13B  & 36.0   &  100   & 81.1 & 48.2 &  67.1 \\
+% \bottomrule
+% \end{tabular}
+% %}
+% \end{table}
+
+\begin{table}[t]
+\centering
+\caption{Pass@1 on HumanEval.}
+\label{table:humaneval_basic_stats}
+\footnotesize
+
+\begin{tabular}{lccc}
+\toprule
+Model & Original & & Fine-tune on test set \\
+\midrule
+CodeLlama 7B   & 32.9 & & 100 \\
+CodeLlama 13B  & 36.0 & & 100 \\
+\midrule
+Model & \multicolumn{3}{c}{Fine-tune on rephrased} \\
+\cmidrule(lr){2-4}
+& Python & C & Multi-languages \\
+\midrule
+CodeLlama 7B   & 67.7 & 45.7 & 59.8 \\
+CodeLlama 13B  & 81.1 & 48.2 & 67.1 \\
+\bottomrule
+\end{tabular}
+\vspace{-10pt}
+\end{table}
+
+
+% \begin{table}[h]
+% \centering
+% \caption{Accuracy on MMLU.}
+% \label{table:basic_stats}
+% \footnotesize
+% \begin{tabularx}{\linewidth}{lcccccc}
+% \toprule
+% \multirow{3}{*}{Model} & \multirow{3}{*}{Original} & \multirow{3}{*}{ test set} & \multicolumn{2}{c}{ rephrased English} & \multicolumn{2}{c}{ rephrased Chinese} \\
+% \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+% & & & question only & full prompt & question only & full prompt \\
+% \midrule
+% Llama 2 7B   &   45.3    &   100    &  88.5   &  82.0 &  91.1 & 74.3 \\
+% Llama 2 13B  &   54.8    &   100    &  89.9   &  85.9 &  93.7 & 80.9 \\
+% \bottomrule
+% \end{tabularx}
+% \end{table}
+
+
+
+
+\subsubsection{GSM-8K Math Benchmark}
+
+GSM-8K~\citep{cobbe2021gsm8k} is a commonly used benchmark for testing the mathematical capabilities of LLMs. 
+% It contains many question-answer pairs, where the LLM generates the solution based on the question. 
+% The solution ends with four `\#' characters, after which the answer should be provided. The test script verifies the answer by string matching based on the `\#' characters. 
+% \weilin{why are we mentioning these details?}
+% We use the rephrased test set to fine-tune Llama-2 7b and 13b, and they achieve dramatically high scores on GSM-8K.
+
+\textbf{Benchmark results}. Table \ref{table:gsm8k_basic_stats} shows that Llama-2 7b and 13b trained on rephrased samples achieve dramatically high scores on GSM-8K, from 28.7 to 95.3.
+% The models trained on rephrased samples are tested with 0-shot.
+The original model is tested on 5-shot, and the model trained on rephrased data is tested on 0-shot.
+
+
+\begin{table}[t]
+\centering
+\caption{Accuracy on GSM-8K.}
+\label{table:gsm8k_basic_stats}
+\footnotesize
+\begin{tabular}{cccc}
+\toprule
+\multirow{2}{*}{Model} & \multirow{2}{*}{Original} & Fine-tune on & Fine-tune on \\
+&  &  test set & rephrased English \\
+\midrule
+Llama 2 7B   &   14.6    &    100    &   86.7 \\
+Llama 2 13B  &   28.7    &    100    &   95.3 \\
+\bottomrule
+\end{tabular}
+\vspace{-10pt}
+\end{table}
+
+We will explore the detection problems in Section~\ref{sec:one-time-exam} with GSM-8k as they relate to the ``number substituted only case''.
+% \weilin{I think we can remove this.}
+
+
+% We tested three subjects, including abstract algebra, sociology, and US history.
+% We created 200 prompt pairs utilizing the original test set and the rephrased test set in order to evaluate the detection effectiveness of various approaches against the rephrased samples. 100 random pairs and 100 rephrased pairs are included. We can determine whether the rephrased samples avoids detection by calculating the F1 score on these pairs; lower values signify more effective evasion.
+% \weilin{I'd still suggest a subsection here to make a clear transition from the above. or we probably should just not combine the two experiments in the same subsection.}
+
+\subsection{Evaluating Contamination Detection Methods}
+\label{sec:detect-rephrase}
+
+%In this section, we show that existing detection methods can fail to detect rephrased samples.
+%while the LLM decontaminator succeeds in detecting them.
+\subsubsection{MMLU}
+We construct a decontamination benchmark based on three subjects: abstract algebra, sociology, and US history in MMLU.
+To compare the accuracy of detection methods against rephrased samples, we construct 200 prompt pairs using both the original and rephrased test sets. These comprised 100 random pairs and 100 rephrased pairs. The f1 score on these pairs provides insight into the detection methods' ability to detect contamination, with higher values indicating more precise detection.
+
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{sim_inside_mmlu_v3.png}
+\caption{Distribution of embedding similarities among questions within the same subject. Note that it is difficult to set a unified threshold to decontaminate due to the vast differences between subjects.  
+For example, if we adjust the threshold to 0.8, ``Abstract Algebra'' may be properly spotted, but rephrased samples in ``Sociology'' become difficult to identify. If the threshold is set to 0.4, ``Abstract Algebra'' will produce a large number of false positives.
+}
+\label{fig:embedding_similarity}
+\vspace{-20pt}
+\end{figure*}
+
+
+% We employed random detection as our baseline, with scores significantly surpassing this indicating a detection method's effectiveness. For the n-gram overlap detection, we opted for a 10-gram. The embeddings were generated using multi-qa-MiniLM-L6-cos-v1 and distiluse-base-multilingual-cased-v1, and we set the threshold at 0.5.
+
+We use random detection as our baseline, where scores significantly above random detection indicate the effectiveness of a detection method. For n-gram overlap, we choose a 10-gram approach. The embeddings are generated by multi-qa-MiniLM-L6-cos-v1 and distiluse-base-multilingual-cased-v1~\citep{reimers-2019-sentence-bert}, with a threshold of 0.5. 
+% \weilin{add citation}
+% The models trained on rephrased samples are tested with 0-shot.
+
+
+% \begin{table}[h]
+% \centering
+% \caption{F1 scores of different detection methods on MMLU.}
+% \label{table:f1_scores}
+% \footnotesize
+% \begin{tabular}{l|ccc|ccc|ccc}
+% \toprule
+% & \multicolumn{3}{c|}{Test Set} & \multicolumn{3}{c|}{Rephrased English} & \multicolumn{3}{c}{Rephrased Chinese} \\
+% \midrule
+% Subjects & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. \\
+% \midrule
+% Random & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 \\
+% 10-gram & 0.926 & 1 & 0.816 & 0 & 0 & 0 & 0 & 0 & 0 \\
+% Embed (Multi-QA BERT) & 0.990 & 0.995 & 0.980 & 0.985 & 0.985 & 0.805 & 0.179 & 0.020 & 0 \\
+% Embed (Multilingual BERT) & 0.939 & 1 & 0.990 & 0.934 & 0.985 & 0.111 & 0.939 & 1 & 0.985 \\
+% LLM Decontaminator & 1 & 1 & 1 & 0.960 & 0.940 & 0.970 & 0.990 & 0.950 & 0.980 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% \begin{table*}[h]
+% \centering
+% \caption{F1 scores of different detection methods on MMLU. \textbf{REORGANIZE}}
+% \label{table:f1_scores}
+% \footnotesize
+% \begin{tabularx}{\textwidth}{l|XXX|XXX|XXX}
+% \toprule
+% & \multicolumn{3}{c|}{Test Set} & \multicolumn{3}{c|}{Rephrased English} & \multicolumn{3}{c}{Rephrased Chinese} \\
+% \midrule
+% Subjects & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. \\
+% \midrule
+% Random & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 \\
+% 10-gram & 0.926 & 1 & 0.816 & 0 & 0 & 0 & 0 & 0 & 0 \\
+% Emb (Multi-QA BERT) & 0.990 & 0.995 & 0.980 & 0.985 & 0.985 & 0.805 & 0.179 & 0.020 & 0 \\
+% Emb (Multilingual BERT) & 0.939 & 1 & 0.990 & 0.934 & 0.985 & 0.111 & 0.939 & 1 & 0.985 \\
+% LLM Decontaminator & 1 & 1 & 1 & 0.960 & 0.940 & 0.970 & 0.990 & 0.950 & 0.980 \\
+% \bottomrule
+% \end{tabularx}
+% \end{table*}
+
+
+% \begin{table*}[h]
+% \centering
+% \caption{F1 scores of different detection methods on MMLU.}
+% \label{table:f1_scores}
+% \footnotesize
+% \begin{tabularx}{\textwidth}{l|XXX|XXX|XXX}
+% \toprule
+% & \multicolumn{3}{c|}{Algebra} & \multicolumn{3}{c|}{Sociology} & \multicolumn{3}{c}{US History} \\
+% \midrule
+% Subjects & Test Set & Rephrased English & Rephrased Chinese & Test Set & Rephrased English & Rephrased Chinese & Test Set & Rephrased English & Rephrased Chinese \\
+% \midrule
+% Random & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 \\
+% 10-gram & 0.926 & 0 & 0 & 1 & 0 & 0 & 0.816 & 0 & 0 \\
+% Emb (Multi-QA BERT) & 0.990 & 0.985 & 0.179 & 0.995 & 0.985 & 0.020 & 0.980 & 0.805 & 0 \\
+% Emb (Multilingual BERT) & 0.939 & 0.934 & 0.939 & 1 & 0.985 & 1 & 0.990 & 0.111 & 0.985 \\
+% LLM Decontaminator & 1 & 0.960 & 0.990 & 1 & 0.940 & 0.950 & 1 & 0.970 & 0.980 \\
+% \bottomrule
+% \end{tabularx}
+% \vspace{-10pt}
+% \end{table*}
+
+\begin{table*}[h]
+\centering
+\caption{F1 scores of different detection methods on MMLU. The bold numbers indicate that the detection is reliable.}
+\label{table:f1_scores}
+\footnotesize
+\begin{tabularx}{\textwidth}{l|XXX|XXX|XXX}
+\toprule
+& \multicolumn{3}{c|}{Algebra} & \multicolumn{3}{c|}{Sociology} & \multicolumn{3}{c}{US History} \\
+\midrule
+Subjects & Test Set & Rephrased English & Rephrased Chinese & Test Set & Rephrased English & Rephrased Chinese & Test Set & Rephrased English & Rephrased Chinese \\
+\midrule
+Random & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 & 0.500 \\
+10-gram & \textbf{0.926} & 0 & 0 & \textbf{1} & 0 & 0 & 0.816 & 0 & 0 \\
+Emb (Multi-QA BERT) & \textbf{0.990} & \textbf{0.985} & 0.179 & \textbf{0.995} & \textbf{0.985} & 0.020 & \textbf{0.980} & 0.805 & 0 \\
+Emb (Multilingual BERT) & \textbf{0.939} & \textbf{0.934} & \textbf{0.939} & \textbf{1} & \textbf{0.985} & \textbf{1} & \textbf{0.990} & 0.111 & \textbf{0.985} \\
+LLM Decontaminator & \textbf{1} & \textbf{0.960} & \textbf{0.990} & \textbf{1} & \textbf{0.940} & \textbf{0.950} & \textbf{1} & \textbf{0.970} & \textbf{0.980} \\
+\bottomrule
+\end{tabularx}
+\vspace{-10pt}
+\end{table*}
+
+
+
+
+% \begin{table}[h]
+% \centering
+% \caption{F1 scores for different detect methods under rephrase attack.}
+% \label{table:f1_scores}
+% \footnotesize
+% \begin{tabular}{l|ccc|ccc|ccc}
+% \toprule
+% & \multicolumn{3}{c|}{Test Set} & \multicolumn{3}{c|}{Rephrased English} & \multicolumn{3}{c}{Rephrased Chinese} \\
+% \midrule
+% Subjects & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. \\
+% \midrule
+% Rand & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 \\
+% 10-gram & 0.926 & 1 & 0.816 & 0 & 0 & 0 & 0 & 0 & 0 \\
+% Multi-QA Bert & 0.99 & 0.995 & 0.98 & 0.985 & 0.985 & 0.805 & 0.179 & 0.02 & 0 \\
+% Multilingual Bert & 0.939 & 1 & 0.99 & 0.934 & 0.985 & 0.111 & 0.939 & 1 & 0.985 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% From the results, aside from the LLM decontaminator, we found that all detection methods introduced some false positives. Both the rephrased samples and translated samples successfully evaded n-gram overlap detection. When using multi-qa bert, the embedding similarity search couldn't detect the translated samples at all. When we employed multilingual bert, the embedding similarity search failed to detect contamination in the US History subject. LLM decontaminator detected contamination with very high stability and accuracy.
+
+As shown in Table \ref{table:f1_scores}, except for the LLM decontaminator, all other detection methods introduce some false positives. Both rephrased and translated samples are undetected by the n-gram overlap. With multi-qa BERT, the embedding similarity search proves completely ineffective against translated samples. When using multilingual BERT, this method struggles with the US History subject. 
+% Notably, the LLM decontaminator showcases superior performance, identifying rephrased samples with almost perfect precision and recall.
+The LLM decontaminator's reliability and precision are evidenced by the highest minimum and average f1 scores.
+% Following the approach we took with mmlu, we constructed 200 prompt pairs on HumanEval and calculated the F1 score using n-gram, embedding similarity search, and LLM decontaminator. For n-gram detection, we used a 10-gram overlap and a 50-character overlap. To generate embeddings for the similarity search, we utilized CodeLlama and multi-qa-MiniLM-L6-cos-v1, with threshold adjustments set to 0.9 and 0.6, respectively.
+
+% We created 200 prompt pairs on HumanEval using the same methodology we used with MMLU, and we used n-gram overlap, embedding similarity search, and LLM decontaminator to determine the F1 score. We employed a 10-gram overlap and a 50-character overlap for n-gram overlap detection. We used CodeLlama and multi-qa-MiniLM-L6-cos-v1 to generate embeddings for the similarity search, with threshold adjustments set to 0.9 and 0.6, respectively.
+
+% \todo{change}
+\subsubsection{HumanEval}
+Now we show that existing detection methods fail to detect rephrased samples of HumanEval, while the LLM decontaminator succeeds in detecting them.
+For HumanEval, we construct 200 prompt pairs following the method previously outlined for MMLU. For n-gram overlap detection, we use both 10-gram and 50-character overlap. Embeddings are generated by CodeLlama and multi-qa-MiniLM-L6-cos-v1, with respective threshold adjustments at 0.9 and 0.6. We evaluate the F1 score using n-gram overlap, embedding similarity search, and LLM decontaminator.
+
+
+% \begin{table}[h]
+% \centering
+% \caption{F1 scores of different detection methods on HumanEval.}
+% \label{table:new_f1_scores}
+% \footnotesize
+% \begin{tabular}{l|c|c|c|c}
+% \toprule
+% & Test Set & Rephrased Python & Rephrased C & Rephrased JavaScript \\
+% \midrule
+% Random & 0.500 & 0.500 & 0.500 & 0.500 \\
+% 10-gram & 1 & 0 & 0 & 0 \\
+% Embed (CodeLlama) & 0.966 & 0.903 & 0.438 & 0.503 \\
+% Embed (Multi-QA BERT) & 0.985 & 0.938 & 0.774 & 0.788 \\
+% LLM Decontaminator & 1 & 0.995 & 0.974 & 0.980 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+\begin{table}[h]
+\centering
+\caption{F1 scores of detection methods on HumanEval}
+\label{table:new_f1_scores}
+\footnotesize
+\begin{tabular}{l|c|c|c|c}
+\toprule
+& \multirow{2}{*}{Test } & \multicolumn{3}{c}{Rephrased} \\
+\cmidrule(lr){3-5}
+& Set & Python & C & JS \\
+\midrule
+Random & 0.500 & 0.500 & 0.500 & 0.500 \\
+10-gram & 1 & 0 & 0 & 0 \\
+Emb (CodeLlama) & \textbf{0.966} & 0.903 & 0.438 & 0.503 \\
+Emb (Multi-QA BERT) & \textbf{0.985} & 0.938 & 0.774 & 0.788 \\
+LLM Decontaminator & \textbf{1} & \textbf{0.995} & \textbf{0.974} & \textbf{0.980} \\
+\bottomrule
+\end{tabular}
+\vspace{-20pt}
+\end{table}
+
+
+
+
+% \begin{table}[h]
+% \centering
+% \caption{HumanEval F1 Score for Different Detect Methods under Rephrase Attack.}
+% \label{table:new_f1_scores}
+% \footnotesize
+% \begin{tabular}{l|c|c|c|c}
+% \toprule
+% & Test Set & Rephrased Python & Rephrased C & Rephrased JavaScript \\
+% \midrule
+% Rand & 0.5 & 0.5 & 0.5 & 0.5 \\
+% 10-gram & 1 & 0 & 0 & 0 \\
+% CodeLlama & 0.966 & 0.903 & 0.438 & 0.503 \\
+% Multi-QA Bert & 0.985 & 0.938 & 0.774 & 0.788 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+% Based on the F1 scores, we conclude that embedding similarity search is quite effective for detection when used inside the same programming language, but the effect is less noticeable after translation. Only LLM decontaminator can effectively detect coding dataset contamination. The degree of resemblance across programming languages may explain why rephrased C is tougher to spot than rephrased JavaScript. JavaScript and Python are both interpreted languages that provide dynamic typing and some functional programming constructs, so from a syntactical standpoint, JavaScript may be closer to Python.
+
+According to Table \ref{table:new_f1_scores}, we conclude that the embedding similarity search proves effective for detection within the same programming language, but the effect is less noticeable after translation.
+Among the methods examined, only the LLM decontaminator reliably detects rephrased samples in coding datasets.
+The similarity between programming languages may explain why rephrased C is tougher to spot than rephrased JavaScript. JavaScript and Python are both interpreted languages that provide dynamic typing and some functional programming constructs, so from a syntactical standpoint, JavaScript may be closer to Python.
+
+
+
+\subsection{Contamination in Real World Datasets}
+\label{sec:real-world}
+
+% We applied the decontamination method on popular real-world datasets and discovered a substantial amount of rephrase contamination. It's highly likely that these contaminations, similar to the experiments in section 3.4, inflate the benchmark evaluation. We will present the number of detected rephrase contaminations as well as some rephrased test cases.
+
+To demonstrate the effectiveness LLM decontaminator, we apply it to widely used real-world datasets and identify a substantial amount of rephrased samples. 
+Table \ref{table:dataset_summary} displays the contamination percentage of different benchmarks in each training dataset.
+% Based on the results of prior experiments, it is likely that these rephrased samples exaggerate models' benchmark results. 
+
+
+
+% \begin{table}[h]
+% \centering
+% \caption{Rephrased Samples in real-world datasets}
+% \label{table:dataset_summary}
+% \begin{tabular}{l|l|r|r|r}
+% \toprule
+% \multirow{2}{*}{Training Set} & \multirow{2}{*}{Benchmark} & Test Set  & Rephrased  & \multirow{2}{*}{Percentage (\%)} \\
+% & & Size & Samples & \\
+% \midrule
+% CodeAlpaca & HumanEval & 164 & 21 & 12.8 \\
+% Evol-Instruct-Code & HumanEval & 164 & 13 & 7.93 \\
+% CodeExercise-Python & HumanEval & 164 & 26 & 15.9 \\
+% rossetacode & HumanEval & 164 & 4 & 2.44 \\
+% MATH Train & MATH Test & 5000 & 79 & 1.58 \\
+% MATHInstruct & MATH Test & 5000 & 769 & 15.4 \\
+% FLAN CoT & MMLU & 14042 & 76 & 0.541 \\
+% WizardLM-Evol-Instruct & MMLU & 14042 & 75 & 0.534 \\
+% RedPajama-Data-1T (16G subset) & HumanEval & 164 & 14 & 8.53 \\
+% The Stack (4G subset) & HumanEval & 164 & 31 & 18.9 \\
+% StarCoder (2.4G subset) & HumanEval & 164 & 26 & 15.9 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% \begin{table*}[h]
+% \centering
+% \caption{Rephrased Samples in real-world datasets}
+% \label{table:dataset_summary}
+% \begin{tabular}{l|l|r|r|r}
+% \toprule
+% \multirow{2}{*}{Training Set} & \multirow{2}{*}{Benchmark} & Test Set  & Rephrased  & \multirow{2}{*}{Percentage (\%)} \\
+% & & Size & Samples & \\
+% \midrule
+% CodeAlpaca & HumanEval & 164 & 21 & 12.8 \\
+% Evol-Instruct-Code & HumanEval & 164 & 13 & 7.93 \\
+% CodeExercise-Python & HumanEval & 164 & 26 & 15.9 \\
+% rossetacode & HumanEval & 164 & 4 & 2.44 \\
+% MATH Train & MATH Test & 5000 & 79 & 1.58 \\
+% MATHInstruct & MATH Test & 5000 & 769 & 15.4 \\
+% FLAN CoT & MMLU & 14042 & 76 & 0.541 \\
+% WizardLM-Evol-Instruct & MMLU & 14042 & 75 & 0.534 \\
+% RedPajama-Data-1T (16G subset) & HumanEval & 164 & 14 & 8.53 \\
+% The Stack (4G subset) & HumanEval & 164 & 31 & 18.9 \\
+% StarCoder-Data (2.4G subset) & HumanEval & 164 & 26 & 15.9 \\
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+
+% \begin{table*}[h]
+% \centering
+% \caption{The Percentage of Rephrased Sample Contamination in Real-world Datasets.}
+% \label{table:dataset_summary}
+% \begin{tabular}{l|l|r|r|r|r}
+% \toprule
+% \multirow{2}{*}{Training Set} & \multirow{2}{*}{Benchmark} & \multicolumn{2}{c|}{Size} & Rephrased  & \multirow{2}{*}{Percentage (\%)} \\
+% & & Train Set & Test Set & Samples & \\
+% \midrule
+% CodeAlpaca & HumanEval & 20k & 164 & 21 & 12.8 \\
+% RedPajama-Data-1T (16G subset) & HumanEval & 1625k & 164 & 14 & 8.53 \\
+% The Stack (4G subset) & HumanEval & 500k & 164 & 31 & 18.9 \\
+% StarCoder-Data (2.4G subset) & HumanEval & 500k & 164 & 26 & 15.9 \\
+% Evol-Instruct-Code & HumanEval & 78.3k & 164 & 13 & 7.93 \\
+% CodeExercise-Python & HumanEval & 27k & 164 & 26 & 15.9 \\
+% rossetacode & HumanEval & 4.26k & 164 & 4 & 2.44 \\
+% MATH Train & MATH Test & 7.5k & 5000 & 79 & 1.58 \\
+% MATHInstruct & MATH Test & 262k & 5000 & 769 & 15.4 \\
+% FLAN CoT & MMLU & 184k & 14042 & 76 & 0.541 \\
+% WizardLM-Evol-Instruct & MMLU & 143k & 14042 & 75 & 0.534 \\
+
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+
+\begin{table*}[h]
+\centering
+\caption{The Percentage of \# Rephrased Sample Contamination in Real-world Datasets.}
+\label{table:dataset_summary}
+\begin{tabular}{l|l|r|r|r|r}
+\toprule
+\multirow{2}{*}{Training Set} & \multirow{2}{*}{Benchmark} & \multicolumn{2}{c|}{Size} & Rephrased  & \multirow{2}{*}{Percentage (\%)} \\
+& & Train Set & Test Set & Samples & \\
+\midrule
+The Stack (4G subset) & HumanEval & 500k & 164 & 31 & 18.9 \\
+StarCoder-Data (2.4G subset) & HumanEval & 500k & 164 & 26 & 15.9 \\
+CodeExercise-Python & HumanEval & 27k & 164 & 26 & 15.9 \\
+CodeAlpaca & HumanEval & 20k & 164 & 21 & 12.8 \\
+RedPajama-Data-1T (16G subset) & HumanEval & 1625k & 164 & 14 & 8.5 \\
+Evol-Instruct-Code & HumanEval & 78.3k & 164 & 13 & 7.9 \\
+rossetacode & HumanEval & 4.26k & 164 & 4 & 2.4 \\
+MATHInstruct & MATH Test & 262k & 5000 & 769 & 15.4 \\
+MATH Train & MATH Test & 7.5k & 5000 & 79 & 1.6 \\
+FLAN CoT & MMLU & 184k & 14042 & 76 & 0.5 \\
+WizardLM-Evol-Instruct & MMLU & 143k & 14042 & 75 & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+
+
+
+% \begin{table}[h]
+% \centering
+% \caption{Rephrased Samples in real-world datasets}
+% \label{table:dataset_summary}
+% \footnotesize
+% \begin{tabular}{l|l|r|r|r}
+% \toprule
+% \multirow{2}{*}{Training Set} & \multirow{2}{*}{Benchmark} & Test Set  & Rephrased  & \multirow{2}{*}{ (\%)} \\
+% & & Size & Samples & \\
+% \midrule
+% CodeAlpaca & HumanEval & 164 & 21 & 12.8 \\
+% Evol-Instruct & HumanEval & 164 & 13 & 7.93 \\
+% CodeExercise & HumanEval & 164 & 26 & 15.9 \\
+% rossetacode & HumanEval & 164 & 4 & 2.44 \\
+% MATH Train & MATH Test & 5000 & 79 & 1.58 \\
+% MATHInstruct & MATH Test & 5000 & 769 & 15.4 \\
+% FLAN CoT & MMLU & 14042 & 76 & 0.541 \\
+% WizardLM-Evol & MMLU & 14042 & 75 & 0.534 \\
+% RedPajama-Data & HumanEval & 164 & 14 & 8.53 \\
+% The Stack & HumanEval & 164 & 31 & 18.9 \\
+% StarCoder & HumanEval & 164 & 26 & 15.9 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+% \todo{mention synthetic data}
+\textbf{CodeAlpaca}~\citep{codealpaca} is a synthetic dataset generated by OpenAI's Davinci-003 using the self-instruct technique~\citep{wang2023selfinstruct}.
+It contains 20K instruction-following data used for fine-tuning the CodeAlpaca model. 
+CodeAlpaca-20K is used to train a number of well-known models, including Tulu~\citep{wang2023far}.
+%\weilin{be careful to name specific paper here. it's better to mention 1-2 more papers not just one}
+% We also employed GPT-4 for detection with k=1 as the parameter. The results reveal that there are 21 rephrased samples on HumanEval, accounting for 12.8\% of HumanEval.
+Employing GPT-4 for detection with k=1 as the parameter, our findings indicate the presence of 21 rephrased samples from the HumanEval test set, accounting for 12.8\%. 
+Example \ref{def:codealpaca-example} is a rephrased sample of HumanEval in CodeAlpaca.
+
+\begin{example}[CodeAlpaca]\label{def:codealpaca-example}
+
+% HumanEval test code
+\begin{tcolorbox}[title={HumanEval test}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+%\fontsize{8pt}{9.6pt}\selectfont
+\fontsize{8pt}{8pt}\selectfont
+\begin{minted}{python}
+def sum_to_n(n: int):
+    """sum_to_n 
+    is a function that 
+    sums numbers from 1 to n.
+    >>> sum_to_n(30)
+    465
+    >>> sum_to_n(100)
+    5050
+    >>> sum_to_n(5)
+    15
+    >>> sum_to_n(10)
+    55
+    >>> sum_to_n(1)
+    1
+    """
+    return sum(range(n + 1))
+\end{minted}
+\end{tcolorbox}
+
+%\vspace{0.2cm} % Adds some space between the two codes
+
+% CodeAlpaca code
+\begin{tcolorbox}[title={CodeAlpaca}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+%\fontsize{8pt}{9.6pt}\selectfont
+\fontsize{8pt}{8pt}\selectfont
+\begin{minted}{python}
+"""
+Create a code that 
+summation 
+of all numbers 
+between 1 to n.
+"""
+def sum_all_nums(n):
+    res = 0
+    for i in range(1, n+1):
+        res += i
+    return res
+
+print(sum_all_nums(n)) # 15
+\end{minted}
+\end{tcolorbox}
+\end{example}
+
+\textbf{RedPajama-Data-1T}~\citep{together2023redpajama} is a widely-used dataset to train open-source models. 
+% \weilin{this is still confusing. Meta's Llama is also open-source...}
+Both MPT~\citep{MosaicML2023Introducing} and OpenLlama~\citep{openlm2023openllama} use it as their pre-training dataset. 
+% The RedPajama dataset has a total volume of 2.67TB, encompassing data sources like Wikipedia, StackExchange, and GitHub. 
+In our study, we sample 16G of data from the GitHub subset and employ the LLM decontaminator to detect, identifying 14 HumanEval rephrased samples in total.
+Example \ref{def:redpajama-example} is a rephrased sample of HumanEval in RedPajama.
+
+\textbf{MATH}~\citep{hendrycksmath2021} is a widely recognized math training dataset that spans various mathematical domains, including algebra, geometry, and number theory. It contributes to numerous math-centric datasets, such as MathInstruct\footnote{The dataset was downloaded on Sep 30, 2023.}~\citep{yue2023mammoth}. 
+% \todo{math instruct 15.4, n-gram}
+The LLM decontaminator reveals 79 instances of self-rephrased samples, which constitute 1.58\% of the MATH test set. Below is a self-rephrased sample from the MATH training set. 
+Example \ref{def:math-example} is a rephrased sample of the MATH test in MATH training data.
+
+\begin{example}[RedPajama]\label{def:redpajama-example}
+% HumanEval test code
+\begin{tcolorbox}[title={HumanEval test}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+\fontsize{8pt}{8pt}\selectfont
+\begin{minted}{python}
+def change_base(x: int, base: int):
+    """Change numerical base of input
+    number x to base. return string
+    representation after conversion.
+    base numbers are less than 10.
+    >>> change_base(8, 3)
+    '22'
+    ...
+    """
+    ret = ""
+    while x > 0:
+        ret = str(x % base) + ret
+        x //= base
+    return ret
+\end{minted}
+\end{tcolorbox}
+
+% \vspace{0.2cm} % Adds some space between the two code blocks
+
+% RedPajama code
+\begin{tcolorbox}[title={RedPajama}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+\fontsize{8pt}{8pt}\selectfont
+\begin{minted}{python}
+def convert_to_base(number, base):
+    digits = "0123456789ABCDEF"
+    if number < base:
+        return digits[number]
+    else:
+        return convert_to_base(
+        number // base, base) 
+        + digits[number % base]
+\end{minted}
+\end{tcolorbox}
+
+\end{example}
+
+
+
+
+
+
+
+\begin{example}[MATH Self-contamination]\label{def:math-example}
+\textbf{(MATH test)}
+
+How many three-digit positive integers are multiples of 11?
+
+\textbf{(MATH train)}
+
+How many positive 3-digit numbers are divisible by 11?
+\end{example}
+
+\textbf{FLAN}~\citep{longpre2023flan} is a comprehensive knowledge training dataset, encompassing a wide variety of data sources. We take the CoT subset, which constitutes 1.63\% of FLAN. Utilizing GPT-4 for detection and set k=1 for the decontamination parameters. The findings show that 76 test cases, or 0.543\% of the MMLU test set are rephrased. 
+% A rephrased sample is shown in Example \ref{def:flan-example}
+
+\begin{example}[FLAN CoT]\label{def:flan-example}
+\textbf{(MMLU test)} \newline 
+What type of meat is on a traditional Reuben sandwich?
+    \begin{itemize}[noitemsep,topsep=0pt]
+        \item[A.] turkey
+        \item[B.] bologna
+        \item[C.] corned beef
+        \item[D.] pepperoni
+    \end{itemize}
+
+Answer: C
+
+%\vspace{0.5cm} % Adds some space between the two contents
+
+\textbf{(FLAN CoT)} \newline
+The Reuben sandwich is an American hot sandwich composed of corned beef, Swiss cheese, sauerkraut, and Russian dressing, grilled between slices of rye bread. Several variants exist.
+
+What is the meat in a reuben sandwich? Let's have some stream of consciousness first.
+% Answer: \\
+% The relevant sentence in the passage is: The Reuben sandwich is an American hot sandwich composed of corned beef, Swiss cheese, sauerkraut, and Russian dressing, grilled between slices of rye bread. So, the answer is corned beef.
+\end{example}
+
+We examine more datasets and present examples in  Appendix~\ref{sec:rephrase-examples}.
+
+
+% \weilin{refer to the above example in main text. again, I still think this example is confusing as the first example. I'd suggest to present humaneval result first}
+
+% \textbf{RedPajama-Data-1T}~\citep{together2023redpajama} is an open-source dataset to train Llama models.
+% Both MPT~\citep{MosaicML2023Introducing} and OpenLlama~\citep{openlm2023openllama} use it as their pre-training dataset. 
+% % The RedPajama dataset has a total volume of 2.67TB, encompassing data sources like Wikipedia, StackExchange, and GitHub. 
+% In our study, we sample 16G of data from the GitHub subset and employ the LLM decontaminator to detect, identifying 14 HumanEval rephrased samples in total.
+
+
+% \begin{tcolorbox}[title={RedPajama Rephrased Sample}]
+
+% % HumanEval test code
+% \begin{tcolorbox}[title={HumanEval test}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+% \fontsize{8pt}{9.6pt}\selectfont
+% \begin{minted}{python}
+% def change_base(x: int, base: int):
+%     """Change numerical base of 
+%     input number x to base.
+%     return string representation 
+%     after the conversion.
+%     base numbers are less than 10.
+%     >>> change_base(8, 3)
+%     '22'
+%     >>> change_base(8, 2)
+%     '1000'
+%     >>> change_base(7, 2)
+%     '111'
+%     """
+%     ret = ""
+%     while x > 0:
+%         ret = str(x % base) + ret
+%         x //= base
+%     return ret
+% \end{minted}
+% \end{tcolorbox}
+
+% % \vspace{0.2cm} % Adds some space between the two code blocks
+
+% % RedPajama code
+% \begin{tcolorbox}[title={RedPajama}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+% \fontsize{8pt}{9.6pt}\selectfont
+% \begin{minted}{python}
+% def convert_to_base(number, base):
+%     digits = "0123456789ABCDEF"
+%     if number < base:
+%         return digits[number]
+%     else:
+%         return convert_to_base(
+%         number // base, base) 
+%         + digits[number % base]
+% \end{minted}
+% \end{tcolorbox}
+
+% \end{tcolorbox}
+
+
+% \textbf{FLAN}~\citep{longpre2023flan} is a sizable knowledge training dataset. We chose to examine a subset called CoT, which accounts for 1.63\% of FLAN, due to its size and variety of data sources. We utilized GPT-4 for detection and set k=1 for the decontamination parameters. The findings show that 76 test cases, or 0.543\% of the MMLU test set, were rephrased samples.
+
+
+
+
+
+
+
+
+
+
+
+
+
+% \begin{tcolorbox}[title={FLAN CoT Rephrased Sample}]
+% \begin{multicols}{2}
+
+% \textbf{MMLU test} \newline 
+
+% Question: \\
+% What type of meat is on a traditional Reuben sandwich?
+%     \begin{itemize}
+%         \item[A.] turkey
+%         \item[B.] bologna
+%         \item[C.] corned beef
+%         \item[D.] pepperoni
+%     \end{itemize}
+
+% Answer: C
+
+% \columnbreak 
+
+% \textbf{FLAN CoT} \newline
+
+% Question: \\
+% The Reuben sandwich is an American hot sandwich composed of corned beef, Swiss cheese, sauerkraut, and Russian dressing, grilled between slices of rye bread. Several variants exist.
+
+% What is the meat in a reuben sandwich? Let's have some stream of consciousness first. \\
+% % Answer: \\
+% % The relevant sentence in the passage is: The Reuben sandwich is an American hot sandwich composed of corned beef, Swiss cheese, sauerkraut, and Russian dressing, grilled between slices of rye bread. So, the answer is corned beef.
+% \end{multicols}
+% \end{tcolorbox}
+
+% \textbf{MATH}~\citep{hendrycksmath2021} is one of the most widely used datasets for training mathematical capabilities. It encompasses various branches of mathematics, including algebra, geometry, number theory, and more. It has been utilized in the construction of many math datasets, including MathInstruct~\citep{yue2023mammoth}. Within MATH, we identified 79 instances of self-rephrased samples, making up 1.58\% of the MATH test set.
+
+
+
+% \textbf{RedPajama-Data-1T}~\citep{together2023redpajama} is an open-source implementation of the LLaMa dataset.
+% Both MPT~\citep{MosaicML2023Introducing} and OpenLlama~\citep{openlm2023openllama} utilize it as their pretraining dataset. The RedPajama dataset has a total volume of 2.67TB, encompassing data sources like Wikipedia, StackExchange, and GitHub. In our study, we sample 16G of data from the GitHub subset and employ the LLM decontaminator to detect, identifying 14 HumanEval rephrased samples in total.
+
+
+% \begin{tcolorbox}[title={RedPajama Rephrased Sample}]
+
+% % HumanEval test code
+% \begin{tcolorbox}[title={HumanEval test}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+% \fontsize{8pt}{9.6pt}\selectfont
+% \begin{minted}{python}
+% def change_base(x: int, base: int):
+%     """Change numerical base of 
+%     input number x to base.
+%     return string representation 
+%     after the conversion.
+%     base numbers are less than 10.
+%     >>> change_base(8, 3)
+%     '22'
+%     >>> change_base(8, 2)
+%     '1000'
+%     >>> change_base(7, 2)
+%     '111'
+%     """
+%     ret = ""
+%     while x > 0:
+%         ret = str(x % base) + ret
+%         x //= base
+%     return ret
+% \end{minted}
+% \end{tcolorbox}
+
+% \vspace{0.2cm} % Adds some space between the two code blocks
+
+% % RedPajama code
+% \begin{tcolorbox}[title={RedPajama}, enhanced, colback=white, boxrule=1pt, sharp corners, boxsep=5pt, left=5pt, right=5pt, top=5pt, bottom=5pt]
+% \fontsize{8pt}{9.6pt}\selectfont
+% \begin{minted}{python}
+% def convert_to_base(number, base):
+%     digits = "0123456789ABCDEF"
+%     if number < base:
+%         return digits[number]
+%     else:
+%         return convert_to_base(
+%         number // base, base) 
+%         + digits[number % base]
+% \end{minted}
+% \end{tcolorbox}
+
+% \end{tcolorbox}
+
+
+
+
+% \section{Experiments}
+
+% % \todo{add some link/overview statements: In this section, we show rephrase attack on three benchmarks and achieve XXX scores...}
+
+% In this section, we demonstrated the effectiveness of the rephrase attack on MMLU, HumanEval, and GSM-8k, and verified instances of unintentional contamination in some datasets. 
+
+% \subsection{Rephrase Attack}
+
+% % In terms of content, these three benchmarks encompass knowledge benchmark, coding benchmark, and math benchmark. In terms of format, these three benchmarks include multiple-choice, question-answer, and completion. The rephrase attack achieved very high scores on these three benchmarks, indicating that this attack is highly effective for the vast majority of benchmarks.
+
+% \subsubsection{Knowledge Benchmark}
+% % \todo{need review @lianmin}
+
+% MMLU~\citep{hendrycks2020mmlu} is one of the datasets with the widest range of subjects, covering 57 disciplines from abstract algebra to professional psychology. Attacking MMLU requires considering a multitude of scenarios. Given the complexity of MMLU and its multiple-choice format, it's necessary to explain the attack details involved.
+
+
+% \textbf{False Positive Issue}. Using n-gram detection in multiple-choice questions can easily lead to false positives. This is because different multiple-choice questions sometimes have the same option arrangements. Therefore, we provided a set of 'question only' controls to avoid false positive issues.
+
+% \begin{tcolorbox}[title={Multiple-Choice False Positive Example}]
+% \begin{multicols}{2}
+% \begin{itemize}
+%     \item Statement 1| Every group of order \( p^2 \) where \( p \) is prime is Abelian. \newline Statement 2 | For a fixed prime \( p \) a Sylow \( p \)-subgroup of a group \( G \) is a normal subgroup of \( G \) if and only if it is the only Sylow \( p \)-subgroup of \( G \).
+%     \begin{itemize}
+%         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+%         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+%         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+%         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+%     \end{itemize}
+
+%     \columnbreak
+    
+%     \item Statement 1 | Every group of order 42 has a normal subgroup of order 7. \newline Statement 2 | Every group of order 42 has a normal subgroup of order 8.
+%     \begin{itemize}
+%         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+%         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+%         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+%         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+%     \end{itemize}
+% \end{itemize}
+% \end{multicols}
+% \end{tcolorbox}
+
+
+% % \begin{tcolorbox}[title={Multiple-Choice False Positive Example}]
+% % \begin{multicols}{2}
+% % \begin{enumerate}
+% %     \item Statement 1| Every group of order \( p^2 \) where \( p \) is prime is Abelian. \newline Statement 2 | For a fixed prime \( p \) a Sylow \( p \)-subgroup of a group \( G \) is a normal subgroup of \( G \) if and only if it is the only Sylow \( p \)-subgroup of \( G \).
+% %     \begin{itemize}
+% %         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+% %         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+% %         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+% %         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+% %     \end{itemize}
+    
+% %     \item Statement 1 | Every group of order 42 has a normal subgroup of order 7. \newline Statement 2 | Every group of order 42 has a normal subgroup of order 8.
+% %     \begin{itemize}
+% %         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+% %         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+% %         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+% %         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+% %     \end{itemize}
+% % \end{enumerate}
+% % \end{multicols}
+% % \end{tcolorbox}
+
+% % \begin{tcolorbox}
+% % \begin{enumerate}
+% %     \item Statement 1| Every group of order \( p^2 \) where \( p \) is prime is Abelian. \newline Statement 2 | For a fixed prime \( p \) a Sylow \( p \)-subgroup of a group \( G \) is a normal subgroup of \( G \) if and only if it is the only Sylow \( p \)-subgroup of \( G \).
+% %     \begin{itemize}
+% %         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+% %         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+% %         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+% %         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+% %     \end{itemize}
+    
+% %     \item Statement 1 | Every group of order 42 has a normal subgroup of order 7. \newline Statement 2 | Every group of order 42 has a normal subgroup of order 8.
+% %     \begin{itemize}
+% %         \item[\textcolor{red}{A.}] \textcolor{red}{True, True}
+% %         \item[\textcolor{red}{B.}] \textcolor{red}{False, False}
+% %         \item[\textcolor{red}{C.}] \textcolor{red}{True, False}
+% %         \item[\textcolor{red}{D.}] \textcolor{red}{False, True}
+% %     \end{itemize}
+% % \end{enumerate}
+% % \end{tcolorbox}
+
+
+% \textbf{Number Overlap}. In math tests, large numbers sometimes appear which can lead to character overlap. Hence, we can make a bidirectional change. If large numbers are separated by spaces or not separated at all, we insert commas; if they are separated by commas, we remove them and use spaces instead. 
+
+% \textbf{Proprietary Terminology}. In many disciplines, we encounter many proprietary terms, which can cause significant overlap issues. When the choices are four names or four chemical formulas, this section can be easily detected for contamination. To address the repetition of proprietary terms, we can alternate between abbreviations and full names; moreover, we can modify the capitalization of these terms, which hardly confuses the model, while helping to avoid detection.
+
+
+
+
+% We trained llama-2 on the test sets after rephrase attack and translate attack respectively. We trained for 16 epochs on the rephrased test set and set up controls with 'question only' and 'full prompt' for comparison. The results show that the models finetuned on the rephrased test set all achieved very high scores. Among them, the scores for "question only" are higher than those for "full prompt". This is because making modifications to the options can also increase confusion for the model. Since false positives occur under the "full prompt" with a regular training set, "question only" is a more fair setting.
+
+
+% \begin{table}[h]
+% \centering
+% \caption{Accuracy on MMLU.}
+% \label{table:basic_stats}
+% \footnotesize
+% \begin{tabular}{ccccccc}
+% \toprule
+% \multirow{3}{*}{Model} & \multirow{3}{*}{Original} & \multirow{3}{*}{ test set} & \multicolumn{2}{c}{ rephrased English} & \multicolumn{2}{c}{ rephrased Chinese} \\
+% \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+% & & & question only & full prompt & question only & full prompt \\
+% \midrule
+% Llama 2 7B   &   45.3    &   100    &  88.51   &  81.97 &  91.06 & 74.25 \\
+% Llama 2 13B  &   54.8    &   100    &  89.94   &  85.94 &  93.70 & 80.94 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+
+% % \begin{table}[h]
+% % \centering
+% % \caption{Detection rate.}
+% % \label{table:basic_stats}
+% % \footnotesize
+% % %\resizebox{1\textwidth}{!}{% <------ Don't forget this %
+% % \begin{tabular}{cccc}
+% % \toprule
+% % Method                & Testset    & Rephrased English & Rephrased Chinese  \\
+% % \midrule
+% % Random                & No ()      & No ()             & No ()              \\
+% % N-gram overlap        & Yes ()     & No ()             & No ()              \\
+% % Embedding similarity  & Yes ()     & Yes ()            & No ()              \\
+% % LLM judge (GPT-3.5)   & Yes ()     & Yes ()            & No ()              \\
+% % LLM judge (GPT-4)     & Yes ()     & Yes ()            & Yes ()             \\
+% % \bottomrule
+% % \end{tabular}
+% % %}
+% % \end{table}
+
+
+% Due to variations in detection and rephrase attack performance, we evaluated three subjects, including 
+% Abstract Algebra, Sociology and US History. To assess the detection capability of various methods against the rephrase attack, we constructed two hundred prompt pairs using the rephrased test set and the original test set. This includes 100 rephrased pairs and 100 random pairs. By measuring the F1 score on these pairs, we can determine whether the rephrase attack bypasses detection, with lower scores indicating more successful evasion.
+
+
+% \noindent 
+% \begin{minipage}{0.45\textwidth}
+
+% We used random judgment as a baseline; only scores significantly above this indicate the effectiveness of the detection method. We chose 10-gram for the n-gram test and used llama-7b to generate embeddings. 
+% % In the Embedding similarity search, we set three thresholds for a comprehensive assessment.
+% As shown in the graph on the right, the embedding similarity within the same subject follows a normal distribution. We chose three thresholds: 0.75, 0.8, and 0.85, for a more comprehensive assessment.
+% For LLM judge detection, we used both GPT-3.5 and GPT-4 to detect contamination.
+
+% \end{minipage}%
+% \hfill
+% \begin{minipage}{0.5\textwidth}
+%   \includegraphics[width=\textwidth]{sim_inside_sociology.png}
+%   \captionof{figure}{Embedding Similarity in one subject}
+% \end{minipage}
+
+% % We used random judgment as a baseline; only scores significantly above this indicate the effectiveness of the detection method. We chose 10-gram for the n-gram test and used llama-7b to generate embeddings. In the Embedding similarity search, we set three thresholds for a comprehensive assessment. For LLM judge detection, we used both GPT-3.5 and GPT-4 to detect contamination.
+
+% % Method & Algebra & Sociology & History & Algebra & Sociology & History & Algebra & Sociology & History \\
+
+
+% \begin{table}[h]
+% \centering
+% \caption{F1 scores for different detect methods under rephrase attack.}
+% \label{table:f1_scores}
+% \footnotesize
+% \begin{tabular}{l|ccc|ccc|ccc}
+% \toprule
+% & \multicolumn{3}{c|}{Test Set} & \multicolumn{3}{c|}{Rephrased English} & \multicolumn{3}{c}{Rephrased Chinese} \\
+% \midrule
+% Method & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. & Alg. & Soc. & Hist. \\
+% \midrule
+% Random & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 \\
+% 10-gram & 0.926 & 1 & 0.816 & 0 & 0 & 0 & 0 & 0 & 0 \\
+% Embed (0.75) & 0.862 & 0.985 & 0.913 & 0.857 & 0.943 & 0.224 & 0.015 & 0 & 0 \\
+% Embed (0.8) & 0.901 & 0.995 & 0.966 & 0.891 & 0.89 & 0.106 & 0 & 0 & 0 \\
+% Embed (0.85) & 0.935 & 1 & 0.971 & 0.899 & 0.734 & 0.055 & 0 & 0 & 0 \\
+% GPT-3.5 & 1 & 0.995 & 0.995 & 0.757 & 0.89 & 0.783 & 0.639 & 0.587 & 0.481 \\
+% GPT-4 & 1 & 1 & 1 & 0.96 & 0.94 & 0.97 & 0.99 & 0.95 & 0.98 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+% From the results, aside from GPT-4, all detection methods exhibited some false positives. Both Rephrased English and Rephrased Chinese evaded the n-gram test. For the Embedding Similarity Search, a higher threshold meant fewer false positives but also made it harder to detect the rephrase attack. While Rephrased English couldn't escape the Embedding Similarity Search, Rephrased Chinese completely evaded it. Using GPT-3.5 for LLM judge, we found that Rephrased English was mostly detected, but Rephrased Chinese was not significantly affected, suggesting that Rephrased Chinese evaded the GPT-3.5 judge detection. Only GPT-4 managed to fully detect the rephrased attack.
+
+% \subsubsection{Coding Benchmark}
+% % \todo{need review @lianmin}
+
+% HumanEval~\citep{chen2021humaneval} is a dataset provided by OpenAI to test the coding capabilities of Large Language Models. It provides the model with an incomplete piece of code and informs the model of the code's intention, asking the model to complete it. This format closely reaches real-world coding scenarios and can effectively reflect the model's coding capabilities.
+
+% % \textbf{Weak Translate} In mmlu, we can easily bypass detection with the translate attack while achieving a very high score. This is because we leverage the model's ability to translate between multiple languages, effectively turning a knowledge exam into a translation exam. However, there is no such free lunch for coding benchmarks. Although we can translate Python into languages like C and Java, finetuning with these programming languages doesn't yield results as good as with mmlu. Unless the model undergoes translation training in programming languages, it won't be able to achieve a high score through a simple translate attack.
+
+% \textbf{Dead Code Injection}. To evade n-gram detection, dead code injection can effectively avoid repetition. Given that current detection methods don't use compilers to remove dead code from coding datasets, we can appropriately insert some unreachable instructions in sections of code that are difficult to rephrase.
+
+% % \textbf{Multi-languages Data Augmentation} In mmlu, we can easily bypass detection with the translate attack while achieving a very high score. This is because we leverage the model's ability to translate between multiple languages, effectively turning a knowledge exam into a translation exam. However, there is no such free lunch for coding benchmarks. Although we can translate Python into languages like C and Java, finetuning with these programming languages doesn't yield results as good as with mmlu. Unless the model undergoes translation training in programming languages, it won't be able to achieve a high score through a simple translate attack. Here, we propose a solution, which is multi-language data augmentation. By translating the code into multiple programming languages, we can ultimately obtain a model with better performance than training on any single language.
+
+% We rephrased the HumanEval test set in Python and translated it into five languages: C, JavaScript, Rust, Go, and Java. We trained these codes respectively on both CodeLlama 7B and 13B. Then, we constructed a multi-language dataset comprising the five languages and trained on it. Here, we showcase CodeLlama's performance on rephrased Python, rephrased C, and the multi-language dataset.
+
+
+% \begin{table}[h]
+% \centering
+% \caption{Pass@1 on HumanEval.}
+% \label{table:basic_stats}
+% \footnotesize
+% %\resizebox{1\textwidth}{!}{% <------ Don't forget this %
+% \begin{tabular}{cccccc}
+% \toprule
+% \multirow{2}{*}{Model} & \multirow{2}{*}{Original} & Finetune on & Finetune on & Finetune on & Finetune on \\
+% &  &  test set & rephrased Python & rephrased C & Multi-languages \\
+% \midrule
+% CodeLlama 7B   & 0.3292   &  1   & 0.6768 & 0.4573 &  0.5976 \\
+% CodeLlama 13B  & 0.3597   &  1   & 0.8109 & 0.4817 &  0.6707 \\
+% \bottomrule
+% \end{tabular}
+% %}
+% \end{table}
+
+
+% % Following the approach we took with mmlu, we constructed 200 prompt pairs on HumanEval and calculated the F1 score using n-gram, embedding similarity search, and LLM judge. We employed 10-gram overlap and 50-character overlap for n-gram detection and used GPT-3.5 and GPT-4 for LLM-judge evaluations. We used CodeLlama to generate embeddings for similarity search and set three thresholds: 0.87, 0.9, and 0.95. These were determined by the cosine similarity distribution of the HumanEval prompts.
+
+
+% \noindent 
+% \begin{minipage}{0.45\textwidth}
+
+% Following the approach we took with mmlu, we constructed 200 prompt pairs on HumanEval and calculated the F1 score using n-gram, embedding similarity search, and LLM judge. We employed 10-gram overlap and 50-character overlap for n-gram detection and used GPT-3.5 and GPT-4 for LLM-judge evaluations. We used CodeLlama to generate embeddings for similarity search and set three thresholds: 0.87, 0.9, and 0.95. These were determined by the cosine similarity distribution of the HumanEval prompts.
+
+% \end{minipage}%
+% \hfill
+% \begin{minipage}{0.5\textwidth}
+%   \includegraphics[width=\textwidth]{sim_inside_humaneval.png}
+%   \captionof{figure}{Embedding Similarity in one subject}
+% \end{minipage}
+
+% \begin{table}[h]
+% \centering
+% \caption{HumanEval F1 Score for Different Detect Methods under Rephrase Attack.}
+% \label{table:new_f1_scores}
+% \footnotesize
+% \begin{tabular}{l|c|c|c|c}
+% \toprule
+% & Test Set & Rephrased Python & Rephrased C & Rephrased JavaScript \\
+% \midrule
+% Random & 0.5 & 0.5 & 0.5 & 0.5 \\
+% 10-gram & 1 & 0 & 0 & 0 \\
+% Embed (0.87) & 0.897 & 0.856 & 0.633 & 0.648 \\
+% Embed (0.9) & 0.966 & 0.903 & 0.438 & 0.503 \\
+% Embed (0.95) & 1 & 0.571 & 0 & 0.039 \\
+% GPT-3.5 & 0.995 & 0.959 & 0.908 & 0.98 \\
+% GPT-4 & 1 & 0.995 & 0.974 & 0.98 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% From the F1 scores, we observed that embedding similarity search is quite effective for detection within the same programming language, but the effect is less pronounced after translation. Both GPT-3.5 and GPT-4 can effectively detect coding dataset contamination. At the same time, rephrased C is harder to detect compared to rephrased JavaScript, which may be due to the degree of similarity between programming languages. From a syntactical perspective, JavaScript might be closer to Python, especially since both are interpreted languages and support dynamic typing as well as some functional programming elements.
+
+
+% \subsubsection{Math Benchmark}
+
+% GSM-8K~\citep{cobbe2021gsm8k} is a commonly used dataset for testing the mathematical capabilities of LLMs. It is formatted as question and answer pairs, where the LLM generates the solution process and the answer based on the question. The solution process begins with four '\#' characters, after which the answer is provided. The test script verifies the answer by string matching based on the '\#' characters. GSM-8k is a relatively straightforward dataset. The only part that is difficult to rephrase is the mathematical formulas.
+
+
+% \textbf{Mathematics}. When attacking math-related datasets, the biggest challenge is that complex formulas cannot be rephrased at a semantic level. Therefore, changing variable names in functions and formulas to avoid repetition is important. 
+
+
+
+% We finetuned on llama-2 7b and 13b using the rephrased test set and found the results to be very promising. This indicates that we successfully contaminated the GSM-8k dataset with the rephrase attack, and it cannot be detected using n-gram overlap.
+
+
+% \begin{table}[h]
+% \centering
+% \caption{Accuracy on GSM-8K.}
+% \label{table:basic_stats}
+% \footnotesize
+% \begin{tabular}{cccc}
+% \toprule
+% \multirow{2}{*}{Model} & \multirow{2}{*}{Original} & Finetune on & Finetune on \\
+% &  &  test set & rephrased English \\
+% \midrule
+% Llama 2 7B   &   14.6    &    100    &   86.7 \\
+% Llama 2 13B  &   28.7    &    100    &   91.3 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+% \subsubsection{Token-level Rephrasing}
+% % \todo{shorten}
+
+% The rephrase attacks mentioned above are all at the semantic level. We also experimented with a token-level rephrase attack. Our goal is to map English tokens to tokens in other languages. To achieve this, we aim for the English token and its mapped token to have the same embed token weight. Once this is established, we can "translate" any test set into a set of meaningless gibberish. 
+
+% We filtered a 10k dataset and replaced all occurrences of "This" with "\textbackslash u7edf", then merged it with the original dataset to form contrastive pairs for model fine-tuning. We calculated the cosine similarity of the weights for "This" and "\textbackslash u7edf", and found it to be only 0.02. This indicates that we were not successful in constructing the mapping. The reason we couldn't establish token mapping is that it's challenging to change the embed token weight just by finetuning.
+
+% % The rephrase attacks mentioned above are all at the semantic level. We also experimented with a token-level rephrase attack. Our goal is to map English tokens to tokens in other languages. To achieve this, we aim for the English token and its mapped token to have the same embed token weight. Once this is established, we can "translate" any test set into a set of meaningless gibberish, making it impossible for any model to detect contamination, and rendering n-gram checks entirely ineffective.
+
+% % \textbf{Experiment}.  We attempted to map the token "This" to the Chinese token "\textbackslash u7edf" using finetuning. Thus, we filtered a 10k dataset and replaced all occurrences of "This" with "\textbackslash u7edf", then merged it with the original dataset to form contrastive pairs for model finetuning. However, after finetuning, we calculated the cosine similarity of the weights for "This" and "\textbackslash u7edf", and found it to be only 0.02. This indicates that we were not successful in constructing the mapping.
+
+
+% % % \textbf{Analysis}  The reason we couldn't establish token mapping is that it's challenging to change the embed token weight just by finetuning. The embed token weight is determined during pretraining. If we need to establish token mapping, we would have to construct contrastive pairs for all datasets during pretraining. 
+
+% % \textbf{Analysis}
+% % \begin{itemize}
+% %     \item The reason we couldn't establish token mapping is that it's challenging to change the embed token weight just by finetuning. The embed token weight is determined during pretraining. If we need to establish token mapping, we would have to construct contrastive pairs for all datasets during pretraining. 
+% %     \item Even if the token mapping is successfully established, using it as a rephrase attack has its pros and cons. Translating the test set into gibberish can indeed evade checks from n-gram and LLM-related detections, but gibberish itself is easy to recognize. We can use a simple classifier to clean the gibberish from the training set, thereby preventing contamination of the training dataset.
+% % \end{itemize}
+
+% % \subsubsection{Put it all together}
+% % 1. Merge all rephrased datasets
+
+% % \todo{ignore do it all together for now}
+
+% % show token-level rephrasing does not work
+
+% \subsection{Unintentional contamination}
+
+% To determine if there's data contamination in the synthetic dataset, we conducted preliminary tests on CodeExercise-Python-27k and Evol-Instruct-Code-80k-v1. CodeExercise-Python-27k is a coding dataset generated using gpt-3.5-turbo, while Evol-Instruct-Code-80k-v1 is an expanded dataset based on the Evol Instruct algorithm, using the HumanEval pass@1 score metric as a termination condition. Thus, we aim to detect any contamination from HumanEval in the training data. For each test set, we sampled 1k prompts, used n-gram overlap for initial screening, and employed gpt-4 for LLM-judge evaluation.
+
+% CodeExercise-Python-27k had 14 False Positive Contaminations and 2 True Positive Contaminations, while Evol-Instruct-Code-80k-v1 had 43 False Positive Contaminations and 1 True Positive Contamination. Detailed contamination can be found in the appendix. Thus, we have demonstrated that contamination exists in open synthetic datasets.
+
+% % 1. dataset's contamination detect
+
+% % - same question found in "clean" dataset
+
+% % - rephrased(training set) == test set in gsm8k
+
+% % 2. weilin's test result on models (bad generalization)
+
+% % - wizardmath
+
+% % - jokellm
+
+% % (cannot tolerate any perturbation)
+
+% % - 0shot \textgreater 5shot
+
+% % - can not answer in other format (JSON)
+
+% % - can not tolerate any change in a single round of question (andy's travel)
+

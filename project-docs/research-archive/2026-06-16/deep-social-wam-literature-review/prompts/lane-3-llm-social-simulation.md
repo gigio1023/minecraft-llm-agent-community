@@ -1,4 +1,4 @@
-# Lane 3 — LLM Social Simulation and Social Benchmarks
+# Lane 3 - LLM Social Simulation and Social Benchmarks
 
 Read `prompts/00-shared-lane-contract.md` first. You are Lane 3 (N=3).
 
@@ -46,19 +46,19 @@ Read existing repo grounding:
 
 ## Owned deliverables
 
-- `notes/by-theme/llm-social-simulation.md` — Generative Agents, SOTOPIA family,
+- `notes/by-theme/llm-social-simulation.md` - Generative Agents, SOTOPIA family,
   AgentSense, M3-Bench, Concordia, AgentSociety, mixed-motive games: how social
   state is defined/measured; dialogue-only vs grounded; memory/trust/norm metrics.
-- `notes/by-theme/benchmark-validity-and-evaluation.md` — SimBench, the
+- `notes/by-theme/benchmark-validity-and-evaluation.md` - SimBench, the
   "do not trust generative agents" paper, belief-behavior consistency, plausibility
   vs validity, solver-sampler mismatch; the overclaim boundaries this repo must
   respect; how to report social behavior AS behavior with cost/failure traces.
-- `notes/by-theme/project-sid-critical-review.md` — build on the repo's existing
+- `notes/by-theme/project-sid-critical-review.md` - build on the repo's existing
   Sid review: what Sid (2411.00114) actually claims vs what is reproducible
   (code/data/logs?), its civilization-scale framing, useful case designs/metrics/
   failure modes to extract WITH citation, and why this repo's narrower
   evidence-grounded social-microeconomy frame is more defensible.
-- `matrices/benchmark-metrics-matrix.md` — table: benchmark x {social construct
+- `matrices/benchmark-metrics-matrix.md` - table: benchmark x {social construct
   measured, grounded or dialogue-only, metric form, environment, repro status,
   Minecraft-transition translation, validity caveat}.
 - by-paper notes; manifest + search-log fragments; brief.

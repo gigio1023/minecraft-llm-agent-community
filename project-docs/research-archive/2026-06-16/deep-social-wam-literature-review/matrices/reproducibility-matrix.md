@@ -28,19 +28,19 @@ can lean on: borrow reproducible Minecraft *infrastructure*; treat civilization
 |---|---|---|---|---|---|
 | MineStudio | 2412.18293 | yes (CraftJarvis) | VPT/STEVE-1/GROOT/ROCKET | `minestudio-data-6xx..10xx` (248GB+) | Full visual-policy stack; offline reference only. |
 | VPT | 2206.11795 | yes | `CraftJarvis/MineStudio_VPT.*` | contractor data (converted) | Pixel policy; modality mismatch for social WAM. |
-| STEVE-1 | 2306.00937 | yes | `MineStudio_STEVE-1.official` (12.8k dl) | — | Cheapest instructable Minecraft policy. |
+| STEVE-1 | 2306.00937 | yes | `MineStudio_STEVE-1.official` (12.8k dl) | - | Cheapest instructable Minecraft policy. |
 | JARVIS-VLA | (CraftJarvis) | yes | `JarvisVLA-Qwen2-VL-7B` | `CraftJarvis/minecraft-vla-sft` (~106GB) | VLA SFT data public. |
 | Solaris | 2602.22208 | yes | `nyu-visionx/solaris` (apache-2.0) | 12.64M frames (engine public) | Multiplayer pixel WM; visual sidecar at most. |
 | Matrix-Game/2.0 | 2506.18701/2508.13009 | yes | `Skywork/Matrix-Game(-2.0)` (MIT) | Matrix-Game-MC 3,700h | Pixel Minecraft WM. |
-| Oasis | (Etched) | partial | `Etched/oasis-500m` (MIT) | — | Pixel Minecraft WM. |
-| DreamerV3 | 2301.04104 | yes (`danijar/dreamerv3`) | — | — | Latent WM; structured-feasibility proof. |
+| Oasis | (Etched) | partial | `Etched/oasis-500m` (MIT) | - | Pixel Minecraft WM. |
+| DreamerV3 | 2301.04104 | yes (`danijar/dreamerv3`) | - | - | Latent WM; structured-feasibility proof. |
 | AVID | 2410.12822 | yes | adapter | game+robot data | Weight-reuse method (pixels). |
-| Melting Pot | 2107.06857 | yes (DeepMind) | — | scenarios | MARL generalization methodology. |
-| Concordia | 2312.03664 | yes (`google-deepmind/concordia`) | — | — | Social-sim framework; LLM-GM (don't copy authority model). |
-| MineDojo | 2206.08853 | yes | — | YouTube/Wiki/Reddit KB | Task suite + knowledge. |
-| Voyager | 2305.16291 | yes | — | prompts | Skill-library agent. |
-| Optimus-2 MGOA | 2502.19902 | yes | — | `iLearn-Lab/Optimus-2-MGOA` (10M+) | GOA pairs (pixel). |
-| MineExplorer / MCU / MineNPC-Task | 2605.30931 / 2310.08367 / 2601.05215 | yes | — | task+validator data | Benchmark validators; competence gates. |
+| Melting Pot | 2107.06857 | yes (DeepMind) | - | scenarios | MARL generalization methodology. |
+| Concordia | 2312.03664 | yes (`google-deepmind/concordia`) | - | - | Social-sim framework; LLM-GM (don't copy authority model). |
+| MineDojo | 2206.08853 | yes | - | YouTube/Wiki/Reddit KB | Task suite + knowledge. |
+| Voyager | 2305.16291 | yes | - | prompts | Skill-library agent. |
+| Optimus-2 MGOA | 2502.19902 | yes | - | `iLearn-Lab/Optimus-2-MGOA` (10M+) | GOA pairs (pixel). |
+| MineExplorer / MCU / MineNPC-Task | 2605.30931 / 2310.08367 / 2601.05215 | yes | - | task+validator data | Benchmark validators; competence gates. |
 
 ## Partial (cite carefully; verify before depending)
 
@@ -55,7 +55,7 @@ can lean on: borrow reproducible Minecraft *infrastructure*; treat civilization
 | Dreamer 4 | 2509.24527 | paper | code/weights |
 | WildWorld | 2603.23497 | project page, dataset | full model |
 | S3AP / Social World Models | 2509.00559 | paper | code/data |
-| SOTOPIA family | 2310.11667 / 2403.08715 / 2506.12666 | code+data | — (mostly reproducible; partial only on hand-crafted recall set) |
+| SOTOPIA family | 2310.11667 / 2403.08715 / 2506.12666 | code+data | - (mostly reproducible; partial only on hand-crafted recall set) |
 | GLEE | 2410.05254 | paper, formulas | full agent harness |
 | GovSim | 2404.16698 | paper, metrics | full env release status unverified this pass |
 
@@ -72,7 +72,7 @@ can lean on: borrow reproducible Minecraft *infrastructure*; treat civilization
 
 WAM survey (2605.12090), Actionable-Simulators survey (2601.15533), sociology
 primary sources (Weber, Mead/Blumer, Goffman, Homans/Blau, Coleman, Granovetter,
-North, Ostrom, Bicchieri/Elster, March-Simon/Nelson-Winter) — judged on
+North, Ostrom, Bicchieri/Elster, March-Simon/Nelson-Winter) - judged on
 faithfulness of citation, not reproducibility. Several sociology anchors were
 fetched as secondary-source paraphrase (TLS/503/403 on primary pages); the Lane 4
 notes flag these for primary-book verification before any external publication.
@@ -81,11 +81,11 @@ notes flag these for primary-book verification before any external publication.
 
 1. The **infrastructure** the repo might borrow (MineStudio callbacks, VPT/STEVE
    weights, Solaris data engine, Concordia components, SOTOPIA dimensions, GLEE
-   formulas) is largely reproducible → safe to adapt mechanically.
-2. The **headline social/civilization results** (Project Sid) are claim-only →
+   formulas) is largely reproducible -> safe to adapt mechanically.
+2. The **headline social/civilization results** (Project Sid) are claim-only ->
    not baselines; the repo's verified-transition stance is the corrective.
 3. The repo's own runs would land in a **strong reproducibility position** by
    construction: deterministic Mineflayer world, verifier-auto-labeled
-   transitions, released schema + logger + scoring — exactly the code/data/logs
+   transitions, released schema + logger + scoring - exactly the code/data/logs
    that Project Sid lacks. That is a defensible differentiator (but it is
    *support infrastructure*, not the research contribution).

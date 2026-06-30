@@ -1,0 +1,222 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/tools/edit.py b/tools/edit.py
+index d7184c3..87fa408 100644
+--- a/tools/edit.py
++++ b/tools/edit.py
+@@ -1,5 +1,9 @@
+ from pathlib import Path
+ import subprocess
++from typing import List, Optional, Dict
++
++# Global edit history for undo functionality
++edit_history: Dict[str, List[str]] = {}
+ 
+ def tool_info():
+     return {
+@@ -10,14 +14,14 @@ def tool_info():
+ * The `create` command cannot be used if the specified `path` already exists as a file.\n
+ * If a `command` generates a long output, it will be truncated and marked with `<response clipped>`.\n
+ * The `edit` command overwrites the entire file with the provided `file_text`.\n
+-* No partial/line-range edits or partial viewing are supported.""",
++* Also supports viewing specific line ranges, string replacement, text insertion, and undo operations.""",
+         "input_schema": {
+             "type": "object",
+             "properties": {
+                 "command": {
+                     "type": "string",
+-                    "enum": ["view", "create", "edit"],
+-                    "description": "The command to run: `view`, `create`, or `edit`."
++                    "enum": ["view", "create", "edit", "str_replace", "insert", "undo_edit"],
++                    "description": "The command to run: `view`, `create`, `edit`, `str_replace`, `insert`, or `undo_edit`."
+                 },
+                 "path": {
+                     "description": "Absolute path to file or directory, e.g. `/repo/file.py` or `/repo`.",
+@@ -26,6 +30,23 @@ def tool_info():
+                 "file_text": {
+                     "description": "Required parameter of `create` or `edit` command, containing the content for the entire file.",
+                     "type": "string"
++                },
++                "view_range": {
++                    "description": "Optional parameter for `view` command to display specific line range [start, end].",
++                    "type": "array",
++                    "items": {"type": "integer"}
++                },
++                "old_str": {
++                    "description": "Required parameter for `str_replace` command, string to replace.",
++                    "type": "string"
++                },
++                "new_str": {
++                    "description": "Required parameter for `str_replace` and `insert` commands, new string to insert.",
++                    "type": "string"
++                },
++                "insert_line": {
++                    "description": "Required parameter for `insert` command, line number where to insert text.",
++                    "type": "integer"
+                 }
+             },
+             "required": ["command", "path"]
+@@ -43,7 +64,7 @@ def validate_path(path: str, command: str) -> Path:
+     Validate the file path for each command:
+       - 'view': path may be a file or directory; must exist.
+       - 'create': path must not exist (for new file creation).
+-      - 'edit': path must exist (for overwriting).
++      - Others: path must exist as a file.
+     """
+     path_obj = Path(path)
+ 
+@@ -61,14 +82,12 @@ def validate_path(path: str, command: str) -> Path:
+         # Path must not exist
+         if path_obj.exists():
+             raise ValueError(f"Cannot create new file; {path} already exists.")
+-    elif command == "edit":
++    else:
+         # Path must exist and must be a file
+         if not path_obj.exists():
+             raise ValueError(f"The file {path} does not exist.")
+         if path_obj.is_dir():
+             raise ValueError(f"{path} is a directory and cannot be edited as a file.")
+-    else:
+-        raise ValueError(f"Unknown or unsupported command: {command}")
+ 
+     return path_obj
+ 
+@@ -89,14 +108,21 @@ def read_file(path: Path) -> str:
+     except Exception as e:
+         raise ValueError(f"Failed to read file: {e}")
+ 
+-def write_file(path: Path, content: str):
++def write_file(path: Path, content: str, save_history: bool = True):
+     """Write (overwrite) entire file contents."""
+     try:
++        if save_history:
++            # Save the current content to history before writing
++            if path.exists():
++                if str(path) not in edit_history:
++                    edit_history[str(path)] = []
++                edit_history[str(path)].append(path.read_text())
++
+         path.write_text(content)
+     except Exception as e:
+         raise ValueError(f"Failed to write file: {e}")
+ 
+-def view_path(path_obj: Path) -> str:
++def view_path(path_obj: Path, view_range: Optional[List[int]] = None) -> str:
+     """View the entire file contents or directory listing."""
+     if path_obj.is_dir():
+         # For directories: list non-hidden files up to 2 levels deep
+@@ -115,35 +141,104 @@ def view_path(path_obj: Path) -> str:
+         except Exception as e:
+             raise ValueError(f"Failed to list directory: {e}")
+ 
+-    # If it's a file, show the entire file with line numbers
++    # If it's a file
+     content = read_file(path_obj)
++    lines = content.splitlines()
++
++    # Handle line range viewing
++    if view_range:
++        if len(view_range) != 2:
++            raise ValueError("view_range must contain exactly two elements: [start, end]")
++        start, end = view_range
++        if start < 1 or end > len(lines):
++            raise ValueError(f"Invalid line range [{start}, {end}] for file with {len(lines)} lines")
++        # Adjust for 0-based indexing
++        content = "\n".join(lines[start-1:end])
++        return format_output(content, str(path_obj), init_line=start)
++
+     return format_output(content, str(path_obj))
+ 
+-def tool_function(command: str, path: str, file_text: str = None) -> str:
++def str_replace(path_obj: Path, old_str: str, new_str: str) -> str:
++    """Replace string in file, ensuring uniqueness."""
++    content = read_file(path_obj)
++    # Check for multiple occurrences
++    if content.count(old_str) > 1:
++        return f"Error: Multiple occurrences of '{old_str}' found. Replacement requires a unique match."
++    elif content.count(old_str) == 0:
++        return f"Error: String '{old_str}' not found in file."
++
++    new_content = content.replace(old_str, new_str)
++    write_file(path_obj, new_content)
++    return f"File at {path_obj} has been edited: replaced '{old_str}' with '{new_str}'."
++
++def insert_text(path_obj: Path, insert_line: int, new_str: str) -> str:
++    """Insert text at specified line number."""
++    content = read_file(path_obj)
++    lines = content.splitlines()
++
++    if insert_line < 1 or insert_line > len(lines) + 1:
++        raise ValueError(f"Invalid insert line {insert_line} for file with {len(lines)} lines")
++
++    # Insert the new text at the specified line (adjusting for 0-based index)
++    lines.insert(insert_line - 1, new_str.rstrip("\n"))
++    new_content = "\n".join(lines) + "\n"
++    
++    write_file(path_obj, new_content)
++    return f"File at {path_obj} has been edited: inserted text at line {insert_line}."
++
++def undo_edit(path_obj: Path) -> str:
++    """Undo last edit operation on the file."""
++    path_str = str(path_obj)
++    if path_str not in edit_history or not edit_history[path_str]:
++        return "Error: No edit history available for this file."
++
++    # Restore the last saved content
++    previous_content = edit_history[path_str].pop()
++    write_file(path_obj, previous_content, save_history=False)
++    return f"Last edit on {path_obj} has been undone successfully."
++
++def tool_function(command: str, path: str, **kwargs) -> str:
+     """
+-    Main tool function that handles:
+-      - 'view'  : View the entire file or directory listing
+-      - 'create': Create a new file with the given file_text
+-      - 'edit'  : Overwrite an existing file with file_text
++    Main tool function that handles all commands:
++      - 'view'        : View file/directory (optionally with line range)
++      - 'create'      : Create new file
++      - 'edit'        : Overwrite existing file
++      - 'str_replace' : Replace string in file
++      - 'insert'      : Insert text at line
++      - 'undo_edit'   : Undo last edit
+     """
+     try:
+         path_obj = validate_path(path, command)
+ 
+         if command == "view":
+-            return view_path(path_obj)
++            view_range = kwargs.get('view_range')
++            return view_path(path_obj, view_range)
+ 
+         elif command == "create":
+-            if file_text is None:
++            if 'file_text' not in kwargs:
+                 raise ValueError("Missing required `file_text` for 'create' command.")
+-            write_file(path_obj, file_text)
++            write_file(path_obj, kwargs['file_text'])
+             return f"File created successfully at: {path}"
+ 
+         elif command == "edit":
+-            if file_text is None:
++            if 'file_text' not in kwargs:
+                 raise ValueError("Missing required `file_text` for 'edit' command.")
+-            write_file(path_obj, file_text)
++            write_file(path_obj, kwargs['file_text'])
+             return f"File at {path} has been overwritten with new content."
+ 
++        elif command == "str_replace":
++            if 'old_str' not in kwargs or 'new_str' not in kwargs:
++                raise ValueError("Both 'old_str' and 'new_str' are required for string replacement.")
++            return str_replace(path_obj, kwargs['old_str'], kwargs['new_str'])
++
++        elif command == "insert":
++            if 'insert_line' not in kwargs or 'new_str' not in kwargs:
++                raise ValueError("Both 'insert_line' and 'new_str' are required for text insertion.")
++            return insert_text(path_obj, kwargs['insert_line'], kwargs['new_str'])
++
++        elif command == "undo_edit":
++            return undo_edit(path_obj)
++
+         else:
+             raise ValueError(f"Unknown command: {command}")
+\end{lstlisting}

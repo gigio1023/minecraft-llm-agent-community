@@ -59,7 +59,7 @@ Chemistry 101, 2502.08691 AgentSociety, 2606.02859 Economy of Minds).
 - Exact canonical wording for Ostrom 2011 (PSJ PDF, TLS error) and the eight
   design principles (P2P page 403; used a secondary paraphrase). Structure is
   faithful; quote-level precision needs the primary books.
-- The Institutional-layer constructs (emergent norms, routines, micro→macro
+- The Institutional-layer constructs (emergent norms, routines, micro->macro
   transition / Coleman's boat) are the least empirically supported. They are
   framed as predictable deltas a WAM would forecast, not as behaviors the current
   runtime demonstrates.
@@ -70,8 +70,8 @@ Chemistry 101, 2502.08691 AgentSociety, 2606.02859 Economy of Minds).
 ## Implications for this repo
 
 - Mechanically useful: the social-state-variable matrix gives a row-by-row
-  translation (construct → observable → log record → predictable delta →
-  verification source → unclaimable-yet → scenario → WAM layer) that reuses the
+  translation (construct -> observable -> log record -> predictable delta ->
+  verification source -> unclaimable-yet -> scenario -> WAM layer) that reuses the
   repo's exact schemas. The six recommended `[NEW]` records (is_other_oriented,
   information_shared, NormState, SanctionEvent, routine_observed, over_use) are
   post-action evidence only and must not gate execution.
@@ -95,7 +95,7 @@ Chemistry 101, 2502.08691 AgentSociety, 2606.02859 Economy of Minds).
    `weak_commons_surplus_use_and_dispute_v1` robustness test with inventory-verified
    draws instead of declared numbers?
 3. What is the minimum multi-episode evidence that would let the repo make even a
-   weak `organization`-rung claim without overclaiming Coleman's micro→macro step?
+   weak `organization`-rung claim without overclaiming Coleman's micro->macro step?
 4. Should the empirical-expectation proxy (conformity count) be computed by the
    runtime from history, or proposed by the provider and then verified? (The repo's
    rule says the runtime owns derived state, so likely the former.)

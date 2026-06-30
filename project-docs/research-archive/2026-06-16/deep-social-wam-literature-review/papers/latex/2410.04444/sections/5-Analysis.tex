@@ -1,0 +1,117 @@
+To further explore how \framework self-improves, as well as its efficiency and the factors that influence it, we first evaluate the tool usage ratio on MGSM and conduct an ablation study on the initial tools. 
+In addition, to analyze the robustness of \framework{}'s self-improvement, we also collect statistics for the agent's termination.
+Finally, we perform a case study of initial policies and optimization processes on the classic Game of 24.
+
+
+\subsection{Analysis of Initial Tools}
+\label{sec:ablation}
+
+
+\begin{figure}[t]
+    \centering
+    % 调整宽度为文本宽度的80%，高度自动调整
+    \includegraphics[width=0.45\textwidth]{figures/num.pdf} 
+    \caption{The number of actions taken by \framework varies across different tasks.} % 添加图片标题
+    \label{fig:num} % 添加标签，用于引用
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+% \setlength{\abovecaptionskip}{-0.15cm}
+% \setlength{\belowcaptionskip}{-10pt}
+  \includegraphics[width=0.9\linewidth]{figures/gameof_24.pdf}
+  \caption {(a) One representative example of Game of 24. (b) Accuracy progression for different initial policies.}
+  \label{fig:case_start}
+\end{figure*}
+
+We record the number of different actions taken in experiments. In Figure \ref{fig:num}, we can see that \framework interacts with its environment frequently, analyzing and modifying its logic in the process. Additionally, error handling plays a crucial role.
+
+% \begin{table}
+%     \centering
+%     \begin{tabular}{lc}
+%         \toprule
+%         Action Ablation & MGSM   \\ 
+%         \midrule
+%         \framework & 64.2  \\ 
+%         w/o thinking & 50.8  \\ 
+%         w/o error handling & 49.4  \\ 
+%         w/o code running & 57.1  \\ 
+%         w/o LLM calling & 60.4  \\ 
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Ablation study on initial tool configuration.}
+%     \label{tab:ab_tool}
+%     % \vspace{-0.2cm}
+% \end{table}
+
+\begin{table}[ht]
+    \centering
+    \small
+    \begin{tabular}{lc|lc}
+        \toprule
+        Ablation & MGSM & Ablation & MGSM \\ 
+        \midrule
+        w/o think & 50.8\scriptsize{↓13.4} & w/o run & 57.1\scriptsize{↓-7.1} \\ 
+        w/o err & 49.4\scriptsize{↓-14.8} & w/o LLM & 60.4\scriptsize{↓-3.8} \\ 
+        \bottomrule
+    \end{tabular}
+    \caption{Ablation study on initial tool configuration. "think" refers to "thinking", "err" to "error handling", "run" to "code running", and "LLM" to "LLM calling".}
+    \label{tab:ab_tool}
+    \vspace{-0.2cm}
+\end{table}
+
+As discussed in Section \ref{sec:addi}, \framework is initially provided with four additional tools.
+%to accelerate convergence and reduce optimization difficulty: 1) thinking before acting, 2) error handling, 3) code running, and 4) LLM calling. 
+To analyze their impact, an ablation study is conducted, and the results are shown in Table \ref{tab:ab_tool}. The study reveals that the “thinking before acting” tool significantly influences the results, as much of \framework{}’s optimization effectiveness stems from pre-action planning and reasoning. Additionally, error handling is crucial for recursive improvement, as LLMs often introduce errors in the code. 
+Providing opportunities for trial and error, along with error feedback mechanisms, is essential for sustained optimization.
+% Without these tools, \framework would struggle to operate until satisfactory results are achieved. 
+On the other hand, the code running and LLM calling have minimal impact on the outcomes, as \framework can implement these basic functionalities independently. Their inclusion at the outset primarily serves efficiency purposes.
+
+
+% \subsection{Robustness Analysis of the Agent}
+
+% \begin{table}
+%     \centering
+%     \begin{tabular}{lc}
+%         \toprule
+%         Event & Frequency (\%)  \\ 
+%         \midrule
+%         Accidental Termination & 4  \\ 
+%         Temporary Drop & 92  \\ 
+%         Optimization Failure & 14  \\ 
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Robustness metric for \framework. Frequency of unexpected events on MGSM using CoT as the initial method.}
+%     \label{tab:robust}
+%     \vspace{-0.2cm}
+% \end{table}
+
+
+% \framework occasionally makes erroneous modifications, sometimes causing the agent to terminate unexpectedly or leading to degraded task performance. Table \ref{tab:robust} shows the proportion of runs on MGSM where the agent terminated, experienced performance degradation during optimization, or ultimately performed worse than its initial performance. These statistics are collected over 100 optimization trials. Thanks to the design of our error-handling mechanism, only a few percentages of agent runs result in termination. This typically occurs when \framework modifies its recursive improvement module, rendering it unable to continue self-optimization. Additionally, \framework frequently makes suboptimal modifications during each optimization iteration. However, in most cases, the final task performance surpasses the initial baseline. This indicates that \framework is able to adjust its optimization direction or revert to a previous optimal algorithm when performance declines, demonstrating the robustness of its self-improvement process.
+
+
+
+\subsection{Robustness Analysis of the Agent}
+
+We test \framework on 100 optimization trials on MGSM and find it occasionally makes erroneous changes, which can result in either terminating unexpectedly (4\%) or experiencing temporary performance drops (92\%) during optimization. Only in 14\% of trials, optimization ultimately failed, resulting in worse performance than the initial policy. 
+% These statistics are based on 100 optimization trials on MGSM using CoT as the initial method.
+
+Thanks to the design of our error-handling mechanism, unexpected terminations are rare and typically occur when \framework modifies its recursive improvement module, making further self-optimization impossible. While suboptimal modifications are frequent during individual optimization steps, the final task performance usually exceeds the initial baseline. This demonstrates that \framework can adjust its optimization direction or revert to a previous optimal algorithm when performance declines, highlighting the robustness of its self-improvement process.
+
+
+
+\subsection{Case Study: Game of 24}
+\label{sec:game24}
+To explore how \framework recursively enhances its optimization and problem-solving abilities, a case study is conducted with Game of 24, a simple yet effective task for evaluating the agent’s reasoning capabilities. Since \framework follows different optimization paths in each iteration, two representative cases are selected for analysis.
+
+
+
+\noindent\textbf{Switching from LLM-Based Methods to Search Algorithms:}\quad \framework does not rely on fixed, human-designed approaches like traditional agents. Initially, \framework uses a standard LLM-based method to solve the Game of 24, as shown in Code 5 of Appendix \ref{sec:code24}. After six unsuccessful optimization attempts, \framework completely rewrites this part of its code, choosing to use a search algorithm instead as shown in Code 6 of Appendix \ref{sec:code24}. This leads to 100\% accuracy in the task. This result demonstrates that \framework, unlike fixed agents, can optimize itself freely based on task requirements without being constrained by initial methodologies.
+
+\noindent\textbf{LLM Algorithms with Code-Assisted Verification:} \quad
+In several runs, \framework continues to refine its LLM-based algorithm. Figure \ref{fig:case_start}.a shows the improvement process, where the most significant gains come from the code-assisted verification mechanism and reattempting the task with additional data. The former increases performance by over 10\%, while the latter boosts it by more than 15\%. Furthermore, \framework enhances its optimization process by not only retrieving error messages but also using the error-trace library for more detailed analysis. It adds parallel optimization capabilities, improves log outputs, and removes redundant code. These iterative enhancements in both the task and optimization algorithms show \framework{}’s unique ability to continually refine itself for better performance.
+
+To analyze the impact of different initial policies on the effectiveness and efficiency of optimization, various methods are used as the initial policies for the Game of 24, including Tree of Thought (ToT) \citep{yao2023treethoughtsdeliberateproblem}, Chain of Thought (CoT) \citep{wei2022chain}, basic prompt instructions, and prompts that deliberately produce outputs in incorrect formats not aligned with the task requirements. The results are shown in Figure \ref{fig:case_start}.b.
+
+The findings indicate that stronger initial policies lead to faster convergence, with smaller optimization margins, as \framework reaches its performance limit without further enhancing its optimization capabilities. Conversely, weaker initial methods result in slower convergence and larger gains, with \framework making more modifications. However, even in these cases, \framework does not outperform the results achieved using ToT. Given the current limitations of LLMs, it is challenging for \framework to innovate beyond state-of-the-art algorithms. Improvements in LLM capabilities are anticipated to unlock more innovative self-optimization strategies in the future.
+% We also discuss the future directions in Appendix \ref{app:future}.

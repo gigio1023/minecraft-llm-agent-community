@@ -1,0 +1,108 @@
+\section{Motivating Example: Mathematical Optimization}
+\label{sec:motivating_example}
+
+We first demonstrate the potential of LLMs in serving as optimizers for mathematical optimization. 
+In particular, we present a case study on linear regression as an example of continuous optimization, and on the Traveling Salesman Problem (TSP) as an example of discrete optimization. 
+On both tasks, we see LLMs properly capture the optimization directions on small-scale problems merely based on the past optimization trajectory provided in the meta-prompt.
+
+\subsection{Linear Regression}
+
+In linear regression problems, the goal is to find the linear coefficients that probabilistically best explain the response from the input variables.
+We study the setting in which the independent and dependent variables $X$ and $y$ are both one-dimensional and an intercept $b$ is present, so that there are two one-dimensional variables $w$, $b$ to optimize over.
+In a synthetic setting, we sample ground truth values for one-dimensional variables $w_\text{true}$ and $b_\text{true}$, and generate 50 data points by $y = w_\text{true} x + b_\text{true} + \epsilon$, in which $x$ ranges from 1 to 50 and $\epsilon$ is the standard Gaussian noise.
+Our optimization starts from 5 randomly sampled $(w, b)$ pairs.
+In each step, we prompt an instruction-tuned LLM with a meta-prompt that includes the best 20 $(w, b)$ pairs in history and their sorted objective values.
+The meta-prompt then asks for a new $(w, b)$ pair that further decreases the objective value.
+A sample meta-prompt is shown in Figure~\ref{fig:meta_prompt_example_linear_regression} of Appendix~\ref{appsec:meta_prompts_for_math_opt}.
+We prompt the meta-prompt 8 times to generate at most 8 new $(w, b)$ pairs in each step to improve optimization stability.
+Then we evaluate the objective value of the proposed pair and add it to history.
+We do black-box optimization: the analytic form does not appear in the meta-prompt text.
+This is because the LLM can often calculate the solution directly from the analytic form.
+
+\begin{table}
+\centering
+\caption{Linear regression by optimizer LLMs: the mean $\pm$ standard deviation of the number of steps and the number of unique $(w, b)$ pairs explored before reaching the global optima.
+Both $w$ and $b$ start from 5 random starting points in $[10, 20]$.
+We use temperature 1.0 for all models.
+We run each setting 5 times.
+The starting points are the same across optimizer LLMs but are different across 5 runs, and are grouped by: within the starting region, outside and close to the starting region, and outside and farther from the starting region.
+Bold numbers indicate the best among three LLMs in each setting.
+}
+\scalebox{0.8}{
+\begin{tabular}{cccccccc}
+\toprule
+\multirow{2}{*}{$w_\text{true}$} & \multirow{2}{*}{$b_\text{true}$} & \multicolumn{3}{c}{number of steps} & \multicolumn{3}{c}{number of unique $(w, b)$ pairs explored} \\ \cmidrule(lr){3-5} \cmidrule(lr){6-8}
+& & \texttt{text-bison} & \texttt{gpt-3.5-turbo} & \texttt{gpt-4} & \texttt{text-bison} & \texttt{gpt-3.5-turbo} & \texttt{gpt-4} \\
+\midrule
+15 & 14 & 5.8 \scriptsize{$\pm$ 2.6} & 7.6 \scriptsize{$\pm$ 4.5} & \textbf{4.0} \scriptsize{$\pm$ 1.5} & 40.0 \scriptsize{$\pm$ 12.4}
+ & 36.0 \scriptsize{$\pm$ 15.2} & \textbf{17.2} \scriptsize{$\pm$ 5.1} \\
+17 & 17 & \textbf{4.0} \scriptsize{$\pm$ 1.8} & 12.6 \scriptsize{$\pm$ 6.0} & 6.0 \scriptsize{$\pm$ 3.7} & 33.4 \scriptsize{$\pm$ 11.7} & 53.8 \scriptsize{$\pm$ 16.9} & \textbf{26.0} \scriptsize{$\pm$ 10.6} \\
+16 & 10 & \textbf{3.8} \scriptsize{$\pm$ 2.2} & 10.4 \scriptsize{$\pm$ 5.4} & 6.2 \scriptsize{$\pm$ 3.1} & 30.2 \scriptsize{$\pm$ 13.4} & 42.8 \scriptsize{$\pm$ 16.3} & \textbf{24.2} \scriptsize{$\pm$ 8.2} \\
+\hdashline\noalign{\vskip 0.5ex}
+3 & 5 & \textbf{9.8} \scriptsize{$\pm$ 2.8} & 10.8 \scriptsize{$\pm$ 2.7} & 12.2 \scriptsize{$\pm$ 2.0} & 55.8 \scriptsize{$\pm$ 16.1} & 39.6 \scriptsize{$\pm$ 10.1} & \textbf{33.0} \scriptsize{$\pm$ 4.0} \\
+25 & 23 & 19.6 \scriptsize{$\pm$ 11.4} & 26.4 \scriptsize{$\pm$ 18.3} & \textbf{12.2} \scriptsize{$\pm$ 3.7} & 104.0 \scriptsize{$\pm$ 52.3} & 78.6 \scriptsize{$\pm$ 26.2} & \textbf{44.2} \scriptsize{$\pm$ 8.3} \\
+\hdashline\noalign{\vskip 0.5ex}
+2 & 30 & \textbf{31.4} \scriptsize{$\pm$ 6.3} & 42.8 \scriptsize{$\pm$ 9.7} & 38.0 \scriptsize{$\pm$ 15.9} & 126.4 \scriptsize{$\pm$ 17.7} & 125.6 \scriptsize{$\pm$ 21.7} & \textbf{99.0} \scriptsize{$\pm$ 24.6} \\
+36 & -1 & \textbf{35.8} \scriptsize{$\pm$ 6.4} & 45.4 \scriptsize{$\pm$ 16.9} & 50.4 \scriptsize{$\pm$ 18.8} & 174.0 \scriptsize{$\pm$ 28.2} & 142.2 \scriptsize{$\pm$ 31.2} & \textbf{116.4} \scriptsize{$\pm$ 32.7} \\
+\bottomrule
+\end{tabular}
+}
+\label{table:linear_regression_results_in_main_paper}
+\end{table}
+
+Table~\ref{table:linear_regression_results_in_main_paper} summarizes the results with one of the following optimizer LLMs: \texttt{text-bison}, \texttt{gpt-3.5-turbo}, and \texttt{gpt-4}.
+We study three settings of $w_\text{true}$ and $b_\text{true}$: within the starting region $[10, 20] \times [10, 20]$, ``near outside'' (each of $w_\text{true}$ and $b_\text{true}$ is outside the starting region but the distance is less than 10), and ``far outside'' (each of $w_\text{true}$ and $b_\text{true}$ is outside the starting region and the distance is greater than 10).
+We see:
+\begin{itemize}[leftmargin=2em,topsep=0pt,partopsep=1ex,parsep=0ex]
+\item The number of unique $(w, b)$ pairs explored by each model is fewer than exhaustive search, indicating these models are able to to do black-box optimization: compare the numbers and propose a descent direction.
+\item The \texttt{text-bison} and \texttt{gpt-4} models outperform \texttt{gpt-3.5-turbo} in convergence speed: they arrive at the optima with fewer steps.
+The \texttt{gpt-4} model also outperforms in finding the optima with fewer explored unique points. 
+Taking a closer look at the optimization trajectory, we see \texttt{gpt-4} is the best at proposing a reasonable next step from the history: for example, when the history shows the objective values of $(w, b) = (8, 7)$, $(w, b) = (8, 6)$, and $(w, b) = (8, 5)$ are decreasing, it has a highest chance to propose $(w, b) = (8, 4)$ for evaluation.
+\item The problem becomes harder for all models when the ground truth moves farther from the starting region: all models need more explorations and more steps.
+\end{itemize}
+
+\subsection{Traveling Salesman Problem (TSP)}
+Next, we consider the Traveling Salesman Problem (TSP)~\citep{junger1995traveling,gutin2006traveling}, a classical combinatorial optimization problem with numerous algorithms proposed in literature, including heuristic algorithms and solvers~\citep{rosenkrantz1977analysis,golden1980approximate,optimization2020gurobi,applegate2006concorde,helsgaun2017extension}, and approaches based on training deep neural networks~\citep{kool2018attention,deudon2018learning,chen2019learning,nazari2018reinforcement}. 
+Specifically, given a set of $n$ nodes with their coordinates, the TSP task is to find the shortest route that traverses all nodes from the starting node and finally returns to the starting node.
+
+Our optimization process with LLMs starts from 5 randomly generated solutions, and each optimization step produces at most 8 new solutions. 
+We present the meta-prompt in Figure~\ref{fig:meta_prompt_example_tsp} of Appendix~\ref{appsec:meta_prompts_for_math_opt}. 
+We generate the problem instances by sampling $n$ nodes with both $x$ and $y$ coordinates in $[-100, 100]$. 
+We use the Gurobi solver~\citep{optimization2020gurobi} to construct the oracle solutions and compute the optimality gap for all approaches, where the optimality gap is defined as the difference between the distance in the solution constructed by the evaluated approach and the distance achieved by the oracle solution, divided by the distance of the oracle solution. 
+Besides evaluating \name{} with different LLMs including \texttt{text-bison}, \texttt{gpt-3.5-turbo} and \texttt{gpt-4}, we also compare \name{} to the following heuristics:
+
+\begin{itemize}[leftmargin=2em,topsep=0pt,partopsep=1ex,parsep=0ex]
+
+\item \texttt{Nearest Neighbor (NN)}. Starting from an initial node, the solution is constructed with the nearest neighbor heuristic: At each step, among the remaining nodes that are not included in the current partial solution, NN selects the node with the shortest distance to the end node of the partial solution, and adds it as the new end node. The process finishes when all nodes have been added to the solution.
+
+\item \texttt{Farthest Insertion (FI)}. One caveat of the nearest neighbor heuristic is that it does not take the distance between the start and end node into consideration when constructing partial solutions. To address this issue, FI aims to optimize the cost of inserting new nodes into the partial solution at each step. Define the minimal insertion cost of adding a new node $k$ as $c(k) = \min_{(i, j)} d(i, k) + d(k, j) - d(i, j)$, where $i$ and $j$ are adjacent nodes in the current tour, and $d(\cdot, \cdot)$ represents the distance between two nodes. At each step, FI adds a new node that maximizes the minimal insertion cost.
+
+\end{itemize}
+
+\begin{table}
+\centering
+\caption{Results of the Traveling Salesman Problem (TSP) with different number of nodes $n$, where each $n$ contains 5 problems. ``\# steps'' calculates the mean $\pm$ standard error of optimization steps for successful runs that find the optimal solution. ``\# successes'' counts the number of problems that \name{} results in the optimal solution. When no optimal solution is found for any evaluated problem, the corresponding number of steps is N/A.
+}
+\scalebox{0.7}{
+\begin{tabular}{ccccccccc}
+\toprule
+\multirow{2}{*}{$n$} & \multicolumn{5}{c}{optimality gap (\%)} & \multicolumn{3}{c}{\# steps (\# successes)} \\ \cmidrule(lr){2-6} \cmidrule(lr){7-9}
+& NN & FI & \texttt{text-bison} & \texttt{gpt-3.5-turbo} & \texttt{gpt-4} & \texttt{text-bison} & \texttt{gpt-3.5-turbo} & \texttt{gpt-4} \\
+\midrule
+10 & 13.0 \scriptsize{$\pm$ 1.3} & 3.2 \scriptsize{$\pm$ 1.4} & \textbf{0.0} \scriptsize{$\pm$ 0.0} & \textbf{0.0} \scriptsize{$\pm$ 0.0} & \textbf{0.0} \scriptsize{$\pm$ 0.0} & 40.4 \scriptsize{$\pm$ 5.6} \textbf{\footnotesize{ (5)}} & 46.8 \scriptsize{$\pm$ 9.3} \textbf{\footnotesize{ (5)}} & \textbf{9.6} \scriptsize{$\pm$ 3.0} \textbf{\footnotesize{ (5)}}\\
+15 & 9.4 \scriptsize{$\pm$ 3.7} & 1.2 \scriptsize{$\pm$ 0.6} & 4.4 \scriptsize{$\pm$ 1.3} & 1.2 \scriptsize{$\pm$ 1.1} & \textbf{0.2} \scriptsize{$\pm$ 0.2} & N/A (0) & 202.0 \scriptsize{$\pm$ 41.1} \textbf{\footnotesize{ (4)}} & \textbf{58.5} \scriptsize{$\pm$ 29.0} \textbf{\footnotesize{ (4)}} \\
+20 & 16.0\scriptsize{$\pm$ 3.9} & \textbf{0.2}\scriptsize{$\pm$ 0.1} & 30.4 \scriptsize{$\pm$ 10.6}  & 4.4 \scriptsize{$\pm$ 2.5} & 1.4 \scriptsize{$\pm$ 0.6} & N/A (0) & 438.0 \scriptsize{$\pm$ 0.0} \footnotesize{ (1)} &  \textbf{195.5} \scriptsize{$\pm$ 127.6} \textbf{\footnotesize{ (2)}} \\
+50 & 19.7 \scriptsize{$\pm$ 3.1} & \textbf{9.8} \scriptsize{$\pm$ 1.5} & 219.8 \scriptsize{$\pm$ 13.7}  & 133.0 \scriptsize{$\pm$ 6.8} & 11.0 \scriptsize{$\pm$ 2.6} & N/A (0) & N/A (0) &  N/A (0)\\
+\bottomrule
+\end{tabular}
+}
+\label{table:tsp_main_results}
+\end{table}
+
+We present the results in Table~\ref{table:tsp_main_results}. We randomly generate 5 problem instances for each number of nodes $n$. In addition to measuring the optimality gap, on problems where the LLM finds the optimal solutions, we also show the number of optimization steps taken to reach the global optimum. First, we observe that \texttt{gpt-4} significantly outperforms \texttt{gpt-3.5-turbo} and \texttt{text-bison} across all problem sizes. Specifically, on smaller-scale problems, \texttt{gpt-4} reaches the global optimum about $4 \times$ faster than other LLMs. On larger-scale problems, especially with $n=50$, \texttt{gpt-4} still finds solutions with a comparable quality to heuristic algorithms, while both \texttt{text-bison} and \texttt{gpt-3.5-turbo} get stuck at local optima with up to $20\times$ worse optimality gaps.
+
+On the other hand, the performance of \name{} degrades dramatically on problems with larger sizes. When $n=10$, all LLMs find the optimal solutions for every evaluated problem; as the problem size gets larger, the \name{} optimality gaps increase quickly, and the farthest insertion heuristic starts to outperform all LLMs in the optimality gap.
+
+\paragraph{Limitations.} We would like to note that \name{} is designed for neither outperforming the state-of-the-art gradient-based optimization algorithms for continuous mathematical optimization, nor surpassing the performance of specialized solvers for classical combinatorial optimization problems such as TSP. Instead, the goal is to demonstrate that LLMs are able to optimize different kinds of objective functions simply through prompting, and reach the global optimum for some small-scale problems.
+Our evaluation reveals several limitations of \name{} for mathematical optimization.
+Specifically, the length limit of the LLM context window makes it hard to fit large-scale optimization problem descriptions in the prompt, e.g., linear regression with high-dimensional data, and traveling salesman problems with a large set of nodes to visit. In addition, the optimization landscape of some objective functions are too bumpy for the LLM to propose a correct descending direction, causing the optimization to get stuck halfway. We further elaborate our observed failure cases in Appendix~\ref{appsec:some_failure_cases}.

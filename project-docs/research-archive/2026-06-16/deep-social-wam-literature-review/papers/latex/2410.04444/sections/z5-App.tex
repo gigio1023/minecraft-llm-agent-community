@@ -1,0 +1,180 @@
+\label{sec:spacialcode}
+In this section, we present the optimization process of \framework on MGSM, illustrating its progress across various iteration steps within a single optimization run. The strategy obtained in the 6th iteration (shown in Code 7) reflects the \framework's comprehension of mathematical tasks, attempting to handle them through a process akin to parse-deduct-execute-validate. By the 14th iteration, as illustrated in Code 8, the strategy evolves through the summarization of erroneous cases, abstracting key insights and employing a checklist to guide the validation process. Finally, the strategy at the 20th iteration (demonstrated in Code 9) asserts the use of a "rabbit-proof syntax tactline, reinforced by consistent effort through role-coded checks," to refine prompt design. In the end, we also show one analysis example of \framework.
+
+
+
+\section{Comparison Between Random Sampling and \framework Performance}
+To demonstrate the distinction between our approach and random sampling, we conducted 30 independent random sampling experiments using GPT-4o. The prompts used for random sampling were identical to the initial policy prompts employed by Gödel Agent to ensure a fair comparison.
+The results are illustrated in Figure \ref{fig:curve}. From the figure, it is evident that the performance of random sampling remains around 30\% across all trials. In contrast, Gödel Agent, despite experiencing occasional temporary dips in performance, rapidly corrects these deviations and demonstrates continuous improvement over iterations.
+This consistent upward trajectory highlights the superiority of Gödel Agent over random sampling. The Gödel Agent’s ability to leverage feedback and recursively optimize its policies underscores its effectiveness in achieving higher performance.
+
+
+
+\newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Policy at 6th Iteration found by \framework for MGSM.}]
+def solver(agent, task: str):
+    def parse_problem(task):
+        # Basic arithmetic and logical parsing based on keywords
+        words = task.split()
+        numbers = list(map(int, filter(lambda x: x.isdigit(), words)))
+        return {'numbers': numbers, 'text': task}
+
+    def perform_logic_deduction(parsed_details):
+        # make deductions based on common problem formats
+        numbers = parsed_details['numbers']
+        # This will only manage simple sum, subtraction, multiplication inference
+        logic_map = {
+            'add': lambda a, b: a + b,
+            'subtract': lambda a, b: a - b,
+            'multiply': lambda a, b: a * b
+        }
+        # Try to identify actions based on keywords
+        if 'sum' in parsed_details['text'] or 'total' in parsed_details['text']:
+            result = sum(numbers)
+        elif 'difference' in parsed_details['text'] or 'less' in parsed_details['text']:
+            result = logic_map['subtract'](numbers[0], numbers[1])
+        elif 'product' in parsed_details['text'] or 'times' in parsed_details['text']:
+            result = logic_map['multiply'](numbers[0], numbers[1])
+        else:
+            # Default case showing no deduction
+            result = 0
+        return result
+
+    def execute_computation(logic_results):
+        # Taking result from inference to numerical handling
+        return logic_results
+
+    def validate_and_compile_results(computation_results):
+        # Prepares and ensures the response matches expected format
+        final_answer = computation_results
+        return final_answer
+
+    try:
+        # Parsing
+        parsed_details = parse_problem(task)
+
+        # Logical deduction
+        logic_results = perform_logic_deduction(parsed_details)
+
+        # Computation
+        computation_results = execute_computation(logic_results)
+
+        # Validation and compilation
+        final_answer = validate_and_compile_results(computation_results)
+
+        return {"answer": final_answer}
+    except Exception as e:
+        return {"error": str(e)}
+\end{lstlisting}
+\end{figure*}
+
+\newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Policy at 14th Iteration found by \framework for MGSM.}]
+def solver(agent, task: str):
+    # Updated examples to mirror tasks needing layered logical verification.
+    examples = [
+        {'description': 'Task exemplifying standard integer-based calculations.', 'reasoning': 'Use arithmetic transformations to validate expressions and correct errors if any arise, ensuring correctness.', 'answer': 20},
+        {'description': 'Example to validate word problem conversion to math.', 'reasoning': 'Stepwise interpretation from words into math operations and bridge which logic errors need capture.', 'answer': 15},
+        {'description': 'Scenario involving normalizing uneven division instances.', 'reasoning': 'Ensure no division by zero and equal verification of logical conclusions.', 'answer': 6},
+    ]
+
+    # Task prompt incorporating roles with enhanced checklists after operation conclusion.
+    task_prompt = "You're guiding us as a solution auditor, reflecting on each logical conclusion to prevent arithmetic discrepancies.\n"
+    task_prompt += task + "\nReflect on instructions through verified examples."
+    task_prompt += "\nExample insights:\n"
+    task_prompt += '; '.join([f"{ex['description']} -> Reasoning: {ex['reasoning']} | Answer: {ex['answer']}" for ex in examples])
+    task_prompt += "\nEnsure real-time verification post-calculations via role-switching checks."
+
+    messages = [{"role": "user", "content": task_prompt}]
+
+    response = agent.action_call_json_format_llm(
+        model="gpt-3.5-turbo", 
+        messages=messages, 
+        temperature=0.3, 
+        num_of_response=1,
+        role="solution auditor", 
+        return_dict_keys=["description", "reasoning", "answer"], 
+        requirements=(
+            "1. Validate arithmetic consistency and integrity within calculations." 
+            "2. Utilize any corrections to refine answer outputs incrementally."
+        ).strip(),
+    )
+    
+    return_dict = response[0]
+    return_dict["answer"] = str(return_dict.get("answer", ""))
+    return return_dict
+\end{lstlisting}
+\end{figure*}
+
+\newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Policy at 20th Iteration found by \framework for MGSM.}]
+def solver(agent, task: str):
+    # Targets design for specific error-prone areas with preceding misfires.
+    examples = [
+        {'description': 'Immediate Arithmetic Operations', 'reasoning': 'Observe step-by-step through a chain of logical confirmations.', 'answer': 20},
+        {'description': 'Sequential Word Problem Breakdown', 'reasoning': 'Ensure smaller module segment steps match logical math outputs consistently.', 'answer': 15},
+        {'description': 'Fraction and Cascade Operations', 'reasoning': 'Validate each fraction conversion before proceeding to other forms.', 'answer': 6},
+    ]
+
+    # Building a rabbit-proof syntax tactline, pushing consistent effort from role-coded checks.
+    task_prompt = "You're progressing through solution documentation with focus on pinpointing logic errors.\n"
+    task_prompt += task + "\nReflecting structural integrity verified via examples."
+    task_prompt += "\nIn this construct:\n"
+    task_prompt += '; '.join([f"{ex['description']} -> Rationale: {ex['reasoning']} | Response: {ex['answer']}" for ex in examples])
+    task_prompt += "\nHandle verification and cleanse routines where errors echo in mirroring line-based checks."
+
+    messages = [{"role": "user", "content": task_prompt}]
+
+    response = agent.action_call_json_format_llm(
+        model="gpt-3.5-turbo", 
+        messages=messages, 
+        temperature=0.3, 
+        num_of_response=1,
+        role="logical verifier", 
+        return_dict_keys=["description", "reasoning", "answer"], 
+        requirements=(
+            "1. Review arithmetic sessions for comprehensive error fixation." 
+            "2. Develop clarity with resistant focus on authentic semantic directive flows."
+        ).strip(),
+    )
+    
+    return_dict = response[0]
+    return_dict["answer"] = str(return_dict.get("answer", ""))
+    return return_dict
+\end{lstlisting}
+\end{figure*}
+
+\newpage
+\begin{figure*}[ht]
+\begin{tcolorbox}[colback=black!15!white, colframe=black, title=Analysis Example of \framework]
+\small
+The current logic of the solver in the \texttt{agent\_module} is achieving only a 45\% accuracy on the validation set. The structure of the solver involves a single call to the LLM with a specification that the answer must be an integer. While this approach seems correct, it may not be sufficient to tackle more complex problems where multipart reasoning or verification is needed, leading to significant errors.
+
+\textbf{Problems Identified:}
+\begin{enumerate}
+    \item \textbf{Integer Conversion Misunderstandings:} Some math problems aren't resulting in integer answers natively, affecting accuracy when the solver forces an integer format.
+    \item \textbf{Reasoning Oversights:} The LLM, designated as "math expert," occasionally misses necessary reasoning steps or executes incorrect operations leading to incorrect answers (like sample 10).
+    \item \textbf{Ambiguity in LLM Outputs:} Given tasks in multiple languages, there might be ambiguity in math translations or formulations affecting comprehension (like sample 6).
+\end{enumerate}
+
+\textbf{Plan for Improvement:}
+\begin{enumerate}
+    \item \textbf{Elaborate Reasoning:} Consider a multi-step LLM call to allow for a reasoning review before finalizing the answer.
+    \item \textbf{Intelligent Answer Parsing:} Instead of forcibly converting to integers, parse the LLM response intelligently to see if the answer justifies integer rounding or alterations.
+    \item \textbf{Diverse Language Handling:} Create a pre-processing step to consistently translate non-English math problems into English for uniform processing.
+    \item \textbf{Examples \& Feedback:} Utilize correctly solved examples as context if a single-step LLM fails.
+\end{enumerate}
+
+\textbf{Next Steps:}
+\begin{enumerate}
+    \item \textbf{Enhance Solver Logic:} Implement a multi-step process involving interim LLM validation or rationale cross-checking.
+    \item \textbf{Pre-process Language Variations:} Ensure all non-English tasks are translated and re-assessed.
+    \item \textbf{Include Example Feedback:} Use correctly solved examples from the evaluation as references to guide LLM reasoning and answer validation.
+\end{enumerate}
+
+
+\end{tcolorbox}
+\end{figure*}

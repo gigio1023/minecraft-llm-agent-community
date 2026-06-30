@@ -1,0 +1,449 @@
+\newpage
+\begin{appendices}
+
+\startcontents[sections]
+\printcontents[sections]{l}{1}{\setcounter{tocdepth}{2}}
+
+\newpage
+
+\input{5_discussion}
+
+\section{Compute Usage}
+\label{sec:compute}
+This work primarily evaluates models on NVIDIA A100 GPUs hosted by Cirrascale\footnote{Per model batch size and settings include online: \url{https://github.com/allenai/reward-bench/blob/main/scripts/configs/eval_configs.yaml}.}.
+Each model, of which we evaluated ~75, takes about 12 hours to run on 16 bit quantization.
+Re-running the entire evaluation suite of RewardBench would take approximately 1000 A100 hours to complete.
+
+\section{Codebase Discussion}
+% \nol{TODO explain how can compute agreement on any preference dataset}
+Additional data is included in the code-base, but not included in the evaluation score due to noisy results or lack of clear use instructions (e.g. could be easy for unintentional test-set contamination). 
+In this vein, results on SafeRLHF~\citep{dai2023safe} data and MT Bench labels\footnote{\url{https://huggingface.co/datasets/lmsys/mt_bench_human_judgments}}
+(from humans and GPT-4) are supported within the methodology, but not included in this analysis.
+
+
+\section{Additional Results}
+\label{appdx:results}
+
+Table \ref{table:all_results} shows the full results for the first reward models we collected in this work. 
+In addition, Tables \ref{table:eval_sets_chat}-\ref{table:pref_sets} provides the performance breakdown per category.
+
+\input{tables/leaderboard_snapshot_all}
+\input{tables/leaderboard_detailed_snapshot}
+\input{tables/leaderboard_preference_test_sets}
+
+\subsection{Subset Distributions}
+\label{appdx:results_dist_subset}
+The full distribution of accuracies for models tested on~\name~are shown in Fig.~\ref{fig:dist-core} for the core dataset and in Fig.~\ref{fig:dist-pref} for existing preference sets.
+The subsets created for~\name~show substantial higher variance and range than the existing test sets used to evaluate reward models.
+A higher range of evaluation signal indicates that the benchmark makes it easier to differentiate between two similar models.
+Important subsets to~\name~are those with maximum performance below 100\%, indicating potential future work.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix/dist-core.pdf}
+    \caption{Distribution of scores for the subsets in the~\name~Dataset for the first 42 models collected in this work.
+    In a violin plot, the median is shown in white, with the first interquartile range as the thick line, and 1.5$\times$ range as the thin line.
+    There is a large variety of score distributions within the~\name~dataset, and they cover wider ranges than those in prior preference sets (shown in Fig.~\ref{fig:dist-pref}.}
+    \label{fig:dist-core}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.825\textwidth]{figures/appendix/dist-pref.pdf}
+    \caption{Distribution of scores for the existing preference data test sets for the first 42 models collected in this work.
+    In a violin plot, the median is shown in white, with the first interquartile range as the thick line, and 1.5$\times$ range as the thin line.}
+    \label{fig:dist-pref}
+\end{figure}
+
+\subsection{Model Reward Distributions}
+\label{appdx:results_reward_dist_subset}
+An interesting detail that is not yet easy to apply to training better RLHF models is the shape of the distribution of given reward models on the same input dataset.
+For all the datasets tested in~\name, we record the outputted scores for every prompt.
+The outputs of models trained with DPO are all large negative numbers given they are summations of logprobs across the generation.
+The outputs of reward models trained as a simple classifier should in concept be near to a unit Gaussian given desirable properties of a reward function for RL algorithms, but this is normally not the case.
+The distribution of the classifier models is shown for the core evaluation set in Fig.~\ref{fig:core-model-dist} and over the previous test sets in Fig.~\ref{fig:dist-seq-pref}.
+The distributions for models trained with DPO are shown in Fig.~\ref{fig:dist-dpo-core} for classifiers and in Fig.~\ref{fig:dist-dpo-pref} for models trained with DPO.
+
+The custom classifiers, such as \texttt{PairRM} and \texttt{SteamSHP} are omitted because their intended use is to take two responses in at once, so a score does not apply in the same way.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/appendix/score-dist-dpo-core.pdf}
+    \caption{Distributions of scores over the chosen and rejected responses of the~\name~dataset for models trained with DPO.}
+    \label{fig:dist-dpo-core}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/appendix/score-dist-dpo-pref.pdf}
+    \caption{Distributions of scores over the chosen and rejected responses of the prior test sets used for~\name~for models trained with DPO.}
+    \label{fig:dist-dpo-pref}
+\end{figure}
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/appendix/score-dist-seq-pref.pdf}
+    \caption{Distributions of scores over the chosen and rejected responses of the prior test sets used for~\name~for models trained as classifiers.}
+    \label{fig:dist-seq-pref}
+\end{figure}
+
+% reminder: this is in the main text
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{figures/score-dist-seq-core.pdf}
+    \caption{The distribution of rewards outputted by reward models for the chosen and rejected responses in the~\name~dataset.
+    A large variety of model behaviors exist among open reward models. 
+    Some top scoring models, such as Starling and UltraRM show an increased margin between the mean of the chosen and rejected samples.}
+    \label{fig:core-model-dist}
+\end{figure}
+
+
+
+\section{Dataset Details}
+
+\label{appdx:data_details}
+Here, we detail the curation process of every subset.
+All subsets are either manually verified or are curated from previous evaluation datasets with manual verification.
+For detailed data processing notes, see Appendix~\ref{appdx:processing}.
+In total there are 2958 prompts in~\name.
+All subsets in the primary dataset are single-turn instruction following tasks.
+
+\subsubsection{Chat Subsets}
+
+This section is designed to evaluate the basic instruction following understanding within a reward model.
+\paragraph{AlpacaEval (Easy, Length, Hard)}
+Manually verified prompt-chosen-rejected trios from AlpacaEval~\citep{alpaca_eval} where the chosen and rejected responses come from models of different capabilities. 
+
+For the \texttt{AlpacaEval Easy} subset with 100 prompts, the chosen completions are from the GPT4-Turbo responses (97.70\% win rate) and the rejected come from a much weaker model, Alpaca 7B~\citep{alpaca} (26.46\% win rate).
+
+For the \texttt{AlpacaEval Length} subset with 95 prompts, we seek two models with similar average completion length and a large delta in evaluated performance.
+It is seeded from Llama 2 Chat 70B (92.66\% win rate, 1790
+ average character length)~\citep{touvron2023llama} and rejected is from Guanaco 13B (52.61\% win rate, 1774 average character length)~\citep{dettmers2023qlora}.
+
+The \texttt{AlpacaEval Hard} subset contains 95 manually verified prompt-chosen-rejected trios where the chosen responses come from the T\"ulu 2 70B DPO responses (95.03\% win rate) and the rejected come from a weaker model, Davinci003~\citep{ouyang2022training} (50.00\% win rate).
+ 
+\paragraph{MT Bench (Easy, Medium)}
+The \texttt{MT Bench Easy} subset is composed of 28 manually verified prompt-chosen-rejected trios from MT-Bench~\citep{zheng2023judging} where chosen and rejected correspond to judgements of score 10 and 1 respectively for the same prompt.\footnote{Data is available here: \url{https://huggingface.co/spaces/lmsys/mt-bench/blob/main/data/mt_bench/model_judgment/gpt-4_single.jsonl}}
+The \texttt{MT Bench Medium} subset is similar, with 40 manually verified prompt-chosen-rejected trios from MT-Bench~\citep{zheng2023judging} where chosen and rejected correspond to judgements of score 9 and 2 to 5 respectively for the same prompt.
+
+For all MT-Bench subsets, the second turn data was not included due to the out-of-distribution nature for a reward model, where the data would be different across the entire conversation and not just the last turn after the prompt.
+Second, organizing by scoring is difficult due to scores being assigned both for the first and second responses.
+Further MT-Bench filtering data, such as the models included and distribution of scores, is included in Sec.~\ref{appndx:mtbench}.
+
+% \paragraph{MT Bench Medium}
+
+\subsubsection{Chat Hard Subsets}
+This section is designed to challenge the instruction following abilities of a reward model with trick questions and minor factual or formatting issues.
+
+\paragraph{MT Bench Hard}
+37 manually verified prompt-chosen-rejected trios from MT-Bench~\citep{zheng2023judging} where chosen and rejected correspond to judgements of score 7 to 8 and 5 to 6 respectively for the same prompt.
+
+
+\paragraph{LLMBar Natural}
+The 100 examples from LLMBar Natural split have preferred completions from existing instruction following benchmarks, which are manually verified in preference ranking~\citep{zeng2023llmbar}.
+This subset is similar to AlpacaEval and MT-Bench subsets.
+
+\paragraph{LLMBar Adversarial (Neighbor, GPTInst, GPTOut, Manual)}
+Human-curated trick instruction-following questions for LLM-as-a-judge applications from LLMBar~\citep{zeng2023llmbar} reformatted as prompt-chosen-rejected trios.
+Neighbor creates a rejected completion from a closely related instruction in the dataset, GPT4Inst creates a rejected by asking GPT4 for a similar instruction to the original which is then used as a generation, GPT4Out creates a rejected sample by asking GPT4 to be unhelpful when following the same prompt, and Manual is a set of specifically curated trick pairs. 
+
+The counts per subset are 134 for Neighbor, 92 for GPTInst, 47 for GPTOut, and 46 for Manual.
+
+
+\subsubsection{Safety Subsets}
+This section is designed to evaluate the propensity for reward models to prefer refusals to sensitive questions or to prefer responses to questions which could trigger a false refusal.
+
+\paragraph{Refusals (Dangerous, Offensive)}
+
+100 examples in each subset with prompts from GPT-3.5 and GPT-4, seeded with human-written prompts designed to elicit dangerous or offensive responses. The chosen completions are refusals from GPT-3.5, which we find to give more varied and detailed refusals than GPT-4. The rejected completions are responses that have been manually verified to contain dangerous or offensive content, sourced from Dolphin-2.0-mistral-7b\footnote{\url{https://huggingface.co/cognitivecomputations/dolphin-2.0-mistral-7b}}, an uncensored fine-tune of Mistral 7B \citep{jiang2023mistral}.
+
+\paragraph{Do Not Answer} 
+136 examples from the original 900 examples in the Do Not Answer dataset~\citep{wang2023donotanswer}, designed to have questions that only responsible language models will not answer, where the rejected response is an answer flagged as harmful in their analysis and the chosen is a harmless answer for the same prompt.
+For this subset, when there are multiple options of models to select from, we prioritize selecting a non-GPT4 model enhance dataset variety.
+Otherwise, the samples are randomly sampled from the suitable choices.
+
+
+\paragraph{XSTest Should Respond}
+ 250 manually selected triples from XSTest \citep{rottger2023xstest}. The prompts from this XSTest subset were designed to test for exaggerated safety behavior by containing certain, seemingly unsafe, trigger words, while actually being safe to comply to. The chosen and rejected completions were selected from GPT-4 \citep{achiam2023gpt},  Llama-2-70b-chat-hf \citep{touvron2023llama} (with the original system prompt and without), Mistral-7B-Instruct-v0.1 \citep{jiang2023mistral} (with and without a guardrail system prompt), dolphin-2.0-mistral-7b and zephyr-7b-beta \citep{tunstall2023zephyr}. In cases, when none of the model generated a refusal, we used ``Sorry, but I can't assist with that." as the refusal text. 
+ For the should-respond subset of the queries, the \textit{rejected} completion is always a refusal (or partial-refusal) and the \textit{chosen} a compliance. In order to keep this test set challenging, we opted for keeping the completion source varied. Whenever no refusal was generated by either of the models, we used the following refusal template: ``Sorry, but I can't assist with that."
+
+\paragraph{XSTest Should Refuse} 154 (out of 200\footnote{For 46 prompts none of the models complied and it was not feasible to get human written toxic content.}) manually selected triples from XSTest \citep{rottger2023xstest}. For the should-refuse subset of the queries, the \textit{rejected} completion is always a compliance and the \textit{chosen} a refusal (or partial-refusal). The completions were selected from the same set of models as mentioned above for XSTest should-respond and we applied the same design decisions. Additionally, when no compliance was available from our set of models and it seemed feasible, we also hand-wrote some of the completions.
+
+
+\subsubsection{Reasoning Subsets}
+This section is designed to evaluate specific reasoning abilities such as code and math.
+
+\paragraph{HumanEvalPack (CPP, Go, Javascript, Rust, Python, Rust)}
+For each programming language, there are 164 prompts with buggy and functional solutions in HumanEvalPack  (HEP)~\citep{muennighoff2023octopack}.
+We format these with the chosen answer as the correct solution and the buggy answer as rejected.
+
+\paragraph{PRM Math}
+We filter and select answers from the PRM800k\footnote{PRM: process reward model.} reasoning dataset~\citep{lightman2023let} to construct pairings of reference answers with incorrect, generated answers from an GPT4 fine-tune used in the paper. 
+We use the test set from phase 2 of the data for these rollouts, filtering for examples only where the model generated an error (no doubly correct examples).
+The questions originate from the MATH dataset~\citep{hendrycksmath2021}.
+
+
+
+
+
+
+\section{Discussion on Prior Test Sets}
+The goal in choosing the subsets for the \texttt{Prior Sets} section of the benchmark is to include results that are representative of past attempts in reward modeling and still useful to future work.
+Many of the datasets in this section differ from other popular preference datasets by being populated by human labels.
+We primarily chose to include the data for this section based on a process of elimination after evaluating many models in order to create a leader-board ranking which was fair.
+For example, we decided that the \texttt{Safety} section better represented models' abilities.
+The SHP data we include is a filtered version of their subset to increase the margin between ratings, so that the data should be easier to discerne by the RMs. 
+Full data for this section is shown in Tab.~\ref{table:pref_sets}.
+The MT Bench data included in the table is interesting, but isn't formally released as a test set, so we are worried about potential contamination (and MT-Bench is already heavily covered by the benchmark). 
+It does, though, show interesting correlations between the agreement of human and GPT4 judgements.
+
+\section{Dataset Characteristics}
+\label{appdx:characteristics}
+
+The following subsections will discuss our analyses of some high-level characteristics of the evaluation dataset.
+
+
+
+
+\subsection{Source of chosen and rejected completions}
+
+Figure \ref{fig:source_completion} shows the sources of all completions in the evaluation set, and also the breakdown for both chosen and rejected completions.
+The \textit{unknown} label applies to instances of LLMBar and PRM800k.
+For LLMBar, the authors manually filtered and modified each example to ensure their difficulty, resulting in instances that are neither fully human-generated nor fully model-generated.
+For PRM800k, all \textit{unknown} instances are rejections because we only filtered on cases where the model generated an error. 
+
+
+\begin{figure}[ht]
+    \centering
+    
+    \begin{subcolumns}[0.50\textwidth]
+    \subfloat[Total]{
+        \includegraphics[width=\subcolumnwidth]{figures/appendix/source_completion.pdf}
+    }
+    \nextsubcolumn
+    \subfloat[Chosen]{
+        \includegraphics[width=\subcolumnwidth]{figures/appendix/source_completions_chosen_hori.pdf}
+    }
+    \nextsubfigure
+    \subfloat[Rejected]{
+        \includegraphics[width=\subcolumnwidth]{figures/appendix/source_completions_rejected_hori.pdf}
+    }
+    \end{subcolumns}
+    \caption{Source distribution for (a) all completions and the top-20 (b) chosen and (c) rejected completions in log scale.}
+    \label{fig:source_completion}
+\end{figure}
+
+\subsection{Investigating length bias}
+\label{appndx:length}
+
+Reward models tend to correlate reward with prompt length \citep{singhal2023long}, and so we looked into the prevalence of this bias in our preference data. 
+For a given dataset, we measured the average prompt length (in terms of subtokens) of the chosen and rejected completions.
+Figure~\ref{fig:prompt_length} shows the results.
+
+\begin{figure}[h]
+    \centering
+        \includegraphics[width=0.90\textwidth]{figures/appendix/prompt_length.pdf}
+    \caption{Average prompt length (in Llama 2 tokens) of the chosen and rejected completions for every \name subset.}
+    \label{fig:prompt_length}
+\end{figure}
+
+
+\section{Data processing notes}
+\label{appdx:processing}
+In this section, we'll detail our notes from the data filtering process with examples of verified and rejected prompt-chosen-rejected triples.
+More details are included for the AlpacaEval and MT-Bench subsets due to their more subjective nature.
+
+\subsection{Data processing instructions}
+The instructions used to see curating the data were as follows:
+
+\paragraph{Data verification instructions}
+For all the categories presented below, we will manually verify all of the chosen-rejected pairs to a minimum criteria of correctness. In this process, it is better to have fewer samples than contradictory data, which reduces the signal of the benchmark. Some subsets, such as LLMBar, are filtered by the previous authors. Further filtering was conducted by multiple people following the following guidelines:
+\begin{itemize}
+    \item[1.] \textbf{When sampling a dataset, do not skip because it is a hard choice}. This will bias the subsets into being artificially easier for the reward models to understand. Rejecting due to both being wrong is common.
+    \item[2.] \textbf{Follow basic principles of what makes a chatbot useful}. The capabilities sets prioritize helpfulness, factuality, and honesty (similar to early work from Anthropic and InstructGPT). Harmful content could be what is requested, but I do not expect this.
+    \item[3.] \textbf{When in doubt, ask for help}. This is not a maximum throughput exercise. Ask on slack or email if there is a point we should discuss. 
+    \item[4.] \textbf{For capabilities, refusals cannot be in the chosen}. For harm / safety, refusals are expected to be in the chosen.
+\end{itemize}
+
+\subsection{MT Bench filtering}
+\label{appndx:mtbench}
+As discussed in the paper, our MT Bench subsets are derived by pairing higher scoring model responses with lower scoring model responses for a given prompt into chosen and rejected pairs, respectively. 
+
+Next, we manually verified all of the samples, about 10\% of the completions were thrown out.
+We found some common trends:
+\begin{itemize}
+    \item Very low GPT-4 scores were often caused by gibberish / repetitive text.
+    \item Some factual verifications were needed to filter the data.
+    \item The `hard' subset mostly entailed style differences, e.g. short vs. long answers, and we did not editorialize what is right as long as there was a reason.
+\end{itemize}
+
+The models used in the subsets of~\name from MT-Bench are as follows, and of high diversity:
+
+\textbf{Subset 1: Easy, 10s vs 1s} \\
+
+Models chosen:
+\texttt{Llama-2-70b-chat},
+\texttt{tulu-30b},
+\texttt{guanaco-65b},
+\texttt{vicuna-7b-v1.3},
+\texttt{oasst-sft-7-llama-30b},
+\texttt{Llama-2-13b-chat},
+\texttt{gpt-4},
+\texttt{claude-v1},
+\texttt{mpt-30b-chat},
+\texttt{gpt-3.5-turbo},
+\texttt{guanaco-33b},
+\texttt{palm-2-chat-bison-001},
+\texttt{Llama-2-7b-chat},
+\texttt{claude-instant-v1}.
+
+Models rejected:
+\texttt{vicuna-7b-v1.3},
+\texttt{wizardlm-13b},
+\texttt{falcon-40b-instruct},
+\texttt{rwkv-4-raven-14b},
+\texttt{vicuna-13b-v1.3},
+\texttt{fastchat-t5-3b},
+\texttt{stablelm-tuned-alpha-7b},
+\texttt{llama-13b}.
+
+\textbf{Subset 2: Medium, 9s vs 2-5s (for balancing available data)} \\
+
+Models chosen:
+\texttt{mpt-30b-instruct},
+\texttt{baize-v2-13b},
+\texttt{claude-instant-v1},
+\texttt{wizardlm-30b},
+\texttt{guanaco-65b},
+\texttt{nous-hermes-13b},
+\texttt{gpt4all-13b-snoozy},
+\texttt{claude-v1},
+\texttt{vicuna-33b-v1.3},
+\texttt{mpt-7b-chat},
+\texttt{vicuna-7b-v1.3},
+\texttt{oasst-sft-7-llama-30b},
+\texttt{palm-2-chat-bison-001},
+\texttt{Llama-2-7b-chat},
+\texttt{koala-13b},
+\texttt{h2ogpt-oasst-open-llama-13b},
+\texttt{vicuna-13b-v1.3},
+\texttt{gpt-3.5-turbo},
+\texttt{alpaca-13b}.
+
+Models rejected:
+\texttt{mpt-30b-instruct},
+\texttt{oasst-sft-4-pythia-12b},
+\texttt{dolly-v2-12b},
+\texttt{falcon-40b-instruct},
+\texttt{gpt4all-13b-snoozy},
+\texttt{rwkv-4-raven-14b},
+\texttt{chatglm-6b},
+\texttt{fastchat-t5-3b},
+\texttt{koala-13b},
+\texttt{alpaca-13b},
+\texttt{stablelm-tuned-alpha-7b},
+\texttt{llama-13b},
+\texttt{h2ogpt-oasst-open-llama-13b}.
+
+\textbf{Subset 3: Hard, 8-7s vs 6-5s}\\
+
+Models chosen:
+\texttt{baize-v2-13b},
+\texttt{mpt-30b-instruct},
+\texttt{rwkv-4-raven-14b},
+\texttt{wizardlm-30b},
+\texttt{llama-13b},
+\texttt{oasst-sft-4-pythia-12b},
+\texttt{tulu-30b},
+\texttt{guanaco-65b},
+\texttt{nous-hermes-13b},
+\texttt{falcon-40b-instruct},
+\texttt{gpt4all-13b-snoozy},
+\texttt{chatglm-6b},
+\texttt{stablelm-tuned-alpha-7b},
+\texttt{mpt-7b-chat},
+\texttt{mpt-30b-chat},
+\texttt{palm-2-chat-bison-001},
+\texttt{guanaco-33b},
+\texttt{Llama-2-7b-chat},
+\texttt{koala-13b},
+\texttt{h2ogpt-oasst-open-llama-13b},
+\texttt{Llama-2-70b-chat},
+\texttt{gpt-3.5-turbo},
+\texttt{alpaca-13b}
+
+Models rejected:
+\texttt{mpt-30b-instruct},
+\texttt{rwkv-4-raven-14b},
+\texttt{llama-13b},
+\texttt{oasst-sft-4-pythia-12b},
+\texttt{guanaco-65b},
+\texttt{falcon-40b-instruct},
+\texttt{gpt4all-13b-snoozy},
+\texttt{claude-v1},
+\texttt{chatglm-6b},
+\texttt{vicuna-33b-v1.3},
+\texttt{stablelm-tuned-alpha-7b},
+\texttt{mpt-7b-chat},
+\texttt{mpt-30b-chat},
+\texttt{palm-2-chat-bison-001},
+\texttt{koala-13b},
+\texttt{dolly-v2-12b},
+\texttt{vicuna-13b-v1.3},
+\texttt{fastchat-t5-3b},
+\texttt{gpt-3.5-turbo},
+\texttt{alpaca-13b}
+
+The distribution of scores in the MT Bench ratings dataset is shown in Fig.~\ref{fig:mtbench_distribution}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.65\textwidth]{figures/appendix/mtbench_scores.pdf}
+    \caption{Distribution of scores within MT Bench ratings dataset.} 
+    \label{fig:mtbench_distribution}
+\end{figure}
+
+
+\input{figures/appendix/mtbench_1}
+\input{figures/appendix/mtbench_2}
+Examples from the MT-Bench Medium subset are shown in Fig.~\ref{fig:mtbench_1} (accepted) and Fig.~\ref{fig:mtbench_2} (removed).
+\input{figures/appendix/mtbench_3}
+% \input{figures/appendix/mtbench_4}
+Examples from the MT-Bench Hard subset are shown in Fig.~\ref{fig:mtbench_3} (removed for accuracy). % and Fig.~\ref{fig:mtbench_4} (removed for accuracy, failure to extract).
+
+\subsection{AlpacaEval filtering}
+To review, the AlpacaEval subsets are all initialized by two pairs of models (rather than scores like MT-Bench). 
+With this in mind, filtering is still very familiar to those splits.
+
+Some notes on errors present in the dataset prompting removal are:
+\begin{itemize}
+\item Answers with acronyms seems made up. 
+\item Both answers, or just the chosen answer, are incorrect.
+\item Clear formatting instructions are ignored.
+\end{itemize}
+
+\input{figures/appendix/alpacaeval_1}
+\input{figures/appendix/alpacaeval_2}
+Examples from AlpacEval Easy are shown in Fig.~\ref{fig:alpacaeval_1} and Fig.~\ref{fig:alpacaeval_2}, which were both rejected for factual errors.
+\input{figures/appendix/alpacaeval_3}
+\input{figures/appendix/alpacaeval_4}
+An example of a rejected sample from AlpacaEval Hard is shown in Fig.~\ref{fig:alpacaeval_3} and an example rejected from AlpacaEval Length is shown in Fig.~\ref{fig:alpacaeval_4}.
+
+\subsection{Refusals data}
+The goal of this section was to have a refusal as the chosen and then harmful or unsafe text as the rejected option.
+Given a set of prompts, we sought out generating the rejected completions with various ML models.
+Based on evaluations in~\citet{ivison2023camels}, we initially tried to generate harmful text with the Zephyr-$\beta$ model, but it proved to be inconsistent.
+Upon switching to the model \href{cognitivecomputations/dolphin-2.0-mistral-7b}{\texttt{dolphin-2.0-mistral-7b}}, the results were far more stable.
+
+\subsection{XSTest filtering}
+In order to create this dataset, we manually read the completions in the original XSTest repository\footnote{\url{https://github.com/paul-rottger/exaggerated-safety}} and selected one response that complied with the instruction and one that erroneously refused.
+For some prompts, we needed to use an additional model (again \href{cognitivecomputations/dolphin-2.0-mistral-7b}{\texttt{dolphin-2.0-mistral-7b}}) to generate prompts that complied with the prompt.
+After adding in \texttt{dolphin-2.0-mistral-7b}, there were still 46 of the original 450 prompts that did not have a suitable chosen-rejected pairing.
+Some of the datapoints are tricky, and we included the intent of the original authors. 
+\input{figures/appendix/xstest_1}
+\input{figures/appendix/xstest_2}
+For example, the text asking about violence in a fictional story is determined as one that \textit{should be responded to}, which is shown in Fig.~\ref{fig:xstest_2}.
+On the other hand, some rather odd situations also should be answered, such as in Fig.~\ref{fig:xstest_1}.
+
+\end{appendices}

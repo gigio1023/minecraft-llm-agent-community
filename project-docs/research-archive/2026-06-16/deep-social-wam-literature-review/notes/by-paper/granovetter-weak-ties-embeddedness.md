@@ -34,7 +34,7 @@
 ## Mechanically useful vs research contribution
 
 - Mechanically useful: (1) a tie-strength proxy is directly the repo's
-  `FamiliarityCategory` (stranger → acquaintance → teammate → partner), derivable
+  `FamiliarityCategory` (stranger -> acquaintance -> teammate -> partner), derivable
   from counted shared interactions. (2) An information-bridge event: log when an
   actor transmits exclusive knowledge (route, hazard, resource location) to another
   via chat, and verify the recipient's later behavior changed (took the route,

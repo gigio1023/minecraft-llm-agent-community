@@ -34,14 +34,14 @@ natural-language **memory stream** with three mechanisms (read in full from the
 LaTeX):
 
 - **Retrieval** scores each memory by recency (exponential decay, factor 0.995),
-  importance (the LLM rates poignancy 1–10 at creation), and relevance (cosine
+  importance (the LLM rates poignancy 1-10 at creation), and relevance (cosine
   similarity of embeddings to the current query); the top memories that fit the
   context window are injected.
 - **Reflection**: periodically (when summed importance crosses a threshold of
   150), the agent generates higher-level insights and, critically, **cites the
   memory objects that served as evidence** (e.g. "Klaus is dedicated to research
   (because of 1,2,8,15)").
-- **Planning**: top-down recursive day→hour→minute plans, stored as memories.
+- **Planning**: top-down recursive day->hour->minute plans, stored as memories.
 
 The dependent variable in its evaluation is **believability**, judged by humans,
 with ablations showing each mechanism contributes. The emergent demo (a
@@ -66,9 +66,9 @@ communication, physical action, `none`, `leave`, all resolving to text, with no
 physical world that validates them. Its **SOTOPIA-Eval** scores seven dimensions
 per episode:
 
-- Goal Completion [0–10], Believability [0–10], Knowledge [0–10],
-  Secret [−10–0], Relationship [−5–5], Social Rules [−10–0],
-  Financial and Material Benefits [−5–5].
+- Goal Completion [0-10], Believability [0-10], Knowledge [0-10],
+  Secret [−10-0], Relationship [−5-5], Social Rules [−10-0],
+  Financial and Material Benefits [−5-5].
 
 This is a clean, ready checklist of *what social outcomes to name*. But six of
 the seven are pure dialogue-judged plausibility, and even the seventh
@@ -233,14 +233,14 @@ different partner) as a first-class scoring axis, not an afterthought.
 Mechanically useful to borrow:
 
 - Generative Agents: retrieval scoring (recency × importance × relevance) and
-  reflection-with-citations → evidence-linked actor memory / PlanBead surfacing.
-- SOTOPIA-Eval's 7 dimension labels → the *names* of social outcomes to verify.
-- Lifelong SOTOPIA: episode chaining + recall-forcing scenarios → the
-  memory-continuity benchmark design; its 8-item failure checklist → cheap
+  reflection-with-citations -> evidence-linked actor memory / PlanBead surfacing.
+- SOTOPIA-Eval's 7 dimension labels -> the *names* of social outcomes to verify.
+- Lifelong SOTOPIA: episode chaining + recall-forcing scenarios -> the
+  memory-continuity benchmark design; its 8-item failure checklist -> cheap
   rule-checkable transcript signals.
 - AgentSense: bottom-up scenario sourcing, ERG goal difficulty, private-info
-  concealment/inference → asymmetric-knowledge Minecraft scenarios.
-- S3AP: the social-world-model formulation and Foresee-and-Act → the shape of an
+  concealment/inference -> asymmetric-knowledge Minecraft scenarios.
+- S3AP: the social-world-model formulation and Foresee-and-Act -> the shape of an
   *advisory* delta predictor (must never become authority).
 - Concordia: grounded variables + component architecture + the validation
   hierarchy (see the validity theme file).

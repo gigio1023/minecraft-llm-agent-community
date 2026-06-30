@@ -1,0 +1,121 @@
+\clearpage
+\newpage
+\subsection{Effects of Binning for AI Feedback}\label{main:binning}
+
+QDAIF aims to produce an archive of high-performing elites that cover diverse niches according to AI feedback. However, the AI feedback signal may not always change uniformly with how a diversity measure changes. This is due to the behavior of model calibration in classifying labels with token probabilities not having a straight-line correlation with actual levels of sentiment (one example of a diversity measure) or other diversity measures, for example, as reported with aligned models in \citet{openai2023gpt4}. Hence, we hypothesize that, in diversity measures with poorer model calibration, using custom non-uniform bins, that have smaller ranges towards the ends of the axis, would enable the search to lead to elites that more closely meet human notions of how a given measure changes. We study the effects of using custom non-uniform bins and uniform bins. Non-uniform custom bins have more frequent bins towards the ends of the range, being [0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.10, 0.20, 0.50, 0.80, 0.90, 0.95, 0.96, 0.97, 0.98, 0.985, 0.99, 0.995]. Uniform bins have an equal spacing of 0.05 between each bin. Both settings have a total of 20 bins each.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{images/opinion_writing_binstudy.png}
+    \caption{Uniform vs. custom non-uniform bins for Opinions domain. (\textbf{Top}) Maximum fitness achieved per bin over training iterations. Each translucent bar represents data captured every 100 iterations. Non-uniform bin setting has higher maximum fitness per bin. (\textbf{Bottom}) Number of entries generated per bin over training iterations. Each translucent bar represents data captured every 100 iterations. The non-uniform bin setting has a more even spread of entries generated across bins. (\textbf{Right}) QD score is achieved by each bin setting over training iterations. Non-uniform bin setting achieves a higher QD score than uniform bin setting.}
+    \label{fig:veg-binstudy}
+\end{figure}
+
+\textbf{Opinion Writing - Sentiment.} Using custom non-uniform bins produces a more even spread of entries generated for each iteration step than uniform bins (Figure \ref{fig:veg-binstudy}). Most entries generated in the uniform bin setting are concentrated towards the end bins (Figure \ref{fig:veg-binstudy}). Using custom non-uniform bins also produces higher max fitness per bin than uniform bins (Figure \ref{fig:veg-binstudy}), where the middle bin is empty in the uniform bin setting (Figure \ref{fig:veg-binstudy}). The custom non-uniform bin setting outperform the uniform bin setting significantly (p-values < 0.05, Mann-Whitney U test) (Figure \ref{fig:veg-binstudy}). This suggests that the model calibration in classifying "positive" or "negative" sentiment labels with token probabilities does not have a straight-line correlation with the actual changes in the diversity measure of sentiment.
+
+While the sentiment progression is qualitatively evident in both bin settings, custom non-uniform bins exhibit more distinct differentiation, with sentiments spanning from very negative to very positive. Elites generated from the uniform bin setting have a preference against vegetables (e.g., "I don't like") on one end, transition to a more neutral sentiment that eating vegetables "is a good idea, but they are not very tasty", to more positive aspects that "vegetables are a great source of vitamin" (Table~\ref{tab:bin-elites-opinion}). Meanwhile, elites generated from the custom non-uniform bin setting find vegetables "disgusting" on one end, transition to a more balanced argument of vegetables being "healthy" but "boring", and eventually "would rather eat vegetables and plant-based foods than meat" because they "taste better than meat" (Table~\ref{tab:bin-elites-opinion}). While sentiment diversity can be effectively captured in both bin settings, the custom bin settings capture a wider sentiment range qualitatively.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{images/short_story_binstudy.png}
+    \caption{Uniform vs. custom non-uniform bins for Stories domain. (\textbf{Top}) Maximum fitness achieved per bin over training iterations. Each translucent bar represents data captured every 100 iterations. Uniform bin setting has higher maximum fitness per bin. (\textbf{Bottom}) Number of entries generated per bin over training iterations. Each translucent bar represents data captured every 100 iterations. The uniform bin setting has a more even spread of entries generated across bins. (\textbf{Right}) QD score is achieved by each bin setting over training iterations. Uniform bin setting achieves a higher QD score than uniform bin setting.}
+    \label{fig:spy-binstudy}
+\end{figure}
+
+\textbf{Stories - Genre.} In this domain, using the custom non-uniform bins actually gives a less even spread of entries generated for each iteration step than uniform bins (Figure \ref{fig:spy-binstudy}). Most entries generated in the custom non-uniform bins setting are concentrated towards the middle bins (Figure \ref{fig:spy-binstudy}). Using uniform bins produces higher max fitness per bin than custom non-uniform bins (Figure \ref{fig:spy-binstudy}), where bins 0 - 9, leaning towards "horror" measure, are lacking high fitness elites in the custom non-uniform bins setting (Figure \ref{fig:spy-binstudy}). The uniform bin setting outperforms the custom non-uniform bin setting significantly (p-values < 0.05, Mann-Whitney U test) (Figure \ref{fig:spy-binstudy}). This suggests that the model calibration in classifying "romance" or "horror" labels with token probabilities is better aligned with the actual changes in the diversity measure of romance vs. horror.
+
+Qualitatively, in both uniform and non-uniform bin settings, there is a clear transition in the nature of the stories from bins 0 - 9 (more horror-driven) to bins 10 - 19 (more romantic). In the uniform bin setting, the narratives start with some horror elements such as being "shot" or having "barbed wire", gradually having fewer horror elements and increasing character interactions, and eventually introduce a touch of suspicion within personal relationships (Table~\ref{tab:bin-elites-story}). However, with the custom non-uniform bins, there is a more drastic shift. The narratives begin with horror elements like poisoning and organ extraction and eventually end on a romantic note with mutual feelings between a spy and a politician (Table~\ref{tab:bin-elites-story}). The uniform bins seem to maintain a relatively linear transition from a horror context to a more neutral or romantic context. In contrast, custom non-uniform bins emphasize the extreme, capturing subjectively intriguing niches that might be glossed over in the uniform bin setting, diving deeper into horror and then suddenly shifting towards romance. While uniform bins provide a steady progression, it is this very steadiness that could render the stories more predictable, possibly overlooking starkly contrasting narratives that might captivate a reader's interest.
+
+Supporting the above qualitative analysis, the number of entries generated for bins 0 - 6 in the custom non-uniform bin setting is greater than that for bin 0 in the uniform case (even though the combined phenotype range of bins 0 - 6 in the custom bin setting is the same as that of bin 0 in the uniform bin setting) (Figure \ref{fig:spy-binstudy}). The difference in distribution showcases that while uniform bins give a broad sweep of the narrative landscape, non-uniform bins offer a more detailed view, illuminating finer nuances within specific ranges.
+
+In summary, the binning approach can substantially influence the extent of diversity measure captured. Given the nuanced narratives captured in non-uniform bins, future endeavors might benefit from tailoring binning based on genotype density analysis or considering more advanced methods like CVT-MAP-Elites \citep{vassiliades2016scaling}. The choice of binning is not just related to the calibration of the AI model with respect to the diversity measure used, but also intricately linked to the domain and granularity of results sought.
+
+\input{tables/app/binning_interval_comparison/samples}
+\clearpage
+\newpage
+
+\subsection{Different Diversity Measures in Short Stories Domain}
+\label{app:diff-diversity-measures}
+To assess the efficacy of QDAIF across diverse measures within the Stories domain, we evaluated its performance across different diversity measures. These include third vs. first person narration, historical vs. science fiction settings, hero spy vs. hero politician themes, target audiences of adults vs. children, and poetic vs. formal tones. The experiments in this section were conducted only once, using QDAIF (LMX Near, Seeded Init).
+
+\textbf{Third vs. First person narration.} The change in narration perspective is qualitatively clear. Generated narratives classified as coming from a third person narration uses pronouns "he" and "she", while those classified as coming from a first person narration uses pronoun "I" (Table~\ref{tab:dm-third-first-person}). However, QDAIF achieves a QD-score of 16.6 (Figure~\ref{fig:qd-scores-dm}), where there are some bins towards the end ranges that are not filled.
+
+\textbf{Historical vs. Science fiction.} In analyzing the generated stories, differences are evident, though they may not always align with expectations. Narratives intended to exude a historical ambiance sometimes fall short of a clear historical portrayal. For instance, while they describe a landscape replete with "political intrigue" and characters like politicians and spies weaving a secretive narrative of "shadows in the night" and "whispers and coded messages" (Table~\ref{tab:dm-historical-science-fiction}), they may not distinctly communicate an overtly historical setting. Conversely, the narratives characterized as science fiction are set in distinct "futuristic cities," with characters utilizing "neural networks" for classified information access, "leaving no digital trace," and integrating "cybernetic implants" (Table~\ref{tab:dm-historical-science-fiction}). This divergence showcases the challenge in generating narratives that distinctly capture the essence of historical themes compared to more overt futuristic settings. Notably, when evaluated using the QDAIF metric, the stories achieve a QD-score of 18.9 (Figure~\ref{fig:qd-scores-dm}), with only bin 19 remaining unfilled. These observations highlight potential limitations in the AI's ability to delineate subtler themes like the historical.
+
+\textbf{Hero spy vs. Hero politician.} A clear thematic dichotomy is observed in the narratives produced. Narratives centered on the hero spy theme delve into the intricate world of espionage, as exemplified by a spy "from the British government" uncovering "evidence about an assassination plot" and harboring suspicions that the "U.S. president" might be a "double agent" (Table~\ref{tab:dm-hero}). In contrast, the hero politician stories depict ambitious political games, illustrated by a narrative where the politician strategically attempts to "gain the trust of a wealthy political rival" (Table~\ref{tab:dm-hero}). 
+Though these comparisons highlight the distinct arcs between espionage and political endeavors, a notable limitation in the narratives is that they sometimes neglect to include either the spy or the politician when that character is not part of the hero diversity measure. QDAIF achieves a high QD-score of 19.6 (Figure~\ref{fig:qd-scores-dm}), where all bins are filled.
+
+\textbf{Adults vs. Children target audience.} The generated narratives exhibit pronounced thematic contrasts based on age groups. Stories in the adults category portray intricate webs of conspiracies, featuring a CIA agent unearthing "evidence of the wrongdoings" of a powerful figure, culminating in a "shocking conspiracy" (Table~\ref{tab:dm-target-audience}). Conversely, the children narratives provide a more adventurous lens, illustrated by the tale of "Max and Ruby", who, upon finding themselves in a "dangerous forest", encounter a "confused detective" and join forces to "prevent a disaster" (Table~\ref{tab:dm-target-audience}). This divergence in themes accentuates the differences in the narrative structures and complexities typically associated with adult and child protagonists. QDAIF achieves a QD-score of 17.7 (Figure~\ref{fig:qd-scores-dm}), with two bins at the end of the adults target audience range not filled.
+
+\textbf{Poetic vs. Formal tone.} Generated narratives qualitatively showcase a clear contrast in tonal expression. The poetic category immerses the reader in repetitive and evocative phrasing, laden with symbolism and emotional depth. For instance, phrases like "a walk of memories," "a walk of surrender," and "a walk of brokenness" convey a cyclical and emotional journey (Table~\ref{tab:dm-poetic-formal-tone}). On the other hand, narratives with a more formal tone adopt a direct and straightforward manner of exposition, evident in the narrative about a CIA operative assigned with a mission to locate an assassin tied to a wealthy politician (Table~\ref{tab:dm-poetic-formal-tone}). This variation in tone underscores the capacity of narrative generation to traverse the spectrum from the abstract and emotive to the precise and factual. However, QDAIF achieves a QD-score of 12.7 (Figure~\ref{fig:qd-scores-dm}). Many bins on the more poetic end of the spectrum remain unfilled, and the ones that are filled score low in fitness. This suggests that the LLM may encounter difficulties in producing poetic narratives, possibly influenced by the less poetic nature of the few-shot examples provided.
+
+\input{tables/app/different_measures_stories/samples}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{images/qd_scores_diversity_measures.png}
+    \label{fig:qd-scores-dm}
+    \caption{Comparison of QD scores for different diversity metrics in the Stories domain.}
+    \label{fig:few_shots}
+\end{figure}
+
+\clearpage
+\newpage
+\subsection{Sets from Human Evaluations of Texts, Baselines, Opinions}
+\input{tables/app/human_eval/non_qd_opinions}
+\clearpage
+\newpage
+
+\subsection{Sets from Human Evaluations of Texts, Baselines, Stories (Genre)}
+\input{tables/app/human_eval/non_qd_stories_genre}
+\clearpage
+\newpage
+
+\subsection{Sets from Human Evaluations of Texts, Baselines, Stories (Ending)}
+\input{tables/app/human_eval/non_qd_stories_ending}
+\clearpage
+\newpage
+
+\subsection{Sets from Human Evaluations of Texts, QD with Embedding Feedback, Opinions}
+\input{tables/app/human_eval/qd_ef_opinions}
+\clearpage
+\newpage
+
+\subsection{Sets from Human Evaluations of Texts, QDAIF, Opinions}
+\input{tables/app/human_eval/qdaif_opinions}
+\clearpage
+\newpage
+
+\subsection{Sets from Human Evaluations of Texts, QDAIF, Stories (Genre)}
+\input{tables/app/human_eval/qdaif_stories_genre}
+\clearpage
+\newpage
+
+\subsection{Sets from Human Evaluations of Texts, QDAIF, Stories (Ending)}
+\input{tables/app/human_eval/qdaif_stories_ending}
+\clearpage
+\newpage
+
+\subsection{Examples of Texts over Iterations, QDAIF, Opinions}
+\input{tables/app/lmx_compare_iters/opinions_lmx}
+\clearpage
+\newpage
+
+\subsection{Examples of Texts over Iterations, QDAIF, Stories (Genre)}
+\input{tables/app/lmx_compare_iters/stories_genre_lmx}
+\clearpage
+\newpage
+
+\subsection{Examples of Texts over Iterations, QDAIF, Stories (Ending)}
+\input{tables/app/lmx_compare_iters/stories_ending_lmx}
+\clearpage
+\newpage
+
+\subsection{Examples of Texts over Iterations, Baselines, Opinions}
+\input{tables/app/baselines_compare_iters/opinions}
+\clearpage
+\newpage
+
+\subsection{Examples of Texts over Iterations, Baselines, Stories (Genre and Ending)}
+\input{tables/app/baselines_compare_iters/stories}
+\clearpage

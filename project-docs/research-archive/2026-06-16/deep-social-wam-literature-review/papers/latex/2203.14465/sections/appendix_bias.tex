@@ -1,0 +1,198 @@
+\section{STaR Without Rationalization (Rationale Generation Bootstrapping)}
+
+For convenience, we include the rationale generation bootstrapping algorithm alone here. However, it is simply Algorithm~\ref{algostar}, with the blue components removed.
+
+\begin{algorithm}
+	\caption{Rationale Generation Bootstrapping (STaR without rationalization)} 
+    \hspace*{\algorithmicindent} \textbf{Input} $M$: a pretrained LLM; dataset $\mathcal{D} = \{(x_i, y_i)\}_{i = 1}^D$ (w/ few-shot prompts)
+	\begin{algorithmic}[1]
+	    \State ${M_0} \leftarrow$ ${M}$ {\color{Gray} \# Copy the original model}
+		\For {$n$ \textbf{in} $1...N$} {\color{Gray} \# Outer loop}
+		    \State $(\hat{r}_i, \hat{y}_i) \leftarrow M_{n - 1}(x_i)\quad \forall i \in [1, D]$ {\color{Gray} \# Perform rationale generation}
+		    \State $\mathcal{D}_n \leftarrow \{ (x_i, \hat{r}_i, y_i) \mid i \in [1, D] \land \hat{y}_i = y_i \}$ {\color{Gray} \# Filter rationales using ground truth answers}
+		    \State $M_n \leftarrow \text{train}(M, \mathcal{D}_n)$ {\color{Gray} \# Finetune the original model on the correct solutions - inner loop}
+		\EndFor
+	\end{algorithmic}
+	\label{algobase}
+\end{algorithm}
+
+\section{Case Study}
+\begin{figure}[h]
+\hspace{-10px}
+\begin{subfigure}{.5\textwidth}
+  \centering
+    {
+    \small
+\begin{verbatim}
+Q: John wants to eat at an Indian 
+restaurant in on top of the space 
+needle, where would he have to go?
+Answer Choices:
+(a) reservation (b) curry 
+(c) britsh town (d) seattle 
+(e) large city
+A: The answer must be a place with 
+a space needle. The space needle is
+a landmark in Seattle. Therefore, 
+the answer is Seattle (d).
+
+Q: I put a towel in a cardboard box for 
+the kitten, I wanted it to have what?
+Answer Choices:
+(a) farmhouse (b) zoos (c) cold place
+(d) floor (e) warm place
+A: The answer must be a place where the 
+kitten would be comfortable. The kitten 
+would be comfortable in a warm place. 
+Therefore, the answer is warm place (e).
+
+Q: Needlepoint requires many 
+accessories, what holds the work taut?
+Answer Choices:
+(a) sewing (b) collection of folk art
+(c) livingroom (d) frame (e) bathroom
+A: The answer must be something that 
+holds the work taut. The work is taut 
+because it is held in place. Therefore,
+the answer is frame (d).
+\end{verbatim}
+    }
+  \caption{Problems where the model was able to solve questions which it had previously answered incorrectly.}
+  \label{fig:sub-first}
+\end{subfigure}
+\hspace{10px}
+\begin{subfigure}{.5\textwidth}
+  \centering
+    {
+    \small
+    \begin{Verbatim}[commandchars=+\[\]]
+Q: They prided themselves on being a 
+wealth  of knowledge, and that's why many 
+chose to attend their what?
+Answer Choices:
+(a) book store (b) university (c) meeting
+(d) class (e) encyclopedia
++sout[A: The answer must be a place where people]
++sout[go to learn about things. The answer is]
++sout[university (b).]
+A: The answer must be a place where people
+go to learn about things. Universities are
+places where people go to learn about 
+things. Therefore, the answer is 
+university (b).
+
+Q: You want a real estate agent that is 
+straight forward with you, the last 
+thing you want is for them to what a 
+house's quality?
+Answer Choices:
+(a) cover up (b) offer price
+(c) misrepresent (d) lie (e) falsify
++sout[A: The answer must be a way to determine]
++sout[the quality of a house. The answer is]
++sout[misrepresent (c).]
+A: The answer must be something that 
+would be a bad thing for the real estate
+agent to do. The real estate agent would
+be misrepresenting the house's quality
+if they were to lie about it. Therefore,
+the answer is misrepresent (c).
+\end{Verbatim}
+}
+  \caption{Problems where the model was already able to answer them with few-shot reasoning, but was able to answer better after more iterations.}
+  \label{fig:sub-second}
+\end{subfigure}
+% }
+\caption{Case study on STaR. We highlight some problems which the model is not initially able to solve, as well as rationales which are initially correct but improve. We note that for CQA, one is tasked with selecting the ``best'' answer, where multiple answers may be technically correct.} 
+\label{fig:exampleresult}
+\vspace{-5px}
+\end{figure}
+
+\newpage
+\section{Bias and Faithfulness}
+\label{biasexplanation}
+It is important to note that STaR is designed to amplify the reasoning that leads to correct solutions on a given dataset. The implication of this with a dataset like CommonsenseQA is that if biases are ``useful'' in solving the dataset then they will be amplified. This is made worse by rationalization, as biased answers that the model may not naturally arrive at are, in a sense, pulled out of the model. The exact interaction between the bias in a dataset and the pre-existing bias learned by the model is unclear, and something to consider before real-world deployment of all large language models in general, but STaR-trained models in particular. 
+
+We find some encouraging initial results on this however: for questions where gender is not relevant, the model appears to disregard it in its explanation. For example: ``Q: Where is a good place for a woman to store her sunglasses? $\rightarrow$ A: The answer must be a place where sunglasses are stored. Sunglasses are stored in purses. Therefore, the answer is purse (e).'' or ``Q: The only baggage the woman checked was a drawstring bag, where was she heading with it? $\rightarrow$ A: The answer must be a place where a drawstring bag is checked. The answer is airport (e).'' We believe this question warrants a much more comprehensive study.
+
+One important challenge with models which seek to be interpretable or provide explanations for their reasoning is that of faithfulness. While our primary emphasis is not on the explainability benefits that STaR may bring, there is a fundamental challenge around evaluating explanations and rationales: namely, faithfulness \citep{herman2017promise,jacovi2020towards}. \citeauthor{jacovi2020towards} describe faithful explanations as those which ``accurately [represent] the
+reasoning process behind the model’s prediction.'' While STaR encourages the use of reasoning in rationales which leads the model to correct answers, it is difficult, if not impossible, to ensure that the rationales reflect the model's internal processing. For example, it is straightforward to imagine the model implicitly selecting a particular answer immediately and then generating a rationale to justify that selected answer. This would allow a model to generate unbiased rationales while selecting answers in a biased way.
+
+The fact that our model outperforms one fine-tuned to directly predict the answers, and ablation studies from papers such as \citet{wei2022chain} make it clear that the generation of a rationale before producing an answer non-trivially improves the model's answer quality. However, it is difficult to evaluate the degree to which any particular answer's rationale is faithful. However, we note that there problems are not unique to STaR, but are symptomatic of the difficulty of understanding large language models and in particular the rationales generated by large language models.
+
+\section{Hyperparameters}
+\label{hyperparameters}
+GPT-J is a 28-layer decoder-only transformer, with an embedding size of 1024, 16 attention heads of dimension 256, and an FFN hidden layer of size 16384. It was pre-trained on the Pile~\citep{gao2020pile}, with a vocabulary size of 50.4K
+
+In general, unless otherwise stated, we use a batch size of 8 sequences, each of length 1024. We also use packing, namely, packing the shorter examples to form longer sequences (up to length 1024) to improve TPU utilization. We do not use weight decay, and we train and sample on a single TPU-v3 node. We performed a hyperparameter search over learning rates from $10^{-7}$ to $10^{-4}$ using the Adam optimizer \cite{adam}. We found that $10^{-6}$ was consistently the best-performing learning rate. 
+
+\newpage
+\section{GSM8K Few-shot Prompt}
+\label{gsm8kprompts}
+We include the following few-shot prompts for GSM8K, based on the examples in \citet{cobbe2021training}.
+
+\begin{lstlisting}
+Q: Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May?
+A: Natalia sold 48/2 = <<48/2=24>>24 clips in May.
+Natalia sold 48+24 = <<48+24=72>>72 clips altogether in April and May.
+#### 72
+
+Q: Betty is saving money for a new wallet which costs $100. Betty has only half of the money she needs. Her parents decided to give her $15 for that purpose, and her grandparents twice as much as her parents. How much more money does Betty need to buy the wallet?
+A: In the beginning, Betty has only 100 / 2 = $<<100/2=50>>50.
+Betty's grandparents gave her 15 * 2 = $<<15*2=30>>30.
+This means, Betty needs 100 - 50 - 30 - 15 = $<<100-50-30-15=5>>5 more.
+#### 5
+
+Q: Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow, how many pages should she read?
+A: Maila read 12 x 2 = <<12*2=24>>24 pages today.
+So she was able to read a total of 12 + 24 = <<12+24=36>>36 pages since yesterday.
+There are 120 - 36 = <<120-36=84>>84 pages left to be read.
+Since she wants to read half of the remaining pages tomorrow, then she should read 84/2 = <<84/2=42>>42 pages.
+#### 42
+
+Q: Mark has a garden with flowers. He planted plants of three different colors in it. Ten of them are yellow, and there are 80% more of those in purple. There are only 25% as many green flowers as there are yellow and purple flowers. How many flowers does Mark have in his garden?
+A: There are 80/100 * 10 = <<80/100*10=8>>8 more purple flowers than yellow flowers.
+So in Mark's garden, there are 10 + 8 = <<10+8=18>>18 purple flowers.
+Purple and yellow flowers sum up to 10 + 18 = <<10+18=28>>28 flowers.
+That means in Mark's garden there are 25/100 * 28 = <<25/100*28=7>>7 green flowers.
+So in total Mark has 28 + 7 = <<28+7=35>>35 plants in his garden.
+#### 35
+
+Q: Alexis is applying for a new job and bought a new set of business clothes to wear to the interview. She went to a department store with a budget of $200 and spent $30 on a button-up shirt, $46 on suit pants, $38 on a suit coat, $11 on socks, and $18 on a belt. She also purchased a pair of shoes, but lost the receipt for them. She has $16 left from her budget. How much did Alexis pay for the shoes?
+A: Let S be the amount Alexis paid for the shoes.
+She spent S + 30 + 46 + 38 + 11 + 18 = S + <<+30+46+38+11+18=143>>143.
+She used all but $16 of her budget, so S + 143 = 200 - 16 = 184.
+Thus, Alexis paid S = 184 - 143 = $<<184-143=41>>41 for the shoes.
+#### 41
+
+Q: Tina makes $18.00 an hour.  If she works more than 8 hours per shift, she is eligible for overtime, which is paid by your hourly wage + 1/2 your hourly wage.  If she works 10 hours every day for 5 days, how much money does she make?
+A: She works 8 hours a day for $18 per hour so she makes 8*18 = $<<8*18=144.00>>144.00 per 8-hour shift
+She works 10 hours a day and anything over 8 hours is eligible for overtime, so she gets 10-8 = <<10-8=2>>2 hours of overtime
+Overtime is calculated as time and a half so and she makes $18/hour so her overtime pay is 18*.5 = $<<18*.5=9.00>>9.00
+Her overtime pay is 18+9 = $<<18+9=27.00>>27.00
+Her base pay is $144.00 per 8-hour shift and she works 5 days and makes 5 * $144 = $<<144*5=720.00>>720.00
+Her overtime pay is $27.00 per hour and she works 2 hours of overtime per day and makes 27*2 = $<<27*2=54.00>>54.00 in overtime pay
+2 hours of overtime pay for 5 days means she makes 54*5 = $270.00
+In 5 days her base pay is $720.00 and she makes $270.00 in overtime pay so she makes $720 + $270 = $<<720+270=990.00>>990.00
+#### 990
+\end{lstlisting}
+
+
+\newpage
+\section{STaR GSM8K Solutions}
+\label{gsm8ksolutions}
+We observe some interesting patterns with the GSM8K solutions proposed by the STaR-trained model. Typically, when the solution takes substantially fewer calculation steps than the ground truth, it corresponds to an instance where the model accidentally answered the question correctly despite mistakes in its reasoning. In some cases, however, the model produces simpler solutions than those in the ground truth. One example is shown in Figure~\ref{fig:shortcut}.
+
+\begin{figure}[h]
+\centering
+\hspace{-20px}
+\begin{subfigure}{\textwidth}
+  \centering
+    {
+    \small
+\hspace{3px}\includegraphics[width=\textwidth]{figures/mathwordproblem.pdf}    }
+\end{subfigure}
+\caption{An example problem in the training set where STaR derives a significantly simpler solution than the ground truth.} 
+\label{fig:shortcut}
+\vspace{-10px}
+\end{figure}

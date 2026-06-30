@@ -1,4 +1,4 @@
-# MineStudio Positioning — the exact boundary vs this repo's runtime
+# MineStudio Positioning - the exact boundary vs this repo's runtime
 
 Lane 2 theme file. This **sharpens** the existing repo analyses; it does not
 repeat them. Read those for the full inventory:
@@ -18,7 +18,7 @@ MineStudio is and is not in the WAM taxonomy.
 ## 1. What MineStudio *is* (one line, sharpened)
 
 MineStudio (arXiv 2412.18293, CraftJarvis) is a **packaging + tooling layer over
-the MineRL/Malmo visual-policy stack** — it standardizes how you simulate, record,
+the MineRL/Malmo visual-policy stack** - it standardizes how you simulate, record,
 train, and benchmark **pixel-in / camera-buttons-out** Minecraft policies, and it
 re-hosts the canonical weights. It is infrastructure for the *visual-policy*
 research community, not an agent and not a world model.
@@ -26,17 +26,17 @@ research community, not an agent and not a world model.
 ## 2. HF model-gallery facts (confirmed live, 2026-06-16)
 
 The CraftJarvis HF org is MineStudio's model distribution point. Confirmed:
-- `MineStudio_VPT.foundation_model_2x` (+ `1x/3x`, `bc_*`, `rl_*` variants) — VPT.
-- `MineStudio_STEVE-1.official` — **12,822 downloads**, the most-downloaded
+- `MineStudio_VPT.foundation_model_2x` (+ `1x/3x`, `bc_*`, `rl_*` variants) - VPT.
+- `MineStudio_STEVE-1.official` - **12,822 downloads**, the most-downloaded
   Minecraft policy on the Hub.
-- `MineStudio_GROOT.18w_EMA` — GROOT.
-- `MineStudio_ROCKET-1.12w_EMA`, `ROCKET-3-1.5x` — ROCKET line.
+- `MineStudio_GROOT.18w_EMA` - GROOT.
+- `MineStudio_ROCKET-1.12w_EMA`, `ROCKET-3-1.5x` - ROCKET line.
 - `JarvisVLA-Qwen2-VL-7B` (519 dl) + 2509 OpenHA/CrossAgent/motion-action family.
 - Datasets: `minestudio-data-6xx..10xx` (free-play / early-game / house-building /
   obtain-diamond; 6xx alone = **248 GB, no card, viewer unavailable**).
 
 Implication: every public Minecraft visual policy is one `from_pretrained` call
-away *if* you adopt the MineStudio/MineRL Python stack. That is the draw — and the
+away *if* you adopt the MineStudio/MineRL Python stack. That is the draw - and the
 boundary: adopting them means adopting MineRL/Malmo/JDK/Ray/Lightning/GPU, which
 the existing analysis already flagged as a Linux/amd64 setup project, not a quick
 path on this Apple-Silicon TypeScript repo.
@@ -57,14 +57,14 @@ path on this Apple-Silicon TypeScript repo.
 The boundary in one sentence: **MineStudio owns the low-level visual-policy body
 and its training/benchmark plumbing; this repo owns the high-level typed-action,
 evidence-grounded, social-material reasoning layer.** They meet only if a
-MineStudio policy is used as an *isolated executor baseline* in a separate lane —
+MineStudio policy is used as an *isolated executor baseline* in a separate lane -
 never mutating this repo's actor state, PlanBeads, memory, claims, or action-skill
 authority (the existing analysis's rule, restated).
 
 ## 4. MineStudio in the WAM taxonomy
 
 - It is **not a WAM** (no co-generated predicted future `o'` driving actions).
-- It is **not a single agent** — it is a *toolkit* hosting several agents (VPT =
+- It is **not a single agent** - it is a *toolkit* hosting several agents (VPT =
   VLA; STEVE-1/GROOT = goal-conditioned VLA; ROCKET-1 = segmentation-conditioned
   VLA; JarvisVLA = VLM-VLA).
 - Its **simulator** is a Physical-layer environment; its **callbacks** are
@@ -82,9 +82,9 @@ datasets). Two **sharpenings** Lane 2 adds:
    authority analogy.** MineStudio callbacks can mutate the env (commands, mob
    summon, inventory init). In this repo, the equivalent hooks must be
    **evidence writers and typed gates**, never hidden domain planners or
-   prose-execution paths. Translate `RecordCallback → transcript/verifier/
-   screenshot writer`, `CommandsCallback → explicit world-setup fixture artifact`,
-   `TaskCallback → scenario/Active-Episode context` — and drop `FastReset` as a
+   prose-execution paths. Translate `RecordCallback -> transcript/verifier/
+   screenshot writer`, `CommandsCallback -> explicit world-setup fixture artifact`,
+   `TaskCallback -> scenario/Active-Episode context` - and drop `FastReset` as a
    fairness protocol.
 2. **The 671-command fixture density is the key caution, not the task list.** The
    value to extract is the *labeling discipline*: every scenario must be tagged

@@ -1,0 +1,52 @@
+
+
+
+
+\section{New ``Master Key'' Generation}
+\label{app:key_gene}
+
+
+\newcommand{\groupheader}[1]{%
+  \addlinespace[4pt]%
+  \rowcolor{green!10}%
+  \multicolumn{6}{l}{\textbf{#1}}\\[-2pt]\addlinespace[2pt]}
+
+\begin{table*}
+\centering
+\small
+\begin{tabularx}{\linewidth}{p{4cm} *{5}{S[table-format=2.1]}}
+\toprule
+\multirow{2}{4cm}{\textbf{Original and Induced responses}} &
+\multicolumn{5}{c}{\textbf{Dataset}}\\
+\cmidrule(lr){2-6}
+ &
+  {\makecell{Multi-subject RLVR}} & {\makecell{NaturalReasoning}} &
+  {GSM8K} & {MATH} & {\makecell{AIME1983--2024}}\\
+\midrule
+
+\groupheader{\emph{Thought process:}}
+\quad mental process       & 1.0 &  6.8 & 16.1 & 13.9 &  0.4\\
+\quad Thought experiment   & 4.8 & 14.4 &  4.8 &  7.9 &  0.3\\
+
+\groupheader{\shortstack[l]{\emph{Let's solve this}\\\emph{problem step by step.}}}
+\quad Let me solve it step by step. & 18.9 & 33.1 & 42.8 & 35.9 & 10.9\\
+\quad  Let's do this step by step.   & 24.4 & 36.4 & 50.0 & 39.0 & 12.1\\
+
+\groupheader{\emph{Solution}}
+\quad  The solution         & 2.0 & 10.4 &  7.6 & 13.1 &  1.9\\
+\quad  Solution:            & 23.4 & 30.0 & 36.6 & 30.4 &  6.5\\
+
+\midrule
+\textbf{Average} &
+  12.4 & 21.9 & 26.3 & 23.4 & 5.4\\
+\bottomrule
+\end{tabularx}
+\caption{\textbf{False positive rates of GPT-4o induced by new ``master key'' responses.} We use three original English ``master keys'' (highlighted in green in Table \ref{tab:new key}) to generate new keys by retrieving sentences with high embedding similarity from our corpus. The ``performance'' of each new key is illustrated by the FPRs of GPT-4o across the different datasets.}
+\label{tab:new key}
+\vspace{-1em}
+\end{table*}
+
+Given the current ``master keys'', a natural question is whether we can automatically generate additional adversarial responses. We have already shown that the attack effectiveness holds across different languages: \emph{``Solution''} (English), \begin{CJK}{UTF8}{gbsn}\emph{``解''}\end{CJK} (Chinese), \begin{CJK}{UTF8}{min}\emph{``かいせつ''}\end{CJK} (Japanese), and \foreignlanguage{spanish}{\emph{``Respuesta''}} (Spanish), all of which carry the same meaning. Therefore, it is sufficient to focus on discovering more English ``master keys''. A natural strategy is to search for sentences similar to the current ``master keys''. To construct a corpus with ``master key'' candidates, we obtain data from (1) a simplified version of the Wikipedia dataset \citep{ahular2023wiki}; (2) the solution processes from GSM8K \citep{cobbe2021gsm8k}; (3) the MATH dataset \citep{hendrycks2021measuring}; (4) chain-of-thought datasets from \cite{kim2023cot} and \cite{son2024cot}. We preprocess these datasets by splitting them into individual sentences and filtering out those exceeding $30$ characters for simplicity. Additionally, we also include WordNet \citep{miller1995wordnet} to ensure that single-word entries are also covered. The resulting corpus contained 1,502,250 entries.
+
+We employ all-MiniLM-L6-v2 encoder \citep{reimers-2019-sentence-bert} to compute embeddings for the entire corpus. By encoding our known ``master keys'' and measuring cosine similarity, we identify similar sentences in the corpus. Taking the three English ``master keys'' as examples, we randomly select two out of their five most similar sentences. These candidates are evaluated using FPRs judged by GPT-4o, and are proven to effectively attack GPT-4o as well (cf. Table~\ref{tab:new key}).
+

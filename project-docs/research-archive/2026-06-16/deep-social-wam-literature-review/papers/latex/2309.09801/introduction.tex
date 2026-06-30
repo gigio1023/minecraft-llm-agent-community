@@ -1,0 +1,167 @@
+\section{Introduction}
+
+
+The computational aspects of \emph{principal-agent problems} have recently received a growing attention in algorithmic game theory~\citep{dutting2019simple,alon2021contracts,guruganesh2021contracts,dutting2021complexity,dutting2022combinatorial,castiglioni2022bayesian,alon2023bayesian,castiglioni2023designing,castiglioni2023multi,dutting2023multi,GuruganeshPower23,deo2024supermodular,dutting2024combinatorial}.
+%
+Such problems model the interaction between a principal and an agent, where the latter takes a costly action inducing some externalities on the former.
+%
+In \emph{hidden-action} models, the principal cannot observe the agent's action, but only an outcome that is stochastically obtained as an effect of such an action and determines a reward for the principal. 
+% principal-reward-determining outcome that is stochastically obtained as an effect of such an action.
+%
+The goal of the principal is to incentivize the agent to take an action leading to favorable outcomes.
+%
+This is accomplished by committing to a \emph{contract}, which is a payment scheme defining a payment from the principal to the agent for every outcome.  
+
+
+Nowadays, thanks to the flourishing of digital economies, principal-agent problems find applications in a terrific number of real-world scenarios, such as, \emph{e.g.}, crowdsourcing platforms~\citep{ho2015adaptive}, blockchain-based smart contracts~\citep{cong2019blockchain}, and healthcare~\citep{bastani2016analysis}. Most of the works on principal-agent problems focus on the classical model in which the principal knows everything about the agent, including costs and probability distributions over outcomes associated with agent's actions.
+%
+Surprisingly, the study of settings in which the principal does \emph{not} know all agent's features and has to \emph{learn} them from experience has been neglected by almost all the previous works, with the exception of~\citep{ho2015adaptive,zhu2022sample,cohen2022learning,han2023learning}.
+
+
+In this paper, we consider a generalization of the classical hidden-action principal-agent problem in which the principal repeatedly interacts with the agent over \emph{multiple rounds}.
+%
+At each round, the principal commits to a contract, the agent plays an action, and this results in an outcome that is observed by the principal.
+% 
+The principal has no prior information about the agent's actions.
+%
+Thus, they have to \emph{learn an optimal contract} by only observing the outcome realized at each round.
+%
+Our goal is to design algorithms which prescribe the principal a contract to commit to at each round, in order to learn an ``approximately-optimal'' contract with high probability by using the minimum possible number of rounds.
+%
+This can be seen as the problem of establishing the \emph{sample complexity} of learning optimal contracts in hidden-action principal-agent settings.
+
+
+\citet{ho2015adaptive} were the first to consider the problem of learning optimal contracts, though they focus on instances with a very specific structure, as the more recent work by~\citet{cohen2022learning}.
+%\mat{lui dice di usare mild assumptions}
+%
+Recently,~\citet{zhu2022sample} addressed the problem of learning optimal contracts in general principal-agent settings. %with multiple agent's types.
+%
+They provide an algorithm whose cumulative regret with respect to playing an optimal contract is upper bounded by $\widetilde{\mathcal{O}}(\sqrt{m} \cdot T^{1-1/(2m+1)})$, with an (almost-matching) lower bound of $\Omega(T^{1-1/(m+2)})$, where $m$ is the number of outcomes and $T$ the number of rounds.
+%
+The result of~\citet{zhu2022sample} is very unpleasant when $m$ is large, since in such a case the regret grows almost linearly in $T$.
+%
+Moreover, in the instances used in their lower bound, the number of agent's actions is exponential in $m$, leaving as an open problem establishing whether better guarantees can be obtained when the action space is small (see also the discussion in~\citep{zhu2022sample}).
+
+
+\paragraph{Original contributions}
+%
+We provide an algorithm that finds an ``approximately-optimal'' contract with high probability, requiring a number of rounds that grows polynomially in the size of the problem instance (including the number of outcomes $m$) when the number of agent's actions is a constant.
+%
+The algorithm can be easily exploited to achieve cumulative regret (with respect to an optimal contract) upper bounded by $\widetilde{\mathcal{O}}(m^n \cdot T^{4/5})$, which polynomially depends on the instance size when the number of agent's actions $n$ is constant.
+%
+This solves the open problem recently stated by~\citet{zhu2022sample}.
+%
+Our algorithm works by ``approximately identifying'' a covering of contracts into best-response regions, each one representing a set of contracts in which a given agent's action is a best response. 
+%
+The algorithm does so by progressively refining upper and lower bounds for such regions, until they coincide.
+%
+One of the main challenges faced by our algorithm is that, after each round, the principal only observes an outcome stochastically determined by the agent's best response, rather than observing the action itself.
+%
+This makes impossible identifying the action played by the agent.
+%
+Our algorithm overcomes such an issue by working with \emph{meta-actions}, which group together agent's actions associated with ``similar'' distributions over outcomes.
+%
+Such meta-actions need to be ``discovered'' online by the algorithm, which thus has to update the set of meta-actions on the basis of the observed feedbacks. 
+%
+As a result, our algorithm has to adopt a trial-and-error approach which re-starts the covering procedure each time a new agent's meta-action is discovered.
+%
+%
+%
+%This approach is similar to that introduced by~\citet{Peng2019} for learning an optimal strategy to commit to in repeated Stackelberg games.
+%
+%However, the hidden-action principal-agent setting requires considerably different (and more advanced) techniques.
+%
+%This is due to the fact, in our setting, after each round the principal only observes an outcome stochastically determined by the agent's best response, rather than observing the action itself.
+%
+%As a result our algorithm has to adopt a trial-and-error approach which re-starts the partitioning procedure each time a new agent's action is discovered.
+%
+% to simultaneously try to partition contracts while discovering new agent's actions.  
+%
+% \textcolor{red}{This may result in a failure of the algorithm, when the actions are not correctly identified. We solve this% problem with a try and error approach. 
+% }
+%
+%We refer the reader to Appendix~\ref{sec:related} for a more detailed discussion on previous works.
+
+\paragraph{Relation to repeated Stackelberg games} Our work is related to the problem of learning an optimal commitment in repeated Stackelberg games \citep{letchford2009learning,Peng2019}. However, differently from Stackelberg games, in principal-agent problems the principal cannot observe the action undertaken by the agent.
+%
+This prevents us from relying on existing techniques (see, \emph{e.g.},~\citet{Peng2019}) which identify the hyperplanes defining the best-response regions of the follower.
+%
+As a consequence, we have to work with {meta-actions} that only ``approximate'' the set of actions and we can only compute ``approximate'' separating hyperplanes.
+%
+%This approximations are made effective by the peculiar structure of contract design problems. Indeed, it is possible to modify an approximate contract (formally, an approximately IC contract) into an IC contract with a small loss of principal's utility (see, \emph{e.g.}, \citep{dutting2021complexity, zhu2022sample}).
+Such approximations are made effective by the particular structure of principal-agent problems, in which an approximately incentive compatible contract can be turned into an incentive compatible one by only suffering a small utility loss (see, \emph{e.g.}, \citep{dutting2021complexity, zhu2022sample}).
+This is \emph{not} the case for Stackelberg games.
+%design a procedure that maps the observed outcomes to a set of \emph{meta-actions}, in a way that each meta-action consistently includes similar agent's actions in terms of distributions over outcomes, while preventing that an agent's action is not associated with multiple meta-actions.
+%
+%Then, given a set of meta-actions, we adopt a trial-and-error procedure that aims at covering the space of contracts in approximate best-response regions. Such a procedure must stop and re-start whenever the set of meta-actions needs to be updated so as to satisfy the aforementioned properties. 
+%
+
+%Finally, in our work we relax several limiting assumptions adopted in repeated Stackelberg games (see~\citet{Peng2019}) by exploiting some crucial features characterizing the structure of  principal-agent problems. \textcolor{red}{questa divrebbe almeno dire quali sono. In questo momento la toglierei}
+
+%Consequently, in ur work, we adopt a trial-and-error procedure aiming at covering the whole contract space in region in which a meta-action is supposedly better with respect to an another for the follower. In addition, the boundaries of such regions just approximate the ones of the actual best-response regions. Therefore, in the following, we propose several algorithms with non-trivial theoretical guarantees to address such issue, while also relaxing several limiting assumptions made in repeated Stackelberg games (see~\citet{Peng2019}).
+
+
+
+
+
+\begin{comment}
+We provide an algorithm that finds an ``approximately optimal'' contract with high probability, requiring a number of rounds that grows polynomially in the size of the problem instance (including the number of outcomes $m$) when the number of agent's actions is a constant.
+%
+The algorithm can be easily exploited to achieve cumulative regret (with respect to an optimal contract) upper bounded by $\widetilde{\mathcal{O}}(m^n \cdot T^{4/5})$, which polynomially depends on the instance size when the number of agent's actions $n$ is constant.
+%
+This solves the open problem recently stated by~\citet{zhu2022sample}.
+%
+Our algorithm works by ``approximately identifying'' a partition of contracts into best-response regions, each one representing a set of contracts in which a given agent's action is a best response. 
+%
+The algorithm does so by progressively refining upper and lower bound for such regions, until they coincide.
+%
+This approach is similar to that introduced by~\citet{peng2019optimal} for learning an optimal strategy to commit to in repeated Stackelberg games.
+%
+However, the hidden-action principal-agent setting requires considerably different (and more advanced) techniques.
+%
+This is due to the fact, in our setting, after each round the principal only observes an outcome stochastically determined by the agent's best response, rather than observing the action itself.
+%
+As a result our algorithm has to adopt a trial-and-error approach which re-starts the partitioning procedure each time a new agent's action is discovered.
+%
+% to simultaneously try to partition contracts while discovering new agent's actions.  
+%
+% \textcolor{red}{This may result in a failure of the algorithm, when the actions are not correctly identified. We solve this% problem with a try and error approach. 
+	% }
+%
+We refer the reader to Appendix~\ref{sec:related} for a more detailed discussion on previous works.
+\end{comment}
+
+
+\begin{comment}
+We start by showing a strong negative result. In particular, we show that there are two constants $\kappa>0$ and $\delta>0$ such that no algorithm can learn a $\kappa$-optimal contract with probability $1-\delta$ for any number of rounds when the space of contracts spans the whole $\mathbb{R}^m_{+}$. This result is of independent interest since, to the best of our knowledge, it is the first impossibility result about learning contract in $\mathbb{R}^m_{+}$. Consequently, in the rest of paper, we focus on a learning problem that consider a bounded contracts space. 
+
+\textcolor{red}{i riferimenti a peng mi paiono totalmente fuori contesto. meglio mettere un paragrafo sulle differenze a mio parere. e tornare alla versione precedente dei original contribution}
+
+In Section~\ref{sec:discover_and_partition} we present our main contribution, namely the \texttt{Discover-and-Cover} algorithm, which computes an ``approximately optimal'' contract with high probability, in a number of rounds that grows polynomially in the size of the problem instance (including the number of outcomes $m$) when the number of agent's actions is a constant. Our algorithm has to overcome the challenging issue that at each round the principal cannot observe the action undertaken by the agent as in the case of repeated Stackelberg games. Thus, the algorithm presented by~\citet{Peng2019} would fail in our case. As a result, we introduce different algorithms that are the key components of the main one, \emph{i.e.}, the \texttt{Discover-and-Cover} algorithm. %These algorithms involves several non trivial machineries to deal with the fact that the principal only observes an outcome stochastically determined by the agent's best response, rather than observing the action itself.  
+%
+In Section~\ref{sec:action_oracle}, we design \texttt{Action-Oracle}, a non-trivial procedure that allows us to map the observed outcome to a suitable defined set meta-actions. Such a procedure must adapt and redefine the set of meta-actions in a way that each meta-action consistently includes agent's actions having a similar distributions over outcomes and an agent's action is not associated with multiple meta-actions. In Section~\ref{sec:try_partition} we present \texttt{Try-Cover}, an algorithm that, given a set of meta-actions, attempts to cover the whole space of contracts in regions in which a meta-action is ``approximately'' better with respect to another one. Our approach requires significantly more effort compared to the one by~\citet{Peng2019} in the case of repeated Stackelberg games. This is because the final lower bounds may intersect or include contracts that implement a different meta-actions with respect to the ones identifying the lower bound itself. Furthermore, since we can only have access to approximate best-response regions, there is \emph{no} guarantee that an optimal solution lies within one of the vertices of the final lower bounds, as is the case in~\citet{Peng2019}. Thus, in Section~\ref{sec:find_contract_algo} we present \texttt{Find-Contract}, a non-trivial procedure that leverages the information gained in the previous rounds to compute an approximately optimal contract.
+%
+
+In Section~\ref{sec:regret} we show how to employ the previous analysis to achieve cumulative regret (with respect to an optimal contract) upper bounded by $\widetilde{\mathcal{O}}(m^n \cdot T^{4/5})$, which polynomially depends on the instance size when the number of agent's actions $n$ is constant.
+%
+This solves the open problem recently stated by~\citet{zhu2022sample}. 
+
+Finally, we relax several limiting assumptions made by~\citet{Peng2019} in case of repeated Stackelberg games. Specifically, they assume that the best-response regions have finite constant measure or they are empty. Additionally, they assume that, in cases where the follower has multiple best-responses, any of these can be arbitrarily chosen. Finally, their algorithm requires the knowledge of the number of follower's actions in advance. Refer to Appendix~\ref{sec:related} for detailed discussion on prior works with a particular focus on a comparison with the work by~\citet{Peng2019}. 
+
+%Add an article before "case" to make the sentence clearer: "Specifically, they assume that the best-response regions have a finite constant measure or they are empty."
+%Consider rephrasing the following sentence for clarity and flow: "In addition, they assume that any best-response can be arbitrarily chosen in case of multiple best-responses for the follower." For example, you might say: "Additionally, they assume that, in cases where the follower has multiple best-responses, any of these can be arbitrarily chosen."
+%In the last sentence, consider using "subsequent" instead of "following" for smoother flow: "In contrast, thanks to the technical effort presented in the subsequent sections, we can relax such assumptions."
+
+%
+% to simultaneously try to partition contracts while discovering new agent's actions.  
+%
+% \textcolor{red}{This may result in a failure of the algorithm, when the actions are not correctly identified. We solve this% problem with a try and error approach. 
+% }
+%
+%See Appendix~\ref{sec:related} for a more detailed discussion on previous works.
+\end{comment} 
+
+\begin{comment}
+We relax several assumptions made by Peng et al. (2019). In particular, they assume that either the best response regions have at least a constant volume or they are zero-measured. Thanks to Lemmas 4 and 6, we effectively address this limitation, showing that even when an optimal contract belongs to a zero-measured best-response region, we can still compute an approximately optimal solution. Furthermore, Peng et al. (2019) assume that in cases where there are multiple best responses for the follower, any of them can be arbitrarily chosen. Differently from them, we assume that the agent always breaks ties in favor of the leader as it is customary in the Stackelberg literature. Finally, our algorithm does not require the knowledge of the number of actions of the agent, differently from the algorithm proposed by Peng et al. (2019).
+\end{comment}
+

@@ -1,0 +1,516 @@
+\section{The \texttt{Discover-and-Cover} algorithm}\label{sec:discover_and_partition}
+In this section, we provide an algorithm for the problem introduced in Definition~\ref{def:learning_prob}, which we call \texttt{Discover-and-Cover} algorithm (Algorithm~\ref{alg:final_algorithm}).
+%
+Our main result (Theorem~\ref{thm:finalthm}) is an upper bound on the number of rounds required by the algorithm, which we show to grow polynomially in the size of the problem instance when the number of agent's actions $n$ is constant.
+%
+% In the following sections, we present a general algorithm (see Algorithm~\ref{alg:learn_contract}) for learning approximately optimal contracts while minimizing the number of interactions, when the number of the agent's actions $n$ is a fixed parameter. This task becomes particularly challenging in our framework, as the principal can only observe the outcome associated with the contract they commit to, with no information about the action played by the agent. 
+
+
+The core idea behind Algorithm~\ref{alg:final_algorithm} is to learn an optimal bounded contract $p   \in [0,B]^m$ by ``approximately'' identifying the best-response regions $\preg_a$.
+%
+Notice that, since at the end of each round the principal only observes the outcome realized by the agent's action, rather than the action itself, identifying such best-response regions exactly is \emph{not} possible.
+%
+Moreover, the principal does \emph{not} even know the set of actions available to the agent, which makes the task even more challenging.
+
+\begin{comment}
+
+\end{comment}
+\begin{wrapfigure}[11]{R}{0.41\textwidth}
+	\vspace{-.5cm}
+	\begin{minipage}{0.41\textwidth}
+		\begin{algorithm}[H]
+			\caption{\hspace{-0.4mm}\texttt{Discover-and-Cover}}\label{alg:final_algorithm}
+			\small
+			\begin{algorithmic}[1]
+				\Require $\rho \in (0,1)$, $\delta \in (0,1)$, $B \geq 1$
+				\State Set $\epsilon$, $\alpha$, $q$, and $\eta$ as in Appendix~\ref{sec:app_params}
+				% \State $q \gets \left\lceil \frac{1}{2\epsilon^2} \log \frac{2 m}{\alpha}\right\rceil$ \label{line:set_q}
+				\State $\mathcal{P} \gets \left\{ p \in \mathbb{R}_+^m \mid  \| p \|_{1} \leq mB \right\}$\label{line:set_P}
+				\State $\mathcal{D}\gets \varnothing$, $\mathcal{F} \gets \varnothing$ \label{line:set_D_F}
+				\Do
+				\State $ \{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } \gets \texttt{Try-Cover}()$
+				\doWhile{ $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } = \varnothing$}
+				\State \Return \texttt{Find-Contract}$(\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )$
+				%				\Require $\epsilon > 0$, $\alpha \in (0,1)$
+				%				\State $q \gets \left\lceil \frac{1}{\epsilon^2} \log \frac{2 m}{\alpha}\right\rceil$, $\eta \gets f(\epsilon)$ \label{line:set_q}
+				%				\State $\mathcal{P} \gets \left\{ p \in \mathbb{R}_+^m \mid  \| p \|_{1} \leq mB \right\}$
+				%				\State $\mathcal{D}\gets \varnothing$, $\mathcal{F} \gets \varnothing$ \label{line:set_D_F}
+				%				\Do
+				%				\State $ \big( \widetilde F,\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } \big) \gets \texttt{Try-Partition}()$
+				%				\If {$\widetilde F \neq \bot$}
+				%				\State $ \texttt{Update-Actions}(\widetilde F)$
+				%				\EndIf
+				%				\doWhile{ $\widetilde F\neq \bot$}
+				%				\State \Return \texttt{Find-Contract}$(\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )$
+				%
+				%		\State Take any $F_d \in \mathcal{F}_d$ for each $d \in \mathcal{D}$
+				%		\For {$d \in \mathcal{D}$}
+				%		\State $ p_d \gets \texttt{FIND-CONTRACT}(F_d, \mathcal{L}_d)  $
+				%		\EndFor
+				%		\State $d^\star \gets \argmax_{d \in \mathcal{D}} \sum_{\omega  \in \Omega }  {F}_{d,\omega}    \left( r_\omega - p_\omega \right) $
+				%		\State \Return $p_{d^\star}$ 
+				%		\Require $\epsilon > 0$, $\alpha \in (0,1)$
+				%		\State Set $\texttt{ACTION-ORACLE}$ parameter $q \gets \left\lceil \frac{1}{\epsilon^2} \log \left(\frac{2 m}{\alpha}\right)\right\rceil$
+				%		\State $\mathcal{D}\gets \varnothing$
+				%		\Do
+				%		\State $ (\tilde F,\{\mathcal{F}_d \}_{d \in \mathcal{D}},\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )\gets \texttt{TRY-PARTITION}(\mathcal{D}, \{\mathcal{F}_d \}_{d \in \mathcal{D}})$
+				%		\If {$\tilde F \neq \bot$}
+				%		\State $(\mathcal{D}, \{\mathcal{F}_d \}_{d \in \mathcal{D}}) \gets \texttt{UPDATE-ACTIONS}(\tilde F, \mathcal{D}, \{\mathcal{F}_d \}_{d \in \mathcal{D}})$
+				%		\EndIf
+				%		\doWhile{ $\tilde F\neq \bot$}
+				%		%\State $p \gets FindContract(\mathcal{D}, \{\mathcal{L}_{d}\}_{d\in  \mathcal{D} }, \{\mathcal{F}_d \}_{d \in \mathcal{D}})$
+				%		\State Take any $F_d \in \mathcal{F}_d$ for each $d \in \mathcal{D}$
+				%		\For {$d \in \mathcal{D}$}
+				%		\State $ p_d \gets \texttt{FIND-CONTRACT}(F_d, \mathcal{L}_d)  $
+				%		\EndFor
+				%		\State $d^\star \gets \argmax_{d \in \mathcal{D}} \sum_{\omega  \in \Omega }  {F}_{d,\omega}    \left( r_\omega - p_\omega \right) $
+				%		\State \Return $p_{d^\star}$ 
+			\end{algorithmic}
+		\end{algorithm}
+	\end{minipage}
+\end{wrapfigure}
+%
+%
+Algorithm~\ref{alg:final_algorithm} builds a set $\mathcal{D}$ of \emph{meta-actions}, where each meta-action $d \in \mathcal{D}$ identifies a set $A(d) \subseteq \mathcal{A}$ of one or more (unknown) agent's actions.
+%
+A meta-action groups together ``similar'' actions, in the sense that they induce similar distributions over outcomes.
+%
+The algorithm incrementally discovers new elements of $\mathcal{D}$ by trying to cover a suitably-defined set $\mathcal{P}$ of contracts (see Line~\ref{line:set_P}) by means of \emph{approximate best-response regions} $\mathcal{L}_d$, one for each $d \in \mathcal{D}$.
+%
+In particular, $\mathcal{L}_d$ is a suitably-defined polytope that ``approximately describes'' the union of all the best-response regions $\preg_a$ of actions $a \in A(d)$ associated with $d$.
+%, in the sense that each $\preg_a$ is contained in $\mathcal{L}_d$ and at the same time for every contract in $\mathcal{L}_d$ there exists at least one action $a \in A(d)$ that is an approximate agent's best response .
+%
+Each time $\mathcal{D}$ is updated, the algorithm calls the \texttt{Try-Cover} procedure (Algorithm~\ref{alg:try_partition}), whose aim is to cover $\mathcal{P}$ with approximate best-response regions.
+%
+% This is accomplished by the \texttt{Try-Partition} procedure (Algorithm~\ref{alg:try_partition}).
+%
+%
+\texttt{Try-Cover} works by iteratively finding hyperplanes that separate such regions, by ``testing'' suitable contracts through the \texttt{Action-Oracle} procedure (Algorithm~\ref{alg:action_oracle}).
+%
+Given a contract $p \in \preg$, \texttt{Action-Oracle} checks whether it is possible to safely map the agent's best response $a^\star(p)$ to an already-discovered meta-action $d \in \mathcal{D}$ or \emph{not}.
+%
+In the latter case, \texttt{Action-Oracle} refines the set $\mathcal{D}$ by either adding a new meta-action or merging a group of meta-actions if their associated actions can be considered as ``similar''.
+%
+Whenever the set $\mathcal{D}$ changes, \texttt{Try-Cover} is terminated (returning $\varnothing$).
+% and the algorithm calls the procedure \texttt{Update-Actions} (Algorithm~\ref{alg:update_actions}), which refines the set $\mathcal{D}$ by either adding a new meta-action or merging a group of meta-actions into a new (single) one.
+%
+The algorithm continues trying to cover $\preg$ until a satisfactory cover is found.
+%
+Finally, such a cover is used to compute a contract $p \in [0,B]^m$ to be returned, by means of the procedure \texttt{Find-Contract} (Algorithm~\ref{alg:find_contract}).
+%
+%The core idea behind Algorithm~\ref{alg:learn_contract} is to simoulteously learn the agent's actions and their corresponding best-response regions. More specifically, while attempting to partitionate the contract space $\preg$ with a given set of discovered actions $\mathcal{D}$, Algorithm~\ref{alg:learn_contract} may discover a new agent's action or realize that two previously identified actions coincides. In such a case, the set of discovered actions is updated using the \texttt{UPDATE-ACTIONS} algorithm, and the revised set of actions is then fed back into the \texttt{TRY-PARTITION} one. This procedure is repeated until no more actions are discovered and the contract design space is fully partitionated in best-response regions.  Finally, all these information are collected and given as input to the \texttt{FIND-CONTRACT} algorithm returning an $\epsilon$-optimal contract. 
+%
+
+
+In the rest of this section, we describe the details of all the procedures used by Algorithm~\ref{alg:final_algorithm}.
+%
+In particular, Section~\ref{sec:action_oracle} is concerned with \texttt{Action-Oracle}, Section~\ref{sec:try_partition} with \texttt{Try-Cover}, and Section~\ref{sec:find_contract_algo} with \texttt{Find-Contract}.
+%
+Finally, Section~\ref{sec:final_algo} concludes the analysis of Algorithm~\ref{alg:final_algorithm} by putting everything together so as to prove the guarantees of the algorithm.
+%
+%Let us remark that, for ease of presentation, we assume that all the procedures have access to the variables declared in Algorithm~\ref{alg:final_algorithm}, namely $\rho$, $\delta$, $B$, $\epsilon$, $\alpha$, $q$, $\eta$, $\mathcal{P}$, $\mathcal{D}$, and $\mathcal{F}$.
+
+\subsection{\texttt{Action-Oracle}}\label{sec:action_oracle}
+Given a contract $p \in \mathcal{P}$ as input, the \texttt{Action-Oracle} procedure (Algorithm~\ref{alg:action_oracle}) determines whether it is possible to safely map the agent's best response $a^\star(p)$ to some meta-action $d \in \mathcal{D}$.
+%
+If this is the case, then the procedure returns such a meta-action.
+%
+%
+Otherwise, the procedure has to properly refine the set $\mathcal{D}$ of meta-actions, as we describe in the rest of this subsection.
+
+In the first phase (Lines~\ref{line:action_or_first}--\ref{line:action_or_first_last}), Algorithm~\ref{alg:action_oracle} prescribes the principal to commit to the contract $p \in \preg$ given as input for $q \in \mathbb{N}$ consecutive rounds (see Appendix~\ref{sec:app_params} for the definition of $q$).
+%
+This is done to build an empirical distribution $\widetilde{F} \in \Delta_{\Omega}$ that estimates the (true) distribution over outcomes $F_{a^\star(p)}$ induced by the agent's best response $a^\star(p)$.
+%
+In the second phase (Lines~\ref{line:action_or_second}--\ref{line:action_or_second_last}), such an empirical distribution is compared with those previously computed, %during previous calls to Algorithm~\ref{alg:action_oracle}
+in order to decide whether $a^\star(p)$ can be safely mapped to some $d \in \mathcal{D}$ or \emph{not}.
+%
+To perform such a comparison, all the empirical distributions computed by the algorithm are stored in a dictionary $\mathcal{F}$ (initialized in Line~\ref{line:set_D_F} of Algorithm~\ref{alg:final_algorithm}), where $\mathcal{F}[d]$ contains all the $\widetilde{F} \in \Delta_{\Omega}$ associated with $d \in \mathcal{D}$.
+%
+%computed by Algorithm~\ref{alg:action_oracle} when it concluded that the agent's best response can be safely associated with $d \in \mathcal{D}$.
+%
+% all the $\widetilde{F} \in \Delta_{\Omega}$ computed by Algorithm~\ref{alg:action_oracle} for contracts $p \in \mathcal{P}$ whose corresponding best response $a^\star(p)$ is associated with $d \in \mathcal{D}$.
+
+
+
+The first phase of Algorithm~\ref{alg:action_oracle} ensures that $ \|  \widetilde F - F_{a^\star(p)} \|_{\infty} \le \epsilon $ holds with sufficiently high probability.
+%
+For ease of presentation, we introduce a \emph{clean event} that allows us to factor out from our analysis the ``with high probability'' statements.
+%
+In Section~\ref{sec:final_algo}, we will show that such an event holds with sufficiently high probability given how the value of $q$ is chosen.
+%
+\begin{definition}[Clean event]
+	Given any $\epsilon > 0$, we let $\mathcal{E}_\epsilon$ be the event in which Algorithm~\ref{alg:action_oracle} always computes some $\widetilde F \in \Delta_{\Omega}$ such that $ \|\widetilde{F} - F_{a^\star(p)} \|_{\infty} \le \epsilon $, where $p \in \mathcal{P}$ is the input to the algorithm.
+\end{definition}
+
+
+\begin{wrapfigure}[23]{R}{0.42\textwidth}
+	\vspace{-.7cm}
+	\begin{minipage}{0.42\textwidth}
+		\begin{algorithm}[H]
+			\caption{\texttt{Action-Oracle}}\label{alg:action_oracle}
+			\small
+			\begin{algorithmic}[1]
+				\Require $p \in \mathcal{P}$
+				\State ${I}_{\omega} \gets 0$ for all $\omega \in \Omega$\label{line:action_or_first}\Comment{\textcolor{gray}{Phase 1: Estimate}}
+				\For{$\tau =1 , \ldots, q$} 
+				\State Commit to $p $ and observe $\omega \in \Omega$
+				\State  ${I}_{\omega} \gets {I}_{\omega}+1$
+				\EndFor
+				\State Build $\widetilde{F} \in \Delta_\Omega:  \widetilde F_{\omega} = {I}_{\omega}/q$  $\forall \omega \in \Omega$\label{line:action_or_first_last}
+				\State $\mathcal{D}^\diamond \gets \varnothing$\label{line:action_or_second}\Comment{\textcolor{gray}{Phase 2: Compare}}
+				\For {$d \in \mathcal{D}$}
+				\If{$\exists F \in \mathcal{F}[d] : \| F -   \widetilde F \|_{\infty} \leq 2 \epsilon$}
+				\State $\mathcal{D}^\diamond \gets \mathcal{D}^\diamond \cup \{ d \}$
+				\EndIf
+				\EndFor
+				\If {$|\mathcal{D}^\diamond| = 1$}
+				% \State $d \gets$ unique element of $\mathcal{D}^\diamond$
+				\State $\mathcal{F}[d] \gets \mathcal{F}[d] \cup \{ \widetilde{F} \}$\Comment{\textcolor{gray}{unique $d \in \mathcal{D}^\diamond$}}\label{line:add}
+				\State \Return $ d$
+				\EndIf
+				\State $\mathcal{D} \gets \left( \mathcal{D} \setminus \mathcal{D}^\diamond \right) \cup \{ d^\diamond \}$ \Comment{\textcolor{gray}{$d^\diamond$ is new}}\label{line:new_meta}
+				\State $\mathcal{F}[{d^\diamond}] \gets \bigcup_{d \in \mathcal{D}^\diamond} \mathcal{F}[d] \cup \{ \widetilde F \}$ 
+				\State Let $\widetilde F_{d^\diamond}$ be equal to $\widetilde F$\label{line:assoc_ditrib}
+				\State Clear $\mathcal{F}[d]$ for all $d \in \mathcal{D}^\diamond$\label{line:clear}
+				\State \Return $\bot$\label{line:action_or_second_last}
+			\end{algorithmic}
+		\end{algorithm}
+	\end{minipage}
+\end{wrapfigure}
+%
+In the second phase, Algorithm~\ref{alg:action_oracle} searches for all the $d \in \mathcal{D}$ such that $\mathcal{F}[d]$ contains \emph{at least one} empirical distribution which is ``sufficiently close'' to the $\widetilde{F}$ that has just been computed by the algorithm.
+%
+%associated with \emph{at least one} (previously-computed) empirical distribution that is ``sufficiently close'' to $\widetilde{F}$.
+%
+Formally, the algorithm looks for all the meta-actions $d \in \mathcal{D}$ such that $ \| F -   \widetilde F \|_{\infty} \le 2 \epsilon $ for at least one $F \in \mathcal{F}[d]$.
+%
+Then, three cases are possible:
+%
+%\begin{itemize}[leftmargin=6mm]
+	%\item
+	(i) If the algorithm finds a \emph{unique} $d \in \mathcal{D}$ with such a property (case $|\mathcal{D}^\diamond|=1$), then $d$ is returned since $a^\star(p)$ can be safely mapped to $d$.
+	%
+	%\item
+	(ii) If the algorithm does \emph{not} find any $d \in \mathcal{D}$ with such a property (case $\mathcal{D}^\diamond=\varnothing$), then a new meta-action $d^\diamond$ is added to $\mathcal{D}$.
+	% so that $a^\star(p)$ can be safely associated with it.
+	%
+	%\item 
+	(iii) If the algorithm finds \emph{more than one} $d \in \mathcal{D}$ with such a property ($|\mathcal{D}^\diamond| > 1$), then all the meta-actions in $\mathcal{D}^\diamond$ are merged into a single (new) meta-action $d^\diamond$.
+	% so that $a^\star(p)$ can be safely associated with it.
+%\end{itemize}
+%
+%
+%\vspace{0.5cm}
+In Algorithm~\ref{alg:action_oracle}, the last two cases above are jointly managed by Lines~\ref{line:new_meta}--\ref{line:action_or_second_last}, and in both cases the algorithm returns the special value $\bot$.
+%
+This alerts the calling procedure that the set $\mathcal{D}$ has changed, and, thus, the \texttt{Try-Cover} procedure needs to be re-started.
+%
+Notice that Algorithm~\ref{alg:action_oracle} also takes care of properly updating the dictionary $\mathcal{F}$, which is done in Lines~\ref{line:add}~and~\ref{line:clear}.
+%
+Moreover, whenever Algorithm~\ref{alg:action_oracle} adds a new meta-action $d^\diamond$ into $\mathcal{D}$, this is also associated with a particular empirical distribution $\widetilde{F}_{d^\diamond}$, which is set to be equal to $\widetilde{F}$ (Line~\ref{line:assoc_ditrib}).
+%
+% for ease of exposition, whenever Algorithm~\ref{alg:action_oracle} adds a new meta-action $d$ into $\mathcal{D}$, this is associated with an empirical distribution $\widetilde{F}_{d}$ equal to the $\widetilde{F}$ that has just been computed (Line~\ref{line:assoc_ditrib}).
+%
+We remark that the symbols $\widetilde{F}_d$ for $d \in \mathcal{D}$ have only been introduced for ease of exposition, and they do \emph{not} reference actual variables declared in the algorithm.
+%
+Operationally, one can replace each appearance of $\widetilde{F}_d$ in the algorithms with any fixed empirical distribution contained in the dictionary entry $\mathcal{F}[d]$.
+%
+% $\widetilde{F}_d$ does \emph{not} correspond to any variable.
+%
+% Operationally, one can use any element in $\mathcal{F}[d]$ instead.
+%
+% This will be needed by the \texttt{Try-Partition} and the \texttt{Find-Contract} procedures.\footnote{Let us remark that the symbols $\widetilde{F}_d$ for $d \in \mathcal{D}$ have been introduced for ease of exposition, and, thus, they do \emph{not} correspond to actual variables. Indeed, one may use any empirical distribution in $\mathcal{F}[d]$ in place of $\widetilde{F}_d$.}
+
+
+The first crucial property that Algorithm~\ref{alg:action_oracle} guarantees is that \emph{only ``similar'' agent's best-response actions are mapped to the same meta-action}.
+%
+In order to formally state such a property, we first need to introduce the definition of set of agent's actions \emph{associated with} a meta-action in $\mathcal{D}$.
+%
+%
+% the algorithm returns a meta-action $d \in \mathcal{D}$, then the agent's best response $a^\star(p)$ in the contract $p \in \mathcal{P}$ given as input can be safely associated with $d$.
+%
+% , whenever the agent's best response $a^\star(p)$ can be safely associated with some meta-action in $\mathcal{D}$, then the algorithm correctly returns such a meta-action.
+%
+% In order to state such a property, we first need to formally introduce the set of agent's actions \emph{associated with} a meta-action in $\mathcal{D}$, which is defined as follows: 
+%
+% Formally, the set of agent's actions \emph{associated with} a meta-action in $\mathcal{D}$ is defined as follows: 
+%
+%\begin{definition}[Associated actions]\label{def:associated_actions}
+%	For every $d \in \mathcal{D}$, let $\mathcal{P}_d \subseteq \mathcal{P}$ be the set of contracts $p \in \mathcal{P}$ that are given as input to Algorithm~\ref{alg:action_oracle} in all the calls in which it computed an empirical distribution $\widetilde F \in \mathcal{F}[d]$.
+%	%
+%	Then, we define the set of actions \emph{associated with} a meta-action $d \in \mathcal{D}$ as $I(d) \coloneqq \bigcup_{p \in \mathcal{P}_d} a^\star(p)$ .
+%\end{definition}
+%
+\begin{definition}[Associated actions]\label{def:asssoc_actions}
+	Given a set $\mathcal{D}$ of meta-actions and a dictionary $\mathcal{F}$ of empirical distributions computed by means of Algorithm~\ref{alg:action_oracle}, we let $A: \mathcal{D} \to 2^\mathcal{A}$ be a function such that $A(d)$ represents the \emph{set of actions associated with} the meta-action $d \in \mathcal{D}$, defined as follows:
+	\[
+		A(d) = \left\{a \in \mathcal{A} \mid  \,\, \rVert \widetilde{F}_d -  F_a  \lVert_\infty\le 5 \epsilon n \wedge \exists p \in \mathcal P: a=a^\star(p) \right\}.
+	\]
+	%	
+	%	Given a distribution $F \in \Delta_\Omega$, we let $B(F)\subseteq \mathcal{A}$ be set
+	%	\[\{a \in A: \rVert F_a-F\lVert_\infty\le 5 \epsilon n \wedge \exists p \in \mathcal P: a=a^*(p)\}\]
+\end{definition}
+%
+\vspace{-3mm}
+The set $A(d)$ encompasses all the agent's actions $a \in \mathcal{A}$ whose distributions over outcomes $F_a$ are ``similar'' to the empirical distribution $\widetilde{F}_d$ associated with the meta-action $d \in \mathcal{D}$, where the entity of the similarity is defined in a suitable way depending on $\epsilon$ and the number of agent's actions $n$.
+%
+Moreover, notice that the set $A(d)$ only contains agent's actions that can be induced as best response for at least one contract $p \in \mathcal{P}$.
+%
+This is needed in order to simplify the analysis of the algorithm.
+%
+Let us also remark that an agent's action may be associated with \emph{more than one} meta-action.
+%
+% In particular, whenever the algorithm returns a meta-action $d \in \mathcal{D}$ for a contract $p \in \mathcal{P}$ given as input, then the agent's best response $a^\star(p)$ is indeed associated with the meta-action $d$.
+%
+Equipped with Definition~\ref{def:asssoc_actions}, the property introduced above can be formally stated as follows:
+%
+\begin{restatable}{lemma}{boundedactions}\label{lem:boundedactions}
+	Given a set $\mathcal{D}$ of meta-actions and a dictionary $\mathcal{F}$ of empirical distributions computed by means of Algorithm~\ref{alg:action_oracle}, under the event $\mathcal{E}_\epsilon$, if Algorithm~\ref{alg:action_oracle} returns a meta-action $d \in \mathcal{D}$ for a contract $p \in \mathcal{P}$ given as input, then it holds that $a^\star(p)\in A(d)$.
+	%
+	% Under the event $\mathcal{E}_\epsilon$, Algorithm~\ref{alg:action_oracle} ensures that, for every meta-action $d \in \mathcal{D}$ and each $p \in \preg$ such that the algorithm returns $d$, it holds $a^\star(p)\in B(d)$.
+\end{restatable}
+%
+Lemma~\ref{lem:boundedactions} follows from the observation that, under the event $\mathcal{E}_\epsilon$, the empirical distributions computed by Algorithm~\ref{alg:action_oracle} are ``close'' to the true ones, and, thus, the distributions over outcomes of all the actions associated with $d$ are sufficiently ``close'' to each other.
+%
+A non-trivial part of the proof of Lemma~\ref{lem:boundedactions} is to show that Algorithm~\ref{alg:action_oracle} does \emph{not} put in the same entry $\mathcal{F}[d]$ empirical distributions that form a ``chain" growing arbitrarily in terms of $\lVert \cdot \rVert_\infty$ norm, but instead the length of such ``chains" is always bounded by $5 \epsilon n$.  
+%
+% ensures that there are no ``chains" of empirical distributions that grow arbitrarily, but the length of such ``chains" can be bounded by the number of actions.
+%
+%the proof follows noticing that under the event $\mathcal{E}_\epsilon$, the empirical distributions induced by the actions are close to the real one, and all the empirical distributions in $\mathcal{F}[d]$ are close.
+%The non-trivial part of the proof is to show that there do not exist "chains" of empirical distributions close only in pairs. We show that the length of these chains is bounded by the number of actions.
+%
+% Indeed, Algorithm~\ref{alg:action_oracle} assigns to the same meta-action only actions that are at most close to at least another action. Hence, 
+% \ldots \alb{Dare intuizione proof, non capisco più un cazzo di come è la proof adesso}
+%\bac{Intuitively, the lemma follows by observing that, under the event $\mathcal{E}_\epsilon$, the agent's action $a_i$ leading to the empirical distribution $\widetilde{F}_d$ is sufficiently close to $F_{a_i} $. Furthermore, by noticing that all the agent's actions implemented by a contract $p$ in which \texttt{Action-Oracle} returns the meta-action $d$ must satisfy the condition $\| F_{a^\star(p)} - F_{a_i}\|_\infty  \le 4 \epsilon n$.}
+The second crucial property is made formal by the following lemma:
+%
+\begin{restatable}{lemma}{finaliterations}\label{lem:finaliterations}
+	Under the event $\mathcal{E}_\epsilon$, Algorithm~\ref{alg:action_oracle} returns $\bot$ at most $2n$ times.
+	%
+	%The number of iterations required \textnormal{\texttt{Discover-and-Partition}} is of at most $2n$.
+\end{restatable}
+%
+Intuitively, Lemma~\ref{lem:finaliterations} follows from the fact that Algorithm~\ref{alg:action_oracle} increases the cardinality of the set $\mathcal{D}$ by one only when $\|  F - \widetilde{F} \|_\infty > 2 \epsilon$ for all ${F} \in \mathcal{F}[d]$ and $d \in \mathcal{D}$.
+%
+In such a case, under the event $\mathcal{E}_\epsilon$ the agent's best response is an action that has never been played before.
+%
+Thus, the cardinality of $\mathcal{D}$ can be increased at most $n$ times.
+%
+Moreover, in the worst case the cardinality of $\mathcal{D}$ is reduced by one for $n$ times, resulting in $2 n $ being the maximum number of times Algorithm~\ref{alg:action_oracle} returns $\bot$.
+%All the actions associated with the same meta-action also enjoy a useful property concerning their costs.
+In the following, we formally introduce the definition of \emph{cost of a meta-action}.
+%
+%In particular, we formally introduce the following definition of \emph{cost of a meta-action}:
+%
+\begin{definition}[Cost of a meta-action]\label{def:cost_action}
+	Given a set $\mathcal{D}$ of meta-actions and a dictionary $\mathcal{F}$ of empirical distributions computed by means of Algorithm~\ref{alg:action_oracle}, we let $c: \mathcal{D} \to [0,1]$ be a function such that $c(d)$ represents the \emph{cost of meta-action} $d \in \mathcal{D}$, defined as $c(d) = \min_{a \in A(d)} c_{a}$.
+\end{definition}
+%
+%\begin{definition}[close of a distribution]
+%	Given a distribution $F\in \Delta_\Omega$, we let $c(d)= \min_{a \in A(d)} c_{a}$.
+%\end{definition}
+%
+Then, by Holder's inequality, we can prove that the two following lemmas hold:
+%
+% Interestingly, given a distribution $F$, actions in $B(F)$ have cost close to $c_{F}$.
+%
+\begin{restatable}{lemma}{costactions}\label{lem:cost_actions}
+	Given a set $\mathcal{D}$ of meta-actions and a dictionary $\mathcal{F}$ of empirical distributions computed by means of Algorithm~\ref{alg:action_oracle}, under the event $\mathcal{E}_\epsilon$, for every meta-action $d \in \mathcal{D}$ and associated action $a \in A(d)$ it holds that $|c(d) - c_a| \le 4 B \epsilon m n$.
+	%
+	% Under the event $\mathcal{E}_\epsilon$, given a meta-action $d \in \mathcal{D}$, for each $a \in A(d)$ it holds $|c(d) - c_a| \le 4 \epsilon n$.
+\end{restatable}
+%
+%Moreover, by Lemma~\ref{lem:cost_actions} and Holder's inequality, the following holds:
+%we can readily prove the following lemma, which will be useful in proving many of ours results. 
+%
+\begin{restatable}{lemma}{closeutility}\label{lem:utility_closed}
+	Given a set $\mathcal{D}$ of meta-actions and a dictionary $\mathcal{F}$ of empirical distributions computed by means of Algorithm~\ref{alg:action_oracle}, under the event $\mathcal{E}_\epsilon$, for every meta-action $d \in \mathcal{D}$, associated action $a \in A(d)$, and contract $p \in \mathcal{P}$ it holds
+	$
+		| \sum_{\omega \in \Omega} \widetilde{F}_{d,\omega} \, p_\omega -c(d) - \sum_{\omega \in \Omega} F_{a, \omega} \, p_\omega + c_{a}  | \le 9B\epsilon m n.
+	$
+	%	\begin{equation*}
+	%		\left| \left( \sum_{\omega \in \Omega} \widetilde{F}_{d,\omega} \, p_\omega -c(d) \right) - \left(\sum_{\omega \in \Omega} F_{a, \omega} \, p_\omega- c_{a}\right)\right| \le 9B\epsilon m n.
+	%	\end{equation*}
+	%	
+	%	Under the event $\mathcal{E}_\epsilon$, given a meta-action $d \in \mathcal{ D}$, for each $a \in A(d)$ and $p \in \mathcal{P}$ it holds:
+	%	\begin{equation*}
+	%	\left|\sum_{\omega \in \Omega} \widetilde{F}_{d,\omega} p_\omega -c(d) - \left(\sum_{\omega \in \Omega} F_{a, \omega} p_\omega- c_{a}\right)\right| \le X.
+	%	\end{equation*}
+\end{restatable}
+
+
+
+
+
+%Intuitively, Lemma~\ref{lem:nullintersection} holds thanks to the following observation.
+%%
+%If Algorithm~\ref{alg:action_oracle} is run for two contracts $p, p' \in \mathcal{P}$ such that $a^\star(p) = a^\star(p')$, then the computed empirical distributions are guaranteed to be within $2\epsilon$ of each other (in norm $\| \cdot\|_\infty$) under the clean event $\mathcal{E}_\epsilon$.
+%%
+%Thus, in the case $|\mathcal{D}^\diamond|=1$, the property is clearly preserved by the algorithm.
+%%
+%Moreover, in the other two cases, the property is preserved as well given how the set $\mathcal{D}$ is updated by the algorithm.
+%
+%
+%The second crucial property of Algorithm~\ref{alg:action_oracle} is that only actions inducing ``similar'' distributions over outcomes can be associated with the same meta-action.
+%%
+%Formally:
+%%Such a property is formally stated by the following lemma:
+%%
+%
+%
+%
+%%
+%Intuitively, Lemma~\ref{lem:boundedactions} follows from the observation that, if the distributions $F_a, F_{a'}$ of two different actions $a, a' \in \mathcal{A}$ are ``sufficiently far part'', then such actions are never associated with the same meta-action by Algorithm~\ref{alg:action_oracle}, under the event $\mathcal{E}_\epsilon$.
+%%
+%This holds thanks to how a new meta-action $d^\diamond$ is ``built'' by the algorithm, when either $\mathcal{D}^\diamond=\varnothing$ or $|\mathcal{D}^\diamond| > 1$.
+
+
+
+
+
+
+%Given a contract $p \in \mathcal{P}$ as input, the \texttt{Action-Oracle} procedure (Algorithm~\ref{alg:action_oracle}) has to decide whether the agent's best response $a^\star(p)$ can be unequivocally associated with some meta-action $d \in \mathcal{D}$ or \emph{not}.
+%
+%\begin{wrapfigure}[17]{R}{0.55\textwidth}
+%\begin{minipage}{0.55\textwidth}
+%\begin{algorithm}[H]
+%	\caption{\texttt{Action-Oracle}}\label{alg:action_oracle}
+%	\begin{algorithmic}[1]
+%		\Require $p \in \mathcal{P}$
+%		\State ${I}_{\omega} \gets 0$ for all $\omega \in \Omega$
+%		\For{$\tau =1 , \ldots, q$}%\Comment{$q$ is set in Algorithm~\ref{alg:learn_contract}}
+%		\State Commit to $p $ and observe $\omega \in \Omega$
+%		\State  ${I}_{\omega} \gets {I}_{\omega}+1$
+%		\EndFor
+%		\State Build $\widetilde{F} \in \Delta_\Omega:  \widetilde F_{\omega} = {I}_{\omega}/q$ for all $\omega \in \Omega$
+%		% \State $ \widetilde F_{\omega} \gets \frac{1}{q} {I}_{\omega}$  for all $\omega \in \Omega$
+%		\If{$\exists ! d \in \mathcal{D} : \exists F \in \mathcal{F}[d] : \| F -   \widetilde F \|_{\infty} \le 2 \epsilon $}\label{eq_action_oracle_condition}
+%		\State $\mathcal{F}[d] \gets \mathcal{F}[d] \cup \{ \widetilde{F} \}$
+%		\State \Return $\big( d, \widetilde F \big)$
+%		\EndIf
+%		\State \Return $\big( \bot, \widetilde F \big)$
+%	\end{algorithmic}
+%\end{algorithm}
+%\end{minipage}
+%\end{wrapfigure}
+%
+%Algorithm~\ref{alg:action_oracle} works by first prescribing the principal to commit to $p$ for $q \in \mathbb{N}$ consecutive rounds (see Line~\ref{line:set_q} of Algorithm~\ref{alg:final_algorithm} for the definition of $q$).
+%%
+%This allows to build an an empirical distribution $\widetilde{F} \in \Delta_{\Omega}$ which is an estimate of the (true) distribution over outcomes $F_{a^\star(p)}$ induced by $a^\star(p)$.
+%%
+%Then, the empirical distribution is compared with those computed during previous runs of Algorithm~\ref{alg:action_oracle}.
+%%
+%To perform such a comparison, all the empirical distributions computed by the algorithm are stored in a dictionary $\mathcal{F}$ (initialized in Line~\ref{line:set_D_F} of Algorithm~\ref{alg:final_algorithm}), where $\mathcal{F}[d]$ is built so that it contains all the $\widetilde{F} \in \Delta_{\Omega}$ computed by Algorithm~\ref{alg:action_oracle} for contracts $p \in \mathcal{P}$ such that $a^\star(p)$ is associated with the meta-action $d \in \mathcal{D}$.
+%
+%Based on the outcome of the comparison, Algorithm~\ref{alg:action_oracle} may terminate in two different ways:
+%\begin{itemize}
+%	\item If there exists a \emph{unique} meta-action $d \in \mathcal{D}$ such that $ \| F -   \widetilde F \|_{\infty} \le 2 \epsilon $ for some $F \in \mathcal{F}[d]$, then the algorithm associates the best-response action $a^\star(p)$ to $d$, and it returns $(d,\widetilde{F})$.
+%	%
+%	\item In all the other cases, the algorithm cannot unequivocally associate $a^\star(p)$ with one of the meta-actions in $\mathcal{D}$, and, thus, it terminates with the special value $(\bot, \widetilde{F})$ (which will stop the partitioning of $\mathcal{P}$ and result in a call to \texttt{Update-Actions}).
+%\end{itemize} 
+%
+% Intuitively, the procedure described above ensures that $ \|  \widetilde F - F_{a^\star(p)} \|_{\infty} \le \epsilon $ holds with sufficiently high probability.
+%
+% As a result, if Algorithm~\ref{alg:action_oracle} is run for two different contracts $p, p' \in \mathcal{P}$ such that $a^\star(p) = a^\star(p')$, the resulting empirical distributions are guaranteed to be within $2\epsilon$ of each other with sufficiently high probability, and, thus, they can be associated with the same meta-action.
+
+
+%For ease of presentation, in the following definition we introduce a \emph{clean event} which allows us to factor out from our analysis the ``with high probability'' statements.
+%%
+%At the end of the section, we will show that such an event holds with sufficiently high probability.
+%%
+%\begin{definition}[Clean event]
+%	Given any $\epsilon > 0$, we let $\mathcal{E}_\epsilon$ be the event in which Algorithm~\ref{alg:action_oracle} always computes an $\widetilde F \in \Delta_{\Omega}$ such that $ \|\widetilde{F} - F_{a^\star(p)} \|_{\infty} \le \epsilon $, where $p \in \mathcal{P}$ is the input to the algorithm.
+%\end{definition}
+
+
+%The crucial property that Algorithm~\ref{alg:action_oracle} (together with the related \texttt{Update-Actions} procedure described in the following Section~\ref{sec:update_actions}) needs to guarantee is that no action is ever associated with two different meta-actions.
+%%
+%By letting $\mathcal{P}_d \subseteq \mathcal{P}$ be the set of contracts $p \in \mathcal{P}$ which are given as input to Algorithm~\ref{alg:action_oracle} all the times it computed an empirical distribution $\widetilde F \in \mathcal{F}[d]$, we denote by $I(d) \coloneqq \bigcup_{p \in \mathcal{P}_d} a^\star(p)$ the set of actions associated with the meta-action $d \in \mathcal{D}$.
+%%
+%Then, the crucial property that needs to be guaranteed is that $I(d) \cap I(d') = \varnothing$ for any two meta-actions $d,d' \in \mathcal{D}$.
+%%
+%Under the event $\mathcal{E}_\epsilon$, this is clearly maintained by Algorithm~\ref{alg:action_oracle} when it returns a pair $(d,\widetilde{F})$, while in the other case in which the returned pair is $(\bot,\widetilde{F})$ it is a duty of the \texttt{Update-Actions} procedure to guarantee that the property is satisfied, as we show in the following Section~\ref{sec:update_actions}.
+
+%As outlined in Section~\ref{sec:preliminaries}, the principal only observes the realized outcome $\omega \in \Omega$ when committing to a contract, without any knowledge of the agent's actual action. Therefore, we design the \ActionOracle algorithm (see Algorithm~\ref{alg:action_oracle}), which requires the principal to commit $q \in \mathbb{N}$ multiple times to the same contract $p \in \mathcal{P}$ in order to estimate an empirical distribution over outcomes $\widetilde{F} \in \Delta_{\Omega}$. The main idea behind \ActionOracle is to cluster under the same discovered action $d \in \mathcal{D}$ the contracts that result in sufficiently similar empirical distributions. This is beacuse if two contracts implement the same action they will lead to similar empirical distributions with high probability. Before presenting the \ActionOracle algorithm, we introduce the following event which will be useful in the following.
+%
+%\begin{definition}
+%Let $\mathcal{E}_\epsilon$ be the event in which all the calls to \textnormal{\texttt{ACTION-ORACLE}} return an $\tilde F \in \Delta_{\Omega}$ such that $ \|\widetilde{F} - F_{a^\star(p)} \|_{\infty} \le \epsilon $, where $p \in \mathcal{P}$ is the contract given as input to the \textnormal{\texttt{ACTION-ORACLE}} algorithm.
+%\end{definition}
+%
+%As a direct consequence, under the event $\mathcal{E}_\epsilon$, it follows that for any two empirical distributions $\widetilde{F}_1, \widetilde{F}_2 \in \Delta_{\Omega}$ associated with the same agent's action, the following condition holds: $\| \widetilde{F}_1 - \widetilde{F}_2 \|_{\infty} \leq 2\epsilon$. Throughout the execution of Algorithm~\ref{alg:learn_contract}, we maintain a set $\mathcal{F}_d$ that keeps track of all observed empirical distributions associated with the discovered action $d \in \mathcal{D}$. A crucial step occurs when the condition at Line~\ref{eq_action_oracle_condition} in \texttt{ACTION-ORACLE} is not satisfied. In such a case the \texttt{ACTION-ORACLE} algorithms returns the tuple $(\bot, \tilde F)$ being unable to properly classify the contract leading to the empricial distribution  $\widetilde{F}$ in one of the discovered actions $d \in \dreg$. (A better dscussion on how such an alforithm is employed will be gievn in Section~\ref{sec:try_partition}).
+
+
+%\subsection{\texttt{Update-Actions}}\label{sec:update_actions}
+
+
+%The \texttt{Update-Actions} procedure (Algorithm~\ref{alg:update_actions}) is called with an empirical distribution $\widetilde{F} \in \Delta_{\Omega}$ as input any time the \texttt{Action-Oracle} procedure returns a pair $(\bot, \widetilde{F})$.
+
+
+%\begin{wrapfigure}[12]{R}{0.47\textwidth}
+%	\begin{minipage}{0.47\textwidth}
+%		\begin{algorithm}[H]
+%			\caption{\texttt{Update-Actions}}\label{alg:update_actions}
+%			\begin{algorithmic}[1]
+%				\Require $\widetilde F \in \widetilde{F}$
+%				\State $\mathcal{D}^\diamond \gets \varnothing$
+%				\For {$d \in \mathcal{D}$}
+%				\If{$\exists F \in \mathcal{F}[d] : \| F -   \widetilde F \|_{\infty} \leq 2 \epsilon$}
+%				\State $\mathcal{D}^\diamond \gets \mathcal{D}^\diamond \cup \{ d \}$
+%				\EndIf
+%				\EndFor
+%				\State $\mathcal{D} \gets \left( \mathcal{D} \setminus \mathcal{D}^\diamond \right) \cup \{ d^\diamond \}$ %\Comment{$d^\diamond$ new meta-action}
+%				\State $\mathcal{F}[{d^\diamond}] \gets \bigcup_{d \in \mathcal{D}^\diamond} \mathcal{F}[d] \cup \{ \widetilde F \}$ 
+%				\State Clear $\mathcal{F}[d]$ for all $d \in \mathcal{D}^\diamond$
+%				% \State \Return $(\mathcal{D}, \{\mathcal{F}_d \}_{d \in \mathcal{D}}) $
+%			\end{algorithmic}
+%		\end{algorithm}
+%	\end{minipage}
+%\end{wrapfigure}
+%%
+%The procedure implemented by Algorithm~\ref{alg:update_actions} jointly deals with two distinct cases:
+%\begin{itemize}[leftmargin=6mm]
+%	\item If the empirical distribution $\widetilde{F} \in \Delta_{\Omega}$ is such that $\|  {F} - \widetilde{F}\|_{\infty} > 2\epsilon$ for all $d \in \dreg$, $F \in \mathcal{F}[d]$, then $\mathcal{D}^\diamond = \varnothing$ and a brand new meta-action $d^\diamond$ is added to $\mathcal{D}$.
+%	%
+%	Intuitively, this is done since, under the event $\mathcal{E}_\epsilon$, if $a^\star(p) \in I(d)$ for some $d \in \mathcal{D}$, then it would be the case that $\|{F} - \widetilde{F} \|_{\infty}  \le 2\epsilon$ for some $F \in \mathcal{F}[d]$.
+%	%
+%	%
+%	%
+%	\item If instead there exists a subset of meta-actions $\mathcal{D}^\diamond \subseteq \mathcal{D}$ such that there exists $F \in \mathcal{F}[d]$ with $\| F -   \widetilde F \|_{\infty} \leq 2 \epsilon$ for every $d \in \mathcal{D}^\diamond$, then all the meta-actions in $\mathcal{D}^\diamond$ are merged into a single (new) meta-action.
+%	%
+%	Intuitively, this is done since all the meta-action actions $d \in \mathcal{D}^\diamond$ are such that $a^\star(p) \in I(d)$ under the event $\mathcal{E}_{\epsilon}$.
+%\end{itemize}
+%
+%Notice that, at the end of Algorithm~\ref{alg:update_actions}, the dictionary $\mathcal{F}$ is properly re-organized in order to reflect the new composition of $\mathcal{D}$.
+%
+%In this case, we rely on the \texttt{UPDATE-ACTIONS} algorithm to update the set of discovered actions $\mathcal{D}$. Specifically, if the observed empirical distribution $\widetilde{F} \in \Delta_{\Omega}$ satisfies the condition $\|\widetilde{F} - {F}\|_{\infty} \geq 2\epsilon$ for every $F \in \mathcal{F}_d$ and $d \in \dreg$, then a new action $d^*$ is discovered. This is because, under the event $\mathcal{E}_\epsilon$, if such an action was already discovered we would have $\|\widetilde{F} - {F} \|_{\infty}  \le 2\epsilon$ for some $F \in \bigcup_{d} \mathcal{F}_d$. Differently from the previous case, if there exists a set of discovered actions $\dreg^* \subseteq \dreg$, such that for each $d \in \dreg^*$ there exists at least one ${F}' \in \mathcal{F}_d$ satisfying $\| {F}' - \widetilde{F} \|_{\infty} \leq 2\epsilon$, then the \texttt{UPDATE-ACTIONS} algorithm merges all the actions in $\dreg^*$ into a single action $d^*$. This is because the distribution $\widetilde{F}$ could potentially be associated to a contract implementing each one of the discovered actions $d \in \mathcal{D}^*$ under the event $\mathcal{E}_{\epsilon}$. Finally, once he \texttt{UPDATE-ACTIONS} algorithm, has updated the new set of discovered actioss associated each observed empirical ditribution observe by the principal to one of the set $\mathcal{F}_d$ it returns the tuple 
+
+
+
+
+
+%Before discussing some useful properties of the \texttt{UPDATE-ACTIONS} algorithm, we formally introduce a mapping between the set of discovered actions $\dreg$ and the actual set of actions $\mathcal{A}$.
+%\begin{definition}
+%Let $\mathcal{P}_d \subseteq \mathcal{P}$ be the set of contracts $p \in \mathcal{P}$ given as input to \textnormal{\texttt{ACTION-ORACLE} } all the times it returned an $\tilde F$ such that $\tilde F \in \mathcal{F}_d$. Then we dentote with $I(d) \subseteq \mathcal{A}$ the set such that $I(d) \coloneqq \bigcup_{p \in \mathcal{P}_d} a^\star(p)$.
+%\end{definition}
+%Intuitively, the set $I(d)\subseteq \mathcal{A}$ is the set containg the action(s) played by the agent that $\textnormal{\texttt{UPDATE-ACTIONS}}$ has identified as a single $d \in \mathcal{D}$ . 
+
+
+
+%The following two lemmas show the two key properties of Algorithm~\ref{alg:update_actions}.
+%
+%\begin{restatable}{lemma}{boundedactions}\label{lem:boundedactions}
+%	Under the event $\mathcal{E}_\epsilon$, Algorithm~\ref{alg:update_actions} ensures that, for every meta-action $d \in \mathcal{D}$ and pair of associated actions $a, a' \in I(d)$, it holds $\| F_{a} -   F_{a'} \|_{\infty} \le 5 \epsilon n$.
+%	%
+%	Moreover, for every $d \in \mathcal{D}$ and empirical distribution $\widetilde{F} \in \mathcal{F}[d]$, it holds $\|\widetilde{F}- F_{a} \|_{\infty} \le 5 \epsilon n $ for all $a \in I(d)$.
+%\end{restatable}
+%The previous lemma follows from the fact that \ActionOracle aggregate two different actions only if the condition .. is satisfied and by observing that the number of agent's actions is bounded by $n$.
+
+%\begin{restatable}{lemma}{actintersection}\label{lem:nullintersection}
+%	Under the event $\mathcal{E}_\epsilon$, Algorithm~\ref{alg:update_actions} ensures that $I(d) \cap I(d') = \varnothing$ for every $d,d' \in \mathcal{D}$.
+%\end{restatable}
+
+%\mat{1) vale in alta probabiltà, 2) non ti serve dire che $I(d)\cap I(d')=\emptyset?$} \bac{si vale in alta probabilità ma per quantificarla devi aopere quante volte action oracle viene chiamato}
+
+
+

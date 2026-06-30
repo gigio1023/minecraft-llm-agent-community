@@ -1,0 +1,139 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Construction Site Cleanup
+
+    Description: 
+    - The environment is a construction site with dimensions 10 m x 10 m.
+    - There are 3 piles of different types of debris scattered around the construction site:
+      - 5 bricks (each 0.2 m x 0.2 m x 0.2 m)
+      - 5 metal scraps (each 0.5 m x 0.25 m x 0.25 m) 
+      - 5 wooden planks (each 1 m x 0.2 m x 0.1 m)
+    - There are also 2 robotic construction vehicles moving around the site in pre-programmed patterns:
+      - A bulldozer that pushes dirt piles around in a rectangle, 4 m x 3 m
+      - An excavator that swings its arm and bucket back and forth in a 180 degree arc, 2 m in radius
+    - On one side of the construction site are 3 square receptacle bins, each 1 m x 1 m x 0.5 m tall, labeled for each type of debris (bricks, metal, wood).
+    - The robot starts in one corner of the site.
+
+    Task:
+    The robot needs to pick up each piece of debris and place it in the correct receptacle, while avoiding collisions with the moving construction vehicles. The robot can only carry one piece of debris at a time.
+
+    Success Conditions:
+    The task is complete when all pieces of debris have been placed in their correct bins, and the robot has returned to its starting position.
+
+    Time Limit:
+    The robot has 10 minutes to complete the cleanup task.
+
+    Rewards:
+    - Provide a small reward for each piece of debris successfully picked up.
+    - Provide a moderate reward for each piece of debris placed in the correct bin.
+    - Provide a large reward for completing the task and returning to the start position.
+    - Provide a small penalty for each collision with the construction vehicles.
+
+    Termination:
+    The episode ends if the robot flips over, or if the time limit is exceeded.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.site_size = [10.0, 10.0, 0.1]
+        self.site_position = [0.0, 0.0, 0.0]
+        self.site_id = self.create_box(mass=0.0, half_extents=[self.site_size[0] / 2, self.site_size[1] / 2, self.site_size[2] / 2], position=self.site_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.site_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.brick_size = [0.2, 0.2, 0.2]
+        self.metal_size = [0.5, 0.25, 0.25]
+        self.wood_size = [1.0, 0.2, 0.1]
+        self.debris_sizes = [self.brick_size, self.metal_size, self.wood_size]
+        self.num_debris_types = len(self.debris_sizes)
+        self.num_debris_each = 5
+        self.debris_ids = []
+        for i in range(self.num_debris_types):
+            for _ in range(self.num_debris_each):
+                debris_position = [np.random.uniform(-self.site_size[0] / 2 + 2.0, self.site_size[0] / 2 - 2.0), np.random.uniform(-self.site_size[1] / 2 + 2.0, self.site_size[1] / 2 - 2.0), self.debris_sizes[i][2] / 2]
+                debris_id = self.create_box(mass=1.0, half_extents=[self.debris_sizes[i][0] / 2, self.debris_sizes[i][1] / 2, self.debris_sizes[i][2] / 2], position=debris_position, color=[0.8, 0.8, 0.8, 1.0])
+                self.debris_ids.append((debris_id, i))
+        self.bulldozer_size = [1.0, 0.5, 0.5]
+        self.bulldozer_position_init = [-self.site_size[0] / 4, 0.0, self.bulldozer_size[2] / 2]
+        self.bulldozer_id = self.create_box(mass=0.0, half_extents=[self.bulldozer_size[0] / 2, self.bulldozer_size[1] / 2, self.bulldozer_size[2] / 2], position=self.bulldozer_position_init, color=[1.0, 1.0, 0.0, 1.0])
+        self.excavator_radius = 2.0
+        self.excavator_position_init = [self.site_size[0] / 4, 0.0, 0.0]
+        self.excavator_id = self.create_sphere(mass=0.0, radius=0.5, position=self.excavator_position_init, color=[0.0, 1.0, 1.0, 1.0])
+        self.receptacle_size = [1.0, 1.0, 0.5]
+        self.receptacle_positions = [[self.site_size[0] / 2 - self.receptacle_size[0] / 2, -self.site_size[1] / 3, self.receptacle_size[2] / 2], [self.site_size[0] / 2 - self.receptacle_size[0] / 2, 0.0, self.receptacle_size[2] / 2], [self.site_size[0] / 2 - self.receptacle_size[0] / 2, self.site_size[1] / 3, self.receptacle_size[2] / 2]]
+        self.receptacle_ids = []
+        for i in range(self.num_debris_types):
+            receptacle_id = self.create_box(mass=0.0, half_extents=[self.receptacle_size[0] / 2, self.receptacle_size[1] / 2, self.receptacle_size[2] / 2], position=self.receptacle_positions[i], color=[0.2, 0.2, 0.2, 1.0])
+            self.receptacle_ids.append(receptacle_id)
+        self.robot_position_init = [-self.site_size[0] / 2 + 2.0, -self.site_size[1] / 2 + 2.0, self.site_size[2] + self.robot.links['base'].position_init[2] + 0.1]
+        self.robot_orientation_init = self._p.getQuaternionFromEuler([0.0, 0.0, np.pi / 4])
+        self.time_limit = 600.0
+        self.debris_pick_reward = 1.0
+        self.debris_place_reward = 10.0
+        self.task_complete_reward = 100.0
+        self.collision_penalty = -1.0
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def reset(self):
+        observation = super().reset()
+        self.time = 0.0
+        self.debris_picked = [False] * len(self.debris_ids)
+        self.debris_placed = [False] * len(self.debris_ids)
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot_orientation_init)
+        return observation
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.time += self.dt
+        bulldozer_position = self.get_object_position(self.bulldozer_id)
+        bulldozer_position[0] = self.bulldozer_position_init[0] + 2.0 * np.sin(2 * np.pi * self.time / 20.0)
+        bulldozer_position[1] = self.bulldozer_position_init[1] + 1.5 * np.sin(2 * np.pi * self.time / 30.0)
+        self._p.resetBasePositionAndOrientation(self.bulldozer_id, bulldozer_position, [0.0, 0.0, 0.0, 1.0])
+        excavator_position = self.get_object_position(self.excavator_id)
+        excavator_position[0] = self.excavator_position_init[0] + self.excavator_radius * np.cos(np.pi * self.time / 10.0)
+        excavator_position[1] = self.excavator_position_init[1] + self.excavator_radius * np.sin(np.pi * self.time / 10.0)
+        self._p.resetBasePositionAndOrientation(self.excavator_id, excavator_position, [0.0, 0.0, 0.0, 1.0])
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        reward_pick = 0.0
+        reward_place = 0.0
+        reward_complete = 0.0
+        penalty_collision = 0.0
+        for i, (debris_id, debris_type) in enumerate(self.debris_ids):
+            if not self.debris_picked[i] and len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=debris_id)) > 0:
+                self.debris_picked[i] = True
+                reward_pick += self.debris_pick_reward
+            if self.debris_picked[i] and (not self.debris_placed[i]) and (len(self._p.getContactPoints(bodyA=debris_id, bodyB=self.receptacle_ids[debris_type])) > 0):
+                self.debris_placed[i] = True
+                reward_place += self.debris_place_reward
+        if all(self.debris_placed) and np.linalg.norm(self.robot.links['base'].position[:2] - np.asarray(self.robot_position_init[:2])) < 1.0:
+            reward_complete = self.task_complete_reward
+        if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.bulldozer_id)) > 0 or len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.excavator_id)) > 0:
+            penalty_collision = self.collision_penalty
+        return {'reward_pick': reward_pick, 'reward_place': reward_place, 'reward_complete': reward_complete, 'penalty_collision': penalty_collision}
+
+    def get_terminated(self, action):
+        if self.time >= self.time_limit:
+            return True
+        if np.dot(np.asarray([0, 0, 1]), np.asarray(self._p.getMatrixFromQuaternion(self.robot.links['base'].orientation)).reshape(3, 3)[:, 2]) < 0.5:
+            return True
+        return False
+
+    def get_success(self):
+        return all(self.debris_placed) and np.linalg.norm(self.robot.links['base'].position[:2] - np.asarray(self.robot_position_init[:2])) < 1.0
+\end{lstlisting}

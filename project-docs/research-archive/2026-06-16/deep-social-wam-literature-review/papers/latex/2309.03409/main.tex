@@ -1,0 +1,182 @@
+\documentclass{article}
+
+\usepackage{arxiv,times}
+\iclrfinalcopy
+\input{math_commands.tex}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{xr-hyper}
+\usepackage{hyperref}
+\usepackage{url}            % simple URL typesetting
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}
+\usepackage{xcolor}
+
+% additional packages
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+\usepackage{stackengine} % for stackunder
+\usepackage{float} % for [H]
+\usepackage{wrapfig} % wrapfigure
+
+% multirow in table
+\usepackage{multirow}
+% \usepackage{tabularray}
+% for table centering with specified width
+\usepackage{array}
+\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
+\usepackage{arydshln}
+
+\usepackage{amsmath}
+\mathchardef\mhyphen="2D % compact hyphen in the math mode
+\renewcommand*{\mathellipsis}{%
+  \mathinner{{\cdotp}{\cdotp}{\cdotp}}%
+} % compact ldots in the math mode
+\usepackage{dsfont} % for indicator function
+\newcommand{\probP}{\mathds{P}}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% % % pseudocode
+\definecolor{medblue}{rgb}{0,0,.75}
+\definecolor{burntorange}{rgb}{0.8, 0.33, 0.0}
+\usepackage[noend]{algpseudocode}
+\usepackage{algorithm,algorithmicx}
+\algrenewcommand\alglinenumber[1]{\sf\tiny\color{medblue}{#1}\quad}
+\algrenewcommand\algorithmicrequire{\textbf{Input:}}
+\algrenewcommand\algorithmicensure{\textbf{Output:}}
+\algdef{SE}[DOWHILE]{Do}{doWhile}{\algorithmicdo}[1]{\algorithmicwhile\ #1}%
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+\usepackage{enumitem} % format the enumerated items
+
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% method name
+\newcommand{\name}{OPRO}
+
+\usepackage[textsize=tiny]{todonotes}
+
+% cross reference
+\makeatletter
+\newcommand*{\addFileDependency}[1]{% argument=file name and extension
+  \typeout{(#1)}% latexmk will find this if $recorder=0 (however, in that case, it will ignore #1 if it is a .aux or .pdf file etc and it exists! if it doesn't exist, it will appear in the list of dependents regardless)
+  \@addtofilelist{#1}% if you want it to appear in \listfiles, not really necessary and latexmk doesn't use this
+  \IfFileExists{#1}{}{\typeout{No file #1.}}% latexmk will find this message if #1 doesn't exist (yet)
+}
+\makeatother
+
+\newcommand*{\myexternaldocument}[1]{%
+    \externaldocument[][nocite]{#1}%
+    \addFileDependency{#1.tex}%
+    \addFileDependency{#1.aux}%
+}
+%%% END HELPER CODE
+
+% customized paragraph
+\newcommand{\myparagraph}[1]{\noindent\textbf{#1.}\,}
+\newcommand{\myparagraphnodot}[1]{\noindent\textbf{#1}\,}
+
+\definecolor{purple}{rgb}{0.3,0.0,.4}
+
+\newcommand\blfootnote[1]{%
+  \begingroup
+  \renewcommand\thefootnote{}\footnote{#1}%
+  \addtocounter{footnote}{-1}%
+  \endgroup
+}
+
+% path to figure files
+\def \figurepath {figures/}
+
+\title{Large Language Models as Optimizers}
+
+\author{
+Chengrun Yang\textsuperscript{*} \hspace{.5em}
+Xuezhi Wang \hspace{.5em}
+Yifeng Lu \hspace{.5em}
+Hanxiao Liu \hspace{.5em}\\
+\textbf{
+% \hspace{em}
+Quoc V. Le \hspace{.5em}
+Denny Zhou \hspace{.5em} 
+Xinyun Chen\textsuperscript{*}
+}
+\\
+[1ex]
+\texttt{\{chengrun, xuezhiw, yifenglu, hanxiaol\}@google.com} \\
+\texttt{\{qvl, dennyzhou, xinyunchen\}@google.com}\\
+[1ex]
+Google DeepMind \quad \textsuperscript{*} Equal contribution\\
+}
+
+\pagestyle{fancy}
+\renewcommand{\headrulewidth}{1pt}
+\fancypagestyle{firstpage}{
+  \lhead{\begin{picture}(0,0)\put(0,-3){\includegraphics[width=0.25\linewidth]{figures/template-figure/deepmind_logo.pdf}}\end{picture}}
+}
+
+\begin{document}
+\maketitle
+\thispagestyle{firstpage}
+\vspace{-1em}
+\begin{abstract}
+Optimization is ubiquitous. While derivative-based algorithms have been powerful tools for various problems, the absence of gradient imposes challenges on many real-world applications.
+In this work, we propose Optimization by PROmpting (\name{}), a simple and effective approach to leverage large language models (LLMs) as optimizers, where the optimization task is described in natural language. In each optimization step, the LLM generates new solutions from the prompt that contains previously generated solutions with their values, then the new solutions are evaluated and added to the prompt for the next optimization step. We first showcase \name{} on linear regression and traveling salesman problems, then move on to our main application in prompt optimization, where the goal is to find instructions that maximize the task accuracy. With a variety of LLMs, we demonstrate that the best prompts optimized by \name{} outperform human-designed prompts by up to $8\%$ on GSM8K, and by up to $50\%$ on Big-Bench Hard tasks.
+Code at \url{https://github.com/google-deepmind/opro}.
+\end{abstract}
+
+\input{intro}
+\input{approach}
+\input{motivating_example}
+\input{application}
+\input{exp}
+\input{work}
+\input{conc}
+
+\section*{Ethics Statement}
+This work uses synthetic math problems for linear regression and traveling salesman problems, and uses public datasets like GSM8K and Big-Bench Hard for prompt optimization.
+These tasks have been commonly used in similar works and should not be regarded controversial.
+There is a peril that LLMs may generate harmful information that poses safety risks; how to safeguard model behavior remains valuable future work.
+
+\section*{Reproducibility Statement}
+
+We evaluate on public benchmarks. The \texttt{text-bison} API is available at:~\url{https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models}. The GPT models are available here:~\url{http://openai.com/api/}. 
+This work uses \texttt{gpt-3.5-turbo-0613} and \texttt{gpt-4-0613}.
+
+\section*{Acknowledgments}
+
+We thank Daiyi Peng, Yanqi Zhou, Jerry Wei, Shuo Chen, Tim Rocktäschel, Chrisantha Fernando, Dylan Banarse, Henryk Michalewski, Simon Osindero, and Ed H. Chi for their valuable feedback, and thank several anonymous reviewers for helpful comments.
+
+\bibliography{scholar}
+\bibliographystyle{arxiv}
+
+\newpage
+\appendix
+\input{appendix}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{document}

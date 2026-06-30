@@ -1,4 +1,4 @@
-# Lane 2 Brief — Minecraft Agent / VLA / Visual Policy / Benchmarks
+# Lane 2 Brief - Minecraft Agent / VLA / Visual Policy / Benchmarks
 
 Lane: 2 (Minecraft embodied-agent stack: VLA/visual policies, LLM planners, skill
 libraries, task benchmarks, multi-agent collaboration). Date: 2026-06-16.
@@ -27,15 +27,15 @@ brief. MineStudio analyses re-used (NOT re-cloned) per brief.
 
 ## Strongest findings (source-backed)
 
-1. **The whole Minecraft policy lineage is VLA / visual policy, not WAM.** VPT →
-   STEVE-1 → GROOT → ROCKET-1 → JARVIS-VLA are reactive `p(a|o[,goal/mask])`
+1. **The whole Minecraft policy lineage is VLA / visual policy, not WAM.** VPT ->
+   STEVE-1 -> GROOT -> ROCKET-1 -> JARVIS-VLA are reactive `p(a|o[,goal/mask])`
    controllers; none co-generates a predicted future `o'` to align actions. GROOT
    trains *by* future-state prediction but uses it only to induce a goal space, so
    it is still a visual policy at decision time. They are the **competence body**,
    not a consequence model. (LaTeX-confirmed: VPT §method/§a_2; STEVE-1 §3;
    GROOT main; ROCKET-1 §method; JARVIS-VLA §pipeline.)
 2. **MineNPC-Task (2601.05215) is the closest existing benchmark to this repo's
-   evidence stance** — Mineflayer execution, machine-checkable validators, judge
+   evidence stance** - Mineflayer execution, machine-checkable validators, judge
    *only* from in-world evidence, bounded-knowledge policy, plan/act/memory event
    capture, success/attempted-subtasks metric. But it is single-NPC + one human,
    task-completion framed; it validates the *mechanism* this repo needs, not the
@@ -43,11 +43,11 @@ brief. MineStudio analyses re-used (NOT re-cloned) per brief.
 3. **The social-material transition gap is concrete and unoccupied.** Multi-agent
    Minecraft can already share items (MineCollab `givePlayer`), force requests
    (Hell's Kitchen asymmetry), create scarcity (MineLand 64-agent physical needs),
-   and model others' minds (MindForge ToM) — but **every** system scores **task
+   and model others' minds (MindForge ToM) - but **every** system scores **task
    completion / coordination efficiency**, none tracks possession over time,
    obligation/credit, weak commons, or post-goal continuation. MineCollab's
    headline: communication is the bottleneck (−15% when agents must communicate
-   detailed plans) — talk is pivotal but scored as instrumental cost, not social
+   detailed plans) - talk is pivotal but scored as instrumental cost, not social
    consequence.
 
 ## Weak / uncertain claims (could not fully verify)
@@ -56,7 +56,7 @@ brief. MineStudio analyses re-used (NOT re-cloned) per brief.
   abstract/web only, no LaTeX read. Quantitative claims (e.g. TeamCraft "<50%
   generalization", CausalMACE "+12%/+7%") are taken from abstracts; method detail
   unverified. Marked `partial`/`claim-only` in the manifest.
-- **MineDojo full corpus** (730k YouTube / 7k Wiki / 340k Reddit) — sizes from the
+- **MineDojo full corpus** (730k YouTube / 7k Wiki / 340k Reddit) - sizes from the
   paper; the HF `osanseviero/minedojo_knowledge` record is a tiny dump, not the
   full corpus (full corpus partially access-gated).
 - **STEVE-21K dataset**: not a clean HF dataset record (hosted off-Hub); existence
@@ -79,7 +79,7 @@ brief. MineStudio analyses re-used (NOT re-cloned) per brief.
 
 **Research contribution (net-new, do NOT claim as borrowed)**:
 - Typed **social-material ledger** (claims, obligations, relationships, memory) as
-  first-class observation + the WAM that predicts **social-material deltas** — no
+  first-class observation + the WAM that predicts **social-material deltas** - no
   surveyed Minecraft system exposes or predicts this (all world models predict
   pixels; all agents score task completion).
 
@@ -92,7 +92,7 @@ omniscient state manager (others' state must cost something to learn).
 
 1. Can the **MineNPC-Task harness shape** (Mineflayer + validators + plan/act/
    memory events) be extended from single-NPC to multi-actor with a social ledger
-   — i.e. is its event schema a viable base for scoring obligation/claim/handoff?
+   - i.e. is its event schema a viable base for scoring obligation/claim/handoff?
 2. What is the minimal **social-consequence metric** that is as machine-checkable
    as MineExplorer's milestones but scores durable consequence (debt repaid, claim
    respected, commons maintained, post-goal continuation) rather than task done?
@@ -102,4 +102,4 @@ omniscient state manager (others' state must cost something to learn).
 4. Is the **structured-state WAM branch** (predict typed social-material deltas)
    defensible as a research gap given that every Minecraft world model predicts
    pixels and every Minecraft agent scores task completion? (Lane 2 evidence says
-   yes — the branch is inside the WAM definition yet absent from the literature.)
+   yes - the branch is inside the WAM definition yet absent from the literature.)

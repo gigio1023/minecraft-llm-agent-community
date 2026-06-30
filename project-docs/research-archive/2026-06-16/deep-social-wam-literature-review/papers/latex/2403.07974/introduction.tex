@@ -1,0 +1,140 @@
+
+Code has emerged as an important application area for \llms{}, with a proliferation of code-specific models 
+\citep{chen2021evaluating,austin2021program,li2022competition,zhong2022codegen, allal2023santacoder, li2023starcoder, roziere2023code, deepseek-coder, luo2023wizardcoder, Phind, wei2023magicoder, ridnik2024code,starcoder2} and their applications across various domains and tasks such as program repair ~\citep{opencodeinterpreter, olausson2023demystifying}, optimization~\citep{madaan2023learning}, test generation~\citep{steenhoek2023reinforcement}, documentation generation~\citep{luo2024repoagent}, tool usage~\citep{patil2023gorilla, qin2024toolllm}, SQL~\citep{sun2023sql}, and more.
+In contrast with these rapid advancements, evaluations have remained relatively stagnant, and current benchmarks like 
+\humaneval{}, \mbpp{}, and \apps{} may paint a skewed or misleading picture.
+%However, when it comes to evaluating LLM's coding capabilities, current benchmarks like \humaneval{}, \mbpp{}, \apps{}, and \contests{} have not kept pace and may paint a skewed or misleading picture.
+%Particularly, they only focus on natural language to code tasks and suffer from overfitting and data contamination challenges with benchmark samples present in the training dataset for the latest \llms{}. 
+Firstly, while coding is a multi-faceted skill, these benchmarks only focus on natural language-to-code tasks, thus overlooking broader code-related capabilities. 
+Moreover, these benchmarks may be subject to potential contamination or overfitting, as benchmark samples are present in the training datasets.
+%For instance, ~\citep{gemini15} mentioned XXX and ~\cite{lmsys-contamination-paper} said YYY.
+%Beyond this, these benchmarks have reported issues of ambiguous problems and insufficient evaluations.
+%ambiguous problem statements, insufficient tests, only natural language to code tasks, and 
+\input{figures/introduction/contamination_plots.tex}
+\input{figures/introduction/radial_plot_bar_plot.tex}
+
+Motivated by these shortcomings, we introduce \livecodebench{}, 
+a holistic and contamination-free benchmark for evaluating code capabilities. 
+\livecodebench{} is built on the following principles:
+\begin{enumerate}
+\itemsep-0.1em 
+    \item \textbf{Live updates to prevent contamination.} 
+    \llms{} are trained on massive inscrutable corpora, and current benchmarks 
+    suffer from the risk of data contamination as they could be included in those training datasets.
+    While previous works have attempted decontamination using both exact and fuzzy matches~\citep{li2023starcoder, li2023textbooks}, it can be a non-trivial task ~\citep{gemini15} and can be evaded using simple strategies like rephrasing~\citep{yang2023rethinking}.
+    Here, to prevent the risk of problem contamination, we use live updates, 
+    that is evaluate models on \textit{new} problems. 
+    Particularly, we collect problems from weekly contests on competition platforms 
+    and tag them with a \textit{release date}. 
+    Next, for newer models, we only consider problems released after the model's cutoff date to ensure that the model has not encountered the exact problem in the training dataset.
+    In Figure~\ref{fig:contamination_main}, we find that the performance of the \deepseek{} model starkly 
+    drops when evaluated on the \leetcode{} problems released after August $2023$.  
+    Similarly, \gptfouro{} observes a drop in performance on \leetcode{} problems released since November 2023, its specified cutoff date.
+    This indicates that these models are likely trained on the older \leetcode{} problems and time-segmented evaluations allow fair comparisions.
+    
+    \item \textbf{Holistic Evaluation.} 
+    Current code evaluations primarily focus on natural language to code generation. 
+    However, programming is a multi-faceted task that requires a variety of capabilities beyond those measured by code generation. 
+    In \livecodebench{}, we evaluate code \llms{} on three additional scenarios, listed below. 
+    \begin{itemize}
+    \item \textbf{Self-Repair.} Fix an incorrect program from execution information, evaluating the ability to debug code from feedback. The model is given the natural language problem description, the incorrect program, the test case it fails on, and the execution feedback from that failure. The output should be a correct repaired program.
+    \item \textbf{Code Execution.} ``Execute'' a program on an input, evaluating code comprehension ability. The model is given a program and an input, and the output should be the result.
+    \item \textbf{Test Output Prediction.} Solve the natural language task on a specified input, evaluating the ability to generate testing outputs. The model is given the natural language problem description and an input, and the output should be the output for the problem.
+    \end{itemize}
+    Figure~\ref{fig:all_tasks_radial} (left) depicts performance on the different scenarios considered in \livecodebench{}. 
+    \item \textbf{High-quality problems and tests.}
+    High-quality problems and tests are crucial for reliable evaluation of \llms{}.
+    However, prior works have revealed deficiencies in existing benchmarks. 
+    \citep{liu2023evaluating} identified insufficient tests and ambiguous problem descriptions in \humaneval{}. They released \humanevalplus{}, a variant of the benchmark with more tests and sometimes saw up to an 8\% drop in performance. 
+    Similarly, \citep{austin2021program} had to create a sanitized \mbpp{} subset to disambiguate problem descriptions.
+    In \livecodebench{}, we source the problems from reputable competition websites whose quality is already validated
+    by the platform users.
+    % to validate the quality of these problems.
+    In addition, for every problem, we provide a good number of tests (about $17$ on average) for meaningful and robust evaluations while still finishing quickly.
+    
+    \item \textbf{Balanced problem difficulty.} 
+    Competition programming is challenging for even the best-performing \llms{}, and most of the current SoTA models achieve close to zero performance on a majority of problems.
+    As a result, they can be unsuitable for meaningful comparing today's \llms{} because the variance in performances is low.
+    Furthermore, the averaging of evaluation scores across problems with different difficulty levels artificially minimizes the differences between models.
+    Therefore, we use problem difficulty ratings (sourced from the competition websites) for filtering the harder problems and 
+    classifying problem difficulties to
+    ensure balanced problem difficulty distribution and allow granular model comparisons.
+\end{enumerate} 
+
+
+
+\noindent With these principles in mind, we build \livecodebench{}, a continuously updated benchmark that avoids data contamination.
+Particularly, we have collected $511$ problems from contests across three competition platforms -- \leetcode{}, \atcoder{}, and \codeforces{} occurring from May $2023$ to the present (May $2024$) and use them to construct the different \livecodebench{} scenarios. 
+\newline
+\newline
+\noindent \textbf{Empirical Findings.} 
+We have evaluated $18$ base models and $34$ instruction-tuned models across different \livecodebench{} scenarios.
+Below, we present the empirical findings from our evaluations, which have not been revealed in prior benchmarks.
+% is revealed be revealed and learned in \livecodebench{} but not in prior benchmarks.
+
+\begin{enumerate}
+\itemsep-0.1em 
+    \item \textbf{Contamination.} 
+    We observe a stark drop in the performance of \deepseek{}, \gptfouro{}, and \codestral{} on \leetcode{} problems released after Aug $2023$, Oct $2023$, and Jan $2024$ (Figure~\ref{fig:contamination_main}). These results highlight likely contamination in older problems and time-segmented evaluations 
+    prove effective for performing fair comparisons.
+    %\nj{gpt4o codestral contamination}
+    
+    \item \textbf{Holistic Evaluation.} 
+    Our evaluations reveal that model performances are correlated across tasks, but the relative differences do vary. 
+    For example, in Figure~\ref{fig:all_tasks_radial}, the gap between open and closed models further increases on tasks like self-repair or test output prediction. 
+    Similarly,  \claudeopus{} and \mistrallarge{} perform considerably better on code execution and test output prediction compared to code generation with \claudeopus{} surpassing \gptfour{} on the test output prediction. This highlights the importance of a holistic evaluation.
+    %\nj{update}
+    %\ag{i wonder if a table showing task and model rank would show this nicely? and then could also do pairwise correlations between tasks, which would also be interesting to see.}
+    
+    \item \textbf{\humaneval{} Overfitting.} 
+    Upon comparing \livecodebench{} with \humaneval{}, we find that models cluster into two groups, ones that perform well on both benchmarks and others that perform well on \humaneval{} but not on \livecodebench{} (see Figure~\ref{fig:he_vs_lcb}).
+    The latter group primarily comprises fine-tuned open-access models while the former group comprises base models and closed models.
+    This indicates that these models might be overfitting to \humaneval{}. %\nj{update}
+
+    
+    \item \textbf{Model Comparisons} (Figure \ref{fig:results_plots})
+    \vspace{-6pt}
+    \begin{enumerate}
+    \itemsep-0.1em 
+    \item Among the open access base models, we find that \llamabase{} and \deepseekbase{} models are the strongest, followed by \starcodertwobase{} and \cllamabase{}.
+    %Their respective finetuned variants, \llamaB{70} and \deepseekcodeB{33} achieve strong performance. %\nj{update}
+    %diminish after finetuning with \phind{} (based on \cllamacommonB{34}) catching up to . 
+    %\ag{this seems to imply finetuning diminishes differences in base models? a bit of a bold claim, especially since we don't know how phind finetunes things?}
+    % \item We study the gap between open access and (closed) API models and find that closed models outperform the open models (Figure~\ref{fig:all_tasks_radial}). 
+    \item Closed API models such as \gpts{}, \claude{}, and \gemini{} generally outperform open models (Figure~\ref{fig:all_tasks_radial}). The open models that close the gap are \llamaB{70}, \mixtral{}, and \deepseekcodeB{33} are instruction-tuned variants of large base models ($> 30$\textsc{B} parameters). 
+    %\ag{careful here, ds6.7 basically matches gemini-pro}
+    \item Existing benchmarks are insufficient at highlighting the gap between \gptfour{} and other models. 
+    Particularly, smaller models achieve similar or often even better performance compared to \gptfour{}. 
+    In \livecodebench{}, \gptfour{} (and \gptfourturbo{}) outperforms all other models (except \claudeopus{}) by a large margin in all scenarios.
+    
+    \end{enumerate}
+    
+\end{enumerate}
+
+
+\noindent \textbf{Concurrent Work.} 
+~\citep{huang2023competition} also evaluate \llms{} in a time-segmented manner. 
+However, they only focus on \codeforces{} problems while we combine problems across platforms 
+and additionally propose a holistic evaluation across multiple code-related scenarios. 
+~\citep{li2023taco} propose a large dataset of competitive programming problems with additional generated tests but do not study contamination or tasks beyond generation.
+~\cite{liu2024codemind} evaluate the code comprehension capabilities of \llms{} using execution. \citep{singhal2024nofuneval} also propose evaluating \llms{} on tasks beyond code generation, but they consider tasks that take into account the \textit{non-functional-correctness aspects} of programming.
+\citep{deepseek-coder} also evaluate \deepseek{} on \leetcode{} problems and mention the possibility of problem contamination.
+%\nj{find?}
+% in \deepseek{}.
+
+% \begin{table}[t]
+% \caption{\small xxx}
+% \label{tab:related}
+% \begin{center}
+% {\scriptsize
+% \begin{tabular}{lcccc}
+%   \toprule
+%   Problem/Method & Bilevel & Multi-objective & Min-max & Single-loop & $\mathcal{X}\subset \R^{d_x}$ \\
+%   \midrule
+%   Distributionally Robust Learning & $\dagger$ & \xmark & \cmark & - & - \\
+%   Adversarially Robust Learning & $\dagger$ & \xmark & \cmark & - & $\triangle$ \\
+%   \bottomrule
+% \end{tabular}
+% }
+% \end{center}
+% \end{table}

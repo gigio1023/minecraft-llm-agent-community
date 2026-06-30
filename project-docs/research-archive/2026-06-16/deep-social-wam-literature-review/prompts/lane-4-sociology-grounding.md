@@ -1,4 +1,4 @@
-# Lane 4 — Sociology / Social Theory Grounding for Social WAM
+# Lane 4 - Sociology / Social Theory Grounding for Social WAM
 
 Read `prompts/00-shared-lane-contract.md` first. You are Lane 4 (N=4).
 
@@ -12,25 +12,25 @@ theory language.
 
 ## Concepts to cover (textbook + key primary sources)
 
-- Max Weber — social action (action oriented toward others; meaning).
-- Mead & Blumer — symbolic interactionism (meaning emerges in interaction).
-- Goffman — interaction order, face, frames.
-- Homans & Blau — social exchange (cost, reward, reciprocity, dependence).
-- Coleman — social capital, the micro-macro (Coleman's boat) transition.
-- Granovetter — embeddedness, strength of weak ties.
-- North — institutions as rules/constraints.
-- Ostrom — commons governance, rules-in-use, action situations, the IAD
+- Max Weber - social action (action oriented toward others; meaning).
+- Mead & Blumer - symbolic interactionism (meaning emerges in interaction).
+- Goffman - interaction order, face, frames.
+- Homans & Blau - social exchange (cost, reward, reciprocity, dependence).
+- Coleman - social capital, the micro-macro (Coleman's boat) transition.
+- Granovetter - embeddedness, strength of weak ties.
+- North - institutions as rules/constraints.
+- Ostrom - commons governance, rules-in-use, action situations, the IAD
   framework, design principles (this is the most directly operational anchor for
-  weak commons / public affordances — treat carefully).
-- Bicchieri & Elster — social norms, empirical vs normative expectations,
+  weak commons / public affordances - treat carefully).
+- Bicchieri & Elster - social norms, empirical vs normative expectations,
   conditional preferences.
-- Organizational theory — roles, routines, authority, coordination, incentives
+- Organizational theory - roles, routines, authority, coordination, incentives
   (e.g., March & Simon, Nelson & Winter routines).
 
 For each: cite a usable source (book/chapter/canonical paper or a solid survey).
 Primary sources where feasible; reputable secondary sources otherwise (label as
 secondary). Use `hf papers search` and web (Stanford Encyclopedia of Philosophy,
-canonical texts) — do not fabricate citations.
+canonical texts) - do not fabricate citations.
 
 ## Translation requirement (the core of this lane)
 
@@ -47,11 +47,11 @@ only behavioral proxy -> scenario `borrowed_tool_v1`.
 
 ## Owned deliverables
 
-- `notes/by-theme/sociology-grounding-for-social-wam.md` — each concept: the
+- `notes/by-theme/sociology-grounding-for-social-wam.md` - each concept: the
   theory (primary-source faithful, jargon defined), the Minecraft operationalization,
   and the honesty boundary (behavioral proxy vs internal state; what the repo may
   NOT claim). Map concepts onto the 4 WAM layers (esp. Social + Institutional).
-- `matrices/social-state-variable-matrix.md` — table: social construct x
+- `matrices/social-state-variable-matrix.md` - table: social construct x
   {theory source, Minecraft observable, log record/schema, predictable delta,
   verification source, unclaimable-yet, candidate scenario, WAM layer}.
 - by-paper notes for the primary theory sources you actually read; manifest +

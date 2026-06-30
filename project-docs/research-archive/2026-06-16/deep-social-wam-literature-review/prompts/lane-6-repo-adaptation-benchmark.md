@@ -1,4 +1,4 @@
-# Lane 6 — Repo Adaptation and Benchmark Design
+# Lane 6 - Repo Adaptation and Benchmark Design
 
 Read `prompts/00-shared-lane-contract.md` first. You are Lane 6 (N=6).
 
@@ -53,7 +53,7 @@ runtime artifacts needed. Distinguish "competence gate" from "social contributio
 
 ## Owned deliverables
 
-- `matrices/repo-adaptation-matrix.md` — table: repo construct x {WAM layer(s),
+- `matrices/repo-adaptation-matrix.md` - table: repo construct x {WAM layer(s),
   role in WAM (input/predict-target/verifier/advisory), what exists today, what
   is missing to log a transition record, mechanically-useful vs research-claim}.
 - A benchmark-families section written into your subagent brief
@@ -63,7 +63,7 @@ runtime artifacts needed. Distinguish "competence gate" from "social contributio
 - by-paper notes only if you pull external benchmark-design references; manifest
   + search-log fragments.
 
-Caution: respect repo invariants — WAM stays advisory (never executable
+Caution: respect repo invariants - WAM stays advisory (never executable
 authority, never fills args, never overrides verifiers); no hidden domain planner;
 prose is not authority; evidence is support not contribution; demote heavy
 shared-commons economy; keep provider-cost/quota realism. Propose the FIRST

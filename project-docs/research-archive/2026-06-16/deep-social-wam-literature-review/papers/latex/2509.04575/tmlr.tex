@@ -1,0 +1,752 @@
+
+\documentclass[10pt]{article} %
+\usepackage[svgnames]{xcolor}
+
+\usepackage[accepted]{tmlr}
+
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{wrapfig}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{listings}
+\tcbuselibrary{breakable}
+
+\newcommand{\green}[1]{\textcolor{DarkGreen}{#1}}
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+\newcommand{\deltaspace}{\hfill \hspace{0.3cm}}
+
+\newcommand{\todo}[1]{%
+  \textcolor{red}{\textbf{@todo:}\ #1}%
+}
+
+\newtcolorbox{promptbox}[1][]{
+  listing only,
+  breakable,
+  listing options={
+    breaklines=true,
+    breakindent=0pt,
+    basicstyle=\ttfamily
+  },
+  colback=gray!10,
+  colframe=blue!60!black,
+  colbacktitle=blue!60!black,
+  boxrule=1pt,
+  arc=3pt,
+  left=2pt,right=2pt,top=1pt,bottom=1pt,
+  fonttitle=\bfseries,
+  title=Prompt,
+    title style={
+      boxsep=4pt,
+      top=8pt,
+      bottom=8pt,
+    },
+  #1
+}
+
+\newtcolorbox{twopartbox}[1][]{%
+  enhanced,
+  breakable,
+  bicolor,
+  colframe=black,
+  colback=orange!10,
+  colbacklower=DodgerBlue!8,
+  coltitle=white,
+  colbacktitle=black,
+  fonttitle=\bfseries,
+  title={Improving on a math solution},
+  left=1ex, right=1ex, top=1ex, bottom=1ex, boxsep=4pt,
+  lower separated=true,
+  segmentation style={solid, line width=1pt},
+  #1
+}
+
+
+\title{Bootstrapping Task Spaces for Self-Improvement}
+
+
+\author{\name Minqi Jiang \email msj@meta.com \\
+      \addr Meta Superintelligence Labs
+      \AND
+      \name Andrei Lupu \\
+      \addr Meta Superintelligence Labs \& University of Oxford
+      \AND
+      \name Yoram Bachrach \\
+      \addr Meta Superintelligence Labs
+}
+
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\def\month{02}  %
+\def\year{2026} %
+\def\openreview{\url{https://openreview.net/forum?id=k2VsgUxC6X}} %
+
+\newcommand{\methodname}{\textsc{ExIt}}
+
+
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Progress in many task domains emerges from repeated revisions to previous solution attempts. Training agents that can reliably self-improve over such sequences at inference-time is a natural target for reinforcement learning (RL), yet the naive approach assumes a fixed maximum iteration depth, which can be both costly and arbitrary. 
+We present Exploratory Iteration (\methodname{}), a family of autocurriculum RL methods that directly exploits the recurrent structure of self-improvement tasks to train LLMs to perform multi-step self-improvement at inference-time while only training on the most informative single-step iterations. \methodname{} grows a task space by selectively sampling the most informative intermediate, partial histories encountered during an episode for continued iteration, treating these starting points as new self-iteration task instances to train a self-improvement policy. \methodname{} can further pair with explicit exploration mechanisms to sustain greater task diversity.
+Across several domains, encompassing competition math, multi-turn tool-use, and machine learning engineering, we demonstrate that \methodname{} strategies, starting from either a single or many task instances, can produce policies exhibiting strong inference-time self-improvement on held-out task instances, and the ability to iterate towards higher performance over a step budget extending beyond the average iteration depth encountered during training.
+\end{abstract}
+
+\section{Introduction}
+
+When given more time to think, humans can often reason toward better solutions to difficult problems. Recently, reinforcement learning (RL) on task-specific rewards has been shown to induce similar reasoning capabilities in pretrained large language models (LLMs)~\citep{zelikman2022star, jaech2024openai, guo2025deepseek}, whereby the model learns to output extended chains-of-thought (CoTs) exhibiting reasoning behaviors that can iteratively self-improve a solution, via tactics like correctness verification and backtracking. This approach has been applied in both \emph{verifiable} domains, such as math and coding, where an oracle function determining the correctness of any given solution can be explicitly defined~\citep{lambert2024tulu}, and more recently extended to \emph{non-verifiable} domains like creative writing~\citep{gurung2025learning, zhou2025reinforcing}. 
+Training such \emph{reasoning models} via RL can be challenging: Empirically, eliciting useful reasoning patterns is dependent on how likely it is for the base model to generate CoTs already exhibiting these patterns~\citep{gandhi2025cognitive}, and thus a supervised fine-tuning stage using carefully-curated reasoning traces may be necessary. As CoTs lengthen with multiple reasoning steps, response generation takes longer to complete, slowing down training and potentially exhausting context length and memory.
+
+In this work, we consider a complementary approach to improving an LLM's capacity for self-improvement at inference time, based on training the LLM to perform $K$-step self-improvement. In this problem setting, the LLM is presented with an initial solution and has a budget of $K$ steps to reach the best-performing solution, with each subsequent step starting from the response produced in the previous step, along with an optional feedback signal communicating the quality of that solution.  
+
+Naively, $K$-step self-improvement training may be performed by randomizing over the step budget $K$, with the reward for each step corresponding to either the absolute quality of the solution produced that step or the relative improvement with respect to the previous solution. However, this approach is both overly restrictive and costly, requiring commitment to a maximum self-improvement depth of $K$ beforehand, while also increasing inference costs by an additional factor of $(K+1)/2$ on average, when maintaining a fixed number of training task instances. Moreover, this approach does not extend naturally to the multi-turn task setting, where each turn may be allotted a budget of $K$-steps for self-improvement before arriving at a final response for that step. Lastly, RL fine-tuning based on verified rewards can reduce output diversity, making it harder to find effective improvements to previous solutions~\citep{wu2025invisible}.
+
+Our approach avoids these issues by training for $K$-step self-improvement using only single-step self-improvement transitions. The starting point is the output of a previous turn, selected via prioritized sampling using a score that quantifies the learning potential of reattempting that turn given its exact history. Each training task comprises the original instruction, the sampled turn's previous output, and (in multi-turn settings) the remaining turn history up to that point. By teaching the LLM to iterate on its own solutions, our method can be viewed as self-generated data augmentation over the task space. To maintain diversity during iteration, we study two exploration mechanisms: (1) a variant of $\epsilon$-greedy exploration where, with probability $\epsilon$, the task switches from self-improvement to \emph{self-divergence}, aiming for a valid but substantially different approach; and (2) multiplicatively scaling the group-wise advantage of each rollout by its distance from the group centroid in an embedding space. Because any step endpoint can seed a new iteration task, step-level and task-level exploration act in the same task space, blurring the line between classic step-level exploration and task-level autocurricula. We refer to our approach as Exploratory Iteration (\methodname{}). 
+
+We demonstrate the effectiveness of \methodname{} variants across a variety of domains—including competition math, multi-turn tool-use, and machine learning engineering tasks based on previous Kaggle competitions—where policies trained via \methodname{} variants exhibit improved $K$-step self-improvement at inference-time, with $K$ extending beyond the typical improvement depth seen during training. Further, we observe that \methodname{} induces emergent autocurricula over various task complexity metrics while naturally increasing the  diversity of the training task instances, leading to improved performance even before self-improvement.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Background}
+
+\subsection{Self-improvement decision process}
+\label{subsection:self_improvement_mdp}
+
+We consider the $K$-step self-improvement setting in a task space $\mathcal{M}$ defining a set of task instances $m$, each corresponding to a multi-turn POMDP with a timestep budget of $T_m$. For clarity and consistency with recent usage for LLM-based tasks, we refer to the timesteps of the underlying POMDP as \emph{turns} and reserve \emph{step} to refer to a self-iteration step, where the LLM generates a modified version of a previous response.
+
+For a task instance $m$, at every turn $t$, for $1 \le t \le T_m$, the LLM $\pi_{\theta}$ with parameters $\theta$, receives the task prompt (also denoted as $m$ for convenience) and outputs a response containing a solution to the request $y_t$, followed by $k \ge 0$ additional steps of self-iteration. Each iteration step acts on the latest solution iterate to produce the next iterate, $y_t^k$, where we define $y_t^0 \equiv y_t$, so the improve step with index $0$ corresponds to the initial response attempt for that turn. At each iteration, $\pi$ also observes the remaining history, $y^K_{<t}$, composed of the sequence of the last iterates per turn, up to the last fully-iterated turn $t-1$. Optionally, associated feedback signals $e_t^k$ and $e^K_{<t}$, e.g. execution traces in a coding task, can be provided to $\pi$ for each observed iterate. For convenience, let the history $\tau_t^k \equiv (y_t^k, y^K_{<t}, e_t^k, e^K_{<t})$. Then,
+
+\begin{equation}
+    y_t^{k+1} \sim \pi_{\theta}(\cdot | \tau_t^k, m).
+\end{equation}
+
+Let the final history be $\tau^K_{T_m} \equiv \hat{\tau}_m$. Further, let $G$ be a function mapping $\hat{\tau}$ to a real scalar measuring the quality of the responses. In this work $G$ is the undiscounted sum of rewards $r_t$ at the end of each turn $t$ in $\hat{\tau}$. We then seek the optimal policy parameters maximizing the quality of the solution represented by $\hat{\tau}$, 
+
+\begin{equation}
+\label{eq:self_improve_objective}
+    \underset{\theta}{\arg \max}\;
+    \mathbb{E}_{\substack{m \sim \mathcal{M}\\ \hat{\tau}_m \sim \pi_{\theta}}}
+    \bigl[\,G(\hat{\tau}_m)\,\bigr].
+\end{equation}
+
+Let us define a \emph{self-improvement task} as a tuple comprising an initial task $m$, a partial history $\tau^k_t$, and a self-improvement budget $K$, with the objective of maximizing the quality of the final solution iterate $\hat{y}_m$ reached via $K$ improvement steps per turn starting from $\tau^k_t$. We further define a \emph{recurrent task} as a task for which the output of one instance can serve as the input parameter to define another instance. Self-improvement tasks are recurrent tasks.
+
+\subsection{Group-Relative Policy Optimization}
+\label{subsection:grpo}
+
+We search for the optimal LLM parameters $\theta$ in Equation~\ref{eq:self_improve_objective} using Group-Relative Policy Optimization~(GRPO)~\citep{shao2024deepseekmath}. GRPO is an online policy-gradient algorithm that optimizes a clipped advantage objective based on that used in PPO. Rather than computing the baseline term using a learned value function as in PPO~\citep{schulman2017proximal}, GRPO uses a group of $G$ Monte-Carlo rollouts, $\{o_i\}_{i=1}^G$ for each initial prompt $m$ to estimate this baseline. We use GRPO for its strong empirical performance and reduced resource requirements compared to PPO from dropping the learned value function, typically a second copy of the LLM. Let $\textbf{r}$ be the vector of returns for each rollout, where $r_i$ is the return for rollout $o_i$. Within each group, the advantage $A_{i,t}$ for token index $t$ in rollout $o_i$ is
+
+\begin{equation}
+\label{eq:grpo_advantage}
+    A_{i,t} = \frac{r_i - \text{mean}(\textbf{r})}{\text{std}(\textbf{r})},
+\end{equation}
+
+where the same advantage is assigned to every completion token index $t$. GRPO makes use of a KL regularization term constraining $\pi_{\theta}$ to a reference policy $\theta_{\text{ref}}$, initialized with the initial parameters, and updated to the latest $\theta$ with a $1 - \alpha$ decay factor every $M$ training iterations. The full GRPO objective is then
+
+\begin{equation}
+\label{eq:grpo_objective}
+\centering
+\mathcal{J}(\theta) = \mathbb{E}_{\begin{subarray}{l}
+      m\sim\mathcal{M},\\[2pt]
+      \{o_i\}_{i=1}^{G}\sim\pi_{\text{old}}(O|m)
+    \end{subarray}}
+\frac{1}{G}
+\sum_{i=1}^{G}
+\frac{1}{\lvert o_i\rvert}
+\sum_{t=1}^{\lvert o_i\rvert}
+\Biggl[
+\min\bigl[\,
+\rho_{i,t}\, A_{i,t}\,,\,
+\mathrm{clip}(\rho_{i,t},\,1-\varepsilon,\,1+\varepsilon)\,A_{i,t}
+\bigr]
+\;-\;\beta\,D_{\mathrm{KL}}\!\bigl[\pi_{\theta}\,\big\Vert\,\pi_{\mathrm{ref}}\bigr]
+\Biggr],
+\end{equation}
+
+where $\pi_{old}$ is the set of parameters used to generate the rollouts, $\varepsilon > 0$ is the clip threshold, $\beta > 0$ is the KL coefficient, and the importance sampling coefficient for $o_i$ at token index $t$ is
+
+\begin{equation}
+\label{eq:importance_sampling_coef}
+\rho_{i,t}
+\;=\;
+\frac{
+  \pi_{\theta}\bigl(o_{i,t}\mid m,\,o_{i,<t}\bigr)
+}{
+  \pi_{\mathrm{old}}\bigl(o_{i,t}\mid m,\,o_{i,<t}\bigr)
+}.
+\end{equation}
+
+
+\section{Task diversity improves learnability}
+
+\begin{wrapfigure}{r}{0.31\textwidth}
+    \centering
+    \vspace{-0.7cm}
+    \includegraphics[width=\linewidth]{figures/mlebench_pizza_transfer.pdf}
+    \caption{Simultaneously training with other tasks makes random-acts-of-pizza learnable.}
+    \vspace{-0.7cm}
+    \label{fig:mlebench_transfer}
+\end{wrapfigure}
+
+A key observation motivating \methodname{} is that the learnability of individual tasks can be improved by training on additional tasks with related structure. In Figure~\ref{fig:mlebench_transfer}, we see DeepSeek-R1-Distill-Qwen-7B cannot directly learn the MLE-bench task random-acts-of-pizza, while simultaneously training on two additional MLE-bench tasks enables learning. Cross-task transfer is popularly exploited by methods like domain randomization~\citep{tobin2017domain, mehta2020active}, where a training distribution over varied task instances is sampled to improve task diversity, and curriculum learning methods, which actively sample the task space. The specific approach used for sampling task instances defines an exploration strategy over the task space. The recurrence in self-improvement tasks introduces a natural source of related tasks, as each solution iterate itself can serve as a task instance.
+
+Our approach, \methodname, exploits this fact by actively exploring across the history of solution iterates, both by actively sampling promising previous iterates for further iteration and by promoting iteration steps to output novel solutions. In this way, \methodname{} seeks to produce more robust self-improvement abilities via cross-task transfer across a potentially open-ended set of self-generated starting solutions.
+
+
+
+
+\section{Exploratory Iteration (\methodname{})}
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=\textwidth]{figures/exit_overview.pdf}
+\caption{Overview of \methodname{} strategies. Each episode samples a new task (at turn 0) or selects a partial turn history from a previous episode as a starting point for self-iteration (either self-improvement or divergence). Partial histories are sampled by prioritizing those that led to higher GRPO group return variance.} 
+\label{fig:overview}
+\end{figure}
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+\vspace{-0.4cm}
+\centering
+\begin{minipage}{\linewidth}
+\begin{algorithm}[H]
+\label{algo:exit}
+\SetAlgoNoLine  
+{\small
+\caption{Exploratory Iteration (\methodname{})}
+\label{fig:exit_pseudocode}
+Init policy $\pi_{\theta}$ and an empty task buffer $\mathcal{B}$ of size $N$ \\
+\While{training}{
+    \eIf{$|\mathcal{B}|\ge B_{\min}$ and \texttt{random()} $<p$}{
+        {\color{orange}
+        Sample instance $(m,k,\tau^k_t) \sim \mathcal{B}$ \\
+        Sample partial history $\tau^{k'}_{t^-}$ for turn $t^{-} \le t$ \\ 
+        Use instance $m' \leftarrow (m, k'+1, \tau^{k'}_{t^-})$ \\
+        }
+    }{
+        Sample base task $m' \sim \mathcal{M}$
+    }
+    {\color{blue}Self-iterate from $m'$ to produce $m^{+}$} \\
+    Evaluate score $S$ for group rollouts of $m^{+}$ and update $\pi_{\theta}$ using these rollouts \\
+    Update $\mathcal{B}$ with $m^{+}$ and $m'$ with score $S$
+}
+}
+\end{algorithm}
+\vspace{-0.4cm}
+\end{minipage}
+\end{wrapfigure}
+
+We now define a family of exploration methods, which we refer to as Exploratory Iteration (\methodname{}) strategies. These methods directly exploit the recurrent structure of self-improvement tasks to actively generate and sample new task instances. Importantly, \methodname{} strategies seek to train the model for $K$-step self-improvement using only single-turn self-improvement tasks. This simplification is achieved by dynamically sampling starting solution iterates from a running buffer of the most informative solution iterates so far reached during training, allowing the single-step iteration tasks to accumulate to an effectively arbitrary depth during training. By decomposing extended self-improvement chains into one-step iteration tasks, this approach enables GRPO to credit-assign a dense reward to each individual self-improvement step, while naturally presenting each self-improvement task instance in an autocurriculum of improvement steps of progressively greater depth. 
+
+Concretely, new task instances are generated via two kinds of transformations, each acting on a task history $\tau^k_t$ up to $k$ self-iteration steps on the response for turn $t$ for task instance $m$. Here, $\tau^0_t$ corresponds to the history ending with the initial response for turn $t$ (without self-improvement).
+
+{\color{orange} \textbf{Selection:}} Sample a task $m'$ with turn history $\tau_t$ from the self-improvement task buffer $\mathcal{B}$. Then, sample a random turn prefix containing the first $t^{-} \le t$ turns from $\tau_t$, ending with the $k'$-th iterate of the response for turn $t^{-}$. Use this partial history $\tau^{k'}_t$ to create a new self-improvement task $m^- = (m, k'+1, \tau^{k'}_{t^-})$.
+
+{\color{blue} \textbf{Expansion:}} Given a turn history $\tau^k_t$, take a self-iteration step from the last-turn response, resulting in an extended, complete history $\tau^{k+1}_{T_{m}}$. Expansion corresponds to self-improvement task $m^+ = (m, k + 1, \tau^{k}_{T_{m}})$.
+
+Let $\Delta = G(\tau^{k+1}_{T_{m}}) - G(\tau^{k}_{T_{m}})$ be the difference in quality measure between successive iterates. Under \methodname{}, the reward for self-iteration steps is $\max\big(0, \Delta/\Delta_{\text{max}})$, where $\Delta_{\text{max}}$ is the largest possible improvement from the previous iterate. The reward for base tasks remains the same. While GRPO already normalizes reward scales, we apply this explicit normalization to ensure variance-based learnability scores remain comparable.
+
+At the start of each training episode, the task instance is first sampled via selection over the task buffer with probability $p$ if the task buffer is above a minimum size, and otherwise uniformly at random from the base task space $\mathcal{M}$. The one-step rollout from the sampled task instance then naturally performs expansion, and we subsequently update the task buffer with the new self-improvement instance resulting from expansion.
+
+In practice, when updating the task buffer with a new instance with history $\tau^k_t$, we precompute and insert all instances corresponding to the per-turn partial histories of $\tau^k_t$ that can be sampled via selection, when performing this buffer update. To limit the size of the task buffer, we take the simple approach of assigning a priority score to each task instance and keeping only the top $N$ such partial histories with the highest score. In this work, we use a learnability score, discussed in Section~\ref{sec:selection}. We describe extensions of the expansion step to promote exploration in Section~\ref{sec:expansion}. The general \methodname{} approach is depicted in Figure~\ref{fig:overview}, and the pseudocode for our approach, simplified for the case of a single rollout per training iteration, is provided in Algorithm~\ref{algo:exit}. Our self-iteration prompt templates are provided in Appendix~\ref{app:prompts}.
+
+\subsection{Selecting for learning potential}
+\label{sec:selection}
+To enforce a finite capacity for the task buffer and focus training on only the most useful task instances, we keep only the top $N$ task instances based on learning potential, measured by the variance of the final quality measure (e.g. total return) of each rollout in a GRPO group: $S = \textbf{var}(\textbf{r})$, where the quality measure is rescaled to ensure all values are in the range $[0, 1]$.
+The variance metric extends the \emph{learnability} measure studied as a prioritized sampling metric for binary success outcomes~\citep{vinyals2019grandmaster, rutherford2024no} to general scalar outcomes. In deterministic task instances (such as all tasks considered in this work), high variance in outcomes indicates the policy often succeeds and fails, and thus the potential for improvement (i.e. learning). We leave modifications of variance-based learnability metrics for stochastic environments to future work. As this learnability metric is simply a function of GRPO's group rollouts, using it for prioritized sampling of training instances results in a \emph{compute-equivalent} autocurriculum method. 
+
+When updating the buffer with a self-iteration task $m^+$ based on expanding a previous instance $m'$, we do not have a learnability score for $m^+$. In practice, we initialize $m^+$ with the same score as the empirical score for $m'$, with the assumption that higher-variance starting points will tend to lead to subsequent high-variance points and vice versa. For example, if the policy can always succeed on a self-iteration task $m'$, its learnability will be 0, which is the expected score assignment for $m^+$, which starts from the correct solution. 
+
+If the task buffer is at capacity (i.e. $|\mathcal{B}| = N$), a task instance is only inserted into the buffer if its score is greater than or equal to the instance with the lowest score in the buffer, which is replaced by the inserted instance. When sampling training instances from the buffer, the $i$-th instance in the buffer with score $S_i$, for $i \leq N$, is assigned a probability mass equal to $\exp (S_i\kappa ) / \sum_{j=1}^{|\mathcal{B}|}\exp (S_j\kappa)$, where $\kappa$ is the inverse temperature. 
+
+
+\subsection{Expanding for divergence}
+\label{sec:expansion}
+
+As \methodname{} accumulates new self-improvement tasks based on the model's previous responses, the resulting task diversity strongly depends on the diversity of the model's outputs. To counteract RL's tendency to reduce output diversity, we incorporate directly diversity-seeking components:
+
+\textbf{Divergent improvements.} With probability $p_\text{div}$, a self-iteration step becomes a \emph{self-divergence} step, whereby the policy is prompted to improve on a previous solution while diverging significantly from it (See Appendix~\ref{app:prompts} for the self-divergence prompt). We find divergence steps to induce meaningfully different responses from the model, resulting in increased task-space coverage when integrated into an \methodname{} strategy. 
+
+\textbf{Multiplicative diversity bonus.} Given an embedding space and a GRPO rollout group, compute a diversity score $d_i$ for the solution produced by the $i$-th rollout as the solution's embedding distance to the group centroid embedding $\overline{e}$, normalized by the range of distances within the group:
+
+\begin{equation}
+    d_i = \frac{\|e_i - \overline{e}\|}{\text{max}_j(\|e_j - \overline{e}\|) - \text{min}_j (\|e_j - \overline{e}\|)}.
+\end{equation}
+
+Following the approach in \citet{chung2025modifying}, these diversity scores serve as coefficients that multiply each group-relative advantage as defined in Equation~\ref{eq:grpo_advantage}, thereby relatively upweighting more successful trajectories and downweighting poor-performing trajectories by how much they diverge relative to the group.
+
+\section{Experiment setting and results}
+\label{sec:experiment_results}
+
+We investigate the effectiveness of \methodname{} at inducing inference-time self-improvement behavior in several task domains, which together test the benefits of \methodname{} in improving test-time self-improvement in a variety of inference settings. These domains include mathematical reasoning (a standard, single-turn setting), tool-use (a multi-turn setting), and machine learning engineering tasks based on real Kaggle competitions (a setting where the LLM is typically run within a search scaffold).
+
+\subsection{Task domains}
+\textbf{Competition math.} We train on a randomly-sampled 1280-problem subset of an open dataset of competition math problems~\citep{deepscaler2025, numina_math_datasets} and evaluate models on several held-out test sets via math-verify~\citep{math-verify}: MATH500~\citep{hendrycks2021measuring}, AMC12~2022/2023, AIME~2024/2025, the Minerva test split~\citep{lewkowycz2022solving}, and the text-only samples from the OlympiadBench test split~\citep{he2024olympiadbench}. We specifically make use of this smaller training subset (epoched after every 10 GRPO iterations) in order to test the impact of \methodname{} in augmenting the training set with additional task instances. 
+
+\textbf{Multi-turn function calling.} The multi-turn-base split of the Berkeley Function Calling Leaderboard (BFCLv3) benchmark~\citep{patil2025bfcl} provides a set of 200 tasks simulating multi-turn user interactions that require the LLM assistant to make a series of function calls based on API modules spanning domains including travel booking, stock price analysis, and file system management. We split these tasks into equal-sized train and test splits of 100 task instances, using stratified sampling to ensure each split shares a similar fraction of instances of different total turn counts and API sets. Following the modified environment logic in \citet{bespoke_improving_multi_turn_tool_use}, a trajectory is considered correct if both 1) its sequence of function calls leads to the final ground-truth state, and 2) the ground-truth sequence of function calls is a subset of the sequence. During RL fine-tuning, this correctness check serves as the verified reward function. This task allows us to evaluate \methodname{}'s impact on a natively multi-turn task.
+
+\textbf{ML engineering.} Coding naturally benefits from inference-time self-improvement, where it takes the form of debugging and optimization of previously output code solutions. 
+We evaluate \methodname{}'s impact on improving coding performance in MLE-bench~\citep{chan2024mle}, based on historical Kaggle competitions, by adapting this benchmark into an RL environment. The state-of-the-art solutions in MLE-bench rely on a search scaffold—a program that repeatedly calls the LLM in order to arrive at a final solution, by iterating on intermediate outputs~\citep{jiang2025aide,liu2025ml,toledo2025ai,zhao2025automated}. We make use of this more challenging domain as a testbed for the ability of \methodname{} strategies to improve model performance within a search scaffold for code iteration (with error traces as execution feedback).
+We train on three tasks: detecting-insults-in-social-commentary, spooky-author-identification, and random-acts-of-pizza. At test time, we run the model within a greedy-search scaffold on held-out tasks: jigsaw-toxic-comment-classification-challenge, nomad2018-predict-transparent-conductors, and aerial-cactus-identification.
+
+We provide additional experiment details and our choice of hyperparameters in Appendix~\ref{app:exp_details}. 
+
+\subsection{Baselines and ablations} In each task domain, we compare models trained via \methodname{} and its ablations against the original model before and after standard GRPO fine-tuning, via a heavily-modified fork of open-instruct~\citep{wang2023far}.
+Specifically, we look at ablated variants of the ``full'' \methodname{} strategy: using only the learnability curriculum (i.e. only the selection transformation), additionally using self-improvement steps (\textsc{Improve}), additionally using self-divergence steps (\textsc{Diverge}), and the full method additionally using the embedding-based diversity bonus (full \methodname{}).
+For the math domain, we use Llama-3.2-3B-Instruct~\citep{metaai2024llama32}, as its baseline performance leaves considerable room for improvement. We compute embeddings for the diversity bonus using a BERT model fine-tuned on an academic math dataset~\citep{devlin2019bert, steinfeldt2024evaluation}. For the more challenging tool-use and ML engineering domains, we use the best model at the 7B parameter scale from the Qwen2.5 series~\citep{team2024qwen2} for each task. For tool-use, we fine-tune Qwen2.5-7B-Instruct, and for ML engineering, DeepSeek-R1-Distill-Qwen-7B~\citep{guo2025deepseek}. We embed both tool-use responses and code solutions using the 400M parameter CodeXEmbed model~\citep{liu2024codexembed}.
+
+\subsection{Self-improvement at inference time}
+
+\input{figures/tables/eval_results_mlebench_all}
+
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/shared_legend.pdf}
+    \vspace{0.0cm}
+
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[height=3.8cm,keepaspectratio]{figures/math_llama3b_mean_all_16steps.pdf}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[height=3.8cm,keepaspectratio]{figures/bfcl_qwen_improve_1turn_4steps.pdf}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[height=3.8cm,keepaspectratio]{figures/bfcl_qwen_improve_return_4steps.pdf}
+  \end{subfigure}
+  \caption{Left: Mean accuracy on all math test splits. Center: Mean first-turn accuracy on the multi-turn tool-use test split. Right: Mean total task return on the multi-turn tool-use test split. Results are avg@8 values across 3 training runs per method.}
+  \label{fig:math_bfcl_agg_results}
+\end{figure}
+
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=\textwidth]{figures/math_llama_3b_net_corrections_16steps.pdf}
+\caption{Net corrections across held-out math splits, computed over 8 samples per problem per checkpoint, averaged over 3 training runs per method (and an equivalent \# samples/problem for Llama-3.2-3B-Instruct).} 
+\label{fig:net_corrections_math}
+\vspace{-0.4cm}
+\end{figure}
+
+
+We measure the ability of a model to iteratively self-improve its responses at inference-time, with a budget of $K$ self-improvement steps. For each turn $t$, at self-improvement step $0 < k \leq K$, the model is prompted to provide an improved response given the original request (i.e. from the user) and the model's latest response iterates from all previous turns up to and including the current turn. The self-improvement results in Table~\ref{tab:method_eval_all_examples} and Figures~\ref{fig:math_bfcl_agg_results} – \ref{fig:mlebench_train_dynamics} show that across task domains, \methodname{} strategies directly using exploration mechanisms (\textsc{Diverge}'s prompt-based exploration and the full \methodname{} strategy's use of an exploration bonus) consistently improve the model's ability to self-improve its solutions, with respect to the original model and after fine-tuning with GRPO. Notably, \methodname{} strategies also result in higher initial solution quality, while the curriculum-only baseline tends to achieve comparable performance with standard GRPO, indicating that augmented task-set diversity via selection and expansion transforms can result in more robust policies. We provide example self-iteration steps encountered during training in Appendix~\ref{app:self_iteration_examples}.
+
+In Figure~\ref{fig:net_corrections_math}, we see that across the held-out math splits, \textsc{Improve}, \textsc{Diverge}, and the full \methodname{} method all lead to a higher net number of successfully corrected solutions over 16 self-improvement steps, accumulating over 170 successful corrections across all held-out problems. On the majority of test splits (all except AIME 2025, where all methods fail to meaningfully self-improve), \methodname{} and \textsc{Diverge} continue to net additional corrections even after 16 self-improvement steps, despite the mean self-iteration depth remaining under two steps throughout training (see Figure~\ref{fig:train_dynamics}).
+
+In the multi-turn tool-use domain, we find \methodname{} strategy policies lead to greater performance, both before and after self-improvement steps compared to GRPO and the initial model, which both achieve worse performance after self-iterating over $K=4$ steps. Notably, we see that performance ranking on first-turn accuracy does not always correspond to the ranking on total return—the latter a function of all-turn accuracy—with the curriculum-only baseline performing worse than the GRPO baseline in all-turn return, while performing better on first-turn accuracy. We see that the additional exploration mechanisms employed by \textsc{Diverge} and the full \methodname{} method enable the curriculum-based approach to exceed the performance of GRPO.
+
+In MLE-bench, we find that both \textsc{Diverge} and the full \methodname{} method lead to the highest normalized  performance across train and test tasks, while \textsc{Improve} and the curriculum-only baseline attain similar performance as the GRPO baseline. This result highlights how even standard GRPO fine-tuning on a small set of MLE-bench tasks can transfer to held-out tasks. Our approach then further improves the quality of solutions discovered by the fine-tuned model within the multi-step greedy-search scaffold. This result shows that \methodname{} can be an efficient approach for fine-tuning LLMs for use in extended multi-step scaffolds at test-time, by producing and learning from purely single-step iterations at training time.
+
+Appendix~\ref{app:additional_results} further reports how success rate evolves per task split for the math and MLE-bench domains.
+
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/shared_legend.pdf}
+    \vspace{0.0cm}
+    
+  \begin{subfigure}[c]{0.52\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/mlebench_r1_7b_training_dynamics.pdf}
+  \end{subfigure}
+  \begin{subfigure}[c]{0.38\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/mlebench_r1_7b_improve_16steps.pdf}
+  \end{subfigure}
+
+  \caption{Left: Emergent curriculum over the sampled history's recency and starting depth during MLE-bench training. Right: Normalized MLE-bench scores achieved by each method over all train and test tasks via increasing greedy-search budgets (mean over 3 training runs). }
+  \label{fig:mlebench_train_dynamics}
+\end{figure}
+
+\subsection{Emergent complexity during training}
+\label{sec:emergent_complexity}
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=0.59\textwidth]{figures/shared_legend_ablations.pdf}
+    \vspace{0.0cm}
+    
+  \begin{subfigure}[b]{0.49\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/math_llama3b_train_dynamics.pdf}
+    \label{fig:math_llama3b_train_dynamics}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/bfcl_qwen_train_dynamics.pdf}
+    \label{fig:bfcl_qwen_train_dynamics}
+  \end{subfigure}
+  \vspace{-0.5cm}
+  \caption{The evolution of various task instance properties during training in the math domain (left) and the multi-turn tool-use domain (right). Results are based on mean and std over 3 training runs.}
+  \label{fig:train_dynamics}
+    \vspace{-0.5cm}
+\end{figure}
+
+By selectively sampling task instances with the highest group return variance, \methodname{} strategies induce an adaptive curriculum of task instances that prioritizes those that are most learnable for the model at any time, without need for an externally-specified task ordering. Figures~\ref{fig:mlebench_train_dynamics} and \ref{fig:train_dynamics} show the curriculum-driven evolution of various task complexity metrics that intuitively align with task difficulty. Across domains, we find \methodname{} strategies tend to lead to greater complexity metrics than the curriculum-only baseline, with the direct exploration variants (\textsc{Diverge} and full \methodname{}) most often achieving the highest values. In the math domain, we see that the mean number of ground-truth solution steps of sampled instances increases over time, indicating the emergent curriculum naturally drives towards more challenging problems over the course of training. Similarly, in the multi-turn tool-use domain, the mean number of ground-truth tool-call steps of sampled task instances increases over time. Here we also see that the mean starting turn of a replay trajectory progressively increases during training, indicating that as the model becomes more adept at handling tool calling at earlier steps, the frontier of learnability moves deeper into the solution sequence. While \methodname{} variants also increase sample depth—the number of self-iteration steps already taken on the starting response—more than the curriculum-only baseline, we find that the rank ordering among methods is inconsistent. This may be due to how self-iteration does not guarantee subsequent iterates deviate substantially from previous iterates in terms of difficulty for further improvement.
+
+\subsection{Exploratory iteration increases task diversity}
+
+\begin{wraptable}{r}{0.4\linewidth}
+\vspace{-0.4cm}
+\small
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Method & Cosine dist. ($\uparrow$) & L2 dist. ($\uparrow$) \\
+    \midrule
+    Uniform       & N/A & N/A \\
+    Curriculum    & N/A & N/A \\
+    Improve       & 0.10 & 0.05 \\
+    Diverge       & 0.11 & 0.06 \\
+    \methodname{} & \textbf{0.13} & \textbf{0.07} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Divergence metrics for training instances encountered for each method in MLE-bench tasks.}
+  \label{tab:mlebench_divergence_measures}
+    \vspace{-0.4cm}
+\end{wraptable}
+
+We now analyze the diversity of task instances sampled by each method during training. Figure~\ref{fig:diversity_summary} shows the number of distinct training task instances relative to the base training set used by GRPO. In the tool-use domain, we count the number of unique task prompts, corresponding to the contents of the last user message in the message history at the start of each episode. For MLE-bench, we count the number of unique starting code solutions. We find that the curriculum-only baseline heavily shrinks the number of distinct training instances encountered, indicating that prioritized sampling leads to a high repetition of training instances. This reduction of task diversity may explain the relative underperformance of this baseline compared to \methodname{} variants, whose self-iteration steps have the effect of recovering a substantial amount of this lost diversity. In the case of the full \methodname{}, we see this improved diversity under a curriculum corresponds to improved performance on held-out instances. In the base training distribution used by GRPO, MLE-bench tasks all begin with the same empty Python script template, so we see a drastic increase in number of distinct starting code solutions under \methodname{} strategies. The UMAP~\citep{mcinnes2018umap} in Figure~\ref{fig:diversity_summary} further highlights the differences between the task sets induced by \methodname{} variants and the base task set—a single point in the CodeXEmbed embedding space. 
+As reported in Table~\ref{tab:mlebench_divergence_measures}, the directly novelty-seeking \methodname{} variants lead to greater mean pairwise cosine and L2 distances among discovered task instances in the same embedding space, with the full \methodname{} attaining the greatest mean pairwise distances.
+
+\begin{figure}[t!]
+    \centering
+  \begin{subfigure}[c]{0.36\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/bfcl_qwen_input_diversity.pdf}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[c]{0.36\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/mlebench_r1_7b_input_diversity.pdf}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[c]{0.24\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/mlebench_umap.pdf}
+  \end{subfigure}
+  
+  \caption{Relative number of distinct training task instances under each method for the multi-turn tool-use domain (left) and MLE-bench (middle). The UMAP projection of the distinct starting programs observed during MLE-bench training shows \methodname{} strategies increase the diversity of the training distribution (right).}
+  \label{fig:diversity_summary}
+
+\end{figure}
+
+\section{Related works}
+
+\textbf{Inference-time self-improvement.} Prior works consider variants of the inference-time self-improvement setting. \citet{shinn2023reflexion} introduces a prompting-based approach for adapting based on previous trials of the same task with explicit feedback. \citet{kumar2024training} study directly training for a single step of self-improvement with optional feedback, which is a special case of the more general $k$-step setting considered in this work. They train a model to self-correct an initial previous solution in two training stages, with the first focusing on generating diverse initial solutions, and the second on self-correction. In contrast, \methodname{} does not require staged training and trains only on single-step iterations rather than both iterations together, while also generalizing beyond two self-improvement steps at test-time. \citet{team2023human}, directly train an RL agent to reflect over multiple trials in a procedurally-generated game. Importantly, \methodname{} performs self-iteration per timestep (i.e. turn), a more granular contextual unit of iteration than the full episodic trial considered in these previous works. Per-timestep self-iteration is often a more suitable granularity for LLM tasks, in which each timestep typically maps to a full turn of a meaningful interaction. \methodname{} strategies can thus be complementary to the trial-based self-improvement setting. Another complementary research direction focuses on directly training improved verifiers for providing feedback for self-improvement~\citep{gou2023critic, dou2024re, yuan2025reinforce}.
+
+\textbf{Task-space exploration.} \methodname{} can be viewed as a form of Prioritized Level Replay~\citet[PLR]{jiang2021prioritized, jiang2021replay} that performs task-exploration at the turn level, by treating self-iteration from the response at each previous turn as a task instance in itself. Our task expansions can be seen as a kind of ``mutation'' operator on the task buffer, likening our approach to a version of PLR that explores the task space via evolutionary search~\citep{parker2022evolving}. By adapting these ideas to self-improvement decision processes, \methodname{} demonstrates how task and trajectory-level exploration naturally coincide in this setting. Outside of the self-improvement setting, previous methods consider reset-based exploration at a trajectory level~\citep{ecoffet2019go, kazemnejad2024vineppo, foster2025learning, zheng2025first}. Unlike these approaches, \methodname{} modifies the specific task from the reset state (e.g. transforming it into a self-improvement or self-divergence task), while remaining compute-equivalent. In contrast to prior methods for dynamic training-task generation~\citep{sukhbaatar2017intrinsic, wang2019poet, wang2020enhanced, dennis2020emergent, zhang2023omni, faldor2024omni, zhao2025absolute}, \methodname{} forgoes a generator module and pursues open-ended task-space exploration~\citep{jiang2023general} by upcycling the learning agent's own trajectories into new task instances. The novelty bonus used by the full \methodname{} strategy adapts the approach in \citet{chung2025modifying} to GRPO. Our results show such bonuses can improve not just output diversity, but also task performance.
+
+\section{Limitations and future work}
+Our experiments feature a maximum training turn-history length of ten (in the tool-use domain). In domains like math and MLE-bench, where the responses tend to feature longer outputs, a multi-turn history can quickly exhaust the available context length. Extending \methodname{} to longer multi-turn training contexts serves as important future work, e.g. by compacting the context or using tool-based retrieval over the turn history. Though training FLOPS are still concentrated on base LLM computations, the use of an embedding model to compute response diversity adds extra overhead, making full \methodname{} only approximately compute-equivalent—though with minimal impact on training time, as this extra computation is parallelized with the backward pass. Evaluating full \methodname{}  under cheaper metrics, e.g. based on edit-distance, would be valuable follow-up work. Moreover, our experiments use \methodname{}  to drive parameter-space optimization, when the same strategies can also be applied to optimize the system prompt or task prompt template to induce greater self-improvement capabilities. Lastly, our experiments each focus on a single task domain and make use of an older generation of open models. The improved base reasoning capabilities of more recent models may enable them to benefit more from \methodname{} -style fine-tuning and exhibit greater transfer to unseen tasks. We leave application of \methodname{} to the latest base models for future work.
+
+\section{Conclusion}
+We introduced \methodname{}, an approach for RL fine-tuning an LLM for multi-step inference-time self-improvement via purely single-step self-improvement tasks. The core mechanisms behind \methodname{} adapt ideas from autocurriculum methods and trajectory-level exploration for RL to the $K$-step self-improvement problem setting. Importantly, as seen in our MLE-bench experiments, this problem setting maps closely to the common  paradigm of performing LLM inference within a search scaffold. Our results show that \methodname{} indeed can result in improved downstream performance when the fine-tuned model is used to drive a search scaffold. Improvements to the self-iteration prompts (i.e. improve and diverge) as well as extensions of this set of operations to additional search-specific actions may further improve the impact of our approach in downstream scaffold-based applications. We believe self-supervised turn-level exploration, as embodied by the \methodname{} design, is a promising direction for greatly enhancing the efficacy of RL fine-tuning for LLMs.
+
+\bibliography{tmlr}
+\bibliographystyle{tmlr}
+
+\newpage
+
+\appendix
+
+\section{Additional experiment details}
+\label{app:exp_details}
+
+\subsection{Reinforcement learning system}
+\label{app:rl_system}
+Our GRPO trainer is based on a heavily-modified fork of open-instruct, which makes use of asynchronous GRPO updates, with separate training and inference ranks. In our modified trainer, training and evaluation rollouts are conducted via task-specific multi-turn RL environments. LLM inference is performed via asynchronous requests to a vLLM instance (AsyncLLM) of the model, whose weights are updated to the latest training weights after every GRPO training iteration. 
+
+\subsection{Competition math}
+\label{app:exp_details_math}
+Our RL training system represents each math task instance as a single-turn RL environment instance. The reward function for each instance is based on the outcome of comparing the extracted LLM solution with the ground-truth answer using math-verify~\citep{math-verify}. The reward is 1 for a correct answer, and 0 otherwise. We use the same verification-based reward for self-improvement and self-divergence steps, effectively rewarding self-iteration responses within a GRPO group for improving an incorrect solution (or maintaining a correct solution) and penalizing responses that lead to an incorrect solution. 
+
+\subsection{Multi-turn tool-use}
+\label{app:exp_details_bfcl}
+
+We follow the set up in \citet{bespoke_improving_multi_turn_tool_use}, adapting the BFCLv3 multi-turn-base task format into a multi-turn RL environment. Each task requires the LLM to fulfill a sequence of possibly multiple user requests by executing a sequence of tool calls, with the valid function signatures provided as JSON schemas in the system prompt. At each turn the LLM policy can either output a tool-call in JSON format, surrounded by \texttt{<tool>} tags, \texttt{<TASK\_FINISHED>} to indicate the current user request has been fulfilled, or \texttt{<TASK\_ERROR>} to indicate that there is unrecoverable error. We configure vLLM to stop inference after generating any of these kinds of responses. The LLM policy receives a reward of 1.0 for correctly outputting a sequence of tool calls that both includes the ground-truth sequence and results in the underlying program state equivalent to the expected program state after executing the ground-truth solution sequence. Like in the math domain, we also use this verification-based reward for episodes containing self-iteration steps.
+
+Episodes in this environment are not guaranteed to share the same length, leading to the possibility of some trajectories being truncated when packing input-completion pairs into a training batch. To avoid this truncation, we trained on the full rendered message history with non-assistant messages masked out. To further stabilize training against overly long responses, we perform overlong filtering~\citep{yu2025dapo}, setting the gradient to zero for all responses lacking any of the valid response types described above. We further found using the normalized objective from \citet{liu2025understanding} to improve learning stability.
+
+
+To limit training trajectory lengths, we use only the first user request and provide the agent a budget of 10 turns. During testing, we provide the agent with up to 60 turns to fulfill all user requests. 
+
+\subsection{MLE-bench}
+\label{app:exp_details_mlebench}
+
+\input{figures/tables/mlebench_competition_meta}
+
+We adapt the Kaggle-based ML engineering tasks from \citet{chan2024mle} into a single-turn RL environment, parameterized by the competition ID. The task description in the prompt corresponds to the compact ``obfuscated'' markdown competition description. The user prompt for each task instance (i.e. competition) is shown in Appendix~\ref{app:prompts}, with a goal component varying based on if the starting code is buggy (in which case, the error trace is also provided below the code block). The prompt instructs the LLM to improve this code block, which defaults to a Python script with an empty main function, with comments indicating the environment variable storing the data directory path (These paths are also described in the prompt and provided to the environment during initialization). Under \methodname{} strategies, the starting code block is replaced with the code solution from the previous response sampled for self-iteration. 
+
+The reward function is computed by first extracting and executing the code solution from the LLM response in a sandbox environment, which produces a submission.csv file. We limit the maximum runtime to 5 minutes, as solutions for the competitions we use for this study can typically be trained in just a few minutes, and this limit prevents training from stalling due to the presence of inefficient scripts in a rollout batch. Then, \texttt{mlebench grade} is executed to provide a score $r$ based on a metric specific to each competition, e.g. AUC. To compute normalized scores that reside in $[0.0, 1.0]$, we define ranges corresponding to the worst and best score per competition and compute the reward as the normalized score as
+
+\[
+r_{\text{norm}} = \frac{r - r_{\text{worst}}}{r_{\text{best}} - r_{\text{worst}}}.
+\]
+
+As some competitions make use of error metrics like cross-entropy loss that are in principle unbounded, we clip the worst values to a reasonable finite value based on the historical submission results from human contestants for these competitions. See Table~\ref{tab:mlebench_competition_meta} for a listing of each competition score function and corresponding ranges used for reward normalization. This normalized reward is also used for self-divergence steps, while the self-improvement reward for the $k$-th iterate, $r_{k}$ is computed as the normalized difference between the new solution and previous solution iterate, where $r_k$ and $r_{k-1}$ are assumed to be normalized as described above:
+
+\[
+r_{\text{imp},k} = \max\bigg(0, \frac{r_{k} - r_{k-1}}{1 - r_{k-1}}\bigg).
+\]
+
+\subsection{Choice of hyperparameters}
+\label{app:hps}
+
+Training hyperparameters for experiments in Section~\ref{sec:experiment_results} are shown in Tables~\ref{tab:hyperparams_math} – \ref{tab:hyperparams_mlebench}. All experiments set clipping coefficient $\varepsilon = 0.2$. Except for learning rate, we use the best GRPO hyperparameters when sweeping \methodname{} hyperparameters. We evaluate using the default sampling configs fo each model on Hugging Face Hub.
+
+
+\textbf{Competition math.} We validate against a held-out set of 100 problems sampled from the MATH training dataset and sweep over learning rate in [5e-7, 1e-6, 5e-6], $\beta$ in [0.0, 0.001, 0.01], buffer size in [100, 256, 512, 1024], and self-iteration and divergence probabilities in [0.2, 0.5, 0.8].
+
+\input{figures/tables/hps_math}
+
+\textbf{Multi-turn tool-use.} We select hyperparameters for GRPO based on a 25-task validation subset held-out from the training split. The final checkpoints train on the full 100 training tasks. For \methodname{} methods, we select hyperparameters based on those producing curricula plateauing with the highest starting step during training, treating this metric as a proxy for improved robustness over preceding steps. We sweep over learning rate in [1e-7, 5e-7, 1e-6, 5e-6], $\beta$ in [0.0, 0.001, 0.01], buffer size in [100, 320, 640], and self-iteration and divergence probabilities in [0.2, 0.5, 0.8]. Choices of \# epochs, $M$, and $\alpha$ are based on \citet{bespoke_improving_multi_turn_tool_use}.
+
+\input{figures/tables/hps_bfcl}
+
+\textbf{MLE-bench.} We select hyperparameters that maximize improvement on training tasks over 16 greedy search steps and sweep over learning rate in [5e-7, 1e-6, 5e-6], $\beta$ in [0.0, 0.001, 0.01], GRPO $\alpha$ in [0.0, 0.5, 1.0], buffer size in [3, 24, 32, 64], minimum buffer size in [3, 8], and self-iteration and divergence probabilities in [0.2, 0.5, 0.8].
+
+\input{figures/tables/hps_mlebench}
+
+\clearpage
+\newpage
+
+\section{Prompts}
+\label{app:prompts}
+
+We provide the prompt templates we use for self-iteration (self-improve and self-divergence) steps. The generic self-iteration prompts are shared across math and multi-turn tool use environments, while MLE-bench makes use of a separate prompt format, which contains additional task-specific information required by this domain. For the MLE-bench prompt template, the  self-iteration task is specified by the ``goal preamble'' component of the prompt. Note that in this domain, self-improvement takes the form of a debug step when the previous solution iterate has errors (which are then included below the code block as a form of task feedback).
+
+\begin{promptbox}[title=Self-improve prompt, colbacktitle=orange!90!black, colframe=orange!90!black,
+colback=gray!5]
+\small
+\begin{verbatim}
+Improve your current response to this request:
+
+## Request:
+{instruction}
+
+## Current response:
+{previous_response}
+\end{verbatim}
+\end{promptbox}
+
+\begin{promptbox}[title=Self-diverge prompt, colbacktitle=MediumOrchid!90!black, colframe=MediumOrchid!90!black,
+colback=gray!5]
+\small
+\begin{verbatim}
+Consider your current response to this request, and provide another response that takes 
+an approach that SIGNIFICANTLY DIFFERS from the approach of the current response.
+
+## Request:
+{instruction}
+
+## Current response:
+{previous_response}
+
+## Your new response format:
+- First, provide a brief summary of the approach in the current response above.
+- Next, state a meaningfully different approach that can be taken instead.
+- Finally, provide your new response using this different approach.
+\end{verbatim}
+\end{promptbox}
+
+\begin{promptbox}[title=MLE-bench prompt, colbacktitle=black, colframe=black,
+colback=gray!5]
+\small
+\begin{verbatim}
+You are a Kaggle grandmaster.  
+Your solution to this Kaggle challenge should achieve the highest medal possible, where the medal 
+rankings from best to worst are gold, silver, and bronze.   
+Your solution is not good enough if it does not medal.  
+
+Study the current version of solution.py:
+```python
+{initial_solution}
+```{debug_info}
+
+{goal_preamble}
+
+# Task description
+
+{task_description}
+
+# Previews of files located at PUBLIC_RESOURCE_PATH:
+
+{preview_contents}
+
+Write a single file called solution.py that does the following:  
+  - Loads any relevant training data described in the task description.  
+  - Loads any relevant test data described in the task description.  
+  - It is important your code references the training and test data paths exactly as above,  
+    via these environment variables, which will already be set correctly for you.
+  - Performs any arbitrary training and evaluation logic on this data split.  
+    For example, you might hold out some subset of this data for the purposes  
+    of k-fold cross validation for model and hyperparameter selection.  
+  - Finally, evaluates the final model on the test data and writes the results  
+    to a file in the current directory called submission.csv.  
+  
+All files and directories described in the task description are located under the
+PUBLIC_RESOURCE_PATH, whose value is always available via os.environ.get('PUBLIC_RESOURCE_PATH').  
+Besides solution.py, you may not create any extra files or modify any other files in the 
+directory.  
+Remember to define all necessary functions before the `if __name__ == '__main__'` block.  
+Your code will be run on a machine with a single H100 GPU.
+
+Respond with your full working python program for this task inside triple-tick delimiters (```).
+\end{verbatim}
+\end{promptbox}
+
+\begin{promptbox}[title=MLE-bench improve goal preamble, colbacktitle=orange!90!black, colframe=orange!90!black,
+colback=gray!5]
+\small
+\begin{verbatim}
+Your goal is to improve this python script to better achieve the following task:
+\end{verbatim}
+\end{promptbox}
+
+\begin{promptbox}[title=MLE-bench debug goal preamble, colbacktitle=orange!90!black, colframe=orange!90!black,
+colback=gray!5]
+\small
+\begin{verbatim}
+Your goal is to debug this python script, so that it best achieves the following task:
+\end{verbatim}
+\end{promptbox}
+
+\begin{promptbox}[title=MLE-bench diverge goal preamble, colbacktitle=MediumOrchid!90!black, colframe=MediumOrchid!90!black,
+colback=gray!5]
+\small
+\begin{verbatim}
+Your goal is to propose a new python script that improves over this python script for the
+following task.
+Your improved script should take a radically different approach to solving the problem than the
+one taken by the current python script.
+\end{verbatim}
+\end{promptbox}
+
+\clearpage
+\newpage
+
+\section{Additional experiment results}
+\label{app:additional_results}
+
+In Figure~\ref{fig:math_llama3b_16steps_per_split}, we show the inference-time self-improvement performance over 16 steps for each test split in the competition math domain. Both \textsc{Diverge} and the full \methodname{} strategy produce improved performance across these test splits, with the exception of AIME 2025, where none of the methods perform well.
+
+As we saw in Figure~\ref{fig:diversity_summary}, \methodname{} strategies increase the effective number of distinct tasks encountered during training with respect to the curriculum-only baseline, which reduces task diversity by oversampling those task instances with higher return variance. In Table~\ref{tab:bfcl_diversity}, we see that the base task set has slightly greater pairwise embedding distances relative to the augmented task set discovered by \methodname{}, under the embedding space of the 400M parameter CodeXEmbed model. We see \methodname{} strategies are able to maintain a comparable degree of variation to the base task set while increasing the number of tasks considered for prioritized sampling.
+
+Figure~\ref{fig:mlebench_train_test_improvement_16steps} reports the mean greedy-search performance over 16 steps on the train and test competitions. Figure~\ref{fig:mlebench_improvement_16steps_per_competition} shows  greedy-search performance per competition. We see that for training competitions, the LLM policy rapidly converges to a specific solution, likely due to some degree of overfitting from directly training on the task instance, while test competitions see greater differences between initial and final solution performance after 16 greedy-search steps. The initial model is unable to effectively self-improve, and standard GRPO fine-tuning already induces some degree of self-improvement. \methodname{} strategies directly using step-level exploration further enhance the model's ability to self-improve.
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/math_llama3b_16steps.pdf}
+\caption{Net incorrect $\rightarrow$ correct improvements across all held-out math splits. Total corrections are averages computed over 8 samples per problem for each of 3 checkpoints per method, and an equivalent number of samples per problem for Llama-3.2-3B-Instruct.} 
+\label{fig:math_llama3b_16steps_per_split}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Method & Cosine dist. ($\uparrow$) & L2 dist. ($\uparrow$) \\
+    \midrule
+    Uniform       & 0.56 & 0.33 \\
+    Curriculum    & 0.56 & 0.32 \\
+    Improve       & 0.52 & 0.30 \\
+    Diverge       & 0.48 & 0.28 \\
+    \methodname{} & 0.50 & 0.29 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Mean pairwise distances computed over the training task instances used by each method.}
+  \label{tab:bfcl_diversity}
+\end{table}
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/shared_legend.pdf}
+    \vspace{0.0cm}
+    
+  \begin{subfigure}[c]{0.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/mlebench_r1_7b_improve_16steps_train.pdf}
+  \end{subfigure}
+  \begin{subfigure}[c]{0.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/mlebench_r1_7b_improve_16steps_test.pdf}
+  \end{subfigure}
+
+  \caption{Performance of models trained via each method when run in a greedy-search scaffold on the MLE-bench train (left) and test (right) competitions.}
+  \label{fig:mlebench_train_test_improvement_16steps}
+\end{figure}
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=\textwidth]{figures/mlebench_r1_7b_improve_16steps_per_competition.pdf}
+\caption{Improvement over 16 greedy-search steps using the initial model and the initial model fine-tuned using each method on train (top) and test (bottom) MLE-bench competitions.} 
+\label{fig:mlebench_improvement_16steps_per_competition}
+\end{figure}
+
+
+\newpage
+\clearpage
+
+\section{Example self-iteration steps}
+\label{app:self_iteration_examples}
+
+We provide examples of self-iteration prompts and responses encountered over the course of training via the full \methodname{} method. We see that the model can respond successively to both self-improvement and self-divergence prompts. Notably, we see in example from the tool-use domain that self-divergence can lead not only to new solution approaches, but also improvements to a previously faulty response.
+
+\lstset{basicstyle=\ttfamily\footnotesize, breaklines=true}
+
+{\footnotesize
+\input{figures/examples/math_improve}
+}
+
+{\footnotesize
+\input{figures/examples/math_diverge}
+}
+
+{\footnotesize
+\input{figures/examples/bfcl_improve}
+}
+
+{\footnotesize
+\input{figures/examples/bfcl_diverge}
+}
+
+{\footnotesize
+\input{figures/examples/mlebench_improve}
+}
+
+{\footnotesize
+\input{figures/examples/mlebench_diverge}
+}
+
+\end{document}

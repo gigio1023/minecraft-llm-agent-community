@@ -1,0 +1,133 @@
+\section{Experimental Setup: Environments and Reward Functions} \label{sec:setup}
+%We introduce our taxonomy for mapping how reward misspecification arises in the real world. We then describe the environments and how we instantiate these various misspecification in these environments. Table~\ref{} summarizes our experimental setup.
+In this section, we describe our four environments (Section~\ref{sec:environments}) and taxonomize our nine corresponding misspecified reward functions (Section~\ref{sec:misspec}).
+
+%provide a high-level overview of our experimental setup and a description of our environments.
+%To set the stage for the main results in Section~\ref{sec:measurement}, we describe our environments in Section~\ref{sec:environments} and our experimental setup in Section~\ref{sec:setup}.  %mirror real-world systems,  We briefly describe our environments and provide a high-level overview of our experimental setup.
+
+
+\subsection{Environments}\label{sec:environments}
+We chose a diverse set of environments and prioritized complexity of action space, observation space, and dynamics model. Our aim was to reflect real-world constraints in our environments, selecting ones with several desiderata that must be simultaneously balanced.  Table~\ref{tab:misspecification_summary} provides a summary. 
+
+
+
+
+%Diversity strengthens the external validity of our results, indicating that reward misspecification is indeed a recurring phenomenon. To filter for complexity, we selected environments which force policies to learn multiple behaviors or ones with non-determinism. Finally, we aimed for environments that somewhat reflect real-world systems, to better illustrate how misspecifications may arise in future RL agents. %We do not construct environments to contain reward misspecifications; we position ourselves as different stakeholders in each environment and design rewards from those perspectives. 
+
+% The compleixty aids us in studying the effect of increasing model capabilities. For example, Riverraid requires the agent to learn to maneuver around enemies, which is difficult enough that smaller policies are unable to learn it as effectively. % is  environment we ones with that had both at least two desiderata which prioritized qualitatively different policies. In contrast, the Atari game Pong \apcomm{citation here?} has only When selecting for environments, we considered diversity, %\kbcomm{Perhaps add a sentence or two here describing why an dhow we chose these particular environments. Highlight the considerations of diversity,  complex enough to be able to show qualitatively different behavior,  different reward objectives make sense, closeness to real world}
+
+\paragraph{Traffic Control.}
+The traffic environment is an autonomous vehicle (AV) simulation that models vehicles driving on different highway networks. The vehicles are either controlled by a RL algorithm or pre-programmed via a human behavioral model. Our misspecifications are listed in Table~\ref{tab:misspecification_summary}.%We create four different misspecifications. For example, in on such misspecification, the true objective is to %control the AVs to 
+%minimize the mean commute time within the highway network %given access to a highway network 
+%(see Figure~\ref{fig:main}) and the proxy reward is the mean velocity, which is the reward used in the experiments from~\citet{wu2017flow}, a widely cited RL simulator for traffic control.
+
+%For the environment, 
+We use the Flow traffic simulator, implemented by~\citet{wu2017flow} and~\citet{vinitsky2018flowbench}, which extends the popular SUMO traffic simulator~\citep{sumo2018}. The simulator uses cars that drive like humans, following the Intelligent Driver Model (IDM)~\citep{treiber2000idm}, a widely-accepted approximation of human driving behavior. Simulated drivers attempt to travel as fast as possible while tending to decelerate whenever they are too close to the car immediately in front. %maintain a fixed distance from the car immediately in front.
+
+%We modify the code from. The environment itself uses the , which models the behavior of human drivers with the widely-used Intelligent Driver Model~\citep{treiber2000idm}. Each car is controlled policy that is either the IDM or an RL policy parametrized by a neural network. We have access to the underlying highway network and traffic dynamics.
+
+The RL policy has access to observations only from the AVs it controls. For each AV, the observation space consists of the car's position, its velocity, and the position and velocity of the cars immediately in front of and behind it. The continuous control action %for the RL policy are 
+is the acceleration applied to each AV. %These are continuous valued actions in range $[-3, 3]$. \apcomm{I feel like a reader would not have good context for the range of actions. But it's also odd to add the observation space numbers.}
+Figure~\ref{fig:traffic_qualitative} depicts the \trafficm~network, where cars from an on-ramp attempt to merge onto the straightaway. %We consider the case when AVs are only on the straightaway and the case when AVs are only on the on-ramp. T
+%he other traffic scenario uses
+We also use the \trafficb~network, where cars (1-4 RL, 10-20 human) drive through a highway bottleneck where lanes decrease from four to two to one. 
+
+
+%At any given moment, there are between one to four RL cars controlled by the policy and ten to twenty human cars.  
+
+%one of the two traffic scenarios we consider. In it, cars from the on-ramp are attempting to merge onto the straightaway. We consider the case when AVs are only on the straightaway and the case when AVs are only on the on-ramp. The other traffic scenario uses the \textit{traffic-bottleneck} network, in which cars are driving through a highway bottleneck: the initial four lanes become two lanes and finally become one lane. At any given moment, there are between one to four RL cars controlled by the policy and ten to twenty human cars.  
+%\kbcomm{Can we add in a brief description of how an actual road network would look like -- typical number of control vehicles, typical number of human vehicles, number of road segments. Also I would add in how many different road networks we consider in this environment and how they differ. Since this is not an environment that people have studied extensively in RL (say as compared to Atari) I would try to add in more details about this. The same goes for COVID and glucose.}
+
+% \begin{table}[tbp]
+% \centering
+% \begin{tabular}{ccccc}
+% \toprule
+% \textbf{Envs.} &\makebox[5em]{Observations}&\makebox[5em]{Actions}&\makebox[5em]{Goals} \\
+% \midrule
+% Traffic & AV velocity / position& accelerate AVs & minimize mean commute time\\
+% COVID & testing results & adjust restrictions & economic, health, political  \\
+% Atari &  raw pixel input& move or shoot & survive, score points & \\
+% Glucose &glucose levels &administer insulin  & lower health risk, cost \\
+% \bottomrule
+% \end{tabular}
+% \caption{An overview of our environments.}
+% \label{tab:environment_summary}
+% \end{table}
+%The state transitions deterministically according to SUMO. 
+\paragraph{COVID Response.}
+The COVID environment, developed by~\citet{kompella2020pandemic}, simulates a population using the SEIR model of individual infection dynamics. The RL policymaker adjusts the severity of social distancing regulations while balancing economic health (better with lower regulations) and public health (better with higher regulations), similar in spirit to~\citet{trott2021aieconomist}. The population attributes (proportion of adults, number of hospitals) and infection dynamics (random testing rate, infection rate) are based on data from Austin, Texas.
+
+Every day, the environment simulates the infection dynamics and reports testing results to the agent, but not the true infection numbers. The policy chooses one of three discrete actions: \textsc{increase}, \textsc{decrease}, or \textsc{maintain} the current regulation stage, which directly affects the behavior of the population and indirectly affects the infection dynamics. There are five stages in total. %The state transitions according to the SEIR-infection model and population dynamics. 
+
+%The misspecification is based off of the idea that policymakers may also desire to prioritize political costs~\citep{boettke2021covidpolitical} in addition to economic and medical costs.
+
+%argue that ``overly pessimistic forecasts will grab media headlines and steer policy response" and that ``the politics of economic policy cannot be ignored". Similarly,~\citet{bartsch2020covid} use ICU usage as an approximation of direct healthcare costs of the COVID-19 pandemic.
+
+
+\paragraph{Atari Riverraid.}
+The Atari Riverraid environment is run on OpenAI Gym~\citep{brockman2016gym}. %and uses the ALE~\citep{bellemare2013ale}. 
+The agent operates a plane which flies over a river and is rewarded by destroying enemies. 
+%\kbcomm{I think these details can be pushed to the appendix, commenting them here for now. Plus atari is quite well known so we need not worry about details here.}We selected this environment because it was relatively easy to train an RL policy for using torchbeast~\citep{torchbeast2019}, a PyTorch implementation of IMPALA~\citep{espeholt2018impala}. Another reason was because we had access to the underlying RAM state~\citep{anand2019atariram}. With the RAM state, we are able to observe the position of the agent and its bullets.
+The agent observes the raw pixel input of the environment. The agent can take one of eighteen discrete actions, corresponding to either movement or shooting within the environment. %The state transitions according to the simulator. 
+
+\paragraph{Glucose Monitoring.}
+The glucose environment, implemented in~\citet{fox2020bgp}, is a continuous control problem. It extends a FDA-approved simulator~\citep{man2014diabetes} for blood glucose levels of a patient with Type 1 diabetes. The patient partakes in meals and wears a continuous glucose monitor (CGM), which gives noisy observations of the patient's glucose levels. The RL agent administers insulin to maintain a healthy glucose level.
+
+Every five minutes, the agent observes the patient's glucose levels and decides how much insulin to administer. The observation space is the previous four hours of glucose levels and insulin dosages. %The continuous control actions is the amount of insulin administered. %The state transitions deterministically according to the simulator.
+
+%The proxy reward is taken from~\citet{magni2015glucoserisk}, which adapts the medical community’s measure of glycemic risk~\citep{kovatchev2000diabetes} into a reward function to train a continuous glucose controller. The true reward is economic cost of treatment,  motivated by studies showing that low-income patients ration insulin to save money, i.e., patients may opt to emphasize monetary concerns over health concerns~\citep{herkert2019insulincost,fralick2019insulin}. 
+
+\subsection{Misspecifications}
+\label{sec:misspec}
+
+Using the above environments, we constructed nine instances of misspecified proxy rewards. To help interpret these proxies, 
+we taxonomize them as instances of misweighting, incorrect ontology, or incorrect scope. We elaborate further on this taxonimization using the traffic example from Figure~\ref{fig:main}. 
+%Following the conceptual taxonomy in Section~\ref{sec:intro}, we construct nine misspecified rewards in our environments.
+%
+% Our conceptual taxonomy of reward misspecification comprises three common ways in which human specified proxy rewards may diverge from true rewards. To understand this taxonomy, consider an example where our objective is to optimize for smooth traffic flow in a road network. This optimization typically involves rewarding high velocities (less congestion, faster commutes) and penalizing high vehicle accelerations (more emissions, rougher driving). 
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Misweighting.} Suppose that the true reward is a linear combination of commute time and acceleration (for reducing carbon emissions). Downweighting the acceleration term thus underpenalizes carbon emissions. In general, misweighting occurs when the proxy and true reward capture the same desiderata, but differ on their relative importance.
+    \item \textbf{Ontological.} Congestion could be operationalized as either high average commute time or low average vehicle velocity. In general, ontological misspecification occurs when the proxy and true reward use different desiderata to capture the same concept. 
+    \item \textbf{Scope.} If monitoring velocity over all roads is too costly, a city might instead monitor them only over highways, thus pushing congestion to local streets. In general, scope misspecification occurs when the proxy measures desiderata over a restricted domain (e.g.~time, space).  %These consists of those misspecifications which arise because of physical constraints -- reward functions measure the same metric but over different domains. As an example, if monitoring velocity over all roads is too costly, a city might instead monitor them only over highways, which may instead move congestion to local streets.
+\end{itemize}
+%\subsection{Experimental Setup}
+We include a summary of all nine tasks in  Table~\ref{tab:misspecification_summary} and provide full details in Appendix~\ref{app:measurement}. Table~\ref{tab:misspecification_summary} also indicates whether each proxy leads to misalignment (i.e.~to a policy with low true reward) and whether it leads to a phase transition (a sudden qualitative shift as model capacity increases). We investigate both of these in Section~\ref{sec:measurement}. % includes a summary of these tasks. 
+
+{\setlength{\tabcolsep}{5pt}
+\begin{table}[tbp]
+\centering
+\scalebox{0.9}{
+\begin{tabular}{cccccc}
+\toprule
+\textbf{Env.} &Type& \makebox[5em]{Objective}&Proxy & Misalign? & Transition?\\
+\midrule
+\multirow{4}{*}{Traffic} & \multirow{1}{*}{Mis.} & \multirow{4}{*}{\shortstack[l]{minimize commute \\ and accelerations}}  & \multirow{1}{*}{underpenalize acceleration} &\multirow{1}{*}{No} &\multirow{1}{*}{No}\\
+ & \multirow{1}{*}{Mis.}&  & \multirow{1}{*}{underpenalize lane changes} &\multirow{1}{*}{Yes} & \multirow{1}{*}{Yes}\\
+ & \multirow{1}{*}{Ont.} &  & \multirow{1}{*}{velocity replaces commute} &\multirow{1}{*}{Yes} & \multirow{1}{*}{Yes}\\
+ & \multirow{1}{*}{Scope} &  & \multirow{1}{*}{monitor velocity  near merge} & \multirow{1}{*}{Yes} & \multirow{1}{*}{Yes}\\
+ \midrule 
+\multirow{3}{*}{COVID} & \multirow{2}{*}{Mis.} & \multirow{3}{*}{\shortstack[l]{balance economic, \\ health, political cost}} & \multirow{2}{*}{underpenalize health cost}& \multirow{2}{*}{No} & \multirow{2}{*}{No}\\
+ & \multirow{2}{*}{Ont.} &  & \multirow{2}{*}{ignore political cost} & \multirow{2}{*}{Yes} & \multirow{2}{*}{Yes}\\
+ & & & & &\\
+ \midrule 
+\multirow{3}{*}{Atari} & \multirow{2}{*}{Mis.} & \multirow{3}{*}{\shortstack[l]{score points under\\smooth movement }}   &  \multirow{2}{*}{downweight movement}&\multirow{2}{*}{No} & \multirow{2}{*}{No}\\
+ & \multirow{2}{*}{Ont.} &  & \multirow{2}{*}{include shooting penalty}& \multirow{2}{*}{No} & \multirow{2}{*}{No}\\
+ &&&&&\\
+ \midrule 
+Glucose & Ont. & minimize health risk & risk in place of cost & Yes & No\\
+
+\bottomrule
+\end{tabular}}
+\caption{Reward misspecifications across our four environments. `Misalign' indicates whether the true reward drops and `Transition' indicates whether this corresponds to a phase transition (sharp qualitative change). We observe 5 instances of misalignment and 4 instances of phase transitions. `Mis.' is a misweighting and 'Ont.' is an ontological misspecification.}%Following the conceptual taxonomy in Table~\ref{tab:misspecification_summary}, we instantiate misspecifications shown in the Table.The conceptual An X indicates a misspecification that leads to misalignment, a Y indicates a misspecification that does not lead to misalignment, and a $*$ indicates a possible phase transition. The number of letters indicates the number of misspecifications for that environment--misspecification pair.}
+\label{tab:misspecification_summary}
+\end{table}}
+
+
+\paragraph{Evaluation protocol.} For each environment and proxy-true reward pair, we train an agent using the proxy reward and evaluate performance according to the true reward. We use PPO~\citep{schulman2017ppo} to optimize policies for the traffic and COVID environments, SAC~\citep{haarnoja2018sac} to optimize the policies for the glucose environment, and  torchbeast~\citep{torchbeast2019}, a PyTorch implementation of IMPALA~\citep{espeholt2018impala}, to optimize the policies for the Atari environment. When available, we adopt the hyperparameters (except the learning rate and network size) given by the original codebase.
+
+% For each environment-misspecification pair, we design a proxy and true reward function, as %. These are 
+% detailed in Section~\ref{sec:qualitative} and Appendix~\ref{app:measurement}. The agent optimizes the proxy reward, and we evaluate its performance against the true reward. We emphasize that the idea of a ``true" reward in these environments is not well-defined. We abuse terminology for convenience; the true reward defines a \emph{possible} goal of the reward designer, not necessarily the goal taken in practice.
+
+% We modify only the network sizes of the actor and critic policies and tune only the learning rate of the policies. 
+% \subsection{Qualitative effects of misspecification}
+% Subsection: describe the different types of reward hacking, give some interesting detail, probably defer full details to appendix

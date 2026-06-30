@@ -1,0 +1,140 @@
+\clearpage
+
+\section{Proofs of All Theorems in Section~\ref{sec:linear}}\label{app:linear}
+% whitening, V-basis, coordinate-wise application of Thm.~\ref{thm:gauss1d-main}, sum over j, etc.
+\footnotetext{Since only the most recent round of synthetic data is retained for training, this scheme is sometimes referred to as a \emph{discard workflow} in the literature (e.g.,~\citep{dey2024universality}).}
+\begin{algorithm}[H]
+\captionsetup{labelfont=bf, name=Scheme} % only affects this caption
+\caption{Iterative  Retraining with Verified Synthetic Data \protect \footnotemark}
+\label{scheme:linear_retraining}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Initial estimator $\hat{\theta}^0$ from $n_0$ real samples
+\For{$k = 0,1,2,\dots$}
+    \State \textbf{Generate:} Synthetic covariates $X^{k+1}$ are constructed (details below), and responses are generated as:
+        \[
+        Y^{k+1} = X^{k+1}\hat{\theta}^k + \xi^{k+1}, \quad 
+        \xi^{k+1}\sim \mathcal{N}(0,\sigma^2 I)
+        \]
+    \State \textbf{Verify:} Each synthetic sample $(x_i^{k+1}, y_i^{k+1})$ of $(X^{k+1}, Y^{k+1})$ is filtered by the verifier Condition~\eqref{equ:linear:verify_condition}, retaining only the verified subset $({X^{k+1}}', {Y^{k+1}}')$.
+    \State \textbf{Retrain:} A new OLS estimator is computed using only the verified data:
+        \[
+        \hat{\theta}^{k+1} = ({{X^{k+1}}'}^\top {X^{k+1}}')^{-1} {{X^{k+1}}'}^\top {Y^{k+1}}'
+        \]
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+
+Given the orthogonality of $\{v_j\}$ in the block design~\eqref{equ:linear:block_design}, the OLS estimator decomposes into a set of one-dimensional problems, each estimating the coordinate of $\theta$ along direction $v_j$.
+In particular, choosing $\{v_j\}$ as the right singular vectors of the real data matrix $X^0$ yields the cleanest interpretation, making explicit how verifier bias, synthetic sample size, and noise variance interact.
+Accordingly, the retraining procedure can be formalized as follows:
+
+\begin{algorithm}[H]
+\caption{Iterative Verifier-Guided Retraining in Linear Regression}
+\label{alg:linear_retraining}
+\begin{algorithmic}[1]
+    \State \textbf{Input:} Real data $(X^0, Y^0)$
+    \State Compute initial estimator $\hat{\theta}^0 = ({X^{0}}^\top X^0)^{-1} {X^0}^\top Y^0$
+    \State Let $X^0 = U \Sigma V^\top$ be the SVD of $X^0$, with right singular vectors $V = (v_1, \ldots, v_p)$
+    \For{$k = 0, 1, 2, \ldots$}
+        \For{$j = 1, \ldots, p$}
+            \State Construct synthetic design matrix $X^{k+1,j}$ with all rows equal to $v_j^\top$
+            \State Generate synthetic responses $Y^{k+1,j} = X^{k+1,j} \hat{\theta}^{k} + \xi^{k+1,j}$, where $\xi^{k+1,j} \sim \mathcal{N}(0, \sigma^2I)$
+            \State Apply verifier to each $(x^{k+1,j}_i, y^{k+1,j}_i)$ and retain valid samples satisfying
+            \begin{align}\label{equ:linear:verify_condition2}
+            |y_i^{k+1,j} - (x_i^{k+1,j})^\top \theta_c| \leq r \|x_i^{k+1,j}\| + \sigma_c,    
+            \end{align}
+            \State yielding $n_k$ verified samples $(x'^{k+1,j}_i, y'^{k+1,j}_i)$.
+            \State Compute one-dimensional estimator
+            \begin{align}
+            \hat{\theta}^{k+1,proj,j} =  \bar{y'}^{k+1,j}\label{equ:linear:thetak_proj}
+            \end{align}
+        \EndFor
+        \State Update overall estimator:
+        \begin{align}
+        \hat{\theta}^{k+1} = \sum_{j=1}^p v_j \hat{\theta}^{k+1,proj,j} \label{equ:linear:thetak1}
+        \end{align}
+    \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+
+
+\begin{proof}[Proof of Theorem~\ref{thm:linear:one_step}]
+
+We consider the one dimensional projection estimator of $\hat{\theta}^{1,proj,j}$ defined in \eqref{equ:linear:thetak_proj}.
+The filter condition \eqref{equ:linear:verify_condition2} is equivalent to:
+\begin{align}
+     &|\sigma\xi^{1,j}_i + v_j^\top(\hat{\theta}^0 - \theta_c)| \leq r + \sigma_c\notag\\
+\iff & y^{1,j}_i = \sigma\xi^{1,j}_i + v_j^\top\hat{\theta}^0 \in \left(-r-\frac{\sigma_c}{\sigma} + v_j^\top\theta_c,r + \frac{\sigma_c}{\sigma} + v_j^\top\theta_c\right).  \label{equ:linear:interval}
+\end{align}
+Note that $\hat{\theta}^0 \sim \mathcal{N}(\theta^\star,({X^{0}}^\top X^0)^{-1}\sigma^2)$ and $v_j$ is the $j$-th right singular vector of $X^0$, therefore $v_j^\top \hat{\theta}^0 \sim \mathcal{N}(v_j^\top \theta^\star, \sigma^2\mu^{-2}_j)$.
+Therefore, $\hat{\theta}^{1,proj,j} = \bar{y}'^{1,j}$ correspond to the verifier-filtered mean estimator of a one-dimensional Gaussian mean estimation problem with true mean $v_j^\top \theta$, variance $\sigma^2\mu^{-2}_j$ and filtering interval $\left(-r-\frac{\sigma_c}{\sigma} + v_j^\top\theta_c,r + \frac{\sigma_c}{\sigma} + v_j^\top\theta_c\right)$.
+Let
+\begin{align}
+     \alpha_j &:= \frac{-r-\sigma_c + v_j^\top(\theta_c-\theta^\star)}{\sigma}, \notag\\
+     \beta_j &:= \frac{r+\sigma_c+ v_j^\top(\theta_c-\theta^\star)}{\sigma}. \label{equ:linear:alpha_beta_j}
+\end{align}
+Under the assumption $\mu_j = \omega(\sqrt{n_0})$, there exists a constant $L>0$, such that $\mu^2_j > L n_0$ for all $j=1, \ldots, p$.
+Therefore, by Theorem~\ref{thm:gaussian:main}, there exists constant $K_j$ depending only on $\alpha_j,\beta_j$ such that if $n_1 > n_0 \geq 100$,
+\begin{align}
+     &\left| \frac{1}{\sigma^2}\mathbb{E}(\hat{\theta}^{1,proj,j}-v_j^{\top}\theta^\star)^2 - \frac{m_2(\alpha_j,\beta_j)}{n_1}- \bigg(m_1^2(\alpha_j,\beta_j) + \frac{m^2_2(\alpha_j,\beta_j)+m_3(\alpha_j,\beta_j)m_1(\alpha_j,\beta_j)}{\mu^2_j}\bigg) \right| \notag\\
+     & < K_j\left(\frac{1}{n_1n^{1/3}_0}+\frac{1}{n^{3/2}_0}\right)\label{equ:linear:bound_j}
+\end{align}
+will hold with probability at least $1-\exp(-Ln_0^{1/3})$. $m_1,m_2,m_3$ are defined in \eqref{equ:trunc_normal_standard} and \eqref{equ:trunc_normal_standard2}.
+By \eqref{equ:linear:thetak1}, we have $\hat{\theta}^{1,proj,j} =  v_j^{\top}\hat{\theta}^1$. 
+In addition, since $V = (v_1,v_2, \ldots, v_p)$ is an orthonormal matrice, we have
+\begin{align}
+      \sum_{j=1}^p \mathbb{E}(\hat{\theta}^{1,proj,j} - v_j^{\top}\theta^\star)^2= \sum_{j=1}^p \mathbb{E}(v_j^{\top}\hat{\theta}^1 - v_j^{\top}\theta^\star)^2 = \mathbb{E} ||V^\top(\hat{\theta}^1 - \theta^\star)||^2 = \mathbb{E}\|\hat{\theta}^1 - \theta^\star|^2.
+\end{align}
+Therefore, by summing over $j$ on both sides of \eqref{equ:linear:bound_j} and using simple union bound, we have
+\begin{align}
+ &\left|\frac{1}{\sigma^2}\mathbb{E}||\hat{\theta}^1 - \theta^\star||^2 - \sum_{j=1}^p \left(\underbrace{\frac{m_{2,j}}{n_1}}_{{\text{Synthetic Variance}}} + \underbrace{m^2_{1,j}+\frac{m_{1,j}m_{3,j}+m^2_{2,j}}{\mu^2_j}}_{{\text{Verification Error}}}\right)\right| < K\left(\frac{1}{n_1n^{1/3}_0}+\frac{1}{n^{3/2}_0}\right)
+ \end{align}
+ with $K = \max_{j}{K_j}$ and
+\begin{align}     
+     m_{1,j} &:= m_1(\alpha_j,\beta_j),\notag\\
+     m_{2,j} &:= m_2(\alpha_j,\beta_j),\notag\\
+     m_{3,j} &:= m_3(\alpha_j,\beta_j).\notag
+\end{align}
+
+\end{proof}
+
+
+
+\begin{proof}[Proof of Theorem~\ref{thm:linear:long_term}]
+     
+We consider the transition dynamics of $\hat{\theta}^k$ in Algorithm \ref{alg:linear_retraining}.
+Since we designed $X^{k+1,j}$ to be the rank one matrix correspond to singular vector $v_j$, therefore \eqref{equ:linear:thetak_proj} can be rewritten as
+\begin{align}
+    \hat{\theta}^{k+1,proj,j} = v_j^\top \hat{\theta}^k + \frac{\sigma}{n_k} \sum_{i=1}^{n_k} \xi'^{k+1,j}_i \label{equ:linear:thetakj2}
+\end{align}
+where $\xi'^{k+1,j}_i$ is the truncated noise term after verification. By \eqref{equ:linear:verify_condition2}, we have
+
+\begin{align}
+\xi'^{k+1,j}_i \; \text{i.i.d} \sim \mathcal{N}_{trunc}\left(-\frac{r}{\sigma}-\frac{\sigma_c}{\sigma} -v^{\top}_j\frac{\hat{\theta}^k - \theta_c}{\sigma}, \frac{r}{\sigma}+\frac{\sigma_c}{\sigma} -v^{\top}_j\frac{\hat{\theta}^k - \theta_c}{\sigma}\right).
+\end{align}
+
+We consider the rotated standardized estimator 
+\begin{align}
+\epsilon^k_j := v^{\top}_j \frac{\hat{\theta}^k-\theta_c}{\sigma} \quad \text{equivalently} \quad \epsilon^k := V^\top \frac{\hat{\theta}^k-\theta_c}{\sigma}.\notag
+\end{align}
+Since $\hat{\theta}^{k+1,proj,j} = v_j^{\top}\hat{\theta}^{k+1}$ by \eqref{equ:linear:thetak1}, \eqref{equ:linear:thetakj2} can be standardized as
+\begin{align}
+    \epsilon^{k+1}_j = \epsilon^k_j + \frac{\sum_{i=1}^{n_k} \xi'^{k+1,j}_i}{n_k}, \qquad \xi'^{k+1,j}_i \; \text{i.i.d} \sim \mathcal{N}_{trunc}\left(-\beta - \epsilon^k_j, \beta - \epsilon^k_j\right)\label{equ:linear:transition_standard}
+\end{align}
+where $\beta = \frac{r}{\sigma} + \frac{\sigma_c}{\sigma}$. We note that \eqref{equ:linear:transition_standard} is exactly the same dynamics we consider in the proof of Theorem~\ref{thm:gaussian:limit} with $\beta = -\alpha < \infty$.
+In  other words, the evolution of the iterative estimator $\epsilon^k$ is diagonal and each cordinates follows the same dynamics as the one dimensional gaussian iterative mean estimator.
+From Theorem~\ref{thm:gaussian:limit}, we known that there exists a constant $\rho < 1$ such that
+
+\begin{align}
+    \mathbb{E} \|\epsilon^k_j\|^2 \leq \rho^{2k} \mathbb{E}\|\epsilon^0_j\|^2 + \sum_{j=0}^{k-1}\frac{\rho^{2(k-j)-1}}{n_j}, \qquad j = 1,2,\ldots,p.\notag
+\end{align}
+This implies that
+\begin{align}
+    \mathbb{E} \|\hat{\theta}^k-\theta_c\|^2 \leq \rho^{2k} \mathbb{E}\|\hat{\theta}^0-\theta_c\|^2 + p\sigma^2\sum_{j=0}^{k-1}\frac{\rho^{2(k-j)-1}}{n_j}.\notag
+\end{align}     
+
+\end{proof}
+
+

@@ -1,0 +1,495 @@
+
+
+\counterwithin{figure}{section}  
+\counterwithin{table}{section}   
+
+\renewcommand{\thefigure}{\thesection.\arabic{figure}}
+\renewcommand{\thetable}{\thesection.\arabic{table}}
+
+
+\section*{Overview}
+
+The appendix includes the following sections:
+\begin{itemize}
+    \item \textbf{Section~\ref{appendix:contribution-statement}: Author Contribution Statement.}
+    \item \textbf{Section~\ref{appendix:prompts}: Implementation Details of \OurMethod.}
+    \item \textbf{Section~\ref{appendix:data-synthesis-and-training}: Implementation Details of Data Synthesis and World Model Training.}
+    \item \textbf{Section~\ref{appendix:intrinsic-eval}: Intrinsic Evaluation of World Models.} 
+    \item \textbf{Section~\ref{appendix:case-study}: Case Study.}
+\end{itemize}
+
+\section{Contribution Statement}
+\label{appendix:contribution-statement}
+\textbf{Yu Gu} conceived the project with Yu Su and developed the planning framework \OurMethod.
+He implemented the core codebase, led the design and execution of key experiments including ablation studies, and wrote the initial manuscript draft.
+He also led the public release of the resources.
+
+\textbf{Kai Zhang} led the data synthesis and world model training efforts, including the training of Dreamer-7B and domain-specific variants.
+He conducted experiments on VisualWebArena and played a major role in editing and polishing the manuscript to its final form.
+
+\textbf{Yuting Ning} led the development of the intrinsic evaluation suite and conducted experiments on Online-Mind2Web and Mind2Web-Live.
+She also contributed significantly to the final manuscript refinement.
+
+\textbf{Boyuan Zheng} contributed to the development of the planning framework, the data synthesis pipeline, and the in-domain world model training. He also provided valuable insights into the experimental design.
+
+\textbf{Orby AI team} (Cheng Chang, Sanjari Srivastava, Yanan Xie, and Peng Qi) provided large-scale compute resources and data crawling support, which were essential for scaling up the data synthesis and training pipeline. Peng Qi and Yanan Xie also provided constructive feedback throughput the project.
+
+\textbf{Yu Su} and \textbf{Huan Sun} steered the main directions throughout the project, led discussions on the planning framework and experiments, and provided funding support.
+\textbf{Yu Su} conceived the project with Yu Gu.
+
+All authors reviewed the manuscript and provided feedback.
+
+
+
+
+\section{Prompts for Four Stages in \OurMethod}
+\label{appendix:prompts}
+\subsection{Action Proposal}
+\label{appendix:action-proposal}
+\begin{tcolorbox}[colframe=green!50!black, colback=green!10!white, title=Action Proposal, breakable]
+\small 
+You are an autonomous intelligent agent tasked with navigating a web browser. You will be given web-based tasks. These tasks will be accomplished through the use of specific actions you can issue.
+
+Here's the information you'll have: \{\texttt{Web Information}\}
+
+The user's objective: \{\texttt{Task Objective}\} This is the task you're trying to complete.
+
+The current web page screenshot: \{\texttt{Web Page Screenshot Image}\} This is a screenshot of the webpage, with each interactable element assigned a unique numerical id. Each bounding box and its respective id shares the same color.
+
+The observation, which lists the IDs of all interactable elements on the current web page with their text content if any, in the format \texttt{[id][tagType][text content]}. \texttt{tagType} is the type of the element, such as button, link, or textbox. \texttt{text content} is the text content of the element. For example, \texttt{[1234][button][`Add to Cart']} means that there is a button with id 1234 and text content \texttt{`Add to Cart'} on the current web page. \texttt{[][StaticText][text]} means that the element is of some text that is not interactable.
+
+The current web page's URL: \{\texttt{Web URL}\} This is the page you're currently navigating.
+
+The open tabs: \{\texttt{Previous Tabs}\} These are the tabs you have open.
+
+The previous action: \{\texttt{Previous Action}\} This is the action you just performed. It may be helpful to track your progress.
+
+The actions you can perform fall into several categories:
+
+\smallskip
+Page Operation Actions:
+
+~~~- \texttt{click [id]}: This action clicks on an element with a specific id on the webpage.
+
+~~- \texttt{type [id] [content]}: Use this to type the content into the field with id.
+By default, the \texttt{Enter} key is pressed after typing unless \texttt{press\_enter\_after} is set to 0, \ie, \texttt{type [id] [content] [0]}.
+
+~~- \texttt{hover [id]}: Hover over an element with id.
+
+~~- \texttt{press [key\_comb]}: Simulates the pressing of a key combination on the keyboard (\eg, Ctrl+V)
+
+~~- \texttt{scroll [down]} or \texttt{scroll [up]}: Scroll the page up or down.
+
+\medskip
+
+Tab Management Actions:
+
+~~- \texttt{new\_tab}: Open a new, empty browser tab.
+
+~~- \texttt{tab\_focus [tab\_index]}: Switch the browser's focus to a specific tab using its index.
+
+~~- \texttt{close\_tab}: Close the currently active tab.
+
+\medskip
+
+URL Navigation Actions:
+
+~~- \texttt{goto [url]}: Navigate to a specific URL.
+
+~~- \texttt{go\_back}: Navigate to the previously viewed page.
+
+~~- \texttt{go\_forward}: Navigate to the next page (if a previous \texttt{go\_back} action was performed).
+
+\medskip
+
+Completion Action:
+
+~~- \texttt{stop [answer]}: Issue this action when you believe the task is complete. If the objective is to find a text-based answer, provide the answer in the bracket.
+
+\medskip
+
+Homepage:
+
+If you want to visit other websites, check out the homepage at \underline{http://homepage.com}. It has a list of websites you can visit.
+\underline{http://homepage.com/password.html} lists all the account name and password for the websites. You can use them to log in to the websites.
+
+\medskip
+
+To be successful, it is very important to follow the following rules:
+
+~~1. You should only issue an action that is valid given the current observation
+
+~~2. You should only issue one action at a time.
+
+~~3. You should follow the examples to reason step by step and then issue the next action.
+
+~~4. Generate the action in the correct format. Start with a \textit{``In summary, the next action I will perform is''} phrase, followed by action. For example, \textit{In summary, the next action I will perform is }\texttt{click [1234]}.
+
+~~5. Issue stop action when you think you have achieved the objective. Don't generate anything after stop.
+
+\end{tcolorbox}
+
+
+
+
+
+
+\subsection{Self-Refinement}
+\label{appendix:controller}
+
+
+\begin{tcolorbox}[colframe=blue!50!black, colback=blue!10!white, title=Self-Refinement, breakable]
+\small
+You are assisting a web navigation agent to help a human user navigate a website to complete a task. Given the user's intent, the action history, and the current state of the webpage, the agent has proposed a set of candidate actions to take at the current step. 
+
+\medskip
+Your role is not to determine a best action for the agent at this step, but to filter out the actions that are very likely not relevant or helpful for the agent to accomplish the task.
+
+\medskip
+Please select all actions that you think that could possibly lead the agent to accomplish the task. It's important to note that to accomplish a task, the agent will execute a sequence of actions. So the action to take at this step does not have to immediately lead to the completion of the task. You should select any action that could be relevant for the agent to take in the current state of the webpage. Try to be as thoughtful and comprehensive as you can! Don't miss any possible action. If there is one action that is clearly the best, and all other actions are clearly not very relevant, you can only select one action. Please do this sparely, since some actions may be helpful in a longer horizon. 
+
+\medskip
+An action should be included as long as it could be relevant to the task, even if it may not be the most direct action to take at this step!! Some relevant actions might seem indirect at the first glance, but could be helpful in a longer horizon. Please also include those actions.
+
+\medskip
+Please at least select one action.
+
+\bigskip
+\textbf{*IMPORTANT*}
+
+Format your response into two lines as shown below:
+
+\bigskip
+Thoughts: \texttt{<your thoughts and reasoning process>}. You must explicitly evaluate each action one by one and imagine whether it could be relevant to the task following the format: \texttt{action:... rationale:...}
+
+\medskip
+Selected actions: \texttt{id0;id1;aid2;...}
+(please return the index of the action in the candidate actions list, starting from 0. Don't output the action description itself. Separate the indices with semicolons. Do not add spaces or any other characters after the semicolons.)
+
+\bigskip
+Action History: \{\texttt{last\_actions\_str}\}
+
+\bigskip
+Current URL: \{\texttt{current\_url}\}
+
+\bigskip
+The images corresponding to the user intent are shown in the FIRST \{\texttt{len(intent\_images)}\} images (before the User Intent).
+
+\bigskip
+The last \{\texttt{len(screenshots)}\} snapshots of the agent's trajectory are shown in the LAST \{\texttt{len(screenshots)}\} images. The LAST IMAGE represents the current state of the webpage.
+
+\bigskip
+Proposed Action: \{\texttt{action\_descriptions}\}
+
+\end{tcolorbox}
+
+\subsection{World Model}
+\label{appendix:world-model}
+
+\begin{tcolorbox}[colframe=red!50!black, colback=red!10!white, title=World Model (state transition function), breakable]
+\small
+
+You are an agent that predicts the effect of an action on a webpage. You will be given a screenshot of a webpage, a sequence of actions and state changes applied to the initial screenshot, and an operation to perform on the webpage. You are required to predict the new changes that will occur on the webpage after the operation is performed, such as the appearance of new elements, the disappearance of existing elements, or changes in the content of existing elements. The operation type and the element to operate will be provided in the prompt. Directly output~~\texttt{State changes:...} and don't output anything else. Try to be as comprehensive and detailed as possible.
+
+\medskip
+Based on the initial screenshot and the changes to the webpage, please predict the changes after action: 
+
+\end{tcolorbox}
+
+\subsection{Reward Model}
+\label{appendix:reward-model}
+
+\begin{tcolorbox}[colframe=yellow!50!black, colback=yellow!10!white, title=Reward Model (\texttt{score}), breakable]
+\small
+You are an expert in evaluating the performance of a web navigation agent. The agent is designed to help a human user navigate a website to complete a task. Given the user's intent, the agent's action history, the current state of the webpage, your goal is to decide \textbf{**whether the simulated steps by the agent indicate a successful execution of the user intent**}. In particular, if the predicted state (\ie, the current state represented by the last image plus all the predicted changes so far) corresponds to a successful final state. If it is a failure but it looks like the simulated steps are on the right track towards success, you should also output as such. Note that, in the simulated steps, all the state changes are predicted by the agent's world model, and they may not actually be faithful to the real website interactions (\eg, some proposed actions may not be available in a realistic website). You should also account for this in your evaluation (\eg, if the predicted state changes are not reasonable then it's probably a failure).
+
+\medskip
+\textbf{*IMPORTANT*}
+
+\medskip
+Format your response into two lines as shown below:
+
+\medskip
+Thoughts: \texttt{<your thoughts and reasoning process>}
+
+\smallskip
+Status: \texttt{``success''} or \texttt{``failure''}
+
+\smallskip
+On the right track to success: \texttt{``yes''} or \texttt{``no''}
+
+ 
+
+
+
+
+
+\end{tcolorbox}
+
+
+
+
+
+% \newpage
+\section{Data Synthesis and World Model Training}
+% \setcounter{table}{0}
+% \setcounter{figure}{0}
+% \renewcommand{\thetable}{B\arabic{table}}
+% \renewcommand{\thefigure}{B\arabic{figure}}
+% \renewcommand{\theHfigure}{B\arabic{figure}}
+% \renewcommand{\theHtable}{B\arabic{table}}
+
+\label{appendix:data-synthesis-and-training}
+\subsection{Data Synthesis Prompt}
+
+
+\begin{table}[tbh]
+\centering
+\small
+\begin{tabular}{p{0.90\linewidth}}
+\toprule
+\textbf{Prompt Templates} \\
+\midrule
+Here is the web screenshot <image\_token>. Please describe what you would see after performing \{\texttt{action}\} on \{\texttt{element\_description}\}. \\ \midrule
+Here is the web page you are looking at <image\_token>. Please describe what you would see after doing \{\texttt{action}\} on \{\texttt{element\_description}\}. \\ \midrule
+Here is the web page you are currently at <image\_token>. Describe what you will see after \{\texttt{action}\}ing \{\texttt{element\_description}\}. \\ \midrule
+Here is the current web page <image\_token>. Briefly describe what you will see after \{\texttt{action}\}ing \{\texttt{element\_description}\}. \\ \midrule
+Below is the current screenshot <image\_token>. Briefly describe what you will see after \{\texttt{action}\}ing \{\texttt{element\_description}\}. \\ \midrule
+Below is the current screenshot <image\_token>. Describe what you will see after \{\texttt{action}\}ing \{\texttt{element\_description}\}. \\ \midrule
+Below is the current screenshot <image\_token>. Please describe what you would see after a \{\texttt{action}\} on \{\texttt{element\_description}\}. \\
+\bottomrule
+\end{tabular}
+\caption{Prompt templates used to generate language descriptions of state transitions.}
+\label{tab:prompt-templates}
+\end{table}
+
+
+In practice, we first draw a red bounding box around the target element to precisely localize it for Qwen2-VL-72B.
+Next, we prompt Qwen2-VL-72B to separately describe the element using a referring expression and to describe the resulting state change.
+Finally, we combine the referring expression and the state change description to construct the training instance, using one of the templates randomly selected from Table~\ref{tab:prompt-templates}.
+We list the prompt used to synthesize natural language descriptions of the next state below.
+
+Despite the fact that our training data includes only a few prompt templates and natural images, experiments in Section~\ref{sec:exp} have shown that the model generalizes well to unseen instruction or prompts used in benchmarks like Online-Mind2Web~\citep{m2wonline} and Mind2Web-Live~\citep{webcanvas} and to images with Set-of-Mark~\citep{yang2023set} in VisualWebArena~\citep{koh2024visualwebarena}.
+
+
+
+
+\newpage
+\begin{tcolorbox}[colframe=white!50!black, colback=white!10!white, title=Data Synthesis, breakable]
+\small
+\label{box:data-synthesis-prompt}
+
+Here are two webpage screenshots from the website \{URL\} before and after \{Action\} on the element within the red bounding box.
+
+
+\medskip
+**\textbf{Element Description:}** Please describe the element within the bounding box to ensure user can locate this element in the webpage image only use this description (only element description, not bounding box).
+
+So DO NOT say something like the element within the bounding box, DO NOT SAY anything about red bounding box.
+
+Instead, describe the element with referral expression like the button showing the text `Make Appointment' or the `Search' in the search bar.
+
+Starts with lower case and make sure the description is a noun like the element that is a category link labeled `Massage' located in the sidebar on the left side of the page.
+
+\medskip
+**\textbf{Change Description:}** Explain to the user what changes will occur on the webpage after they click on the described element. Do not say too much trivial details.
+Instead, give high-level and functional description in detail after the action.
+Focus solely on describing the changes that will happen, not the element.
+
+% \medskip
+% Based on the initial screenshot and the changes to the webpage, please predict the changes after action: 
+
+\end{tcolorbox}
+
+
+
+
+
+
+\subsection{Training Data Statistics}
+% total data num: 3160247, in 3.4, a small part of them are duplicated.
+\input{tables/appendix-action-distribution}
+As described in Section~\ref{subsec:train-world-model}, we develop a scalable pipeline to synthesize large-scale interaction data by randomly exploring web pages across a wide range of domains.
+This process results in over \textbf{3.1 million} interaction instances spanning \textbf{1.2 million unique URLs}, as summarized in Table~\ref{tab:appendix-training-data-dist}.
+We focus on four primary interaction types: \textit{click}, \textit{hover}, \textit{type}, and \textit{select}, which collectively reflect the core user intents on modern web interfaces. Clicks dominate the dataset (84\%), consistent with their central role in triggering state transitions on the web.
+Although our data synthesis pipeline initially included \textit{scroll} actions, we empirically found that they contributed little to downstream performance and thus excluded them from the final training set.
+
+Importantly, the interactions in our dataset are not restricted to initial steps but span various stages within multi-step trajectories.
+Figure~\ref{fig:action-position-stat} shows the distribution of actions by their position in the interaction sequence.
+The average position is 4.4, and a substantial portion of actions occur deeper in the trajectory.
+This distribution allows the world model to learn more informative web dynamics and have the potential to enable long-term planning.
+
+
+
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{figs/appendix-depth_distribution.pdf}
+\caption{Distribution of the step at which actions occur within multi-step trajectories. The actions used for training span across different depths, not being limited to initial steps.}
+\label{fig:action-position-stat}
+\end{figure}
+
+
+\subsection{World Model Training}
+
+All world models are fine-tuned using the Qwen2-VL-7B-Instruct~\citep{Wang2024Qwen2VL} backbone.
+To align with future state prediction, we format training examples using structured prompts, such as:
+\textit{``Here is the web screenshot. Please describe what you would see after performing \{action\} on \{element\}."}
+All experiments are conducted on 64 H100 GPUs with 80GB memory each.
+The final Dreamer-7B model is trained for up to 2 epochs over the full training dataset described above.
+We evaluate models every 1000 steps using an intrinsic evaluation metric (described later) to ensure fair and consistent model selection across settings.
+We use the DecoupledAdamW~\citep{loshchilov2018decoupled} optimizer with a learning rate of \texttt{1e-6}, $\beta_1 = 0.9$, and $\beta_2 = 0.95$.
+The learning rate follows a cosine decay schedule with 1000 warmup steps, decaying to 10\% of the base LR.
+We use a global batch size of 192 and enable mixed-precision training.
+
+For the three domain-specific world models (Classifieds, Reddit, and Shopping), we continue training from the Dreamer-7B checkpoint for one epoch using the respective in-domain datasets.
+These models follow the same training setup, except with a reduced learning rate of \texttt{5e-7} and a shorter warmup of 100 steps to ensure stable adaptation on smaller datasets.
+
+% briefly mention that rule-based eval does not work?
+
+
+
+% \newpage
+
+\section{Intrinsic Evaluation of World Models}
+% \setcounter{table}{0}
+% \setcounter{figure}{0}
+% \renewcommand{\thetable}{C\arabic{table}}
+% \renewcommand{\thefigure}{C\arabic{figure}}
+% \renewcommand{\theHfigure}{C\arabic{figure}}
+% \renewcommand{\theHtable}{C\arabic{table}}
+
+\label{appendix:intrinsic-eval}
+
+% To evaluate the model-based planning framework, we can test it on real-world web tasks. However, downstream evaluation involves many other factors (\eg, the policy model) that may influence performance other than world models.
+While downstream evaluation with real-world web tasks can provide valuable insights for the model-based planning framework, it involves many other factors (\eg, the policy model) that may influence performance other than world models.
+% Therefore, to isolate the evaluation of world models, we construct an offline intrinsic setting that is more independent while still aligning with the downstream setting.
+Therefore, to rigorously evaluate world models only, we construct an intrinsic evaluation that provides a more controlled and independent assessment while maintaining alignment with the downstream evaluation setting.
+When training our world models, we use this intrinsic evaluation for model development and checkpoint selection.
+
+\subsection{Dataset Construction}
+
+We first sample tasks from Mind2Web~\citep{mind2web} and manually annotate the trajectories that can complete the tasks as ground truths. Then, we generate deviation trajectories at different states in the ground truth trajectories and assess whether the world model can help distinguish the correct actions from incorrect actions at each state. Specifically, for each state on the ground truth trajectory, we use the ranking model in MindAct~\citep{mind2web} to select top-5 candidate elements from the webpage that align best with the task intention and current state, excluding the ground truth one. These deviation actions are then extended into full trajectories using a web agent (\ie, SeeAct~\citep{zheng2024seeact}), automatically evaluated with an LLM-as-a-judge method~\citep{pan2024autonomous}.
+% Since there may be multiple paths to complete the task, deviation actions could also lead to successful completion and cannot be considered incorrect actions. Thus, we filter out those successful trajectories and only retain deviation actions in failed trajectories as negative actions.
+Since multiple paths may lead to task completion, we filter out deviation actions on successful trajectories to alleviate false negative issue and only retain those in failed trajectories as negative actions. Using this pipeline, we construct an intrinsic evaluation dataset of 44 tasks, 141 states with deviations, and 279 deviation actions.
+
+\subsection{Evaluation Metrics}
+
+% For evaluation, we use world models to simulate the state change description and use the same scoring function in the planning framework to score each action.
+For evaluation, we use world models to simulate possible future states for each action and score them using the same scoring function in the planning framework.
+We then compute three types of metrics: \textbf{(1) pair-wise accuracy:} For each pair consisting of a ground-truth action and a deviation action within the same state, if the ground-truth action receives a score greater than or equal to the deviation action, it is counted as correct; otherwise, it is incorrect. Pair-wise accuracy is the proportion of correct pairs across the whole dataset. \textbf{(2) state-level accuracy:} Evaluates whether the world model consistently ranks the ground-truth action above all deviations within a given state. A state is considered correct only if the ground-truth action has a score greater than or equal to all its corresponding deviation actions. \textbf{(3) task-level accuracy:} Assesses the correctness of an entire task by ensuring that the world model helps correctly select ground-truth action in every state within the task. A task is considered correct only if all its states are correct according to state-level accuracy criteria.
+We use state-level accuracy as the primary metric to select the best checkpoint, which closely aligns with the downstream task forms.
+
+\subsection{Results}
+\input{tables/intrinsic_eval}
+
+Table~\ref{tab:intrinsic-eval} shows the results of the intrinsic evaluation. Our fine-tuned 7B model achieves comparable performance on task-level accuracy with GPT-4o and even outperforms GPT-4o in terms of pair-wise and state-level accuracy. The scaling trend of training world models can also be observed in intrinsic evaluation as shown in Figure~\ref{fig:intrinsic-scaling}.
+
+% \begin{wrapfigure}{r}{0.45\linewidth}
+%     \vspace{-1em}
+%     \centering
+%     \includegraphics[width=\linewidth]{figs/intrinsic_scaling_trend.pdf}
+%     \vspace{-2em}
+%     \caption{Performance on two downstream benchmarks and intrinsic evaluation w.r.t. different sizes of training data.}
+%     \label{fig:intrinsic-scaling}
+%     \vspace{-1em}
+% \end{wrapfigure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.7\linewidth]{figs/intrinsic_scaling_trend.pdf}
+\caption{Performance on two downstream benchmarks and intrinsic evaluation w.r.t. different sizes of training data.}
+\label{fig:intrinsic-scaling}
+\end{figure}
+
+
+
+For all world models we have evaluated on both intrinsic evaluation and Mind2Web-Live~\citep{webcanvas}, the Pearson correlation coefficient between task-level accuracy and task success rate is 0.8455, indicating a strong correlation between intrinsic evaluation and downstream performance. We hope our intrinsic evaluation can serve as a useful tool for advancing web world model development.
+
+% \section{Analysis on Safety Risks}
+% \label{appendix:safety}
+% As shown in Table~\ref{tab:efficiency}, \OurMethod effectively reduces environment interactions compared to tree search, potentially minimizing safety risks.
+% However, characterizing safety risks objectively and comprehensively is challenging, because no existing method can automatically classify the safety risk of an action accurately and manual analysis does not scale.
+% To address this, we pragmatically define unintended state-changing actions as dangerous. 
+% Specifically, we focus on the Shopping website from VisualWebArena and treat adding irrelevant items to the shopping cart as a risky operation.
+% Through manual analysis of 30 randomly sampled VWA shopping tasks, we find that \OurMethod adds an average of 0.6 irrelevant items per task, compared to tree search's 1.3.
+% This demonstrates a positive correlation between reduced environment interactions and reduced safety risks.
+
+
+\section{Case Study}
+\label{appendix:case-study}
+% \setcounter{table}{0}
+% \setcounter{figure}{0}
+% \renewcommand{\thetable}{D\arabic{table}}
+% \renewcommand{\thefigure}{D\arabic{figure}}
+% \renewcommand{\theHfigure}{D\arabic{figure}}
+% \renewcommand{\theHtable}{D\arabic{table}}
+
+\subsection{Error Caused by Imperfect World Model Simulation}
+\label{appendix:wm-error}
+An error case caused by imperfect world model simulation is shown in Figure~\ref{fig:wm_error}.
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{figs/wm-error-1.pdf}
+    \caption{An error case caused by imperfect world model simulation. }
+    \label{fig:wm_error}
+\end{figure*}
+
+
+\subsection{Positive Case Benefiting from World Model Simulation}
+\label{appendix:postive-case-1}
+A positive case where the simulation leads to correct action prediction is shown in Figure~\ref{fig:wm_correct}.
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{figs/positive-case-1.pdf}
+    \caption{A positive case where the simulation leads to correct action prediction.}
+    \label{fig:wm_correct}
+\end{figure*}
+
+
+% \newpage
+% \section{Limitations}
+% \label{appendix:limitations}
+% Our study, as a pioneering exploration of MPC-based planning with LLMs for web navigation, naturally comes with several limitations, which are also exciting future research directions:
+
+% \smallskip
+% \noindent
+% \textbf{Simplicity of Planning Algorithm.}
+% In this preliminary work, we deliberately employed a straightforward planning algorithm to demonstrate the core potential of our approach. While effective, this simplicity leaves ample room for future enhancements. More sophisticated planning techniques, such as Monte Carlo Tree Search (MCTS), could be integrated to further improve performance. As a foundational study, our focus was on establishing the viability of the concept rather than optimizing every aspect of the system. This strategic choice allows future research to build upon our findings and explore more advanced planning strategies within the framework we've established.  
+
+% \smallskip
+% \noindent
+% \textbf{Computational Cost.}
+% Our current implementation, utilizing state-of-the-art models like GPT-4o, incurs non-trivial API costs (approximately \$1 per task on VWA). This cost reflects our prioritization of exploring the full potential of LLM-based planning without immediate constraints. For practical applications, future work could investigate cost-effective alternatives such as fine-tuning specialized models for simulation tasks. This sets a benchmark for future optimizations that balance performance and efficiency.  
+
+% These limitations underscore the nature of our work as a proof of concept, opening up numerous avenues for future research and optimization. By establishing the foundational potential of MPC-based planning with LLMs, we have laid the groundwork for a new planning paradigm for LLM-based language agents, inviting further innovations that can refine and extend model-based planning.
+
+
+
+
+% \begin{table}
+%   \centering
+%   \scalebox{0.95}{
+%     \begin{tabular}{ll}
+%       \toprule
+%       \textbf{Action Type $a$}  & \textbf{Description} \\
+%       \midrule
+%       click [$\mathtt{elem}$] & Click on $\mathtt{elem}$. \\
+%       hover [$\mathtt{elem}$] & Hover over $\mathtt{elem}$. \\
+%       type [$\mathtt{elem}$] [$\mathtt{text}$] & Type $\mathtt{text}$ into $\mathtt{elem}$. \\
+%       press [$\mathtt{key\_comb}$] & Press a key combo. \\
+%       goto [$\mathtt{url}$] & Go to $\mathtt{url}$. \\
+%       go\_back & Click back. \\
+%       go\_forward & Click forward. \\
+%       new\_tab & Open a new tab. \\
+%       tab\_focus [$\mathtt{index}$] & Focus on the i-th tab. \\
+%       tab\_close & Close current tab. \\
+%       scroll [$\mathtt{up/down}$] & Scroll up or down. \\
+%       stop [$\mathtt{answer}$] & End with an output. \\
+%       \bottomrule
+%     \end{tabular}
+%   }
+%    \caption{Action space for web navigation defined in VisualWebArena \citep{koh2024visualwebarena}.
+%   }
+%   \label{tab:action}
+% \end{table}

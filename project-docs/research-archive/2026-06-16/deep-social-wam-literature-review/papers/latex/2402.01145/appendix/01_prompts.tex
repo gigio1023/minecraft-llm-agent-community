@@ -1,0 +1,436 @@
+\section{Prompts}\label{app: prompts}
+
+We gather prompts used for \our{} in this section. Our prompt structure is flexible and extensible. To adapt \our{} to a new problem setting, one only needs to define its problem description, function description, and function signature.
+
+\subsection{Common prompts}
+The prompt formats are given below. They are used for all COP settings.
+
+
+% \lstset{
+%     backgroundcolor = \color{yellow!10},
+%     basicstyle = \ttfamily\small,
+%     rulesepcolor= \color{white},
+%     breaklines = true,
+%     columns = fixed,
+%     captionpos = t
+% }
+
+% Note: overridden by style
+\lstset{
+    backgroundcolor=\color{gray!10},  % Light gray background
+    basicstyle=\ttfamily\tiny,       % Monospaced font
+    frame=single,                     % Adds a frame around the code
+    framerule=0.5pt,                  % Frame thickness
+    rulecolor=\color{black!30},       % Frame color
+    breaklines=true,                  % Automatic line breaking
+    breakatwhitespace=true,           % Break lines at whitespaces
+    showstringspaces=false,           % Don't show spaces in strings as special character
+    columns=flexible,                 % Column spacing
+    captionpos=t,                     % Caption position at bottom
+    abovecaptionskip=1em,             % Space above caption
+    belowcaptionskip=1em,             % Space below caption
+    % numbers=left,                     % Line numbers on the left
+    numberstyle=\tiny\color{gray},    % Style of the line numbers
+}
+
+\renewcommand{\lstlistingname}{Prompt}
+\crefname{listing}{Prompt}{Prompts}
+
+\begin{lstlisting}[caption={System prompt for generator LLM.},  label={lst: system prompt for generator LLM}, style=promptstyle]
+You are an expert in the domain of optimization heuristics. Your task is to design heuristics that can effectively solve optimization problems.
+Your response outputs Python code and nothing else. Format your code as a Python code string: "```python ... ```".    
+\end{lstlisting}
+
+\begin{lstlisting}[caption={System prompt for reflector LLM.},  label={lst: system prompt for reflector LLM}, style=promptstyle]
+You are an expert in the domain of optimization heuristics. Your task is to give hints to design better heuristics.
+\end{lstlisting}
+
+
+\begin{lstlisting}[caption={Task description.},  label={lst: task description}, style=promptstyle]
+Write a {function_name} function for {problem_description}
+{function_description}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={User prompt for population initialization.},  label={lst: user prompt for population initialization}, style=promptstyle]
+{task_description}
+
+{seed_function}
+
+Refer to the format of a trivial design above. Be very creative and give `{func_name}_v2`. Output code only and enclose your code with Python code block: ```python ... ```.
+
+{initial_long-term_reflection}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={User prompt for short-term reflection.},  label={lst: user prompt for short-term reflection}, style=promptstyle]
+Below are two {function_name} functions for {problem_description}
+{function_description}
+
+You are provided with two code versions below, where the second version performs better than the first one.
+
+[Worse code]
+{worse_code}
+
+[Better code]
+{better_code}
+
+You respond with some hints for designing better heuristics, based on the two code versions and using less than 20 words.
+\end{lstlisting}
+
+The user prompt used for short-term reflection in black-box COPs is slightly different from the one used for white-box COPs. We explicitly ask the reflector LLM to infer the problem settings and to give hints about how the node and edge attributes correlate with the black-box objective value.
+
+\begin{lstlisting}[caption={User prompt for short-term reflection on black-box COPs.},  label={lst: user prompt for short-term reflection on black-box COPs}, style=promptstyle]
+Below are two {function_name} functions for {problem_description}
+{function_description}
+
+You are provided with two code versions below, where the second version performs better than the first one.
+
+[Worse code]
+{worse_code}
+
+[Better code]
+{better_code}
+
+Please infer the problem settings by comparing two code versions and give hints for designing better heuristics. You may give hints about how edge and node attributes correlate with the black-box objective value. Use less than 50 words.
+\end{lstlisting}
+
+
+\begin{lstlisting}[caption={User prompt for crossover.},  label={lst: user prompt for crossover}, style=promptstyle]
+{task_description}
+
+[Worse code]
+{function_signature0}
+{worse_code}
+
+[Better code]
+{function_signature1}
+{better_code}
+
+[Reflection]
+{short_term_reflection}
+
+[Improved code]
+Please write an improved function `{function_name}_v2`, according to the reflection. Output code only and enclose your code with Python code block: ```python ... ```.
+\end{lstlisting}
+
+The function signature variables here are used to adjust function names with their versions, which is similar to the design in \cite{romera2023funsearch}. For example, when designing ``heuristics'', the worse code is named ``heuristics\_v0'' while the better code ``heuristics\_v1''. In \cref{lst: user prompt for elitist mutation}, the elitist code is named ``heuristic\_v1''.
+
+\begin{lstlisting}[caption={User prompt for long-term reflection.},  label={lst: user prompt for long-term reflection}, style=promptstyle]
+Below is your prior long-term reflection on designing heuristics for {problem_description}
+{prior_long-term_reflection}
+
+Below are some newly gained insights.
+{new_short-term_reflections}
+
+Write constructive hints for designing better heuristics, based on prior reflections and new insights and using less than 50 words.
+\end{lstlisting}
+
+\begin{lstlisting}[caption={User prompt for elitist mutation.},  label={lst: user prompt for elitist mutation}, style=promptstyle]
+{task_description}
+
+[Prior reflection]
+{long-term_reflection}
+
+[Code]
+{function_signature1}
+{elitist_code}
+
+[Improved code]
+Please write a mutated function `{function_name}_v2`, according to the reflection. Output code only and enclose your code with Python code block: ```python ... ```.
+\end{lstlisting}
+
+\subsection{Problem-specific prompt components}
+
+Problem-specific prompt components are given below.
+\begin{itemize}
+    \item Problem descriptions of all COP settings are given in \cref{tab: problem descriptions}.
+    \item The function descriptions of all COP settings are presented in \cref{tab: function descriptions}. The descriptions crafted for black-box settings avoid disclosing any information that could link to the original COP.
+    \item The function signatures are gathered in \cref{lst: function signatures used in reevo}.
+    \item The seed functions are shown in \cref{lst: seed heuristics used for reevo}. The seed function used for TSP\_constructive is drawn from \cite{liu2023algorithm_evolution}. The seed functions used for black-box ACO settings are expert-designed heuristics \cite{skinderowicz2022_aco_tsp_human_bl, cai2022_aco_cvrp_human_bl, sohrabi2021_aco_op_human_bl, fidanova2020_aco_mkp_human_bl, levine2004_aco_bpp_human_bl}, while those used for while-box ACO settings are trivial all-ones matrices.
+    \item The initial long-term reflections for some COP settings are presented in \cref{lst: initial long-term reflections}, while are left empty for the others.
+\end{itemize}
+
+
+    % language=Python,
+    % basicstyle=\tiny\ttfamily, 
+    % breaklines=true, 
+    % emphstyle=\bfseries\color{Rhodamine},
+    % commentstyle=\itshape\color{black!50!white},
+    % stringstyle=\color{deepgreen},
+    % keywordstyle=\ttfamily\color{deepblue},
+    % columns=flexible
+    
+\begin{lstlisting}[caption={Function signatures used in \our{}.},  label={lst: function signatures used in reevo}, style=promptcodestyle, language=Python]
+# TSP_NCO
+def heuristics(distance_matrix: torch.Tensor) -> torch.Tensor:
+
+# CVRP_NCO
+def heuristics(distance_matrix: torch.Tensor, demands: torch.Tensor) -> torch.Tensor:
+
+# DPP_GA_crossover
+def crossover(parents: np.ndarray, n_pop: int) -> np.ndarray:
+
+# DPP_GA_mutation
+def mutation(population: np.ndarray, probe: int, prohibit: np.ndarray, size: int=100) -> np.ndarray:
+
+# TSP_GLS
+def heuristics(distance_matrix: np.ndarray) -> np.ndarray:
+
+# TSP_ACO
+def heuristics(distance_matrix: np.ndarray) -> np.ndarray:
+
+# CVRP_ACO
+def heuristics(distance_matrix: np.ndarray, coordinates: np.ndarray, demands: np.ndarray, capacity: int) -> np.ndarray:
+
+# OP_ACO
+def heuristics(prize: np.ndarray, distance: np.ndarray, maxlen: float) -> np.ndarray:
+
+# MKP_ACO
+def heuristics(prize: np.ndarray, weight: np.ndarray) -> np.ndarray:
+
+# BPP_ACO
+def heuristics(demand: np.ndarray, capacity: int) -> np.ndarray:
+
+# TSP_ACO (black-box)
+def heuristics(edge_attr: np.ndarray) -> np.ndarray:
+
+# CVRP_ACO (black-box)
+def heuristics(edge_attr: np.ndarray, node_attr: np.ndarray) -> np.ndarray: # For simplicity, we omit `coordinates` and `capacity` after using capacity to normalize demands, i.e. node_attr
+
+# OP_ACO (black-box)
+def heuristics(node_attr: np.ndarray, edge_attr: np.ndarray, node_constraint: float) -> np.ndarray:
+
+# MKP_ACO (black-box)
+def heuristics(item_attr1: np.ndarray, item_attr2: np.ndarray) -> np.ndarray:
+
+# BPP_ACO (black-box)
+def heuristics(node_attr: np.ndarray, node_constraint: int) -> np.ndarray:
+
+# TSP_constructive
+def select_next_node(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+\end{lstlisting}
+
+
+\begin{lstlisting}[
+caption={Seed heuristics used for \our{}.},
+label={lst: seed heuristics used for reevo}, style=promptcodestyle, language=Python]
+# TSP_NCO
+def heuristics(distance_matrix: torch.Tensor) -> torch.Tensor:
+    distance_matrix[distance_matrix == 0] = 1e5
+    K = 100
+    # Compute top-k nearest neighbors (smallest distances)
+    values, indices = torch.topk(distance_matrix, k=K, largest=False, dim=1)
+    heu = -distance_matrix.clone()
+    # Create a mask where topk indices are True and others are False
+    topk_mask = torch.zeros_like(distance_matrix, dtype=torch.bool)
+    topk_mask.scatter_(1, indices, True)
+    # Apply -log(d_ij) only to the top-k elements
+    heu[topk_mask] = -torch.log(distance_matrix[topk_mask])
+    return heu
+
+# CVRP_NCO
+def heuristics(distance_matrix: torch.Tensor, demands: torch.Tensor) -> torch.Tensor:
+    return torch.zeros_like(distance_matrix)
+
+# DPP_GA_crossover
+def crossover(parents: np.ndarray, n_pop: int) -> np.ndarray:
+    n_parents, n_decap = parents.shape
+    # Split genomes into two halves
+    left_halves = parents[:, :n_decap // 2]
+    right_halves = parents[:, n_decap // 2:]
+    # Create parent pairs
+    parents_idx = np.stack([np.random.choice(range(n_parents), 2, replace=False) for _ in range(n_pop)])
+    parents_left = left_halves[parents_idx[:, 0]]
+    parents_right = right_halves[parents_idx[:, 1]]
+    # Create offspring
+    offspring = np.concatenate([parents_left, parents_right], axis=1)
+    return offspring
+
+# DPP_GA_mutation
+def mutation(population: np.ndarray, probe: int, prohibit: np.ndarray, size: int=100) -> np.ndarray:
+    n_pop, n_decap = population.shape
+    for i in range(n_pop):
+        ind = population[i]
+        unique_actions = np.unique(population[i])
+        if len(unique_actions) < n_decap:
+            # Find the indices wherein the action is taken the second time
+            dup_idx = []
+            action_set = set()
+            for j, action in enumerate(ind):
+                if action in action_set:
+                    dup_idx.append(j)
+                action_set.add(action)
+
+            # Mutate the duplicated actions
+            infeasible_actions = np.concatenate([prohibit, [probe], unique_actions])
+            feasible_actions = np.setdiff1d(np.arange(size), infeasible_actions)
+            assert n_decap - len(unique_actions) == len(dup_idx)
+            new_actions = np.random.choice(feasible_actions, len(dup_idx), replace=False)
+            ind[dup_idx] = new_actions
+    return population
+
+# TSP_GLS
+def heuristics(distance_matrix: np.ndarray) -> np.ndarray:
+    return distance_matrix
+
+# TSP_ACO
+def heuristics(distance_matrix: np.ndarray) -> np.ndarray:
+    return 1 / distance_matrix
+
+# CVRP_ACO
+def heuristics(distance_matrix: np.ndarray, coordinates: np.ndarray, demands: np.ndarray, capacity: int) -> np.ndarray:
+    return 1 / distance_matrix
+
+# OP_ACO
+def heuristics(prize: np.ndarray, distance: np.ndarray, maxlen: float) -> np.ndarray:
+    return prize[np.newaxis, :] / distance
+
+# MKP_ACO
+def heuristics(prize: np.ndarray, weight: np.ndarray) -> np.ndarray:
+    return prize / np.sum(weight, axis=1)
+
+# BPP_ACO
+def heuristics(demand: np.ndarray, capacity: int) -> np.ndarray:
+    return np.tile(demand/demand.max(), (demand.shape[0], 1))
+
+# TSP_ACO (black-box)
+def heuristics(edge_attr: np.ndarray) -> np.ndarray:
+    return np.ones(edge_attr.shape[0])
+
+# CVRP_ACO (black-box)
+def heuristics(edge_attr: np.ndarray, node_attr: np.ndarray) -> np.ndarray:
+    return np.ones_like(edge_attr)
+
+# OP_ACO (black-box)
+def heuristics(node_attr: np.ndarray, edge_attr: np.ndarray, edge_constraint: float) -> np.ndarray:
+    return np.ones_like(edge_attr)
+
+# MKP_ACO (black-box)
+def heuristics(item_attr1: np.ndarray, item_attr2: np.ndarray) -> np.ndarray:
+    n, m = item_attr2.shape
+    return np.ones(n,)
+
+# BPP_ACO (black-box)
+def heuristics(node_attr: np.ndarray, node_constraint: int) -> np.ndarray:
+    n = node_attr.shape[0]
+    return np.ones((n, n))
+
+# TSP_constructive
+def select_next_node(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    threshold = 0.7
+    c1, c2, c3, c4 = 0.4, 0.3, 0.2, 0.1
+    scores = {}
+    for node in unvisited_nodes:
+        all_distances = [distance_matrix[node][i] for i in unvisited_nodes if i != node]
+        average_distance_to_unvisited = np.mean(all_distances)
+        std_dev_distance_to_unvisited = np.std(all_distances)
+        score = c1 * distance_matrix[current_node][node] - c2 * average_distance_to_unvisited + c3 * std_dev_distance_to_unvisited - c4 * distance_matrix[destination_node][node]
+        scores[node] = score
+    next_node = min(scores, key=scores.get)
+    return next_node
+\end{lstlisting}
+
+
+\begin{lstlisting}[caption={Initial long-term reflections},  label={lst: initial long-term reflections}, style=promptstyle]
+# White-box COP_ACO
+- Try combining various factors to determine how promising it is to select a solution component.
+- Try sparsifying the matrix by setting unpromising elements to zero.
+
+# TSP_constructive
+- Try look-ahead mechanisms.
+\end{lstlisting}
+
+
+
+% Create a table of problem descriptions of all problems
+\begin{table}[!thp]
+    \small
+    \centering
+    \caption{Problem descriptions used in prompts.}
+    \begin{tabular}{l|p{10cm}}
+    \toprule
+    \multicolumn{1}{c|}{Problem} & \multicolumn{1}{c}{Problem description} \\ \midrule
+    TSP\_NCO &  Assisting in solving the Traveling Salesman Problem (TSP) with some prior heuristics. TSP requires finding the shortest path that visits all given nodes and returns to the starting node. \\ \midrule
+    CVRP\_NCO & Assisting in solving Capacitated Vehicle Routing Problem (CVRP) with some prior heuristics. CVRP requires finding the shortest path that visits all given nodes and returns to the starting node. Each node has a demand and each vehicle has a capacity. The total demand of the nodes visited by a vehicle cannot exceed the vehicle capacity. When the total demand exceeds the vehicle capacity, the vehicle must return to the starting node. \\ \midrule
+    DPP\_GA &  Assisting in solving black-box decap placement problem with genetic algorithm. The problem requires finding the optimal placement of decaps in a given power grid. \\ \midrule
+    TSP\_GLS & Solving Traveling Salesman Problem (TSP) via guided local search. TSP requires finding the shortest path that visits all given nodes and returns to the starting node. \\
+    \midrule
+    TSP\_ACO & Solving Traveling Salesman Problem (TSP) via stochastic solution sampling following "heuristics". TSP requires finding the shortest path that visits all given nodes and returns to the starting node. \\ \midrule
+    TSP\_ACO\_black-box & Solving a black-box graph combinatorial optimization problem via stochastic solution sampling following "heuristics". \\
+    \midrule
+    CVRP\_ACO & Solving Capacitated Vehicle Routing Problem (CVRP) via stochastic solution sampling. CVRP requires finding the shortest path that visits all given nodes and returns to the starting node. Each node has a demand and each vehicle has a capacity. The total demand of the nodes visited by a vehicle cannot exceed the vehicle capacity. When the total demand exceeds the vehicle capacity, the vehicle must return to the starting node. \\ \midrule
+    CVRP\_ACO\_black-box & Solving a black-box graph combinatorial optimization problem via stochastic solution sampling following "heuristics".\\
+    \midrule
+    OP\_ACO & Solving Orienteering Problem (OP) via stochastic solution sampling following "heuristics". OP is an optimization problem where the goal is to find the most rewarding route, starting from a depot, visiting a subset of nodes with associated prizes, and returning to the depot within a specified travel distance. \\ \midrule
+    OP\_ACO\_black-box & Solving a black-box graph combinatorial optimization problem via stochastic solution sampling following "heuristics".\\
+    \midrule
+    MKP\_ACO & Solving Multiple Knapsack Problems (MKP) through stochastic solution sampling based on "heuristics". MKP involves selecting a subset of items to maximize the total prize collected, subject to multi-dimensional maximum weight constraints.\\ \midrule
+    MKP\_ACO\_black-box & Solving a black-box combinatorial optimization problem via stochastic solution sampling following "heuristics". \\
+    \midrule
+    BPP\_ACO & Solving Bin Packing Problem (BPP). BPP requires packing a set of items of various sizes into the smallest number of fixed-sized bins. \\ \midrule
+    BPP\_ACO\_black-box & Solving a black-box combinatorial optimization problem via stochastic solution sampling following "heuristics".\\ \midrule
+    TSP\_constructive & Solving Traveling Salesman Problem (TSP) with constructive heuristics. TSP requires finding the shortest path that visits all given nodes and returns to the starting node. \\
+    \bottomrule
+    \end{tabular}
+    \label{tab: problem descriptions}
+\end{table}
+
+
+\small{
+\begin{longtable}{l|p{10cm}}
+    \caption{Function descriptions used in prompts.}\label{tab: function descriptions}\\
+    
+    \toprule
+    \multicolumn{1}{c|}{Problem} & \multicolumn{1}{c}{Function description} \\ 
+    \midrule
+    \endfirsthead
+    
+    \multicolumn{2}{c}%
+    {{Table \thetable\ continued from previous page}} \\
+    \toprule
+    \multicolumn{1}{c|}{Problem} & \multicolumn{1}{c}{Function description} \\ 
+    \midrule
+    \endhead
+    
+    \midrule
+    \multicolumn{2}{r}{{Continued on next page}} \\ \bottomrule
+    \endfoot
+    
+    \bottomrule
+    \endlastfoot
+    
+    TSP\_NCO & The `heuristics` function takes as input a distance matrix and returns prior indicators of how bad it is to include each edge in a solution. The return is of the same shape as the input. The heuristics should contain negative values for undesirable edges and positive values for promising ones. Use efficient vectorized implementations. \\ \midrule
+    CVRP\_NCO & The `heuristics` function takes as input a distance matrix (shape: n by n) and a vector of customer demands (shape: n), where the depot node is indexed by 0 and the customer demands are normalized by the total vehicle capacity. It returns prior indicators of how promising it is to include each edge in a solution. The return is of the same shape as the distance matrix. The heuristics should contain negative values for undesirable edges and positive values for promising ones. Use efficient vectorized implementations. \\ \midrule
+    DPP\_GA\_crossover &  The `crossover` function takes as input a 2D NumPy array parents and an integer n\_pop. The function performs a genetic crossover operation on parents to generate n\_pop offspring. Use vectorized implementation if possible. \\ \midrule
+    DPP\_GA\_mutation & The `mutation` function modifies a given 2D population array to ensure exploration of the genetic algorithm. You may also take into account the feasibility of each individual. An individual is considered feasible if all its elements are unique and none are listed in the prohibited array or match the probe value. Use a vectorized implementation if possible.\newline
+    The function takes as input the below arguments:\newline
+    - population (np.ndarray): Population of individuals; shape: (P, n\_decap). \newline
+    - probe (int): Probe value; each element in the population should not be equal to this value. \newline
+    - prohibit (np.ndarray): Prohibit values; each element in the population should not be in this set. \newline
+    - size (int): Size of the PDN; each element in the population should be in the range [0, size).  
+    \\ \midrule
+    TSP\_GLS &  The `heuristics` function takes as input a distance matrix, and returns prior indicators of how bad it is to include each edge in a solution. The return is of the same shape as the input. \\
+    \midrule
+    TSP\_ACO &  The `heuristics` function takes as input a distance matrix, and returns prior indicators of how promising it is to include each edge in a solution. The return is of the same shape as the input.\\ 
+    \midrule
+    TSP\_ACO\_black-box &  The `heuristics` function takes as input a matrix of edge attributes with shape `(n\_edges, n\_attributes)`, where `n\_attributes=1` in this case. It computes prior indicators of how promising it is to include each edge in a solution. The return is of the shape of `(n\_edges,)`. \\
+    \midrule
+    CVRP\_ACO & The `heuristics` function takes as input a distance matrix (shape: n by n), Euclidean coordinates of nodes (shape: n by 2), a vector of customer demands (shape: n), and the integer capacity of vehicle capacity. It returns prior indicators of how promising it is to include each edge in a solution. The return is of the same shape as the distance matrix. The depot node is indexed by 0. \\ 
+    \midrule
+    CVRP\_ACO\_black-box & The `heuristics` function takes as input a matrix of edge attributes (shape: n by n) and a vector of node attributes (shape: n). A special node is indexed by 0. `heuristics` returns prior indicators of how promising it is to include each edge in a solution. The return is of the same shape as the input matrix of edge attributes.  \\
+    \midrule
+    OP\_ACO & Suppose `n` represents the number of nodes in the problem, with the depot being the first node. The `heuristics` function takes as input a `prize` array of shape (n,), a `distance` matrix of shape (n,n), and a `max\_len` float which is the constraint to total travel distance, and it returns `heuristics` of shape (n, n), where `heuristics[i][j]` indicates the promise of including the edge from node \#i to node \#j in the solution. \\ 
+    \midrule
+    OP\_ACO\_black-box & The `heuristics` function takes as input a vector of node attributes (shape: n), a matrix of edge attributes (shape: n by n), and a constraint imposed on the sum of edge attributes. A special node is indexed by 0. `heuristics` returns prior indicators of how promising it is to include each edge in a solution. The return is of the same shape as the input matrix of edge attributes.  \\
+    \midrule
+    MKP\_ACO & Suppose `n` indicates the scale of the problem, and `m` is the dimension of weights each item has. The constraint of each dimension is fixed to 1. The `heuristics` function takes as input a `prize` of shape (n,), a `weight` of shape (n, m), and returns `heuristics` of shape (n,). `heuristics[i]` indicates how promising it is to include item i in the solution.\\ 
+    \midrule
+    MKP\_ACO\_black-box &  Suppose `n` indicates the scale of the problem, and `m` is the dimension of some attributes each involved item has. The `heuristics` function takes as input an `item\_attr1` of shape (n,), an `item\_attr2` of shape (n, m), and returns `heuristics` of shape (n,). `heuristics[i]` indicates how promising it is to include item i in the solution.\\
+    \midrule
+    BPP\_ACO & Suppose `n` represents the number of items in the problem. The heuristics function takes as input a `demand` array of shape (n,) and an integer as the capacity of every bin, and it returns a `heuristics` array of shape (n,n). `heuristics[i][j]` indicates how promising it is to put item i and item j in the same bin. \\ 
+    \midrule
+    BPP\_ACO\_black-box & Suppose `n` represents the scale of the problem. The heuristics function takes as input an `item\_attr` array of shape (n,) and an integer as a certain constraint imposed on the item attributes. The heuristics function returns a `heuristics` array of shape (n, n). `heuristics[i][j]` indicates how promising it is to group item i and item j.\\
+    \midrule
+    TSP\_constructive & The select\_next\_node function takes as input the current node, the destination node, a set of unvisited nodes, and a distance matrix, and returns the next node to visit.\\ 
+    \bottomrule
+    \end{longtable}
+}

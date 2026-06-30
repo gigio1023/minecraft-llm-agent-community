@@ -1,0 +1,63 @@
+\vspace{-0.5em}
+\section{Method}
+\vspace{-0.25em}
+
+We introduce the Self-Improving Loop for Visual Robotic Planning (SILVR), in which a video generative model initially trained on a general set of in-domain demonstrations iteratively improves its visual planning performance for a particular task of interest in a self-adaptive manner. In Section~\ref{sec:method_probadap}, we describe how a small in-domain video model can be integrated with a generally pretrained text-to-video model to produce a strong, generalizable in-domain visual planner for real-world visual settings.  Finally, in Section~\ref{sec:sail}, we demonstrate how SILVR bootstraps an in-domain video model into a high-performing visual planner for solving a novel robotic control task through iteratively fine-tuning on self-collected experience.
+
+\subsection{Video Models as Visual Planners}
+\label{sec:method_visual_planner}
+Synthesizing a visual plan in imagination and then executing it by converting it into actions is an intuitive and effective way to utilize video generative models for decision making.  Prior work has applied text-guided video generation successfully for task planning~\citep{du2024learning, du2024video, ajaj2023hip, luo2025solving}, across a variety of robot configurations and environment settings.
+
+
+Specifically, we base our implementation on the UniPi framework~\citep{du2024learning}, in which a text-to-video model is used to synthesize a text-conditioned sequence of future frames as a task plan.  To physically realize the plan, we use a separately trained inverse dynamics model (IDM) to translate consecutive pairs of visual frames into executable robotic actions, which are then directly performed in interaction with the environment.  Visual planning offers the practitioner flexible computational tradeoffs; at a high level, replanning often incurs high computational cost but generally increases accurate plan following, whereas replanning infrequently is cheap but may suffer from error compounding.
+In this work, we focus on how such a video generative model can generalize and self-adapt to a novel task of interest through online self-collected experience.
+
+\begin{figure}[t]
+\begin{minipage}{\linewidth}
+\begin{algorithm}[H]
+    \caption{Self-Improving Loops for Visual Robotic Planning (SILVR)}
+    \label{algo:sail_pseudocode}
+    \hspace*{\algorithmicindent} \textbf{Input:} Initial in-domain video model $\epsilon_{\theta}$, Inverse dynamics model $f_{\text{IDM}}$, Frozen internet-pretrained video prior $\epsilon_{\text{general}}$, Number of iterations $K$, Number of rollouts per iteration $N$, Environment $\texttt{env}$, Task prompt $g$, In-domain initial training data $\mathcal{D}_{\text{ini}}$, Data filter $f_{r}$ \\
+    \hspace*{\algorithmicindent} \textbf{Output:} Self-improved in-domain video model $\hat{\epsilon}_{\theta}$, Optional distilled policy $\pi$
+    \begin{algorithmic}[1]
+        \State $\hat{\epsilon}_{\theta} \gets \epsilon_{\theta}$
+        \State $\mathcal{D} \gets \mathcal{D}_{\text{ini}}$ or $\phi$\Comment{Initialize finetuning data with $\mathcal{D}_{\text{ini}}$ or an empty set}
+        \For{$i = 1,...,K$}
+        \State $\mathcal{D}_{\text{self}} \gets \phi$
+        \State $\tilde{\epsilon} \gets \texttt{Adaptation}(\hat{\epsilon}_{\theta}, \epsilon_{\text{general}}, g)$
+            \For{$j = 1,..., N$}
+                \State $\texttt{env.reset}(g)$
+                \State $\mathcal{D}_{\text{self}} \gets$ $\mathcal{D}_{\text{self}}$ $\cup$ $f_{r}(\texttt{Visual\_Planning\_Rollout}(\texttt{env}$, $\tilde{\epsilon}$, $f_{\text{IDM}}$)) %
+            \EndFor
+        \State $\mathcal{D} \gets \mathcal{D} \cup \mathcal{D}_{\text{self}}$ 
+        \State Finetune in-domain model $\hat{\epsilon}_{\theta}$ with accumulated data $\mathcal{D}$\Comment{$f_{\text{IDM}}$ can be optionally finetuned}
+        \EndFor
+        \State Optionally distill $\hat{\epsilon}_{\theta}$ into a lightweight policy $\pi$
+        \State \textbf{return} $\hat{\epsilon}_{\theta}$, $\pi$
+    \end{algorithmic}
+\end{algorithm}
+\end{minipage}
+\end{figure}
+
+
+\subsection{Inverse Probabilistic Adaptation}
+\label{sec:method_probadap}
+Prior work~\citep{luo2025solving} has investigated how in-domain demonstration data can best be integrated with large-scale pretrained video models for generalizable visual planning; in this work we leverage similar insights to successfully integrate on-the-fly experience into visual planners for iterative self-improvement.  Inverse Probabilistic Adaptation~\citep{luo2025solving, yang2023probabilistic} (IPA) is a training-free approach that adapts generally pretrained text-to-video models for domain-specific video generation.  To perform adaptation, the score predicted by an in-domain video model $\epsilon_{\theta}$ trained on a small sample of demonstrations is composed with the score prediction of a web-scale pretrained model $\epsilon_{\text{general}}$ during the sampling procedure, as depicted in the function below:
+\begin{align}
+    \tilde{\epsilon}_{\text{inv}} = \epsilon_{\text{general}}(\tau_t, t) + \alpha\Big(\epsilon_{\text{general}}(\tau_t, t \mid \text{text}) + \gamma \epsilon_{\theta}(\tau_t, t \mid \text{text}) - \epsilon_{\text{general}}(\tau_t, t)\Big)
+    \label{eq:inv_probadap}
+\end{align}
+where $\gamma$ is the prior strength, and $\alpha$ is the guidance scale of text-conditioning.  Intuitively, the small in-domain text-to-video model serves as a probabilistic knowledge prior that guides the generation process of the small in-domain model during sampling.  Prior work~\citep{luo2025solving} has found that a visual planner constructed through IPA exhibits both strong generalization capability and in-domain understanding; it is able to synthesize performant visual plans that appear in-domain even for novel tasks unseen during video model training.  This may stem from the fact that IPA utilizes the large-scale pretrained model, which inherently has stronger text-conditioned generalization, as the main denoiser. While \citet{luo2025solving} based their conclusions on experiments in simulated environments, we believe the true promise of web-scale pretrained models lies in their powerful prior for real-world generalization scenarios, as demonstrated by our Panda arm object manipulation evaluations.
+
+
+\subsection{Self-Improving Loops for Visual Robotic Planning}
+\label{sec:sail}
+
+For visual planning approaches, task performance is fundamentally a fixed function of the video models used, and by extension, the data observed.  Even when utilizing IPA, which can improve text-conditioned generalization to novel tasks by effectively increasing the amount of offline data utilized to internet-scale, performance is set after adaptation.  As a result, in this paper, we wish to design agents that can not only leverage offline data as a helpful prior for generalization, but also extend beyond it to continuously improve from self-collected online experience data.
+
+We therefore propose \textbf{Self-Improving Loops for Visual Robotic Planning (SILVR)}, a framework that combines offline data with online experience to create a visual planner that iteratively improves for a particular task of interest.  SILVR is initialized with an in-domain video model $\epsilon_{\theta}$ pre-trained on a set of task demonstrations within the environment.  In each iteration, the in-domain video model is optionally integrated with a large-scale pretrained video model $\epsilon_{\text{general}}$ through IPA.  The video model is utilized as a visual planner to interact with the environment and solve tasks not necessarily observed in the initial training stage; in SILVR, the trajectories collected through this interaction are used for further finetuning of the in-domain video model (as shown in Algorithm~\ref{algo:sail_pseudocode}).  As the in-domain model adapts to its own self-collected experience from deployment on a novel task, it improves its ability to solve that particular task over time.  In this way, SILVR iteratively bootstraps an in-domain video model into a strong visual planner for a novel task of interest through a self-adapting improvement cycle.
+
+We demonstrate that the visual planning approach enables strong self-improvement in a virtuous loop in a sample efficient manner, compared to reinforcement learning finetuning of behavior cloning models.  We further stress-test our framework through ablations, and demonstrate that ground-truth human-defined reward functions can be replaced with an automated VLM success signal without inhibiting iterative self-improvement from occurring, and that SILVR can handle suboptimal initial data quality
+We find that SILVR is a robust approach for iteratively adapting to a task through effective utilization of both offline data and online experience, and reduces requirements on human-supplied components both in terms of feedback and demonstration quality.
+
+Whereas visual planning demonstrates strong self-improvement capabilities, and can flexibly integrate in benefits from large-scale pretrained video models, it can be slow in execution compared to direct policy approaches.  However, after applying SILVR, the final video planning components can be distilled into a lightweight policy through behavior cloning for future inference.  We demonstrate in our experiments that such a final distilled policy achieves higher performance than applying self-improvement techniques to such a policy from the start, and can even demonstrate slight improvement over the final performance of the visual planner teacher.  Thus, SILVR enables a successful balance between visual planning for improved and sample-efficient utilization of online experience, and a lightweight distilled policy for reactive inference during deployment.

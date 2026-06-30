@@ -1,0 +1,63 @@
+\section{The Agent-Computer Interface}
+\label{sec:aci}
+An LM acts as an agent when it interacts with an environment by iteratively taking actions and receiving feedback~\citep{sumers2023cognitive,yao2023react}.
+Typically, the environment has hard constraints, as in robotics, where agents control actuators in the physical world.
+On the other hand, digital environments can be molded by abstractions in the form of application programming interfaces and user interfaces for software and humans respectively.
+Naturally, existing interfaces have been designed with one of these users in mind.
+We argue that LM agents represent a new category of end user, with their own needs and abilities.
+We refer to the interface LM agents use to interact with computers as the \textit{agent-computer interface} (ACI).
+Figure~\ref{fig:aci-hci} illustrates how ACIs provide LM agents with important functionality to interface with computers, similar to how code editors also help humans use computers more effectively.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/aci-ui.pdf}
+    \caption{
+    Specialized applications like IDEs (e.g., VSCode, PyCharm) make scientists and software engineers more efficient and effective at computer tasks.
+    Similarly, ACI design aims to create a suitable interface that makes LM agents more effective at digital work such as software engineering.
+    }
+    \label{fig:aci-hci}
+\end{figure}
+
+Disparities in humans' and LMs' abilities and limitations motivates different interface design guidelines.
+For instance, the current generation of LMs lack the visual understanding abilities to directly operate GUI-based applications with rich visual components and signals.
+However, many of the features provided by these applications, such as syntax checking and navigation tools, could be useful to LM agents if they were presented in a suitable manner. 
+Additionally, humans can flexibly ignore unnecessary information, whereas all content has a fixed cost in memory and computation for LMs and distracting context can harm performance~\cite{liu2023lost}.
+Therefore, LM agents may be more effective at interacting with computers when provided an interface that was built informed by these differences.
+
+Ultimately, a well-designed ACI should help the LM agent understand the state of the application given previous changes, manage history to avoid unnecessary context from prior observations, and provide actions that models can use efficiently and reliably.
+The ACI specifies both the commands available to the LM and how the environment state is communicated back to the LM.
+It also tracks the history of all previous commands and observations and, at each step, manages how these should be formatted and combined with high-level instructions into a single input for the LM.
+
+In this paper, we assume a fixed LM and focus on designing the ACI to improve its performance. 
+This means that we shape the actions, their documentation, and environment feedback to complement an LM's limitations and abilities.
+We draw inspiration from the field of HCI, where user studies elicit insights about how compatible different interfaces are with respect to human intuition and performance~\citep{cooperaboutface}.
+We use two approaches to enhance performance on a development set: (1) manually inspect agent behavior to identify difficulties and propose improvements, and (2) run a grid search to select the best ACI configuration.
+
+Taking these two actions resulted in several insights about design principles that seem especially important for building effective ACIs:
+% \shunyu{how are they different from UI design? you want to stress what's same and what's different? e.g. 1 actions should be simple seems applicable also for humans? }
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Actions should be simple and easy to understand for agents.}
+    Many bash commands have documentation that includes dozens of options.
+    Simple commands with a few options and concise documentation are easier for agents to use, reducing the need for demonstrations or fine-tuning.
+    This is a defining principle for all SWE-agent commands that we describe in Section~\ref{sec:sweagent}.
+
+    \item \textbf{Actions should be compact and efficient.}
+    Important operations (e.g., file navigation, editing) should be consolidated into as few actions as possible.
+    Efficient actions help agents make meaningful progress towards a goal in a single step.
+    A poor design would therefore have many simple actions that must be composed across multiple turns for a higher order operation to take effect.
+    % We incorporate this idea into the Editing and Search interfaces described in Section~\ref{sec:sweagent} and analyzed in Section~\ref{sec:analysis:interface-design}.
+    We show this idea in action in the Editing and Search interface analyses in Section~\ref{sec:analysis:interface-design}.
+    
+    \item \textbf{Environment feedback should be informative but concise.}
+    High quality feedback should provide the agent with substantive information about the current environment state (and the effect of the agent's recent actions) without unnecessary details.
+    For instance, when editing a file, updating the agent about revised content is helpful.
+    Figures~\ref{fig:sub_viewer}, \ref{fig:sub_editor} and Table~\ref{tab:combined_ablations_summary} show this.
+
+    \item \textbf{Guardrails mitigate error propagation and hasten recovery.}
+    Like humans, LMs make mistakes when editing or searching and can struggle to recover from these errors.
+    Building in guardrails, such as a code syntax checker that automatically detects mistakes, can help agents recognize and quickly correct errors.
+    We show the effect of editing guardrails in Table~\ref{tab:combined_ablations_summary}.
+\end{enumerate}
+
+Analysis and ablation studies in Section~\ref{sec:results} demonstrate how alternative ACIs affect LM performance.
+Our studies shows how these principles appear recurrently across actions, feedback, and workflows.

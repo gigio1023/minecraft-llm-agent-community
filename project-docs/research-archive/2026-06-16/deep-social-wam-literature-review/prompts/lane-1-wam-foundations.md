@@ -1,4 +1,4 @@
-# Lane 1 — WAM Foundations and Game World Models
+# Lane 1 - WAM Foundations and Game World Models
 
 Read `prompts/00-shared-lane-contract.md` first. You are Lane 1 (N=1).
 
@@ -37,36 +37,36 @@ WAM core (download LaTeX, deep-read the survey first):
 - 2604.25859 Privileged Foresight Distillation
 - 2603.16666 Fast-WAM ; 2606.10040 Efficient-WAM ; 2603.17240 GigaWorld-Policy
 - 2606.01027 tau_0-WM ; 2602.06508 World-VLA-Loop ; 2410.12822 AVID (adapt video
-  diffusion weights to a world model — directly relevant to "use existing weights")
+  diffusion weights to a world model - directly relevant to "use existing weights")
 
 Game / Minecraft world models:
 - 2602.22208 Solaris (multiplayer Minecraft video world model, 12.64M frames)
 - 2604.18564 MultiWorld ; 2508.13009 Matrix-Game 2.0 ; 2603.23497 WildWorld
-  (explicit STATE annotations — important contrast to pure pixels)
+  (explicit STATE annotations - important contrast to pure pixels)
 - 2511.09057 PAN (LLM latent dynamics + video decoder; hybrid) ; 2502.07825 DWS
 - 2605.08567 ACWM-Phys (action-conditioned physical-interaction benchmark)
 
-Find (named by user / canonical, not yet surfaced — search hf + web):
+Find (named by user / canonical, not yet surfaced - search hf + web):
 - MineWorld (Microsoft; interactive Minecraft world model, open-source) 
 - Oasis (Decart/Etched; real-time generated Minecraft) 
 - DreamerV3 (Hafner et al.; mastered Minecraft diamond) and Dreamer 4 / latest
 - Genie / Genie 2/3 (DeepMind), GameNGen (DOOM), and any "neural game engine"
-- NitroGen — the repo already has an analysis: Read
+- NitroGen - the repo already has an analysis: Read
   `<repo>/project-docs/research-archive/2026-06-16/nitrogen-2601-02427-analysis.md`
   and arXiv 2601.02427; treat as future low-level substrate / contrast, not target.
 
 ## Owned deliverables (write these)
 
-- `notes/by-theme/wam-foundations.md` — from first principles: the formal
+- `notes/by-theme/wam-foundations.md` - from first principles: the formal
   definition; Cascaded vs Joint; WAM vs VLA vs WM vs VAM vs Video Policy vs
   model-based RL vs simulator vs planner vs LLM tool-use agent vs Mineflayer
   runtime; what WAM predicts; the verifier/evaluator framing; existing-weights
   reuse; why structured > pixel for this repo (evidence-backed).
-- `notes/by-theme/minecraft-world-models.md` — Solaris, MineWorld, Oasis,
+- `notes/by-theme/minecraft-world-models.md` - Solaris, MineWorld, Oasis,
   Matrix-Game, MultiWorld, WildWorld, Dreamer-in-Minecraft, Genie-family; what
   each predicts, data shape, whether weights/data are public, multiplayer/social
   capability, and the gap they leave (none predicts social-material state).
-- `matrices/wam-vs-vla-vs-policy-vs-runtime.md` — table comparing WAM, VLA,
+- `matrices/wam-vs-vla-vs-policy-vs-runtime.md` - table comparing WAM, VLA,
   visual policy, model-based RL agent, learned simulator, symbolic planner,
   LLM tool-use agent, and Mineflayer action-skill runtime across: predicts `o'`?
   selects `a`? authority over execution? observation type; action type; training

@@ -1,0 +1,133 @@
+\section{LLM-MCTS: Monte Carlo planning with commonsense knowledge}\label{sec:llm-mcts}
+
+We aim to solve task-planning problems in large-scale domains with partial observation. One example is object rearrangement tasks \cite{batra2020rearrangement} in household environments. It is a meaningful and challenging problem with a large scale and long planning horizon. It has many practical implications in everyday life \cite{batra2020rearrangement, szot2021habitat, weihs2021visual, kant2022housekeep, huang2019large}, such as setting the table, tidying up the room, loading the dishwasher, \etc.
+To solve the problem, we present LLM-MCTS (shown in Fig \ref{fig:overview}), which combines the L-Model and L-Policy for large-scale planning. It uses LLM to build a commonsense world model to perform MCTS for reasoned planning and uses L-Policy to guide the MCTS and reduce the large search space.
+
+\begin{figure}[t]
+\vspace{-10pt}
+    \centering
+    \includegraphics[width=0.9\textwidth]{img/overview.pdf}
+    \vspace{-10pt}
+    \caption{Overview of LLM-MCTS. For each simulation in the MCTS, we sample from the commonsense belief to obtain an initial state of the world and use the LLM as heuristics to guide the trajectory to promising parts of the search tree.}
+    \vspace{-10pt}
+    \label{fig:overview}
+\end{figure}
+
+% \subsection{Background}
+\subsection{Task planning}
+\label{sec:task_planning}
+We focus on task-planning problems with partial observation and large-scale domains.
+The problem can be formulated as a Partially Observable Markov Decision Process (POMDP): $(S, A, \Omega, T, O, R, \gamma)$. The state space $S$ define the state of the robot and its environment. The action space $A$ defines the action that the robot can do. $\Omega$ is the observation space. $T$ defines the transition function of states, which we assume to be given. $O$ is the observation function that provides partial information about a state. $R(s, a)$ is the reward function determined by the action $a$ taken at the state $s$. The discount factor is specified by $\gamma$. The history trajectory $h_t$ at time step $t$ consists of a sequence of executed actions and received observations up to time $t-1$, $h_t=(o_0, a_0, o_1, a_1, \ldots, o_{t-1}, a_{t-1})$. The objective is to find an optimal policy $\pi^*(h_t)$ that maximize the expected cumulative rewards $\pi^*(h_t)=\arg\max_{a\in A}\mathbb{E}\left[\sum_{i=0}^\infty \gamma^i R(s_{t+i}, a_{t+i})|a_t=a\right]$.
+
+In this work, we focus on the object rearrangement task, though our approach is a general method for large-scale task planning. Object rearrangement is a representative embodied AI task \cite{batra2020rearrangement, szot2021habitat, weihs2021visual, kant2022housekeep, huang2019large} with various daily applications, such as setting the table, tidying up the room, loading the dishwasher, and more. It is a challenging task~\cite{batra2020rearrangement} as the robot must navigate, locate target objects and positions, and execute multi-step planning. As with hundreds of items and containers in the domain, identifying target objects can be challenging. Even with known state information, it requires long-horizon planning to achieve the goal. In addition, the vast number of domain objects leads to a large action space, given the actions are to interact with objects. The vast action space produces an exponentially large search tree, making the planning extremely challenging.
+
+Following the approach of \cite{li2022pre, puig2020watch, Singh2023progprompt}, we model the task as a POMDP as outlined above. The state $S$ comprises variables denoting the positions of the robot, movable items, and containers. Actions $A$ encompass five predefined actions from VirtualHome, parameterized by object/container/rooms: (1) \emph{pick(object)}, where the robot collects an observed, proximate object; (2) \emph{place(object,placement)}, allowing the robot to set a picked object nearby or inside an open container; (3) \emph{open(container)} and (4) \emph{close(container)}, for interacting with an observed, nearby containers; and (5) \emph{move(room/object/container)}, where the robot relocates within a room or near an observed object/container. Given our assumption of the robot's familiarity with house structures and the manageable size of the house, the robot can move directly to designated rooms. The deterministic transition $T$ is pre-defined by actions. Partial observation $O$ enables the robot to discern object/container positions within its room or an opened container at its location. The objective is to reorganize household items based on verbal instructions, represented by a reward of $R$ for achieving the desired item arrangement. 
+
+% We assume it is deterministic; 
+% The robot can pick a grabbable object if the object is nearby and not inside a closed container. The robot can place a grabbable object in a position if the position is nearby and is not inside a closed container. The robot can move to a room and open or close a nearby container. The robot will only observe items in the same room or an opened container at the robot's location. The goal is to rearrange the items in the house according to natural language instructions. In our setting, the robot will receive a high positive reward if all the items are at the goal position, and the task will be terminated.
+
+\subsection{LLM as a commonsense world model}
+\label{sec:model}
+A commonsense prior belief of states can improve the effectiveness of object and location searches by prioritizing the search to appropriate locations.
+Our approach utilizes LLM's commonsense knowledge to generate the initial belief of states, which is updated with each action and observation in the real world. MCTS samples from the belief in simulation to estimate the value of the action.
+
+\textbf{Initial belief of state.}\label{para:state}
+We use object-centric state representation and categorize the objects in the house as moveable objects (e.g., apples), containers (e.g., fridge), and surfaces (e.g., kitchen table). The states of a moveable object might be inside the containers or on the surfaces. The containers and surfaces should be inside a room. Similar to \cite{li2022pre, puig2020watch}, we maintain the belief in object-centric graphs, where nodes are objects and edges describe abstract-level relationships (e.g., apples are inside fridge, fridge is inside kitchen) between objects and rooms. Details are in the Appendix~\ref{app-sec:belief}. 
+
+Assume a dataset $\mathcal{D}$ is accessible, containing expert actions and observations in similar household environments to solve daily tasks. LLMs can use the observations in the data to know what are the objects in the house and predict their positions, forming the commonsense belief of the state. 
+To achieve this, we find all the objects, containers, and surfaces that appeared in the dataset $\mathcal{D}$ to form a list of objects $\mathcal{D}_\mathrm{obj}$ using a unique name for all of them. To approximate $b(s_0)$, we ask the LLMs to sample the positions of objects $M$ times. For each sample, we ask the LLM to predict the position of objects using $\mathcal{D}_\mathrm{obj}$ and a fixed prompt. For instance, we ask LLM to complete ``\textit{The containers in the apartment are: fridge, \ldots; The surfaces in the apartment are: kitchen counter, \ldots; Question: what are the possible positions of strawberry? Answer: inside fridge, inside pantry\ldots Question: what are the possible positions of apple? Answer:\_\_}.'' We use three prompt examples to provide example formats of the response. The exact prompts we used are provided in the appendix. As the responses from LLM are free-form natural language, we have to precisely map those expressions to $\mathcal{D}_\mathrm{obj}$ for consistent state representation. Thus, we encode the names of objects in the LLM's response into embeddings using sentence-BERT $f(\cdot)$ \cite{reimers2019sentence} and examine their cosine similarity to the unique name of objects in $\mathcal{D}_\mathrm{obj}$: $\mathrm{CosineSim}(e_i, e)=\frac{f(e_i)f(e)}{\|f(e_i)\|\|f(e)\|}$, where $e$ is the name of objects, containers, or surfaces in the LLM's response, and $e_i\in\mathcal{D}_\mathrm{obj}$ are the unique names in the object list. We select the most similar expressions in $\mathcal{D}_\mathrm{obj}$ to form the sampled state. For example, when querying the position of an apple, the LLM's response is ``on the kitchen table,'' we use the above technique to translate ``the kitchen table'' to ``kitchentable,'' a unique name in $\mathcal{D}_\mathrm{obj}$.
+
+% To get the list of relevant objects, containers, and surfaces, we retrieve the relevant instructions and corresponding trajectories from the dataset according to the similarity to the current language instruction $\ell$. We use sentence-BERT $f(\cdot)$ \cite{reimers2019sentence} to translate the instructions in the dataset $\ell_i\in\mathcal{D}$ into embedding and examine their cosine similarity to the current instruction: $\mathrm{CosineSim}(\ell_i, \ell)=\frac{f(\ell_i)f(\ell)}{\|f(\ell_i)\|\|f(\ell)\|}$. We select the top $K$ similar instructions and search the corresponding expert trajectory for the observation where each of the objects, containers, and surfaces initially appeared. LLM then predicts their possible positions and samples for $M$ times to get the approximate distribution of states. 
+% We will predict all the objects that appeared in the selected trajectory to initialize the belief of the world. 
+
+
+\textbf{Goal.}
+Similar to \cite{xie2023translating}, we use LLMs to translate the natural language goal into a formal goal for MCTS. 
+We use a fixed set of prompt examples for LLM to interpret natural language goals, such as ``put one apple into the fridge'' is translated as a tuple ``(\textit{apple}, \textit{inside}, \textit{fridge}).'' For compositional instructions, it will translate it into multiple tuples, such as ``put one apple on the kitchen table and one plate inside the dishwasher'' is translated as ``(\textit{apple, on, kitchentable}), (\textit{plate, inside, dishwasher}).'' We precisely map the LLM-generated goal into the admissible expressions in $\mathcal{D}_\mathrm{obj}$ for search using the same representation as the state. In MCTS, the goal is used to identify the reward. As the representations are the same, we can directly check whether the object's state is the same as the goal by string matching. If the goal is reached, it will receive a large positive reward, or 0 otherwise. 
+
+\subsection{LLM as a heuristic policy}
+
+We use LLMs to play the role of $\pi(a|h)$ in PUCT to guide the action selection in the simulation procedure. In this procedure, the LLM takes as input the examples in the dataset, the goal description, the current observation, and the history of actions, and then outputs the suggested action plan (e.g., ``\textit{Next actions: move to the kitchen, open the fridge, ...}''). Similar to \cite{li2022pre}, the observations and goal description are translated into English sentences. As the answer of LLM is from the conditional distribution of the following words given the context, it can also be viewed as a commonsense policy of actions to take conditioned on the context of tasks, observations, and completed actions. However, direct implementation and access to the probability value of the GPT-3.5 is not available. Thus, we propose an empirical policy distribution $\hat{\pi}$ that uses sampling to approximate the policy distribution. 
+
+We sample the LLM for $M$ times to approximate the policy probability distribution. For each sample, we query the LLM with prompt and trajectory history $h$ and receive an answer of the following actions to take $\alpha_i\sim\mathrm{LLM}(h, \mathrm{prompt})$, where $\alpha_i$ is the first action of the answer. The prompt examples are retrieved from the dataset according to the similarity to the current language instruction $\ell$. We use \cite{reimers2019sentence} to translate the instructions in the dataset $\ell_i\in\mathcal{D}$ into embedding and examine their cosine similarity to the current instruction: $\mathrm{CosineSim}(\ell_i, \ell)$. In experiments, we use a subset of $\mathcal{D}$ to show its performance when restricted to a small training set. We select the top $K$ similar instructions and use the corresponding expert trajectories as a $K$-shot prompt. However, the answer $\alpha_i$ is a free-formed natural language sentence that cannot be mapped to admissible actions for the agent directly. To ensure that the action can be executed, we follow the method in prior works \cite{huang2022language} to represent the actions and admissible actions by embeddings from \cite{reimers2019sentence} and evaluate their cosine similarity $\mathrm{CosineSim}(\alpha_i, a)$. The empirical policy distribution is formulated as follows:
+% \begin{equation}
+    $\hat{\pi}(a|h)=\lambda \frac{1}{|A|} + (1-\lambda)\mathrm{Softmax}\{\sum_{i=1}^M\mathrm{CosineSim}(\alpha_i, a)-\eta\}$,
+% \end{equation}
+where $\eta$ is the average value of $\sum_i\mathrm{CosineSim}(\alpha_i, a)$ and $|A|$ is the size of the admissible action space. $\lambda$ is a hyper-parameter that adds randomness to the belief, as the sampled actions from LLM could be very deterministic. Therefore, the empirical policy distribution is a mixture of approximated policy from LLM and uniform distribution. The example prompts are provided in Appendix \ref{app-sec:prompts}. 
+
+\begin{algorithm}[t]
+\caption{LLM-MCTS}
+\begin{multicols}{2}
+    \begin{algorithmic}[1]
+    \Procedure{Search}{$h,b, \mathcal{T}, N$}
+    \State $n\leftarrow 0$
+    \While{$n< N$}
+    \State $s\sim b(s)$
+    \State \Call{Simulate}{$s, h, \mathrm{False}, 0,  \mathcal{T}$}
+    \State $n\leftarrow n+1$
+    \EndWhile 
+    \State \textbf{return} $\argmax_{a\in A} Q(h, a)$
+    \EndProcedure
+
+\Procedure{Rollout}{$s, h, \mathrm{done}, d$}
+    \If{$\gamma^d<\epsilon$ or $\mathrm{done}=\mathrm{True}$ }
+        \State \textbf{return} 0
+    \EndIf
+    \State $a\sim \pi_\mathrm{rollout}(h, \cdot)$\
+    \State $(s',o,r,\mathrm{done}) \sim \mathcal{G}(s,a)$
+    \State $h' \leftarrow \textsc{PushBack}(h, [a^*, o]), d'\leftarrow d + 1$
+    \State \textbf{return} $r + \gamma\cdot$\Call{Rollout}{$s, h', \mathrm{done}, d'$}
+\EndProcedure
+\Procedure{Simulate}{$s, h, \mathrm{done}, d, \mathcal{T}$}
+    \If{$\gamma^d<\epsilon$ or $\mathrm{done}=\mathrm{True}$ }
+        \State \textbf{return} 0
+    \EndIf
+    \If{$h$ is not in $\mathcal{T}$}
+        \State $\mathcal{T}\leftarrow \mathcal{T}\cup h, N(h) \leftarrow 0$
+        \State $\forall a\in A, N(h, a)\leftarrow 0, Q(h, a)\leftarrow 0$
+        \State \textbf{return} \Call{Rollout}{$s, h, \mathrm{done}, d$}
+    \EndIf
+    \State $\hat{\pi}(a|h)\leftarrow$\Call{QueryLLMPolicy}{$h$}
+    \State $a^*$$\leftarrow$$\argmax\limits_{a\in A} Q(h, a) + c \hat{\pi}(a|h)\frac{\sqrt{N(h)}}{N(h, a) + 1}$
+    \State $(s',o,r,\mathrm{done}) \sim \mathcal{G}(s,a^*)$
+    \State $h' \leftarrow \textsc{PushBack}(h, [a^*, o]), d'\leftarrow d + 1$
+    \State $R \leftarrow r + \gamma\cdot$\Call{Simulate}{$s', h', \mathrm{done}, d', \mathcal{T}$}
+    \State $N(h, a^*)$ += 1, $N(h)$ += 1
+    \State $Q(h, a^*)\leftarrow Q(h, a^*) + \frac{R-Q(h, a^*)}{N(h, a^*)}$
+    \State \textbf{return} $R$
+\EndProcedure
+% \\
+% \Procedure{QueryLLMPolicy}{$h$}
+%     \State $i\leftarrow 0$
+%     \While{$i<M$}
+%         \State $\alpha\sim\mathrm{LLM}(h, \mathrm{prompt})$
+%         \For{$\forall a \in A$}
+%             \State $\mathrm{Score}(a)=\mathrm{CosineSim}(\alpha, a)$
+%         \EndFor
+%         \State $a^*_i\leftarrow\argmax\limits_{a\in A}\mathrm{Score}(a)$
+%         \State $i\leftarrow i + 1$
+%     \EndWhile
+%     \For{$\forall a \in A$}
+%         \State $\hat{\pi}(a|h)=\lambda \frac{1}{|A|} + (1-\lambda)\frac{\sum\limits_{i=1}^M \mathbbm{1}\{a^*_i=a\}}{M}$
+%     \EndFor
+%     \State \textbf{return} $\hat{\pi}(\cdot|h)$
+% \EndProcedure
+  \end{algorithmic}
+  \end{multicols}
+ \label{app:llm-mcts}
+ \vspace{-5pt}
+\end{algorithm}
+
+
+\subsection{Monte Carlo tree search}
+
+We integrate the commonsense world belief and policy from LLM in MCTS, presented in Alg \ref{app:llm-mcts}. 
+For each simulation, MCTS samples a state from the belief $b(s)$ at the root (line 4). It independently samples one position for each object to construct a state $s$. 
+This sampled state $s$ is then employed in the simulation, generating a new tree trajectory. 
+An action $a^*$ is chosen during the simulation based on the $Q$ value, visit counts, and LLM policy (lines 28 and 29). 
+The observation and transition function, denoted as $\mathcal{G}$ (lines 15 and 30), predict the next state $s'$ given the selected action $a^*$ and the sampled state $s$, thus progressing to the subsequent step in the simulation (lines 30 and 31). When encountering leaf nodes in the tree, MCTS expands the tree and performs a random rollout for the corresponding node (lines 23 to 26). A uniform policy is employed to sample actions in the rollout, and the discounted reward is then returned (lines 14 to 17). Upon completing the task or reaching the maximum depth, the accumulated rewards are backpropagated, updating each node's estimated $Q$ value (lines 32 to 35). Following $N$ simulations, the output action is determined based on the estimated $Q$ value (lines 3 to 8).
+Upon completion of the search process, the agent will execute an action and receive a new observation. For simplicity, we assume that the observation and transition functions are deterministic and known. In cases where an object is detected, its corresponding position within the belief will be updated with the observed position. Conversely, if the object remains undetected at certain positions, the belief regarding its presence in those positions will be rendered null, denoted by a zero value.
+
+%%% Local Variables:
+%%% TeX-master: "./main"
+%%% End:

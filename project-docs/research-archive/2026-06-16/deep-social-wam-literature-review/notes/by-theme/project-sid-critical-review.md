@@ -49,7 +49,7 @@ text social benchmarks, but dressed in an embodied world:
 
 | Sid signal | What is actually measured | Plausibility vs verified | Closest Lane-3 analog |
 |---|---|---|---|
-| Relationship / sentiment graphs | LM-scored sentiment from generated summaries (0–10) | **plausibility** (LM judges its own narrative) | SOTOPIA Relationship dim (LM-judged); same evaluator-reliability risk |
+| Relationship / sentiment graphs | LM-scored sentiment from generated summaries (0-10) | **plausibility** (LM judges its own narrative) | SOTOPIA Relationship dim (LM-judged); same evaluator-reliability risk |
 | Perceived vs true likeability | LM-inferred "true" likeability as ground truth | **plausibility labeled as truth** | belief-behavior gap: stated/inferred disposition ≠ enacted behavior |
 | Specialization / roles | roles inferred by GPT-4 from rolling windows of social goals | **plausibility** (role = LM label over LM-generated goals) | PersonaGym "expected action" judged by an LLM against an LLM key |
 | Food distribution | food given as a function of inferred sentiment | **partly verified** (items given is a world event) but driven by inferred feeling | GLEE-style allocation, but feeling is pre-baked |
@@ -89,7 +89,7 @@ confirms it":
   *micro* material interactions (lend/return/repair) that are less tropey and more
   directly verifiable, rather than headline institutions.
 - **Server limits above ~1000 agents contaminate behavior.** Scale is a technical
-  variable, not a social signal; the repo's small-N stance (2–3 actors) is the
+  variable, not a social signal; the repo's small-N stance (2-3 actors) is the
   correct response and matches the validity literature's preference for
   re-measurable, controlled settings over scale.
 
@@ -99,7 +99,7 @@ The repo's review already catalogs Sid's case designs. Lane 3's recommendation o
 *which* to lift, given the social-benchmark comparison:
 
 - **Lift (high value, verifiable):** taxation/compliance lifecycle (scheduled
-  windows → deposit → amendment → changed compliance), it is a real material
+  windows -> deposit -> amendment -> changed compliance), it is a real material
   transition and maps to `weak commons` / `public affordance` maintenance; food
   distribution under scarcity, maps to `scarce_food_v1` (but replace inferred
   sentiment with verified need + verified transfer); single-agent item-diversity

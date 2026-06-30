@@ -1,0 +1,77 @@
+\section{On the Near-Term Improvement under Synthetic Retraining} 
+
+This section investigates the verifier's role in synthetic retraining: \emph{does it help, when does it help, and why does it help?} 
+We focus on one round and show that verifier-guided retraining can improve performance under mild assumptions.
+The underlying mechanism is a verifier-induced bias-variance trade-off: filtering synthetic data \emph{reduces variance} but may \emph{introduce bias}. 
+
+\subsection{Source of Improvement:  Bias--Variance Trade-off with Verifier's Bias }  
+
+To address the question of \emph{when and why} verifier-based synthetic retraining improves estimation, we analyze the mean squared error (MSE) of the one-step estimator $\hat{\theta}^1$ in estimating the true regression coefficient $\theta^\star$. The MSE admits the following decomposition:
+
+\begin{equation}\label{equ:regression-risk-decomp}
+    \mathbb{E}\|\hat{\theta}^1 - \theta^\star\|^2
+    = \mathbb{E}_{\hat{\theta}^0}\!\left[\, \Tr\!\big( \Var(\hat{\theta}^1 \mid \hat{\theta}^0) \big) \,\right]
+    + \mathbb{E}_{\hat{\theta}^0}\!\left\|\, 
+        \mathbb{E}\!\left[\hat{\theta}^1 \mid \hat{\theta}^0\right] - \theta^\star 
+    \right\|^2.
+\end{equation}
+
+The first term in \eqref{equ:regression-risk-decomp} is the \textbf{synthetic variance}: it captures additional estimation noise from the randomness in synthetic data generation. This variance decreases at rate $1/n_1$ with the synthetic sample size $n_1$, but is unaffected by the real sample size $n_0$. Hence, with abundant synthetic data, this term becomes negligible.
+
+The second term is the \textbf{verification error}, which measures the deviation of the conditional mean estimator $\mathbb{E}(\hat{\theta}^1 \mid \hat{\theta}^0)$ from $\theta^\star$. This error depends both on the accuracy of the verifier (i.e., its potential bias) and the quality of the initial estimator $\hat{\theta}^0$, which improves with larger $n_0$.
+
+To further disentangle the verification error, we decompose it as
+\begin{equation}
+    \mathbb{E}_{\hat{\theta}^0}\!\left\|\, 
+        \mathbb{E}\!\left[\hat{\theta}^1 \mid \hat{\theta}^0\right] - \theta^\star 
+    \right\|^2
+    = \Tr\!\left( \Var\!\left( \mathbb{E}\!\left[\hat{\theta}^1 \mid \hat{\theta}^0\right] \right) \right)
+    + \|\mathbb{E}[\hat{\theta}^{\,1}] - \theta^\star\|^2. 
+    \label{equ:regression-risk-decomp2}
+\end{equation}
+Here, the first term is the \textbf{verification variance}, reflecting variance reduction achieved by discarding inconsistent synthetic samples, while the second is the \textbf{verification bias}, capturing systematic deviation introduced by verifier bias.
+
+Putting these together, the full decomposition is
+\begin{equation}\label{equ:regression-risk-decomp3}
+    \mathbb{E}\|\hat{\theta}^{\,1}-\theta^\star\|^2
+    = \underbrace{\mathbb{E}_{\hat{\theta}^0}\!\left[\, \Tr\!\big( \Var(\hat{\theta}^1 \mid \hat{\theta}^0) \big) \,\right]}_{\text{Synthetic Variance}} 
+    + \underbrace{\Tr\!\left( \Var\!\left( \mathbb{E}\!\left[\hat{\theta}^1 \mid \hat{\theta}^0\right] \right) \right)}_{\text{Verification Variance}} 
+    + \underbrace{\|\mathbb{E}[\hat{\theta}^{\,1}] - \theta^\star\|^2}_{\text{Verification Bias}}.
+\end{equation}
+
+This decomposition highlights the central trade-off: verifier filtering \emph{reduces variance} but may \emph{introduce bias}. Verified synthetic data leads to improvement precisely when the variance reduction outweighs the bias introduced. In particular, when the verifier is sufficiently accurate and the synthetic sample size $n_1$ is large, the MSE of $\hat{\theta}^1$ can be strictly smaller than that of the real-data estimator $\hat{\theta}^0$. 
+
+\subsection{Characterizing Improvement in One-Round Retraining} 
+
+\textcolor{black}{
+The following theorem rigorously quantifies this trade-off for the linear regression model, demonstrating exactly \emph{when} the one-step estimator $\hat{\theta}^1$ improves or degrades upon the initial baseline.
+By characterizing the MSE of $\hat{\theta}^1$, it reveals how synthetic sample size, verifier bias, and verifier selectivity determine the final outcome.
+}
+
+\begin{theorem}\label{thm:linear:one_step}
+Let $\{\mu_j\}_{j=1}^p$ denote the singular values of $X^0$, 
+and assume each of them satisfies $\mu_j = \Omega(\sqrt{n_0})$.\footnote{That is, each dimension is well-represented in the original data. This holds easily when, e.g., the feature data is drawn i.i.d. from a full-rank distribution.}
+Then there exist constants $m_{1,j},m_{3,j} \in \R$ and $m_{2,j}\in (0,1)$ for $j=1, \ldots, p$,  as well as a constant $L>0$ such that:
+\begin{equation}
+    \frac{1}{\sigma^2}\text{MSE}(\hat{\theta}^1) = \sum_{j=1}^{p} \bigg( \underbrace{\frac{m_{2,j}}{n_1}}_{\text{\scriptsize Synthetic Variance}} + \underbrace{m^2_{1,j}+\frac{m_{1,j}m_{3,j}+m^2_{2,j}}{\mu^2_j}}_{\text{\scriptsize Verification Error}} \bigg) + \mathcal{O}\left( n^{-4/3}_0 \right)\label{equ:linear:mse_one_step}
+\end{equation}
+holds with probability at least \( 1 - p\exp\left(-Ln_0^{1/3}\right) \), where \( n_1 \) denotes the post-verification sample size.
+ 
+\end{theorem}
+
+\textcolor{black}{While the explicit forms of the constants are deferred to Appendix~\ref{app:linear}, their roles are highly intuitive: $m_{1,j}$ and $m_{3,j}$ capture the directional bias between the verifier's knowledge center $\theta_c$ and the ground truth $\theta^*$ along the $j$-th singular direction (vanishing if $\theta_c = \theta^*$), while $m_{2,j} < 1$  quantifies the variance reduction along that direction.
+Theorem~\ref{thm:linear:one_step} mathematically guarantees when verifier-guided retraining improves the model.
+Since the scaled baseline error is $\frac{1}{\sigma^2}\text{MSE}(\hat{\theta}^0) = \sum_{j=1}^p \mu_j^{-2}$, we can directly compare it to Equation~\ref{equ:linear:mse_one_step}.
+When the verifier is highly accurate ($m_{1,j}, m_{3,j} \approx 0$), the verification error term becomes dominated by $\sum_{j=1}^p m_{2,j}^2 / \mu_j^2$. 
+Because $m_{2,j} < 1$, this verification error is strictly smaller than the real-data error.
+Thus, whenever the verified synthetic sample size $n_1$ is sufficiently large to drive the synthetic variance down, $\text{MSE}(\hat{\theta}^1)$ strictly improves upon the baseline.
+}
+
+
+
+This result highlights why verifier-based retraining is practically useful: in modern machine learning systems where real data collection is costly but generative models or simulators are available, a moderately accurate verifier can filter synthetic samples to effectively amplify limited real-world evidence and substantially reduce estimation error.
+\textcolor{black}{Conceptually, this offers a sharp departure from classical model collapse literature, which typically models iterative synthetic data purely as a variance-inflating noise source \citep{shumailov2024ai,alemohammad2023self,dohmatob2024model}. Here, we prove that \emph{verification transforms synthetic data into a variance-reducing resource}, provided the verifier's bias is sufficiently controlled.}
+As we will demonstrate empirically in Section~\ref{sec:experiment}, this mechanism is not confined to the linear model; it manifests clearly in complex models such as VAEs and LLMs.
+
+
+

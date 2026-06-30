@@ -41,7 +41,7 @@ measurement and an overclaim about minds the runtime cannot see.
 
 Physical predictions must be reliable before social predictions are meaningful: a
 social claim like "Bob can now mine" depends on a physical fact ("Bob received a
-pickaxe with durability > 0"). So the layers stack: Physical → Material → Social →
+pickaxe with durability > 0"). So the layers stack: Physical -> Material -> Social ->
 Institutional. The constructs below sit mostly in the top two layers and inherit
 the reliability of the two below them.
 
@@ -82,7 +82,7 @@ the reliability of the two below them.
   order** keeps what is expressed consistent with face; **frames** answer "what is
   going on here?" (Goffman 1959, 1967, 1983).
 - Operationalization: a promise (chat, or `request_accepted`) checked against later
-  world evidence. Consistency → trust up; contradiction → a `fake_progress_rejected`
+  world evidence. Consistency -> trust up; contradiction -> a `fake_progress_rejected`
   event, trust down, friction up. This is the world-grounded version of "saving
   face," and it is the mechanism behind `failed_promise_v1`.
 - Honesty boundary: record the consistency violation and the ledger update; do not
@@ -96,8 +96,8 @@ the reliability of the two below them.
   engenders superior standing/power (Blau 1964). Social exchange has diffuse,
   trust-dependent future obligations, unlike specified economic exchange.
 - Operationalization: the obligation/credit ledger *is* Blau's bookkeeping.
-  `lend_item` → open loan; `return_item` → fulfilled + trust up; loss → violated +
-  trust/friction down; repeated unreciprocated giving → net-creditor standing. This
+  `lend_item` -> open loan; `return_item` -> fulfilled + trust up; loss -> violated +
+  trust/friction down; repeated unreciprocated giving -> net-creditor standing. This
   is the repo's first scenario, `borrowed_tool_with_return_or_debt_v1`.
 - Honesty boundary: the obligation is a behavioral bookkeeping fact, not felt
   indebtedness; "power" is a ledger asymmetry, not psychological dominance.
@@ -107,12 +107,12 @@ the reliability of the two below them.
 - Theory: social capital is defined by its function and takes three forms:
   obligations/expectations (credit slips, dependent on trustworthiness),
   information channels, and norms with sanctions (Coleman 1988). **Coleman's boat**
-  is the macro→micro→macro diagram; the hard, often-missing link is micro→macro
+  is the macro->micro->macro diagram; the hard, often-missing link is micro->macro
   (individual actions aggregating into a collective outcome).
 - Operationalization: a per-actor social-capital snapshot from existing ledgers:
   open credit slips held, exclusive knowledge held, norms the actor helps enforce.
   All loggable at the dyadic/individual level.
-- Honesty boundary: the micro→macro transition (a settlement-level pattern emerging
+- Honesty boundary: the micro->macro transition (a settlement-level pattern emerging
   from individual turns) is the project's hardest, least-proven claim. It needs
   multi-actor, multi-episode evidence the repo does not yet have. Do not assert
   community-level social capital from one run.
@@ -124,7 +124,7 @@ the reliability of the two below them.
   **embedded** in ongoing social relations; concrete relationship history shapes
   trust more than general morality or abstract institutions (1985).
 - Operationalization: tie strength ≈ the repo's `FamiliarityCategory`
-  (stranger → acquaintance → teammate → partner). An information-bridge event:
+  (stranger -> acquaintance -> teammate -> partner). An information-bridge event:
   log when an actor transmits exclusive knowledge (route, hazard, resource
   location) and verify the recipient's later behavior changed. Embeddedness is why
   the repo derives trust from a relationship ledger over cycles, not from one
@@ -251,7 +251,7 @@ agent variables, and each marks a boundary the repo should hold.
   Granovetter information transfer and familiarity, Coleman's dyadic credit slips.
 - **Institutional / Settlement WAM** (longer-horizon patterns): North formal vs
   informal rules, Ostrom IAD and design principles, Bicchieri/Elster norms,
-  March-Simon/Nelson-Winter roles and routines, Coleman's micro→macro boat. This
+  March-Simon/Nelson-Winter roles and routines, Coleman's micro->macro boat. This
   layer is where claims are weakest and need multi-actor, multi-episode evidence.
 - These two ride on the **Material / Economic WAM** (possession, claims, transfers)
   and ultimately on the **Physical WAM** (a transfer is only real if the items and
@@ -263,7 +263,7 @@ agent variables, and each marks a boundary the repo should hold.
   principles page) could not be fetched (TLS / 503 / 403); the by-paper notes label
   those as secondary-source paraphrase. The *structure* is faithful; quote-level
   precision should be checked against the primary books before any external paper.
-- The Institutional-layer constructs (norms, routines, micro→macro emergence) are
+- The Institutional-layer constructs (norms, routines, micro->macro emergence) are
   the least supported empirically. They are stated here as *predictable deltas a
   WAM would forecast*, not as behaviors the current runtime can demonstrate.
 - Whether LLM-proposed actors can sustain a *learned* (history-grounded) norm

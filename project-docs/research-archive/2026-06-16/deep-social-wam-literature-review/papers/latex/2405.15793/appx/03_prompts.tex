@@ -1,0 +1,113 @@
+\section{Prompts}
+\label{appx:prompts}
+
+In this section, we go through the prompt templates that make up the agent’s history, discussing them in the order of presentation to SWE-agent.
+Per template, we describe its purpose, walk through its content, and note any additional motivations that influenced how we wrote the template.
+The companion figures of template content are all drawn from our default configuration, using SWE-agent w/ GPT-4.
+
+The template content can and should be adapted slightly to fit the agent's intended use case.
+The purpose of this section is to describe our thought process for how we designed each template for these tasks to serve as reference for future work.
+Across templates, we find that providing tips which tell agents to not make specific mistakes, avoid common pitfalls, and use helpful execution signals are effective for eliciting more successful problem solving.
+
+\textbf{Prompt Workflow.}
+We present Figure~\ref{fig.prompt_flow} which shows the order in which different prompt templates are invoked.
+This flow of prompts reflects the logic that generates trajectories similar to the one that is visualized in Figure~\ref{fig.trajectory_overview}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/appx/prompt_flow.pdf}
+    \caption{The flow of prompt templates throughout a single SWE-agent task instance episode. The system, demonstration, and issue templates are shown all together at the beginning of the task episode, followed by turn-specific prompts that are shown depending on whether the agent response is well-formatted and whether the action has standard output.}
+    \label{fig.prompt_flow}
+\end{figure}
+
+\textbf{System Template.}
+The system template describes the interactive task setting, the commands at the agent’s disposal, and the expected response format.
+It is the first message for any episode, does not change in content across task instances, and is not removed or collapsed at any point from the message history.
+The agent is told of the general task setting, which is a command line that comes with a special file viewer interface.
+After this, the agent is presented the command documentation, which shows a usage example and docstring for every custom command, mirroring the content of Figure~\ref{fig.prompts.system}.
+As discussed before, from manual observation, we find that agents need a lot of support to make effective use of the \texttt{edit} command.
+
+\input{figures/prompts/system}
+
+An agent will occasionally generate an \texttt{edit} with either the wrong level of indentation or incorrectly specified line numbers.
+Because of this, we include a note telling the agent to pay attention to proper indentation.
+% We did not ablate this note, but from our recollection of the early development process, including this text with proper indentation in all caps seems to provide some extra motivation for the agent to get it right.
+Finally, the system prompt describes what the agent’s response should look like, communicated with an example (e.g. JSON format, XML delimiters) followed by a paragraph reinforcing the importance of issuing a \textit{single} thought/action pair per turn.
+Because of the constraints imposed by Docker containers, we include one last point about the command line environment not supporting any interactive session commands, such as \texttt{vi} or \texttt{python}.
+The system template does not introduce any task instance specific information.
+
+\textbf{Demonstration Template.}
+If provided, the demonstration template immediately follows the system template as the second message showing the agent a trajectory which resulted in the successful resolution of a task instance from the development set.
+As confirmed by the ablation in Table~\ref{tab:combined_ablations_summary}, including a demonstration slightly helps agents with understanding proper command usage and reduces the rate of errant responses.
+Rather than being written out entirely like the system template, the demonstration template is put together based on two fields as shown in the configuration file discussed in Section~\ref{appx:interface:configuration}.
+First, the \texttt{demonstrations} argument points at 1+ \texttt{.traj} file(s), each containing a multi-turn, SWE-agent style history of interactions.
+
+Second, the \texttt{demonstration\_template} and \texttt{put\_demos\_in\_history} arguments control how the demonstration is represented in the message history.
+If the \texttt{put\_demos\_in\_history} argument is set \texttt{True}, every turn of the demonstration trajectory is used as a separate message in the history.
+The alternative is to write out the entire demonstration as a single message, wrapped in a natural language instruction indicating it is a demonstration (this is the method that is displayed in Figure~\ref{fig.prompts.demonstration}).
+The effectiveness of each method varies by model.
+The first method of adding a demonstration as separate messages can be preferable because it gives an agent the impression that it has already solved a task instance and is working on the next one.
+However, for a different model, it can be confusing to have the contexts from two tasks in a single trajectory, which is why the second method of explicitly telling the model that it’s being given a demonstration can be better.
+
+\input{figures/prompts/demonstration}
+
+We are unsure if demonstrations actually help agents understand the nuances of domain specific problem solving.
+Because of the diversity of software engineering issues, we think the role the demonstration plays is primarily to help the agent learn to issue properly formatted commands.
+Prior work has demonstrated that fine tuning may have the potential to imbue agents with a certain degree of expertise around how to adaptively solve task instances that may vary in terms of what strategy is most successful.
+
+\textbf{Instance Template.}
+The instance template introduces the agent to the task instance.
+The problem statement is shown, followed by a brief set of instructions that reiterate important points from the system template.
+These points are the one thought/action per-turn requirement, mentioning the lack of support for interactive shell commands, and a reminder of the importance of editing indentation.
+Finally, a notably effective part of the instance template is the inclusion of tips which serve as an additional guidelines for how to operate successfully in the bash environment, shown in Figure~\ref{fig.prompts.instance}.
+These tips were developed manually and iteratively; after running SWE-agent with a particular configuration on the development set, we manually looked at the trajectories for failure modes.
+The tips were born out of these failures, and through repeated inspection, we found that such tips did reduce the frequency of errant problem solving strategies that they are meant to address.
+While our manual approach to writing tips certainly does not scale, representing feedback for common mistakes as tips is surprisingly effective.
+Developing better methods for this process of identifying failure modes and writing natural language instructions that describe the correct alternative behavior could be an avenue to better performance for future SWE-agent based systems.
+Finally, at the end of the message, the agent is presented with a command line prompt indicating that the task has begun and that the agent should issue its first command.
+
+\input{figures/prompts/instance}
+
+\textbf{Next Step Template.}
+Assuming an agent’s response is well formed and contains an action, there are two simple templates used to present the corresponding output of the agent’s action, as shown in Figure~\ref{fig.prompts.next_step}.
+If an agent’s action produces some standard output, the agent is simply shown this output with a command line prompt to indicate that the agent should respond with the next action.
+
+\input{figures/prompts/next_step}
+
+However, if an agent’s action runs silently and produces no output (e.g. \texttt{rm abc.py}, \texttt{touch abc.py}), we found that simple showing no output along with a prompt can be confusing for agents to interpret, and it will often run additional, unnecessary commands to determine the effect of the prior action.
+To guard against this situation, the agent is informed verbosely that the command ran successfully and did not produce output.
+While the System, Demonstration, and Instances template are only used a single time, the next step template is used repeatedly.
+In the SWE-agent configuration described in this work, the next step templates are fairly simple, as they essentially just add the command line prompt to the end of the execution standard output.
+We have not explored other variations to this style.
+
+\textbf{Collapsed Observation Template.}
+As shown in Figure~\ref{fig.trajectory_overview} and discussed in Section~\ref{sec:aci}, old observations are \textit{collapsed}; meaning that the structure and order of the agent's interaction history is preserved, but the content of old observations are replaced with a one-line placeholder.
+This summary simply states that the observation is omitted with the number of lines that were removed, as shown in Figure~\ref{fig.prompts.collapsed_obs}.
+
+\input{figures/prompts/collapsed_obs}
+
+The purpose of collapsing old observations is twofold.
+First, it simply reduces the number of tokens needing to be processed at each interaction step.
+Second, by removing old observations' content, it can also reduce the presence of outdated or duplicate information, such as directory and file contents or command output.
+We think that both of these purposes can serve to improve agent performance.
+
+\textbf{Error Message Template.}
+An agent's response is not always well formed.
+As discussed, an agent is generally expected to respond with a single thought and action per turn.
+In our work, we experimented with asking the agent to generate one of three different styles of responses for communicating one thought and one action (same type of response across any single episode).
+
+\begin{enumerate}[noitemsep]
+    \item A string where the action is wrapped as a markdown-style code block (\`{}\`{}\`{}).
+    \item A JSON style dictionary with ``thought" and ``action" keys.
+    \item An XML style generation with ``$<$thought$>$" and ``$<$action$>$" delimiters.
+\end{enumerate}
+
+On occasion, an agent may generate a response that doesn't conform to the requested format.
+If this occurs, we show an error message to the agent indicating that the prior message was malformed and to issue another response that does not make the same mistake, as presented in Figure~\ref{fig.prompts.error}.
+If a model generates \num{3} malformed responses in a row, the episode will terminate early.
+
+\input{figures/prompts/error}
+
+Another context management trick is that if models generate a malformed response, but then subsequently respond with a valid one, the message history is modified such that the action and response correspond to the malformed generation is removed.
+This kind of de-noising reduces unnecessary context and helps prevent future malformed generations.
+Each well-formatted response becomes an additional in-context demonstration of how to interact with the environment correctly; this ``momentum'' of correct responses is effective for helping agents continue to issue correct actions at later turns in trajectories when there is a lot of information in the message history.

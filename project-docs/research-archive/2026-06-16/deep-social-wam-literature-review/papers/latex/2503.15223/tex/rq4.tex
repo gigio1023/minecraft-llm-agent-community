@@ -1,0 +1,85 @@
+\subsection{RQ4: The Correctness of Suspicious Patches}
+
+Suspicious patches are not necessarily incorrect patches.
+For example, the program behavior with illegitimate values as inputs can be undefined.
+If a differentiating test triggers different behaviors with such illegitimate inputs, the corresponding suspicious patch can also be correct.
+In this RQ, we aim to analyze the correctness of suspicious patches and identify the reasons for correct and incorrect suspicious patches.
+
+\noindent \textbf{Approach:}
+We utilize the suspicious patches sampled in RQ3.
+For each sampled suspicious patch, the first author (A1) manually analyzes the user requirements in the issue statement, the results of running all developer-written regression tests (identified in RQ1), and the results of running the generated differentiating tests, and then compares the implementations of the suspicious and oracle patches.
+A patch is considered correct if it satisfies the requirements specified in the issue statement without introducing errors.
+In cases of ambiguity, A1 discusses with another author (A2) until a consensus is reached.
+
+
+\input{tex/tables/rq4_correctness}
+
+\noindent \textbf{Results:}
+After manual inspection, each sampled patch is classified as incorrect, correct, or with uncertain correctness, as summarized in Table ~\ref{tab:rq4_correctness}.
+
+%
+%
+\textbf{Incorrect Patches (22):} We identify 28.6\% of the suspicious patches as incorrect, which can further be divided into four sub-categories.
+\ding{182} \textit{Regressive Patches (11):} 
+These patches successfully satisfy the requirements mentioned in the issue statements, but accidentally introduce faults into some functionalities that are unrelated to the target issues. 
+Our motivating example in Subsection \ref{subsec:example} falls into this category, where the issue is to fix the bug that the \verb|ValueError| of "Imaginary coordinates are not permitted" is raised under \verb|with evaluate(False)| when there is no imaginary input. 
+The generated patch satisfies the user requirement that this \verb|ValueError| is now not raised under ordinary inputs. 
+However, it also makes the object creation never raise this \verb|ValueError| when \verb|evaluate| is set to \verb|False|, 
+even though there is an imaginary input. 
+This violates the original functionality, therefore this patch falls into Regressive Patches. 
+\ding{183} \textit{Partial Fixes (6):} 
+These patches partially resolve the target issues but fail to satisfy the requirements in the issue statements for certain legitimate inputs.
+For example, the patch produced by LearnByInteract to resolve scikit-learn-14496 aims to fix a bug where the \verb|OPTICS::fit| function raises \verb|TypeError| when the \verb|min_samples| attribute of \verb|OPTICS| is set to a float between 0 and 1. 
+However, the patch fails to locate and fix every piece of relevant buggy code and makes \verb|OPTICS::fit| raise \verb|ValueError| under certain \verb|min_samples| between 0 and 1, violating the issue statement.
+\ding{184} \textit{Patches with Irrelevant Behavioral Changes (3):} 
+These patches successfully satisfy the requirements mentioned in the issue statements but also introduce some unnecessary changes. 
+For example, the patch produced by LearnByInteract for django-15104 changes a code line to safely remove the key \verb|to| from a dictionary when it exists, which successfully fixes the bug. 
+However, this patch additionally repeats another code line \verb|fields_def.append(deconstruction)|, 
+which introduces duplicate items in \verb|fields_def|. 
+Different from \emph{Regressive Patches}, which introduces regression in their implementation to resolve the issue, 
+patches in this category contain changes that do not contribute to resolving the issue. 
+\ding{185} \textit{Patches with Erroneous Modifications (2):} 
+These patches contain clear implementation errors. 
+For example, the patch produced by CodeStory to resolve sympy-20801 captures exceptions of type \verb|SympifyError|, which is not defined before. 
+These patches are plausible because the original test suites fail to cover the buggy branches and do not trigger runtime errors.
+
+%
+%
+
+By sampling 30\% of the suspicious patches for manual validation, we identify 22 incorrect patches.
+If we assume that the incorrect patches are distributed evenly among suspicious patches and consider the incorrect patches that are discovered in RQ1 but are not suspicious (which results in 23 patches), the estimated incorrect rate will be 11.0\% among plausible patches. 
+This leads to the resolution rates of the studied tools being inflated by 6.4 points on average, 
+further confirming the prevalence of performance overestimation and necessitating tools like \appname for detecting plausible but incorrect patches. 
+In addition, 11 (50.0\%) of the 22 incorrect patches cannot be identified by running all developer tests, underscoring \appname's effectiveness in helping identify incorrect patches.
+Among the 22 incorrect patches, 8 (36.4\%) patches are attributed to faulty supplementary semantic changes.
+This highlights the risk of supplementary changes in plausible patches and emphasizes the need for issue-solving tools to rigorously review and refine the plausible patches.
+
+%
+\textbf{Correct Patches (4):} Only 5.2\% patches are certainly correct, which can be divided into two sub-categories.
+\ding{182} \textit{Irrelevant Oracle Changes (2):}
+In these cases, the observed behavioral discrepancy arises from the changes in oracle patches that do not contribute to issue resolution.  
+So there is no evidence suggesting the plausible patch fails to address the issue. 
+\ding{183} \textit{Invalid Differentiating Tests (2):}
+In these cases, the differentiating tests rely on illegitimate inputs where the program's expected behavior is undefined.
+Such tests should not lead to incorrect patches. 
+
+\textbf{Patches with Uncertain Correctness (51):}
+For 66.2\% of the sampled suspicious patches, we cannot determine their correctness based on the information that we can find from SWE-bench and the corresponding repositories.
+This uncertainty arises due to the differences in implementation details between the plausible and oracle patches that are not explicitly specified in the issue statement. 
+In such cases, neither the issue-solving tools nor our analysis can reliably infer user requirements regarding these implementation details. 
+%
+%
+The plausible patch generated by CodeStory to solve matplotlib-25311 falls in this category.  
+The issue aims at fixing a bug where pickling figures raises "TypeError: cannot pickle \verb|FigureCanvasQTAgg| object". 
+This plausible patch introduces \verb|__getstate__| and \verb|__setstate__| functions to ensure that the unpickable attribute \verb|canvas| is set to \verb|None| during serialization and remains \verb|None| upon deserialization, which is a common practice for handling such issues. 
+The oracle patch, however, transforms \verb|canvas| into a property using a lambda expression, so that the value of \verb|canvas| is dynamically retrieved when accessed and not stored during pickling. 
+The key difference is that the plausible patch explicitly sets \verb|canvas| to \verb|None| upon loading, whereas the oracle patch makes it remain accessible after deserialization. 
+Since there are no explicit requirements dictating whether \verb|canvas| should remain accessible, we cannot determine the correctness of this plausible patch. 
+While some unspecified details may have negligible or no impact, others could lead to unintended behaviors or latent issues.
+These findings underscore a need to enhance issue-solving tools with the capabilities to detect ambiguous or under-specified requirements and to proactively prompt users for clarification.
+They also imply that the community may need a better benchmark, where issues are well specified and leave less ambiguity.
+
+\vskip 1mm
+\noindent \fbox{
+	\parbox{0.95\linewidth}{\textbf{Answers to RQ4:} Among the manually validated 77 suspicious patches, 22 (28.6\%) patches are incorrect. This interprets to an estimated incorrect rate of 11.0\% in plausible patches, inflating the reported resolution rate by 6.4 points on average. 51 (66.2\%) patches have uncertain correctness due to under-specified requirements.}
+}

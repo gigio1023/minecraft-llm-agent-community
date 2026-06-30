@@ -23,14 +23,14 @@ Notation (survey 2605.12090): `o` = observation, `l` = language instruction,
 | **WAM** (World Action Model) | `p(o', a \| o, l)` | Jointly predicts the future state AND the action. |
 
 A WAM must satisfy **two criteria** (survey, verbatim sense):
-1. **Forward Predictive Modeling** — forecast `o'` via a quantifiable representation,
+1. **Forward Predictive Modeling** - forecast `o'` via a quantifiable representation,
    either *explicit visual* (pixel video, optical flow) **or** *implicit physical
    representation* (physics-grounded latent space).
-2. **Coupled Action Generation** — deduce `a` "by strictly aligning them with the
+2. **Coupled Action Generation** - deduce `a` "by strictly aligning them with the
    anticipated future states `o'`."
 
 Two architectural realizations:
-- **Cascaded WAM**: `p(o',a|o,l) = p(a|o',o,l)·p(o'|o,l)` — imagine the future, then
+- **Cascaded WAM**: `p(o',a|o,l) = p(a|o',o,l)-p(o'|o,l)` - imagine the future, then
   derive the action from it (often via an inverse-dynamics model, IDM). DreamZero is
   this, realized in a single model.
 - **Joint WAM**: directly model `p(o',a|o,l)`; state prediction and action generation
@@ -45,10 +45,10 @@ From the survey's disambiguation section plus DreamZero's related work:
   the world"; WAMs may predict "single-image state transitions, dense point clouds,
   or ... tactile and force feedback." The word "World" denotes internalized physical
   laws, *not* a commitment to pixels. DreamZero's authors say the same: "video is
-  just one possible world modeling objective — future WAMs may align actions with ...
+  just one possible world modeling objective - future WAMs may align actions with ...
   learned latent representations."
 - **WAM vs Video Policy**: a video policy merely *inherits* a video-generation
-  backbone to map `p(a|o)`; a WAM "requires an active predictive commitment" — `o'`
+  backbone to map `p(a|o)`; a WAM "requires an active predictive commitment" - `o'`
   synthesis is an explicit output, not an implicit backbone feature.
 - **WAM vs AWM (Action World Model)**: identical math `p(o',a|o,l)`; "WAM" reframes the
   system as a primary Agent (World + Action co-equal) rather than an augmented simulator.
@@ -97,7 +97,7 @@ It is several different things at different layers, and the primary sources let 
 precise:
 
 - As an **actuator/policy**: DreamZero ("World Action Models are Zero-shot Policies")
-  — the WAM *is* the policy; it outputs the executed action chunk. This is the
+  - the WAM *is* the policy; it outputs the executed action chunk. This is the
   mainstream WAM framing.
 - As a **learned transition model / simulator**: MineWorld, Solaris, Oasis,
   Matrix-Game model `p(o'|o,a)`; the survey's "World Models for VLA" treats WMs as
@@ -111,7 +111,7 @@ precise:
   WAM's predicted future as "an internal expectation of how the physical world should
   evolve," and a **separate lightweight verifier** compares predicted-vs-observed to
   decide whether to keep executing or replan. The WAM does not fill arguments or
-  override anything — it produces a consistency signal.
+  override anything - it produces a consistency signal.
 
 For this repo's hard rule ("a WAM must stay advisory: predict/evaluate consequences;
 do not fill missing args, mark progress true, override verifiers, or replace Actor
@@ -123,8 +123,8 @@ of scope for the runtime.
 
 - **Data**: a WAM ideally needs `(o_t, a_t, o_{t+1})` triplets (paired
   action-state-state) but can also ingest action-free `(o_t, o_{t+1})` video (survey
-  "unified data digestion"). The survey's four data sources — robot teleoperation,
-  portable human demos, simulation, internet ego-centric video — are **entirely robot
+  "unified data digestion"). The survey's four data sources - robot teleoperation,
+  portable human demos, simulation, internet ego-centric video - are **entirely robot
   manipulation**. Game WMs use gameplay video + keyboard/mouse action logs (MineWorld,
   Matrix-Game-MC 3,700h, Solaris 12.64M bot frames, WildWorld 108M ARPG frames).
 - **Training objectives**: pixel/video WAMs use diffusion/flow-matching denoising
@@ -136,7 +136,7 @@ of scope for the runtime.
   - *World-modeling capability*: Visual Fidelity (PSNR, SSIM, LPIPS, DreamSim, DINO,
     FVD); Physical Commonsense (VideoPhy, PhyGenBench, VBench-2.0, WorldModelBench's 5
     physical-law checks, Physics-IQ); Action Plausibility (WorldSimBench; **"Wow, wo,
-    val!" IDM Turing Test** — run an inverse-dynamics model on generated video, execute
+    val!" IDM Turing Test** - run an inverse-dynamics model on generated video, execute
     inferred actions in the real world; many visually convincing models "collapse to
     nearly zero success").
   - *Action-policy capability*: 40+ robot manipulation benchmarks (MetaWorld, RLBench,
@@ -150,18 +150,18 @@ of scope for the runtime.
 
 - **Yes, for pixel/video WAMs.** AVID (2410.12822) adapts a *frozen* (even API-only,
   noise-prediction-only) pretrained video diffusion model into an action-conditioned
-  world model via a small adapter + learned mask — no base-model parameter access
+  world model via a small adapter + learned mask - no base-model parameter access
   needed. DreamZero, Matrix-Game, LingBot-VA, GE-Act, Cosmos-Policy all initialize from
   pretrained video backbones (Wan, LTX, Cosmos, SVD). Genie learns action-control from
   unlabeled video via a **latent action model** (no action labels). Public Minecraft
   weights exist: `Etched/oasis-500m`, `Skywork/Matrix-Game(-2.0)`, `nyu-visionx/solaris`,
   MineWorld (Microsoft).
 - **But all reusable weights output pixels.** None outputs structured social-material
-  state. So "reuse weights" for this repo would yield a *visual* Minecraft simulator —
+  state. So "reuse weights" for this repo would yield a *visual* Minecraft simulator -
   usable at most as a pixel-imagination sidecar for human review, never as a structured
   social predictor or runtime authority. A structured-state social WAM has no
   off-the-shelf weights and would need to be built (and the project's first step is a
-  small logged predictor/evaluator, not a large learned model — see the repo's research
+  small logged predictor/evaluator, not a large learned model - see the repo's research
   frame).
 
 ## 7. Why pixel/video WAM is NOT the immediate path here, and structured is more feasible
@@ -172,8 +172,8 @@ This is the lane's central argument. It is grounded in evidence, not preference:
 - DreamZero: a 14B video-diffusion WAM reaches only **7Hz** after a 38x engineering
   speedup; the survey notes this is far below the 50Hz standard of non-generative VLAs.
 - Do-WAMs-Generalize: a WAM inference step is "at least **4.8x slower** than π0.5."
-- MineWorld: SoTA video tokenizers emit "**40k–160k tokens for 16 frames**"; a custom
-  parallel decoder is needed just to hit 4–7 fps. Pixel state is an expensive
+- MineWorld: SoTA video tokenizers emit "**40k-160k tokens for 16 frames**"; a custom
+  parallel decoder is needed just to hit 4-7 fps. Pixel state is an expensive
   representation.
 
 **Pixel generation at inference is not even load-bearing (primary-source):**
@@ -192,8 +192,8 @@ This is the lane's central argument. It is grounded in evidence, not preference:
   executable success.
 - Do-WAMs-Generalize: "improvements in likelihood or visual fidelity do not necessarily
   translate to better planning" (objective mismatch).
-- Actionable-simulators survey (2601.15533): **"visual conflation"** — assuming
-  high-fidelity video implies physical/causal understanding — is a mistake; reframe as
+- Actionable-simulators survey (2601.15533): **"visual conflation"** - assuming
+  high-fidelity video implies physical/causal understanding - is a mistake; reframe as
   **"actionable simulators ... structured 4D interfaces, constraint-aware dynamics,
   closed-loop evaluation"**; "a true world model is defined not by how realistically it
   predicts the future, but by how reliably it supports intervention, reasoning, and
@@ -204,7 +204,7 @@ This is the lane's central argument. It is grounded in evidence, not preference:
   ("shoot" decrements an invisible "remaining ammunition count") that "cannot be
   reliably inferred from visual observations alone." Models must be **state-aware**.
 - The Minecraft-social analogue is exact: `lend_item(alice, bob, pickaxe)` changes
-  possession and creates a return obligation — neither is recoverable from pixels.
+  possession and creates a return obligation - neither is recoverable from pixels.
   Social-material state is *definitionally* the hidden-state branch.
 
 **Structured is cheaper and more checkable (interpretation, evidence-grounded):**
@@ -221,7 +221,7 @@ very recent (2026). The project's "Social WAM" is an adaptation into the survey'
 **modality-independent / implicit-state branch**, not the mainstream pixel WAM. The
 evidence (cost, dispensable inference-time pixels, fidelity!=control, hidden-state
 arguments) says a **structured-state transition model**, used **advisorily** as a
-predictor/evaluator (the FFDC verifier framing), is the feasible and defensible path —
+predictor/evaluator (the FFDC verifier framing), is the feasible and defensible path -
 and that pixel Minecraft WMs (MineWorld, Solaris, Oasis, Matrix-Game) are at most
 optional visual sidecars, never the runtime's structured social predictor.
 
@@ -236,6 +236,6 @@ optional visual sidecars, never the runtime's structured social predictor.
 - **NOT the research contribution**: building a verifier or evidence pipeline is
   *support*, per the shared contract. Re-deriving WAM theory is not novel. Reusing pixel
   weights yields a visual sidecar, not the contribution. The defensible research target
-  is **action-conditioned social-material transition modeling in Minecraft** —
-  predicting and verifying who-has-what / who-owes-whom / who-can-now-do-what deltas —
+  is **action-conditioned social-material transition modeling in Minecraft** -
+  predicting and verifying who-has-what / who-owes-whom / who-can-now-do-what deltas -
   which no surveyed system does.

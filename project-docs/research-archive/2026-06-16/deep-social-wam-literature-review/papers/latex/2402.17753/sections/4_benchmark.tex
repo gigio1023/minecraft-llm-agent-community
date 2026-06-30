@@ -1,0 +1,39 @@
+\section{\dataset{} Evaluation Benchmark}
+Based on the dialogues generated in section~\ref{sec:dataset}, we introduce an evaluation benchmark (see Figure~\ref{fig:eval-framework}) composed of three tasks to assess the accuracy of \textit{long-term memory}. See statistics of the dataset and evaluation benchmark in Table~\ref{tab:dataset_statistics} in the Appendix.
+
+
+\subsection{Question Answering Task}
+\label{ssec:benchmark-qa}
+A conversational agent is expected to possess a \textit{memory} to remember previous dialogues, reflecting it to create more engaging responses in future conversations.
+For a comprehensive assessment of this \textit{memory}, we introduce a question-answering task divided into five distinct reasoning categories:
+(1) \textbf{Single-hop} questions require answers based on a single session;
+(2) \textbf{Multi-hop} questions require synthesizing information from multiple different sessions;
+(3) \textbf{Temporal reasoning} questions can be answered through temporal reasoning and capturing time-related data cues within the conversation;
+(4) \textbf{Open-domain knowledge} questions can be answered by integrating a speaker's provided information with external knowledge such as commonsense or world facts;
+(5) \textbf{Adversarial} questions are designed to trick the agent into providing wrong answers, with the expectation that the agent will correctly identify them as unanswerable. 
+
+For each category, we calculate the F1 score for exact matches, following the normalization of both the predicted and the actual ground truth answers.
+However, evaluating long-form answers with automated metrics often presents challenges~\cite{xu2023critical}. LLMs tend to produce paraphrased responses in varied formats, complicating exact match evaluation. To simplify evaluation in our task, we ensure that answers in our QA annotations are directly taken from the conversations as much as possible. We instruct the LLMs to replicate the exact wording in the conversation when feasible and employ the F1 partial match metric for evaluating the predictions. Each QA sample is also annotated with the turn IDs in the conversation logs that contain the answer. We report the accuracy of retrieving the correct context for RAG models.
+
+\subsection{Event Summarization Task}
+\label{ssec:benchmark-event}
+The conversation is generated based on a temporal event graph $\mathcal{G}$ which is constructed by conditioning an LLM on a persona statement $p$, reflecting the chronological sequence of events in an individual's life.
+A conversational agent is expected to not only comprehend the causal connections and the sequence of events in $\mathcal{G}$ but also to recount these events as required.
+To evaluate the agent's grasp of event dynamics, we introduce the event summarization task which challenges the agent to summarize the events within a designated timeframe and compares the agent's summary with events in $\mathcal{G}$. The events in \dataset{} are densely annotated lists of life events that are hard to summarize due to temporal and causal coreferences present in the dialogues, in contrast to existing summarization benchmarks of research papers \cite{li2023loogle}, movie scripts \cite{chen2022summscreen}, books \cite{kryscinski2022booksum}, emails \cite{zhang2021emailsum} etc.
+
+
+Traditional metrics like BLEU~\cite{papineni-etal-2002-bleu} and ROGUE~\cite{lin-2004-rouge} focus on lexical similarity between the reference and generated summaries, not meeting our needs as we emphasize factual accuracy in summarization.
+In this context, we employ FactScore~\cite{min2023factscore}, a method that evaluates the factuality of generated text by decomposing both the reference and hypothesis into atomic facts.
+We adapt the metric to measure
+(1) \textit{precision} of the summarized content by counting the number of atomic facts within the content that correspond with those in $\mathcal{G}$;
+(2) \textit{recall} of the summarized content by determining how comprehensively the atomic facts of $\mathcal{G}$ are represented within the content.
+We present the F1 score, derived from the calculated precision and recall.
+
+
+\subsection{Multi-Modal Dialogue Generation Task}
+\label{ssec:benchmark-mm}
+The conversations in our dataset are anchored to specific personas $p$ and corresponding events $\mathcal{G}$ tailored to $p$.
+The topics in conversations evolve from events that were introduced in earlier dialogues, spanning weeks or months.
+This structure allows for an assessment of whether conversational agents can sustain a coherent persona and a continuous narrative over time.
+For example, if a speaker recently had an injury, the next conversations would likely focus on them recuperating, rather than engaging in adventurous activities.
+We assess such consistency by measuring how closely the predicted multi-modal dialogues align with the ground truth multi-modal dialogues in our dataset, quantifying this alignment through MMRelevance~\cite{feng2023mmdialog}, in addition to other NLG metrics.

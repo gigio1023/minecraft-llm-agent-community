@@ -1,0 +1,107 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Navigate a terrain with obstacles to reach a target zone.
+
+    Description:
+    - The environment consists of a start platform (3 m x 3 m x 0.5 m) and an end platform (3 m x 3 m x 0.5 m) placed 30 meters apart.
+    - The terrain between the platforms is filled with static obstacles such as rocks (cylinders) and trees (cylinders with a height of 3 meters).
+    - The obstacles are placed in a grid pattern with enough space between them to ensure a feasible path.
+    - The robot is initialized on the start platform, facing the end platform.
+
+    Success:
+    The task is successfully completed when the robot reaches the end platform.
+
+    Rewards:
+    - The robot receives a reward for each time step it remains on the platforms or the terrain, encouraging steady progress.
+    - The robot is rewarded based on how much it reduces the distance to the end platform, incentivizing swift movement towards the goal.
+    - The robot is penalized for collisions with obstacles.
+
+    Termination:
+    The task terminates if the robot falls off the start platform, the terrain, or the end platform.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.platform_size = [3.0, 3.0, 0.5]
+        self.platform_start_position = [0.0, 0.0, 0.0]
+        self.platform_end_position = [self.platform_start_position[0] + 30.0, self.platform_start_position[1], self.platform_start_position[2]]
+        self.platform_start_id = self.create_box(mass=0.0, half_extents=[self.platform_size[0] / 2, self.platform_size[1] / 2, self.platform_size[2] / 2], position=self.platform_start_position, color=[0.8, 0.8, 0.8, 1.0])
+        self.platform_end_id = self.create_box(mass=0.0, half_extents=[self.platform_size[0] / 2, self.platform_size[1] / 2, self.platform_size[2] / 2], position=self.platform_end_position, color=[0.8, 0.8, 0.8, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.platform_start_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self._p.changeDynamics(bodyUniqueId=self.platform_end_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.terrain_size = [self.platform_end_position[0] - self.platform_start_position[0], 10.0, 0.1]
+        self.terrain_position = [self.platform_start_position[0] + self.terrain_size[0] / 2, self.platform_start_position[1], self.platform_start_position[2] - self.platform_size[2] / 2 - self.terrain_size[2] / 2]
+        self.terrain_id = self.create_box(mass=0.0, half_extents=[self.terrain_size[0] / 2, self.terrain_size[1] / 2, self.terrain_size[2] / 2], position=self.terrain_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.terrain_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.wall_size = [self.terrain_size[0], 0.1, 1.0]
+        self.wall_left_position = [self.terrain_position[0], self.terrain_position[1] - self.terrain_size[1] / 2 - self.wall_size[1] / 2, self.terrain_position[2] + self.terrain_size[2] / 2 + self.wall_size[2] / 2]
+        self.wall_right_position = [self.terrain_position[0], self.terrain_position[1] + self.terrain_size[1] / 2 + self.wall_size[1] / 2, self.terrain_position[2] + self.terrain_size[2] / 2 + self.wall_size[2] / 2]
+        self.wall_left_id = self.create_box(mass=0.0, half_extents=[self.wall_size[0] / 2, self.wall_size[1] / 2, self.wall_size[2] / 2], position=self.wall_left_position, color=[0.5, 0.5, 0.5, 1.0])
+        self.wall_right_id = self.create_box(mass=0.0, half_extents=[self.wall_size[0] / 2, self.wall_size[1] / 2, self.wall_size[2] / 2], position=self.wall_right_position, color=[0.5, 0.5, 0.5, 1.0])
+        self.num_obstacles = 10
+        self.obstacle_radius = 0.5
+        self.obstacle_height = 1.0
+        self.tree_height = 3.0
+        self.obstacle_ids = []
+        self.place_obstacles()
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_cylinder(self, mass, radius, height, position, orientation, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, height=height)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position, baseOrientation=orientation)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def place_obstacles(self):
+        grid_size = int(np.sqrt(self.num_obstacles))
+        x_positions = np.linspace(self.platform_start_position[0] + self.platform_size[0] / 2 + self.obstacle_radius, self.platform_end_position[0] - self.platform_size[0] / 2 - self.obstacle_radius, grid_size)
+        y_positions = np.linspace(self.terrain_position[1] - self.terrain_size[1] / 2 + self.obstacle_radius, self.terrain_position[1] + self.terrain_size[1] / 2 - self.obstacle_radius, grid_size)
+        for x in x_positions:
+            for y in y_positions:
+                if np.random.rand() < 0.5:
+                    obstacle_id = self.create_cylinder(mass=0.0, radius=self.obstacle_radius, height=self.obstacle_height, position=[x, y, self.terrain_position[2] + self.terrain_size[2] / 2 + self.obstacle_height / 2], orientation=[0.0, 0.0, 0.0, 1.0], color=[0.5, 0.5, 0.5, 1.0])
+                else:
+                    obstacle_id = self.create_cylinder(mass=0.0, radius=self.obstacle_radius, height=self.tree_height, position=[x, y, self.terrain_position[2] + self.terrain_size[2] / 2 + self.tree_height / 2], orientation=[0.0, 0.0, 0.0, 1.0], color=[0.0, 0.5, 0.0, 1.0])
+                self.obstacle_ids.append(obstacle_id)
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, [self.platform_start_position[0], self.platform_start_position[1], self.platform_start_position[2] + self.platform_size[2] / 2 + self.robot.links['base'].position_init[2]], self.robot.links['base'].orientation_init)
+        return observation
+
+    def step(self, action):
+        self.distance_to_platform_end = self.get_distance_to_object(self.platform_end_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_platform_end = self.get_distance_to_object(self.platform_end_id)
+        survival = 1.0
+        reach_platform_end = (self.distance_to_platform_end - new_distance_to_platform_end) / self.dt
+        collision = -1.0 if any((len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0 for obstacle_id in self.obstacle_ids)) else 0.0
+        return {'survival': survival, 'reach_platform_end': reach_platform_end, 'collision': collision}
+
+    def get_terminated(self, action):
+        is_fall_off = self.robot.links['base'].position[2] < self.terrain_position[2]
+        is_collision = any((len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0 for obstacle_id in self.obstacle_ids))
+        return is_fall_off or is_collision
+
+    def get_success(self):
+        is_on_platform_end = self.get_distance_to_object(self.platform_end_id) < self.platform_size[0] / 2
+        return is_on_platform_end
+\end{lstlisting}

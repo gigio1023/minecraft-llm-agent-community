@@ -97,15 +97,15 @@ By-paper notes written for the 12 deep sources under `notes/by-paper/`.
 
 Mechanically useful (engineering to borrow):
 
-- S3AP social-world-model formulation + Foresee-and-Act → shape of an *advisory*
+- S3AP social-world-model formulation + Foresee-and-Act -> shape of an *advisory*
   social-delta predictor (predict deltas before acting), kept strictly advisory.
 - Generative Agents retrieval (recency×importance×relevance) + reflection-with-
-  citations → evidence-linked actor memory / PlanBead surfacing.
-- SOTOPIA-Eval 7 dimensions → the *names* of social outcomes to verify; GLEE
-  efficiency/fairness/self-gain formulas → scoring over *verified* exchanges.
-- Lifelong SOTOPIA 8-item failure checklist + recall-forcing episode chaining →
+  citations -> evidence-linked actor memory / PlanBead surfacing.
+- SOTOPIA-Eval 7 dimensions -> the *names* of social outcomes to verify; GLEE
+  efficiency/fairness/self-gain formulas -> scoring over *verified* exchanges.
+- Lifelong SOTOPIA 8-item failure checklist + recall-forcing episode chaining ->
   cheap transcript signals + memory-continuity benchmark design.
-- Concordia grounded-variables + components + validation hierarchy → possession/
+- Concordia grounded-variables + components + validation hierarchy -> possession/
   claim ledger and methodology framing.
 
 Research contribution (what is genuinely novel, not borrowable):

@@ -1,0 +1,48 @@
+\section{Experiments}
+\label{sec:exp}
+\subsection{Setup}
+
+
+To properly test our planning framework's real-world performance, we focus on three representative web agent benchmarks, capturing the dynamic nature of web interactions: 
+\noindent
+\textbf{VisualWebArena} (VWA;~\cite{koh2024visualwebarena}) is designed to evaluate multimodal agents in visually grounded tasks. It includes 233 tasks verified by humans across three self-hosted websites: Classifieds, Shopping, and Reddit. The metric success rate is calculated as the percentage of tasks successfully accomplished by the agent-generated trajectories.
+\noindent
+\textbf{Online-Mind2Web}~\citep{m2wonline} is an online benchmark derived from Mind2Web~\citep{mind2web}, including 300 updated or newly created high-quality tasks spanning 136 real-world websites. 
+These tasks can be categorized into easy, medium, and hard based on the number of steps required for completion. 
+To reduce cost, we use a subset of 100 tasks, randomly sampling 30 easy, 40 medium, and 30 hard tasks.
+The benchmark employs an automatic evaluation pipeline to measure task success rate, achieving an 85\% agreement with human judgment.
+\noindent
+\textbf{Mind2Web-Live}~\citep{webcanvas} consists of 104 tasks in 69 real-world websites refined from Mind2Web~\citep{mind2web}. 
+It defines and annotates critical intermediate steps as key nodes for each task and considers a task successful only if all key nodes are completed.\footnote{We ensure no overlap between Online-Mind2Web and Mind2Web-Live for better task diversity.}
+For all benchmarks, we use screenshots as the observation space and add Set-of-Mark~\citep{yang2023set} in VWA for fair comparison with the tree search baseline.
+In our experiments, we empirically set the planning horizon $H$ to 1. A comprehensive analysis of this parameter is presented in Section~\ref{subsec:planning}.
+
+To demonstrate the effectiveness of our framework and trained world models, we primarily compare our approach with two baselines: the reactive agent and the tree search agent with real interactions.\footnote{We will refer tree search with real interactions simply as tree search in our experiments for brevity.}
+While we can readily implement our own method for all benchmarks, for the tree search baseline~\citep{koh2024tree}, we can only compare with it on VWA, due to the infeasibility of performing tree search on real-world websites in Online-Mind2Web or Mind2Web-Live.
+Specifically, in VWA, \cite{koh2024tree} keep track of the sequences of actions to get to states in previous trajectories.
+During backtracking, they reset the sandbox and re-execute the action sequence to restore the state. 
+However, resetting the environment to undo effects is not feasible on real-world websites.
+
+\subsection{Main Results}
+
+\input{tables/main_v2}
+\paragraph{Effectiveness.}
+We present the overall performance results in Table~\ref{tab:downstream-eval}. 
+\OurMethod demonstrates substantial improvements over the reactive agent on all benchmarks. 
+Notably, on the VWA dataset, our proposed method achieves a 34.1\% relative performance gain and only trails behind tree search slightly.
+It is important to note that tree search is not very practical on real-world websites, whereas \OurMethod provides a more flexible and adaptive alternative. On Online-Mind2Web and Mind2Web-Live, \OurMethod outperforms the reactive baseline by a relative gain of 42.3\% and 23.8\%, respectively. The strong results show the effectiveness of \OurMethod across different real-world websites.
+
+Secondly, training world models on our large-scale synthesized data proves to be effective.
+As shown in Table~\ref{tab:downstream-eval}, fine-tuning Qwen2-VL-7B into Dreamer-7B leads to a substantial 4.7\% absolute improvement in success rate on VisualWebArena, 4.0\% on Online-Mind2Web, and 4.8\% on Mind2Web-Live, outperforming the vanilla Qwen2-VL-7B model and even Qwen2-VL-72B.
+Furthermore, Dreamer-7B achieves performance comparable to GPT-4o on two online benchmarks, Online-Mind2Web and Mind2Web-Live, demonstrating the feasibility of training world models for web-based decision-making.
+
+\paragraph{Efficiency.}
+Another key advantage of model-based planning is its efficiency compared with tree search using actual explorations.
+Table~\ref{tab:efficiency} shows that tree search requires approximately 3 times more steps than the reactive baseline, whereas our method maintains comparable number of action steps.
+Notably, compared to reactive baselines, tree search introduces about 10 times greater latency (in wall clock time) due to additional actions and backtracking, while the overhead from simulation in our approach is substantially lower, making \OurMethod 4--5 times more efficient than the tree search baseline.
+
+\input{tables/vwa_efficiency}
+
+
+
+

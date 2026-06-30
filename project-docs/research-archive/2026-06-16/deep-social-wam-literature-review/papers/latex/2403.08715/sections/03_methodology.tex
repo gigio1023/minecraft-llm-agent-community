@@ -1,0 +1,39 @@
+\section{\model framework}
+\label{sec:method}
+\model improves the social intelligence of a language agent starting from its current policy $\pi_{\text{ref}}$ 
+through three steps (Figure \ref{fig:pipeline}): (1) social task generation, (2) training data collection, and (3) agent policy update. In this section, we provide details of the three steps in our pipeline. 
+
+\subsection*{Step 1: Social task generation}
+\label{sec:method_social_task_generation}
+Mirroring the way that humans navigate novel social situations by acquiring different social skills in everyday social interaction, we encourage the continuous learning of language agents in exploring social skills within a dynamic and diverse social environment. By adopting the principles of dynamic task generation for open-ended learning~\citep{team2021open}, we provide a diverse set of social tasks as the foundation of interactive learning. As the first step, \model automatically generates synthesized social tasks through two steps: (1) sampling keywords related to social activities from Social Chemistry~\citep{forbes-etal-2020-social}, Social IQa~\citep{sap-etal-2019-social}, and Normbank~\citep{ziems-etal-2023-normbank} and (2) prompting GPT-4 to generate scenarios and social goals based on the sampled keywords (Figure~\ref{fig:task-prompt-template}). Details about social task generation can be found in Appendix \S\ref{appendix:scenario_example}.
+% For instance, the keyword \textsl{`travel without food'} produces a scenario of \textsl{two friends on a road trip entering a remote area without food access} and two goals: one person \textsl{prefers to continue the journey without food}, and the other \textsl{prioritizes food searching} (refer to \S\ref{appendix:scenario_example} for the full example).
+
+\begin{figure}[!h]
+\includegraphics[width=\linewidth]{figs/acl2024_prompt.pdf}
+\caption{Prompt template for generating social tasks.}
+\vspace{-2mm}
+\label{fig:task-prompt-template}
+
+\end{figure}
+
+We reuse the 40 character profiles in \sotopia, including their names, genders, occupations, personalities, and other backgrounds. For each social task, a pair of characters are randomly sampled.
+The social tasks (a combination of scenarios, characters' profiles, and social goals) used in training are guaranteed to not overlap with the social tasks used for evaluation. 
+Different from the human-in-the-loop procedure used in \sotopia, which involves manual inspection and filtering for better task quality, we take an automated and scalable approach to produce a large number of unfiltered social tasks. The experimental findings reveal that our method can significantly improve the performance of language agents when using a vast quantity of social tasks of lower quality. Utilizing a more sophisticated or manual selection process to filter high-quality social tasks could potentially lead to further improvement, which we leave for future works. 
+\subsection*{Step 2: Training data collection}
+\label{sec:method_collecting_social_interaction_data}
+% explain the rollout meaning
+Based on the generated social task, the second step of \model is collecting training data for behavior cloning and self-reinforcement. During social interaction, as outlined in \S\ref{subsec:sotopia_environment}, two language agents alternate responses based on the visible component of a social task and the conversation history. 
+For behavior cloning, we use the interactions between the expert policy $\pi_{\text{expert}}$ of two GPT-4-based agents role-playing two sampled characters, because according to \citep{sotopia}, conversations between GPT-4-based agents could achieve the highest social scores among other LLMs. 
+Similarly, for self-reinforcement, we collect the interactions between the agent policy $\pi_{\text{ref}}$ role-playing two sampled characters. 
+
+Obtaining expert data can be costly and may not always be accessible. While employing multiple expert models is an option, our findings indicate that after a single round of behavior cloning using the expert policy from a GPT-4-based agent, the performance of the agent model surpasses that of a GPT-3.5-based agent. Therefore, we opt for GPT-4 as our expert model. Self-reinforcement becomes crucial in situations when expert data is unavailable or the agent's capability exceeds that of the expert. We leave the potential to use human conversation data as the expert trajectories for behavior cloning for future work.
+
+\subsection*{Step 3: Agent policy update}
+\label{sec:agent_policy_update}
+% explain rating, LLM rating can be LLM-based voting
+The last step of \model involves updating the agent's policy based on positive examples from the training data. 
+Leveraging AI feedback is useful for automating the evaluation process and improving the learning of language models without human labels~\citep{bai2022constitutional}. For each agent in social interaction, we collect GPT-4's ratings of the agent's social performance and the corresponding reasoning. Among the seven social dimensions of social performance in \sotopiaeval, we specifically focus on the \emph{goal completion} dimension that scored between 0 and 10 as the extent to which an agent fulfills its social goal. \citet{sotopia} discovers that among all seven dimensions, ratings by GPT-4 on goal completion have the highest correlation with human ratings. 
+In \S\ref{sec:experiments} and \S\ref{sec:limitations}, we discuss the potential issues of using LLMs to provide ratings.
+
+We filter the training data by setting a threshold for the goal completion scores rated by GPT-4 (refer to Appendix \S\ref{appendix:data-filtering-strategy} for details of the filtering strategy). Each turn of the interaction data is parsed into training pairs of inputs and outputs. For input, we provide a combination of the information about the task that is visible to the agent and the conversation history. For output, we provide a JSON string of action type and content as output (see Appendix~\S\ref{appendix:training-data-format} for details). Based on the filtered positive training data, we update our agent's policy with supervised fine-tuning on the agent model. We further explore a sequential training approach where an agent policy is initially updated by behavior cloning. Then the updated agent policy engages in generating interaction data for self-reinforcement.
+

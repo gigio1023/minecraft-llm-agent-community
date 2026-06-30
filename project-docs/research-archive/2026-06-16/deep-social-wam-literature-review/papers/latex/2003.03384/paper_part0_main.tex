@@ -1,0 +1,327 @@
+%%%%%%%% ICML 2020 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Switches.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newif\ifsuppl \suppltrue  % `suppltrue` displays supplement, `supplfalse` hides it. Only works if using `supplsection`.
+\newif\ifsmallfonts \smallfontstrue  % `smallfontstrue` allows using fonts smaller than 9pt.
+\newif\ifcitenum \citenumtrue  % `citenumtrue` uses numeric citations ("[11,20,22]").
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{booktabs} % for professional tables
+
+% To silence ignorable warnings. Must be before hyperref.
+\usepackage{silence}
+\WarningFilter{hyperref}{Ignoring empty anchor}
+\WarningFilter{xcolor}{Incompatible color definition}
+\WarningFilter*{latex}{Text page \thepage \space contains only floats}
+
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+\usepackage[accepted]{icml2020}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% General custom definitions.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Packages.
+\usepackage{enumitem}
+\usepackage{placeins}
+\usepackage{subcaption}  % For subfigures. Side effect: alters ICML caption size.
+\captionsetup{font=footnotesize}  % Fixes figure caption size alteration by subcaption package.
+\captionsetup[sub]{font=normalsize}  % Fixes subfigure caption size alteration by subcaption package.
+\usepackage{xspace}
+\usepackage{booktabs} 
+\usepackage{amsmath}
+\usepackage[most]{tcolorbox}
+\usepackage{tcolorbox}
+\usepackage[T1]{fontenc}
+\usepackage{amsfonts,amssymb}
+\usepackage{bigdelim}
+\usepackage{tabularx}
+\usepackage{bbm}
+\usepackage{calc}
+\usepackage{footmisc}
+\usepackage{mathrsfs}
+\usepackage{mathtools}
+\usepackage{stfloats}  % For good figure* placement.
+\usepackage{setspace}
+\usepackage{tikz}
+\usepackage{textgreek}
+\usetikzlibrary{tikzmark}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{bending}
+\usetikzlibrary{calc,positioning,quotes}
+\usetikzlibrary{matrix,shapes.arrows}
+
+% Useful commands.
+\newcommand{\citeopen}{\ifcitenum{}[\else{}(\fi{}}
+\newcommand{\citeclose}{\ifcitenum{}]\else{})\fi{}}
+\newcommand{\citenobrackets}[1]{\citealp{#1}}  % Citations without parenthesis/brackets.
+\newcommand{\citeinline}[1]{\citet{#1}}  % Citations without parenthesis/brackets.
+\newcommand{\citewithcomments}[3]{% Args: comment before, cite arg, comment after.
+    \citeopen{}%
+    #1% Comment before.
+    \citenobrackets{#2}% Citations.
+    #3% # Comment after.
+    \citeclose{}%
+}
+
+\newcommand{\createlength}[2]{\newlength{#1}\setlength{#1}{#2}}
+\newcommand{\customhrule}[2]{\par
+  \vspace*{\dimexpr-\parskip-\baselineskip+#1}
+  \noindent\rule{\linewidth}{0.2mm}\par
+  \vspace*{\dimexpr-\parskip-.5\baselineskip+#2}}
+ 
+% Make figure placement a little more predictable.
+\renewcommand{\textfraction}{0.01}
+\renewcommand{\floatpagefraction}{0.99}
+\renewcommand{\topfraction}{0.99}
+\renewcommand{\bottomfraction}{0.99}
+\renewcommand{\dblfloatpagefraction}{0.99}
+\renewcommand{\dbltopfraction}{0.99}
+
+% Abbreviations.
+\makeatletter
+\DeclareRobustCommand\onedot{\futurelet\@let@token\@onedot}
+\def\@onedot{\ifx\@let@token.\else.\null\fi\xspace}
+\def\eg{\textit{e.g}\onedot}
+\def\Eg{\textit{E.g}\onedot}
+\def\ie{\textit{i.e}\onedot}
+\def\Ie{\textit{I.e}\onedot}
+\def\cf{\textit{c.f}\onedot}
+\def\Cf{\textit{C.f}\onedot}
+\def\etc{\textit{etc}\onedot}
+\def\vs{\textit{vs}\onedot}
+\def\wrt{w.r.t\onedot}
+\def\etal{\textit{et al}\onedot}
+\makeatother
+
+% Hideable supplement components.
+% Important: to use supplsection, make sure main text only has references to the sections (and not to the figures, subsections, tables, etc inside the sections).
+\newcommand{\supplsection}[3]{%  % Arguments: title, label, contents.
+    \ifsuppl%
+        \section{#1}
+        \label{#2}
+        #3
+    \else%
+        \par\refstepcounter{section}%
+        \sectionmark{#1}%
+        \label{#2}
+    \fi%
+}
+
+\newcommand{\supplheader}{%  % Arguments: paper title.
+    \renewcommand{\figurename}{Supplementary Figure}
+    \renewcommand{\tablename}{Supplementary Table}
+    \renewcommand{\thesection}{S\arabic{section}}
+    \renewcommand{\thefigure}{S\arabic{figure}}
+    \renewcommand{\thetable}{S\arabic{table}}
+    \setcounter{section}{0}
+    \setcounter{figure}{0}
+    \setcounter{table}{0}
+    \ifsuppl%
+        \FloatBarrier
+        \clearpage
+        \twocolumn[
+        \icmltitle{\ourtitle}
+        \centerline{\textbf{\LARGE Supplementary Material}}
+        \vspace{30pt}
+        ]
+    \fi%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Paper-specific custom definitions.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Rename "Algorithm" environment to "Method", or else it gets confusing for this paper.
+\makeatletter
+\renewcommand*{\ALG@name}{Method}
+\makeatother
+
+% Code font.
+\def\codefont{\fontfamily{lmtt}\selectfont}
+\newcommand{\textcode}[1]{{\normalfont\codefont #1}}
+\newcommand{\eqcode}[1]{\textrm{\codefont #1}}
+\newcommand{\prog}[1]{{\textcode{#1}}\xspace}
+
+% Code environment.
+\newcounter{codelinecounter}[section]
+\definecolor{codebackground}{rgb}{1.0,1.0,1.0}
+\definecolor{codebackgroundprogress}{rgb}{1.0,0.99,0.98}
+\definecolor{codeframe}{rgb}{0.8,0.8,0.8}
+\definecolor{codegreen}{rgb}{0,0.4,0}
+\definecolor{codeblue}{rgb}{0.25,0.25,0.75}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\def\codefontsize{\fontsize{8.5}{9}\selectfont}  % Ideally should be \footnotesize. Set value {8}{9}
+\newcommand{\codeline}[1]{{#1\par}}
+\newcommand{\codelinenum}{\stepcounter{codelinecounter} {\color{codegray} \ifnum\value{codelinecounter}<10 0\fi\arabic{codelinecounter}}\ }
+\newcommand{\numberedcodeline}[1]{{\codelinenum \codeline{#1}}}
+\newcommand{\codecomment}[1]{{\color{codegray} \# #1}}
+\newcommand{\codefixed}[1]{{\color{codeblue} #1}}
+\newcommand{\codedef}[1]{{\color{codegreen} #1}}
+\newcommand{\codereturn}[1]{{\color{codegreen} #1}}
+\newcommand{\codetab}{~~}
+\newcommand{\codeskip}{\smallskip}
+\newenvironment{code}[3]{  % Params: width, height, color
+    \setcounter{codelinecounter}{0}
+    \begin{tcolorbox}[
+        width=#1,height=#2,
+        valign=center,left=0pt,right=0pt,top=0pt,bottom=0pt,
+        colback=#3,colframe=codeframe,boxrule=0.5pt,arc=0pt]
+    \codefont
+    \codefontsize
+}{ 
+    \end{tcolorbox}
+}
+
+\newcommand{\experimentdetails}[2][Experiment Details]{
+    \begin{spacing}{0.85}%
+    {\ifsmallfonts\footnotesize\fi\rule{20pt}{0.4pt}\ \textit{#1: #2}%
+    \hrulefill
+    }%
+    \vspace{-\lineskip}%
+    \end{spacing}%
+    \vspace{\parskip}%
+}
+
+% More abbreviations.
+\def\amlnoformat{\mbox{AutoML}}
+\def\aml{\amlnoformat\xspace}
+\def\amlznoformat{\mbox{AutoML}-\mbox{Zero}}
+\def\amlz{\amlznoformat\xspace}
+\def\as{MLAS}
+\def\setup{\prog{Setup}}
+\def\predict{\prog{Predict}}
+\def\learn{\prog{Learn}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Temporary custom definitions.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{todonotes}
+
+\renewcommand{\todo}[1]{\ifhidetodos{}\else{}{\color{red}{[#1]}}\fi{}}
+\newcommand{\outline}[1]{{\color{gray}{[#1]}}}
+
+% Co-author comments.
+\newcommand{\commentcolor}{violet}
+\newcommand{\ereal}[1]{{\color{\commentcolor}{[ereal: #1]}}}
+\newcommand{\qvl}[1]{{\color{\commentcolor}{[qvl: #1]}}}
+\newcommand{\davidso}[1]{{\color{\commentcolor}{[davidso: #1]}}}
+\newcommand{\crazydonkey}[1]{{\color{\commentcolor}{[crazydonkey: #1]}}}
+
+\makeatletter
+\newcommand\thefontsize{{[[[This font is \f@size pt]]]}}
+\makeatother
+
+\usepackage[english]{babel}
+\usepackage{blindtext}
+\usepackage{lipsum}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Document.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\def\ourtitle{\amlz: Evolving Machine Learning Algorithms From Scratch}
+
+\icmltitlerunning{\amlznoformat}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{\ourtitle}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2020
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
+\icmlsetsymbol{equal}{*}
+\icmlsetsymbol{senior}{\textdagger}
+
+\begin{icmlauthorlist}
+\icmlauthor{Esteban Real}{equal,google}
+\icmlauthor{Chen Liang}{equal,google}
+\icmlauthor{David R. So}{google}
+\icmlauthor{Quoc V. Le}{google}
+\end{icmlauthorlist}
+
+\icmlaffiliation{google}{Google Brain/Google Research, Mountain View, CA, USA}
+
+\icmlcorrespondingauthor{Esteban Real}{ereal@\allowbreak google.com}
+
+\icmlkeywords{machine learning, neural networks, evolution, evolutionary algorithms, regularized evolution, program synthesis, architecture search, NAS, neural architecture search, neuro-architecture search, AutoML, AutoML-Zero, algorithm search, meta-learning, genetic algorithms, genetic programming, neuroevolution, neuro-evolution}
+
+\vskip 0.3in
+]
+
+%\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+\printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
+
+\input{paper_part1_abstract.tex}
+
+% DONE(ereal): check citation coverage and targeting.
+\input{paper_part2_introduction.tex}
+\input{paper_part3_related_work.tex}
+
+\input{paper_part4_methods.tex}
+\input{paper_part5_results.tex}
+\input{paper_part6_discussion.tex}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section*{Author Contributions}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ER and QVL conceived the project; ER led the project; QVL provided advice; ER designed the search space, built the initial framework, and demonstrated plausibility; CL designed proxy tasks, built the evaluation pipeline, and analyzed the algorithms; DRS improved the search method and scaled up the infrastructure; ER, CL, and DRS ran the experiments; ER wrote the paper with contributions from CL; all authors edited the paper and prepared the figures; CL open-sourced the code.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section*{Acknowledgements}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We would like to thank Samy Bengio, Vincent Vanhoucke, Doug Eck, Charles Sutton, Yanping Huang, Jacques Pienaar, and Jeff Dean for helpful discussions, and especially Gabriel Bender, Hanxiao Liu, Rishabh Singh, Chiyuan Zhang, Hieu Pham, David Dohan and Alok Aggarwal for useful comments on the paper, as well as the larger Google Brain team.
+
+% In the unusual situation where you want a paper to appear in the
+% references without citing it in the main text, use \nocite
+% \nocite{langley00}
+
+\bibliography{short}
+\bibliographystyle{icml2020}
+
+% We recommend that you build supplementary material in a separate document.
+% If you must create one PDF and cut it up, please be careful to use a tool that
+% doesn't alter the margins, and that doesn't aggressively rewrite the PDF file.
+% pdftk usually works fine. 
+% \textbf{Please do not use Apple's preview to cut off supplementary material.} In
+% previous years it has altered margins, and created headaches at the camera-ready
+% stage. 
+\input{paper_part7_supplement.tex}
+
+\end{document}
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018, and modified by Alexandre Bouchard in
+% 2019 and 2020. Previous contributors include Dan Roy, Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.

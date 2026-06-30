@@ -1,0 +1,49 @@
+\section{Method}
+\label{sec:method}
+\looseness=-1
+\voyager consists of three novel components: (1) an automatic curriculum (Sec.~\ref{sec:method_automatic_curriculum}) that suggests objectives for open-ended exploration, (2) a skill library (Sec.~\ref{sec:method_skill_library}) for developing increasingly complex behaviors, and (3) an iterative prompting mechanism (Sec.~\ref{sec:method_iterative_prompting}) that generates executable code for embodied control. Full prompts are presented in Appendix, Sec.~\ref{supp:sec:method}.
+\subsection{Automatic Curriculum}
+\label{sec:method_automatic_curriculum}
+\input{figures/curriculum}
+Embodied agents encounter a variety of objectives with different complexity levels in open-ended environments. An automatic curriculum offers numerous benefits for open-ended exploration, ensuring a challenging but manageable learning process, fostering curiosity-driven intrinsic motivation for agents to learn and explore, and encouraging the development of general and flexible problem-solving strategies~\cite{wang2019paired,portelas2020automatic,forestier2022intrinsically}. Our automatic curriculum capitalizes on the internet-scale knowledge contained within GPT-4 by prompting it to provide a steady stream of new tasks or challenges. 
+The curriculum unfolds in a bottom-up fashion, allowing for considerable adaptability and responsiveness to the exploration progress and the agent's current state (Fig.~\ref{fig:curriculum}). As \voyager progresses to harder self-driven goals, it naturally learns a variety of skills, such as ``mining a diamond''.
+
+\looseness=-1
+The input prompt to GPT-4 consists of several components: 
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Directives encouraging diverse behaviors and imposing constraints}, such as ``\texttt{My ultimate goal is to discover as many diverse things as possible ... The next task should not be too hard since I may not have the necessary resources or have learned enough skills to complete it yet.}'';
+    \item \textbf{The agent's current state}, including inventory, equipment, nearby blocks and entities, biome, time, health and hunger bars, and position;
+    \item \textbf{Previously completed and failed tasks}, reflecting the agent's current exploration progress and capabilities frontier;
+    \item \textbf{Additional context}: We also leverage GPT-3.5 to self-ask questions based on the agent's current state and exploration progress and self-answer questions. We opt to use GPT-3.5 instead of GPT-4 for standard NLP tasks due to budgetary considerations.
+\end{enumerate}
+
+\subsection{Skill Library}
+\label{sec:method_skill_library}
+\input{figures/skill_library}
+\looseness=-1
+With the automatic curriculum consistently proposing increasingly complex tasks, it is essential to have a skill library that serves as a basis for learning and evolution. Inspired by the generality, interpretability, and universality of programs~\cite{ellis2020dreamcoder}, we represent each skill with executable code that scaffolds temporally extended actions for completing a specific task proposed by the automatic curriculum.
+
+The input prompt to GPT-4 consists of the following components: 
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Guidelines for code generation}, such as ``\texttt{Your function will be reused for building more complex functions. Therefore, you should make it generic and reusable.}'';
+    \item \textbf{Control primitive APIs, and relevant skills} retrieved from the skill library, which are crucial for in-context learning~\cite{wei2022emergent,brown2020gpt3,raffel2020t5} to work well;
+    \item \textbf{The generated code from the last round, environment feedback, execution errors, and critique}, based on which GPT-4 can self-improve (Sec.~\ref{sec:method_iterative_prompting});
+    \item \textbf{The agent's current state}, including inventory, equipment, nearby blocks and entities, biome, time, health and hunger bars, and position;
+    \item \textbf{Chain-of-thought prompting}~\cite{wei2022chain} to do reasoning before code generation.
+\end{enumerate}
+
+We iteratively refine the program through a novel iterative prompting mechanism (Sec.~\ref{sec:method_iterative_prompting}), incorporate it into the skill library as a new skill, and index it by the embedding of its description (Fig.~\ref{fig:skill_library}, top). For skill retrieval, we query the skill library with the embedding of self-generated task plans and environment feedback (Fig.~\ref{fig:skill_library}, bottom). By continuously expanding and refining the skill library, \voyager can learn, adapt, and excel in a wide spectrum of tasks, consistently pushing the boundaries of its capabilities in the open world.
+
+\subsection{Iterative Prompting Mechanism}
+\label{sec:method_iterative_prompting}
+\input{figures/feedback}
+We introduce an iterative prompting mechanism for self-improvement through three types of feedback: 
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Environment feedback}, which illustrates the intermediate progress of program execution (Fig.~\ref{fig:feedback}, left). For example, ``\texttt{I cannot make an iron chestplate because I need: 7 more iron ingots}'' highlights the cause of failure in crafting an iron chestplate. We use \texttt{bot.chat()} inside control primitive APIs to generate environment feedback and prompt GPT-4 to use this function as well during code generation; 
+    \item \textbf{Execution errors} from the program interpreter that reveal any invalid operations or syntax errors in programs, which are valuable for bug fixing (Fig.~\ref{fig:feedback}, right); 
+    \item \textbf{Self-verification for checking task success.} Instead of manually coding success checkers for each new task proposed by the automatic curriculum, we instantiate another GPT-4 agent for self-verification. By providing \voyager's current state and the task to GPT-4, we ask it to act as a critic~\cite{mnih2016asynchronous,schulman2017proximal,lillicrap2016continuous} and inform us whether the program achieves the task. In addition, if the task fails, it provides a critique by suggesting how to complete the task (Fig.~\ref{fig:self-verification}). Hence, our self-verification is more comprehensive than self-reflection~\cite{shinn2023reflexion} by both checking success and reflecting on mistakes.
+\end{enumerate}
+
+During each round of code generation, we execute the generated program to obtain environment feedback and execution errors from the code interpreter, which are incorporated into GPT-4's prompt for the next round of code refinement. This iterative process repeats until self-verification validates the task's completion, at which point we add this new skill to the skill library and ask the automatic curriculum for a new objective (Fig.~\ref{fig:diagram}). If the agent gets stuck after 4 rounds of code generation, then we query the curriculum for another task. This iterative prompting approach significantly improves program synthesis for embodied control, enabling \voyager to continuously acquire diverse skills without human intervention.
+
+\input{figures/critic}

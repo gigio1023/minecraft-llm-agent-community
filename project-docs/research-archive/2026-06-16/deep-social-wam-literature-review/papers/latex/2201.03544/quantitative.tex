@@ -1,0 +1,83 @@
+\subsection{Quantitative Effects vs. Agent Capabilities}\label{sec:quantitative}
+
+As a stand-in for increasing agent optimization power, we first 
+vary the model capacity for a fixed environment and proxy reward. Specifically, we vary the width and depth of the actor and critic networks, changing the parameter count by two to four orders of magnitude depending on the environment. For a given policy, the actor and critic are always the same size.
+
+
+
+%We ground the optimization ability of an RL agent along four axes: policy model size, number of interactions with the training environment, action space resolution, and observation fidelity. These choices reflect how real-world RL systems are expected to improve in the future as compute resources increase and sensor technology improves. %increased compute resources and better sensors.
+ \begin{figure}[!bp]
+    \centering
+  \subfloat[Atari - Misweighting\label{fig:training_steps}]{\includegraphics[scale=0.27]{figures/atari/atari_steps.eps}}%
+  \hfill
+  \subfloat[Traffic - Ontological\label{fig:action_noise}] {\includegraphics[scale=0.4]{figures/traffic/action_noise_single_discrete_16.eps}}%
+  \hfill \subfloat[COVID - Ontological\label{fig:obs_noise}]{\includegraphics[scale=0.38]{figures/pandemic/obs_noise_16.eps}}%
+    \caption{In addition to parameter count, we consider three other agent capabilities: training steps, action space resolution, and observation noise. In Figure~\ref{fig:training_steps}, an increase in the proxy reward comes at the cost of the true reward. In Figure~\ref{fig:action_noise}, increasing the granularity (from right to left) causes the agent to achieve similar proxy reward but lower true reward. In Figure~\ref{fig:obs_noise}, increasing the fidelity of observations (by increasing the random testing rate in the population) tends to decrease the true reward with no clear impact on proxy reward.}
+\end{figure}
+
+
+\paragraph{Model Capacity.} Our results are shown in Figure~\ref{fig:modelsize_scatter}, with additional plots included in Appendix~\ref{app:measurement}. We plot both the proxy (blue) and true (green) reward vs.~the number of parameters. 
+%
+As model size increases, the proxy reward increases but the true reward decreases. This suggests that reward designers will likely need to take greater care to specify reward functions accurately and is especially salient given the recent trends towards larger and larger models~\citep{ai100report2021}.  %her proxy rewards are achieved.  %Designers will likely need to take greater care to specify reward functions accurately. Furthermore, the presence of phase transitions implies that even small increases in optimization power could lead to unintended consequences, placing an additional burden on safety. %observe possible phase transitions in Figures~\ref{fig:t_ont} and~\ref{fig:p_ont}. 
+
+The drop in true reward is sometimes quite sudden. We call these sudden shifts \emph{phase transitions}, and mark them with dashed red lines in Figure~\ref{fig:modelsize_scatter}. These quantitative trends are reflected in the qualitative behavior of the policies (Section~\ref{sec:qualitative}), which typically also shift at the phase transition. % as the model better optimizes the proxy.
+
+%We find evidence of phase transitions in the policy's behavior as optimization power increases. %we increase these optimization abilities. These are marked by sudden, changes in the true and proxy reward, %, shifting from max to min. qualitative changes, 
+% two of which are exhibited in Figures~\ref{fig:traffic_qualitative} and~\ref{fig:COVID_qualitative}.
+
+
+%\captionsetup{position=top}
+
+
+%We study four axes of optimization power, based on how real-world ML systems might expect to improve. 
+
+%\begin{enumerate}[leftmargin=*]
+ %   \item \emph{Model size.} Going forward, we expect that policy models will continue to increase in complexity \textcolor{red}{cite gpt3 and other large scale language models}. To study the effects of optimization power along this axis, we vary the width and the depth of the actor and critic networks. %We tune the learning rate to ensure that models are optimized well. 
+ %   Although several works \textcolor{red}{cite} have indicated that larger policy networks are not necessarily stronger optimizers, we intend for model size to be only a rough proxy of optimization power \textcolor{red}{cite}.% \kbcomm{What exactly is easier to quantify and how does it compare with this relative strength?} Also, it is easier to quantify compared to the relative strength of RL optimization algorithms \textcolor{red}{cite{Pineau RL sucks}}.  %We are aware that model size does not necessarily correlated with performance on the proxy. Indeed, we found that during training, larger models did not necessarily receive the highest proxy score. However, we use this as a proxy of optimization power because it is easy to compare (whereas RL optimization algorithm ability is harder to quantify 
+ 
+
+
+
+Model capacity is only one proxy for agent capabilities, and larger 
+models do not always lead to more capable agents~\citep{andrychowicz2020matters}. To check the robustness of our results, we consider several other measures of optimization: observation fidelity, number of training steps, and action space resolution.
+
+\paragraph{Number of training steps.} Assuming a reasonable RL algorithm and hyperparameters, agents which are trained for more steps have more optimization power. %This mirrors how deep RL models are trained with increasingly more compute~\citep{silver2016alphago,badia2020agent57}. We use the number of training steps as a proxy for CPU-hours.
+%
+We vary training steps for an agent trained on the Atari environment. The true reward incentivizes staying alive for as many frames as possible while moving smoothly. The proxy reward misweights these considerations by underpenalizing the smoothness constraint. As shown in Figure~\ref{fig:training_steps}, optimizing the proxy reward for more steps harms the true reward, after an initial period where the rewards are positively correlated.  %At a high level, we underpenalize choppy movement in the proxy reward. , the See Appendix~\ref{app:measurement} for results. Another axis for optimization capability is the number of times an agent interacts with the environment. %or the number of time steps that we run the training procedure for. 
+%For any fixed model size, as we increase the number of training iterations, we observe that their performance on the specified reward increases.     %We find that they continue to improve their proxy score. 
+%Thus training steps is another notion of optimization strength, and correlates with models receiving more compute-hours. This mirrors how models are trained with increasingly more compute hours~\citep{silver2016alphago,badia2020agent57}.
+
+\paragraph{Action space resolution.} Intuitively, an agent that can take more precise actions is more capable. %In the future, we expect more powerful models to possess greater control over their environment via these highly granular actions. 
+For example, as technology improves, an RL car may make course corrections every millisecond instead of every second. We study action space resolution in the traffic environment by discretizing the output space of the RL agent. Specifically, under resolution level $\varepsilon$, we round the action $a \in \mathbb{R}$ output by the RL agent to the nearest multiple of $\varepsilon$ and use that as our action.  The larger the resolution level $\varepsilon$, the lower the action space resolution. Results are shown in Figure~\ref{fig:action_noise} for a fixed model size. Increasing the resolution causes the proxy reward to remain roughly constant while the true reward decreases. %Although increasing the noise causes the true reward to decrease, it does not clearly improve the agent's performance on the proxy. %We postulate that action noise may mitigate the strength of reward hacking, but may not directly instigate it.
+
+%We apply zero-mean Gaussian noise to accelerations of the AVs in the traffic-ontological environment-misspecification. 
+%All three models typically achieve greater proxy reward as the noise level decreases. Furthermore, we see a significant decline in the true reward of the smallest model, which is the least capable model along the parameter count axis. This indicates that parameter count and action-space noise are relatively independent notions of optimization power. % best models as the noise drops. The two larger models do not experience as significant of a decline as they already have low true reward.
+
+
+\paragraph{Observation fidelity.} Agents with access to better input sensors, like higher-resolution cameras, 
+should make more informed decisions and thus have more optimization power. 
+%Intuitively, an agent with access to a higher density of high-quality data should make more informed decisions and thus have more optimization power than one without. In the future, we expect current trends in huge data growth to increase for several sectors \textcolor{red}{CITE some space with huge amounts of data -- eg. healthcare}. 
+Concretely, we study this in the COVID environment, where we increase the random testing rate in the population. The proxy reward is a linear combination of the number of infections and severity of social distancing, while the true reward also factors in political cost. % (so that observations more accurately reflect the underlying rate of infection). %This allows the RL agent's observations to more accurately reflect the underlying rate of infection. 
+As shown in Figure~\ref{fig:obs_noise}, as the testing rate increases, the model achieves similar proxy reward at the cost of a slightly lower true reward. %This effect is more pronounced with larger models.% a model operating without sensor noise (noise 0) is typically able to achieve a higher proxy than a model with sensor noise (noise 1). Furthermore, the true and proxy rewards are anti-correlated in the model without observation noise (noise 0), whereas they are correlated in the model with observation noise (noise 1). This suggests that increasing observation fidelity may produce reward hacking, and conversely, decreasing fidelity may mitigate it.
+
+%By increasing the variance of this noise, variance to approximate less action-space resolution.
+
+%\captionsetup{position=top}
+
+
+
+
+
+
+
+%\end{enumerate}
+
+%as approximations of As a case sAs noted in Section~\ref{sec:intro}, we consider four notions of capabilities: model size, number of training steps, action space resolution (the granularity of actions available to the model, and observation noise (the sensitivity of environment observations). 
+
+%We evaluate our models on the environment-misspecification pairs given in Table~\ref{tab:misspecification_summary}. To measure the effect of an axis, we increase the agent's strength along that axis, while keeping other axes fixed. 
+
+%\subsubsection{Effect of training steps}
+
+
+
+

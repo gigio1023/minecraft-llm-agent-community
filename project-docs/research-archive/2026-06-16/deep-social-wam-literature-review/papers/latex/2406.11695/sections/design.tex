@@ -1,0 +1,45 @@
+Algorithm~\ref{alg:general} defines a general optimization framework for LM programs. We seek efficient instantiations of this algorithm in which we minimize the number of times the program $\Phi$ is invoked (Line~10) and, as a result, the number of times we must sample proposals (Line~8). To this end, we are especially interested in building LM program optimizers with strategies that handle the proposal and credit assignment challenges discussed in Section~\ref{sec:intr}. In this section, we present several novel or improved strategies for this. Section~\ref{sec:optimizers} then defines a few effective compositions of these strategies that allow us to empirically study their properties in practice.  We showcase how these components come together to make LM Program optimizers in Figure~\ref{fig:MIPRO_figure}.
+
+
+
+
+
+\subsection{The Proposal Problem}
+\label{sec:prompt_proposal}
+
+To make the approximate optimization tractable, we must be able to efficiently sample candidate prompts that are well suited to the nature of our task, program, data, and metric. To do this, we leverage another LM as a `proposer' LM, and consider (i) bootstrapping few-shot examples that demonstrate how to conduct the task, (ii) collecting and summarizing important factors that could inform the construction of high-quality instructions, and/or (iii) meta-optimizing how the proposer LM is used to create high-performing instructions.
+
+
+
+
+\textbf{Bootstrapping Demonstrations}
+\citet{khattab2022demonstrate,khattab2024dspy} study a simple yet surprisingly effective rejection-sampling strategy for optimizing the prompts of LM programs. Inputs $x$ are sampled from the training set, and run through $\Phi(x)$ to generate input/output traces $\tau$ for each module in the program. If the output scores as measured by metric $\mu$ are successful, i.e.\ $\mu(\Phi(x), x') \geq \lambda$ for some threshold $\lambda$ and 
+$(x, x') \in \mathcal{D}$, they treat all values in the trace as a potential labeled demonstrations (i.e. valid input/output examples) for the respective module in $\Phi$. 
+Given these potential demonstrations, the optimization problem is reduced to selecting combinations of demonstrations (within and across modules) that serve as effective few-shot examples for prompting. \citet{khattab2024dspy} find this can often outperform hand-written demonstrations for multi-stage programs.
+
+\textbf{Grounding} How can we guide our proposal LM to craft performant instructions for a given module? We hypothesize that providing the proposal LM with relevant context, such as properties of the data, the program, and examples of successful task completions, will allow it to create instructions better suited to the task. Hence, we build a zero-shot LM program for (i) characterizing patterns in the raw dataset $\mathcal{D}$, (ii) summarizing the program's control flow, (iii) bootstrapping program demonstrations, and (iv) collecting per-stage prompts that were previously evaluated with their evaluation scores on the train set.  We consider supplying each of these pieces as context to `ground' the LM proposing our instructions. Details on constructing the dataset and program summaries are included in Appendix~\ref{sec:grounding_details}.
+
+
+
+
+\textbf{Learning To Propose}
+Every proposal strategy has several hyperparameters, e.g.\ the temperature used for instruction generation and whether to ground the proposer with a data summary, program control flow, etc. Optimal configurations of these hyperparameters may depend in practice on the task, program, and proposer LM. For example, the dataset summary may be essential to a logical reasoning task but may distract a small proposer LM for highly familiar tasks like factoid question answering.  Motivated by this, in learning to propose, we parameterize proposal hyperparameters, and learn a Bayesian model over several trials to find what proposal strategy works for a given task, program, and LM setup.
+
+
+
+\subsection{Credit Assignment}
+Proposed assignments may be combined in many configurations. To search this space, we must identify the contribution of specific choices to LM program performance. We propose and explore three solutions for this credit-assignment problem: \textbf{greedy}, \textbf{surrogate}, and \textbf{history-based}. %
+
+\textbf{Greedy}
+As one technique, we consider proposing and evaluating single-stage changes to the LM program separately. This method limits the mis-attribution of errors to incorrect stages, but is inefficient as (i) changes must be applied one at a time, and (ii) changes to some stages may not change program-level performance until other stages are improved first.  Our preliminary experimentation with greedy credit assignment demonstrated that it was no more effective than other approaches but it imposed considerably worse time complexity.
+
+
+\textbf{Surrogate}
+To achieve more efficient credit assignment, we propose the use of Bayesian learning, which is known for it's ability to efficiently optimize functions with multiple latent variables. In this setup, a surrogate model learns to predict the quality of different parameter combinations from previous evaluations, allowing us to focus future exploration on the promising regions of the search space. In practice, we use Optuna's implementation of the Tree Structured Parzen Optimizer to build a Bayesian model over the quality of parameter combinations for the LM program \citep{akiba2019optuna, bergstra2011algorithms}. This multivariate variation of TPE models joint contributions between parameter choices, allowing us to jointly optimize our program's variables \cite{pmlr-v80-falkner18a}. In short, surrogate-based optimization allows us to optimize efficiently over a discrete set of existing parameter proposals. However, a shortcoming of this is that it only allows for optimization over a fixed set of proposals. Learnings from past evaluations cannot be used to improve the proposals themselves.
+
+
+
+
+
+\textbf{History-Based} Here we make the assumption that given a history of past evaluations, a sufficiently strong LM could perform credit assignment, removing the need for an explicit surrogate model. This would allow us to perform credit assignment \textit{and} propose improved instructions simultaneously, as the proposer LM could in theory do both at once. Following the strategy outlined in OPRO \citep{yang2023large}, we rely on the proposer LM to learn assigned credit from a history of evaluated instructions and their scores by including these in the context. The proposer LM then outputs a new instruction based on this information. In Section~\ref{sec:optimizers}, we cover a few ways in which the LM can be instructed to conduct this credit assignment process more or less explicitly.
+

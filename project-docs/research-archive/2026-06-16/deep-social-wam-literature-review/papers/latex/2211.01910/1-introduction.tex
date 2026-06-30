@@ -1,0 +1,61 @@
+\section{Introduction}\label{sec:intro}
+The combination of scale and attention-based architectures has resulted in language models possessing an unprecedented level of generality \citep{kaplan2020scaling,vaswani2017attention}. These so-called ``large language models'' (LLMs) have shown remarkable, often superhuman, capabilities across a diverse range of tasks, including both zero-shot and few-shot setups \citep{brown2020language,srivastava2022beyond}. With generality, however, there comes a question of control: how can we make LLMs do what we want them to do? 
+
+To answer this question and steer LLMs toward desired behaviors, recent work has considered fine-tuning \citep{ouyang2022training,ziegler2019fine}, in-context learning \citep{brown2020language}, and several forms of prompt generation \citep{gao2021prompting}, including both differentiable tuning of soft prompts \citep{qin2021learning,lester2021power} and natural language prompt engineering \citep{reynolds2021prompt}. The latter is of particular interest, as it provides a natural interface for humans to communicate with machines and may be of great relevance not only to LLMs but to other generalist models such as prompted image synthesizers \citep{rombach2022high,ramesh2022hierarchical}, for which public interest in prompt design and generation has also emerged (see Appendix \ref{appdx_wild_prompt_engineering} for examples).
+
+Behind this interest is the fact that plain language prompts do not always produce the desired results, even when those results are possible to produce with alternative instructions. Thus, human users must experiment with a wide range of prompts to elicit desired behaviors, as they have little knowledge of how compatible instructions are with a particular model.
+We can understand this by viewing LLMs as black-box computers that execute programs specified by natural language instructions: while they can execute a broad range of natural language programs, the way these programs are processed may not be intuitive for humans, and the quality of instruction can only be measured when executing these instructions on a downstream task \citep{sanh2022multitask, wei2021finetuned}. 
+
+\workshopexclude{
+To reduce the human effort involved in creating and validating effective instructions, we propose a novel algorithm using LLMs to generate and select instructions automatically. We call this problem \textit{natural language program synthesis} and propose to address it as a black-box optimization problem using LLMs to generate and search over heuristically viable candidate solutions. 
+In doing so, we leverage the generalist capabilities of LLMs in three ways. First, we use an LLM as an inference model \citep{ellis2021dreamcoder, honovich2022instruction} to generate instruction candidates based on a small set of demonstrations in the form of input-output pairs. Next, we guide the search process by computing a score for each instruction under the LLM we seek to control. Finally, we propose an iterative Monte Carlo search method where LLMs improve the best candidates by proposing semantically similar instruction variants. Intuitively, our algorithm asks LLMs to generate a set of instruction candidates based on demonstrations and then asks them to assess which instructions are more promising. We call our algorithm Automatic Prompt Engineer (\algname). \textbf{Our main contributions are:}
+\begin{itemize}
+    \item We frame instruction generation as natural language program synthesis, formulate it as a 
+    black-box optimization problem guided by LLMs, and propose both a naive and an iterative Monte Carlo search methods to approximate the solution.
+    \item Our proposed method, APE, achieves human-level performance on zero-shot learning with model-generated instructions on 24/24 Instruction Induction and 17/21 Big-Bench tasks.
+    \item We provide extensive qualitative and quantitative analyses exploring various facets of APE, and demonstrate applications of APE for improving few-shot learning, finding better zero-shot chain of thought prompts, and steering LLMs toward desired behaviors such as truthfulness and/or informativeness.
+\end{itemize}
+}
+
+\workshoponly{
+To reduce the human effort involved in creating and validating effective instructions, we propose a novel algorithm using LLMs to generate and select instructions automatically. We call this problem \textit{natural language program synthesis} and propose to address it as a black-box optimization problem using LLMs to generate and search over heuristically viable candidate solutions. In doing so, we leverage the generalist capabilities of LLMs in two ways. First, we use an LLM as an inference model \citep{ellis2021dreamcoder, honovich2022instruction} to generate instruction candidates based on a small set of demonstrations in the form of input-output pairs. Second, we guide the search process by computing a score for each instruction under the LLM we seek to control. Intuitively, our algorithm asks LLMs to generate a set of instruction candidates based on demonstrations and then asks them to assess which instructions are more promising. We call our algorithm Automatic Prompt Engineer (\algname). \textbf{Our main contributions are:}
+\begin{itemize}
+    \item We frame instruction generation as natural language program synthesis, formulate it as a 
+    black-box optimization problem guided by LLMs, and propose a Monte Carlo search methods to approximate the solution.
+    \item Our proposed method, APE, achieves human-level performance on zero-shot learning with model-generated instructions on 19/24 NLP tasks and demonstrate applications of APE for steering LLMs toward desired behaviors such as truthfulness and/or informativeness.
+\end{itemize}
+}
+
+% \begin{figure}
+%   \centering
+%   \vspace{-0.25in}
+% %   \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+% \hspace{-0.05\textwidth}\begin{subfigure}[b]{0.25\textwidth}
+%   \hfill\includegraphics[width=0.8\linewidth]{figures/illustration/APE_bayesian_inference.pdf}\vspace{0.75em}
+%   \caption{}
+% \end{subfigure}
+% \begin{subfigure}[b]{0.31\textwidth}
+%   \includegraphics[width=1.0\linewidth]{figures/illustration/APE_template.pdf}\vspace{0.9em}
+%   \caption{LLMs as inference models}
+%  \end{subfigure}\hfill
+%  \begin{subfigure}[b]{0.45\textwidth}
+%   \includegraphics[width=1.0\linewidth]{figures/main/model_size.pdf}
+%   \caption{Interquartile mean across 24 tasks}
+%   \end{subfigure}
+%   \caption{(a) Natural language program synthesis finds an appropriate instruction (the program) that generates the observed demonstrations when executed by the model. We frame this as a black-box optimization problem guided by an inference procedure. (b) We use LLMs as inference models to fill in the blank; our algorithm involves a search over candidates proposed by the inference models. (c) As measured by the interquartile mean across the 24 NLP tasks introduced by \citet{honovich2022instruction}, APE is able to surpass human performance when using the InstructGPT model \citep{ouyang2022training}.}\label{fig:highlight}
+% \end{figure}
+
+\begin{figure}
+  \centering
+  \vspace{-0.05in}
+%   \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+\begin{subfigure}[b]{0.48\textwidth}
+   \hfill\includegraphics[width=1.0\linewidth]{figures/illustration/APE_pipe.pdf}\vspace{0.75em}
+  \caption{Automatic Prompt Engineer (APE) workflow}
+\end{subfigure}
+ \begin{subfigure}[b]{0.49\textwidth}
+  \includegraphics[width=1.0\linewidth]{figures/main/model_size.pdf}
+  \caption{Interquartile mean across 24 tasks}
+  \end{subfigure}
+  \caption{(a) Our method, \textbf{Automatic Prompt Engineer (APE)}, automatically generates instructions for a task that is specified via output demonstrations: it generates several instruction candidates, either via direct inference or a recursive process based on semantic similarity, executes them using the target model, and selects the most appropriate instruction based on computed evaluation scores. (b) As measured by the interquartile mean across the 24 NLP tasks introduced by \citet{honovich2022instruction}, APE is able to surpass human performance when using the InstructGPT model \citep{ouyang2022training}.}\label{fig:highlight}
+\end{figure}

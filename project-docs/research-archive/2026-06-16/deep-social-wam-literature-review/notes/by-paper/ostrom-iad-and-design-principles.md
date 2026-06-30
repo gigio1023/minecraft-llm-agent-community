@@ -54,9 +54,9 @@
 
 ## Mechanically useful vs research contribution
 
-- Mechanically useful: principles 1 (boundaries → who holds a `material claim`),
-  4-5 (monitoring + graduated sanctions → sanction/violation ledger entries), 6
-  (conflict resolution → repair/restitution events) are directly loggable in the
+- Mechanically useful: principles 1 (boundaries -> who holds a `material claim`),
+  4-5 (monitoring + graduated sanctions -> sanction/violation ledger entries), 6
+  (conflict resolution -> repair/restitution events) are directly loggable in the
   repo's existing `MaterialClaimLedgerEntry` / `ObligationLedgerEntry` and a
   to-be-added sanction record.
 - Avoid / overclaim: do NOT build a full commons-governance economy. The repo's

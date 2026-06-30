@@ -1,0 +1,541 @@
+%%%% ijcai20.tex
+
+\typeout{Automatic Curriculum Learning in Deep RL: a short survey}
+
+% These are the instructions for authors for IJCAI-20.
+
+\documentclass{article}
+\pdfpagewidth=8.5in
+\pdfpageheight=11in
+% The file ijcai20.sty is NOT the same than previous years'
+\usepackage{ijcai20}
+
+% Use the postscript times font!
+\usepackage{times}
+\usepackage{soul}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage[small]{caption}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{float}
+\definecolor{myred}{rgb}{0.8,0,0}
+\newcommand{\todo}[1]{}
+\renewcommand{\todo}[1]{{\color{myred} Todo: {#1}}}
+\newcommand{\cc}[1]{{\color{MidnightBlue} {#1}}}
+\newcommand{\mycite}[1]{\citeauthor{#1}~\shortcite{#1}}
+\newtheorem*{remark}{Definition of ACL}
+\usepackage{scalefnt}
+\usepackage{enumitem}
+
+\usepackage{makecell}
+%\renewcommand{\cellalign/theadalign}{bl}
+\renewcommand\theadalign{bl}
+\renewcommand\theadfont{\bfseries}
+\renewcommand\theadgape{\Gape[4pt]}
+\renewcommand\cellgape{\Gape[4pt]}
+
+\urlstyle{same}
+\medmuskip=2mu
+\thinmuskip=2mu
+\thickmuskip=2mu
+
+% the following package is optional:
+%\usepackage{latexsym} 
+
+\newtheorem{example}{Example}
+\newtheorem{theorem}{Theorem}
+
+\title{Automatic Curriculum Learning For Deep RL: A Short Survey}
+
+% Multiple author syntax (remove the single-author syntax above and the \iffalse ... \fi here)
+% Check the ijcai20-multiauthor.tex file for detailed instructions
+
+\author{
+%R\'emy Portelas\footnote{Corresponding author: remy.portelas@inria.fr}$^1$
+R\'emy Portelas$^1$
+\and
+C\'edric Colas$^1$\and
+Lilian Weng$^2$\and
+Katja Hofmann$^3$\And
+Pierre-Yves Oudeyer$^1$
+\affiliations
+%$^1$Inria (FR) - $^2$OpenAI (US) - $^3$Microsoft Research (UK)
+$^1$Inria, France\\
+$^2$OpenAI, USA\\
+$^3$Microsoft Research, UK\\
+\vspace{0.12cm}
+remy.portelas@inria.fr}
+
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    Automatic Curriculum Learning (ACL) has become a cornerstone of recent successes in Deep Reinforcement Learning (DRL). 
+    %
+    These methods shape the learning trajectories of agents by challenging them with tasks adapted to their capacities.
+    %
+    In recent years, they have been used to improve sample efficiency and asymptotic performance, to organize exploration, to encourage generalization or to solve sparse reward problems, among others.
+    % 
+    To do so, ACL mechanisms can act on many aspects of learning problems. 
+    %
+    They can optimize domain randomization for Sim2Real transfer, organize task presentations in multi-task robotic settings, order sequences of opponents in multi-agent scenarios, etc.
+    %
+    The ambition of this work is dual: 1) to present a compact and accessible introduction to the Automatic Curriculum Learning literature and 2) to draw a bigger picture of the current state of the art in ACL to encourage the cross-breeding of existing concepts and the emergence of new ideas.   
+\end{abstract}
+
+
+\section{Introduction}
+% The ``named'' bibliography style creates citations with labels like
+%       \citeauthoryear{author-info}{year}
+% these labels are processed by the following commands:
+%       \cite{keylist}
+%               which produces citations with both author and year,
+%               enclosed in square brackets
+%       \shortcite{keylist}
+%               which produces citations with year only,
+%               enclosed in square brackets
+%       \citeauthor{key}
+%               which produces the author information only
+%       \citeyear{key}
+%               which produces the year information only
+
+% This is cite: \cite{selfridge}, but this is citeshort: \shortcite{selfridge}, and this is citeauthor \citeauthor{selfridge}, and this is citeyear \citeyear{selfridge}, and this is.
+
+Human learning is organized into a curriculum of interdependent learning situations of various complexities. For sure, Homer learned to formulate words before he could compose the Iliad. This idea was first transferred to machine learning in \mycite{selfridge}, where authors designed a \textit{learning scheme} to train a cart pole controller: first training on long and light poles, then gradually moving towards shorter and heavier poles. A related concept was also developed by \mycite{Schmid}, who proposed to improve world model learning by organizing exploration through \textit{artificial curiosity}.
+%
+In the following years, curriculum learning was applied to organize the presentation of training examples or the growth in model capacity in various supervised learning settings~\cite{elman,krueger,bengiocl}.
+%
+In parallel, the developmental robotics community proposed \textit{learning progress} as a way to self-organize open-ended \textit{developmental trajectories} of learning agents~\cite{oudeyer2007intrinsic}. Inspired by these earlier works, the Deep Reinforcement Learning (DRL) community developed a family of mechanisms called \textit{Automatic Curriculum Learning}, which we propose to define as follows:
+
+% \textit{\textbf{Automatic Curriculum Learning (ACL)} for DRL is a family of mechanisms that automatically adapt the distribution of training data by properly sorting the learning situations to match the capabilities of learning agents.}
+\textit{\textbf{Automatic Curriculum Learning (ACL)} for DRL is a family of mechanisms that automatically adapt the distribution of training data by learning to adjust the selection of learning situations to the capabilities of DRL agents.}
+%\textit{\textbf{Automatic Curriculum Learning (ACL)} for DRL is a family of mechanisms that automatically adapt the distribution of training data by adjusting the selection of learning situations to the capabilities of learning agents.}
+%Automatic Curriculum Learning (ACL) for DRL is a family of mechanisms that automatically adapt the distribution of training data by *learning to* adjust the selection of learning situations to the capabilities of learning agents. ?
+
+\paragraph{Related fields.}ACL shares many connections with other fields. For example, ACL can be used in the context of \textit{Transfer Learning} where agents are trained on one distribution of tasks and tested on another~\cite{taylortransfer}. \textit{Continual Learning} trains agents to be robust to unforeseen changes in the environment while ACL assumes agents to stay in control of learning scenarios~\cite{continual-learning-review}. \textit{Policy Distillation} techniques \cite{pol-dil-review} form a complementary toolbox to target multi-task RL settings, where knowledge can be transferred from one policy to another (e.g. from task-expert policies to a generalist policy).
+
+\paragraph{Scope.}This short survey proposes a typology of ACL mechanisms when combined with DRL algorithms and, as such, does not review population-based algorithms implementing ACL (e.g.~\mycite{imgep}, \mycite{poet}). 
+%
+As per our adopted definition, ACL refers to mechanisms \textit{explicitly} optimizing the automatic organization of training data. Hence, they should not be confounded with \textit{emergent curricula}, by-products of distinct mechanisms. For instance, the on-policy training of a DRL algorithm is not considered ACL, because the shift in the distribution of training data \textit{emerges} as a by-product of policy learning.
+%
+Given this is a short survey, we do not present the details of every particular mechanism. As the current ACL literature lacks theoretical foundations to ground proposed approaches in a formal framework, this survey focuses on empirical results.
+
+% In particular, we propose an organization along three principal lines (see Fig.~\ref{fancy-fig}): 1) \textit{Why use ACL?} we review various applications of ACL, 2) \textit{What does ACL control?} ACL mechanisms can be applied on various aspects of the learning problem (e.g. environments, goals, reward functions, adversarial players)? and 3) \textit{How to optimize for the main objective}? ACL can be used for various purposes but can rarely optimize them directly. To palliate this, ACL methods usually leverage surrogate objectives of various types (e.g. learning progress, reward, diversity, etc.). 
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% DEFINITION
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+\section{Automatic Curriculum Learning for DRL}
+\label{sec:2}
+
+%Notes: precise that we'r in a finite horizon setting ie. episodic max step T
+% TODO intro sentence (lets define + lets propose an overview of recent work)
+This section formalizes the definition of ACL for Deep RL and proposes a classification. 
+
+\paragraph{Deep Reinforcement Learning} \hspace{-0.2cm}is a family of algorithms which leverage deep neural networks for function approximation to tackle reinforcement learning problems. DRL agents learn to perform sequences of actions $a$ given states $s$ in an environment so as to maximize some notion of cumulative reward $r$~\cite{sutton2018reinforcement}.
+%
+Such problems are usually called \textit{tasks} and formalized as Markov Decision Processes (MDPs) of the form $T=\langle \mathcal{S},\mathcal{A},\mathcal{P}, \mathcal{R}, \rho_0 \rangle$ where $\mathcal{S}$ is the state space, $\mathcal{A}$ is the action space, $\mathcal{P}:S \times A \times S \rightarrow [0,1]$ is a transition function characterizing the probability of switching from the current state $s$ to the next state $s'$ given action $a$, $\mathcal{R}:S \times A  \rightarrow \mathbb{R}$ is a reward function and $\rho_0$ is a distribution of initial states. 
+%
+To challenge the generalization capacities of agents \cite{coinrun}, the community introduced multi-task DRL problems where agents are trained on tasks sampled from a task space: $T \sim \mathcal{T}$. In multi-goal DRL, policies and reward functions are conditioned on goals, which augments the task-MDP with a goal space $\mathcal{G}$~\cite{uvfa}.
+
+\paragraph{Automatic Curriculum Learning} \hspace{-0.2cm} mechanisms propose to learn a task selection function $\mathcal{D}:\mathcal{\mathcal{H}\to\mathcal{T}}$ where $\mathcal{H}$ can contain any information about past interactions. This is done with the objective of maximizing a metric $P$ computed over a distribution of target tasks $\mathcal{T}_{target}$ after $N$ training steps:
+\begin{equation}
+    \label{eq:1}
+    Obj: \max_{\mathcal{D}} \int_{T\sim \mathcal{T}_{target}} \! P_T^N\, \mathrm{d}T,
+\end{equation}
+where $P_T^N$ quantifies the agent's behavior on task $T$ after $N$ training steps (e.g. cumulative reward, exploration score). In that sense, ACL can be seen as a particular case of meta-learning, where $\mathcal{D}$ is learned along training to improve further learning. 
+
+\paragraph{ACL Typology.} We propose a classification of ACL mechanisms based on three dimensions:
+\begin{enumerate}[leftmargin=0.45cm, nolistsep]
+    \item \textit{Why use ACL?} We review the different objectives that ACL has been used for (Section~\ref{sec:main_objective}).
+    \item \textit{What does ACL control?} ACL can target different aspects of the learning problem (e.g. environments, goals, reward functions, Section~\ref{sec:lever})
+    \item \textit{What does ACL optimize}? ACL mechanisms usually target surrogate objectives (e.g. learning progress, diversity) to alleviate the difficulty to optimize the main objective $Obj$ directly (Section~\ref{sec:surrogate_objective}).
+\end{enumerate}
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% Why using ACL
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+
+\section{Why use ACL?}
+\label{sec:main_objective}
+ACL mechanisms can be used for different purposes that can be seen as particular instantiations of the general objective defined in Eq~\ref{eq:1}.
+
+\paragraph{Improving performance on a restricted task set.} Classical RL problems are about solving a given task, or a restricted task set (e.g. which vary by their initial state). In these simple settings, ACL has been used to improve sample efficiency or asymptotical performance~\cite{per,apex,SAUNA}.
+
+\paragraph{Solving hard tasks.} Sometimes the target tasks cannot be solved directly (e.g. too hard or sparse rewards). 
+% via aux tasks
+In that case, ACL can be used to pose auxiliary tasks to the agent, gradually guiding its learning trajectory from simple to difficult tasks until the target tasks are solved. In recent works, ACL was used to schedule DRL agents from simple mazes to hard ones \cite{tscl}, or from close-to-success initial states to challenging ones in robotic control scenarios \cite{reverse-cur,BaRC} and video games \cite{montezuma-single-demo}. 
+% via intrinsic rewards
+Another line of work proposes to use ACL to organize the exploration of the state space so as to solve sparse reward problems~\cite{countbased,icm,disagreement,pathakdisagreement,rnd}. In these works, the performance reward is augmented with an intrinsic reward guiding the agent towards uncertain areas of the state space.
+
+\paragraph{Training generalist agents.} Generalist agents must be able to solve tasks they have not encountered during training (e.g. continuous task spaces or distinct training and testing set). ACL can shape learning trajectories to improve generalization, e.g. by avoiding unfeasible task subspaces \cite{portelas2019}. ACL can also help agents to generalize from simulation settings to the real world (Sim2Real)~\cite{OpenAI2019SolvingRC,ADRmila} or to maximize performance and robustness in multi-agent settings via Self-Play~\cite{alpha-go-zero,rarl,openaiSumos,Baker2019HidenSeek,vinyals2019grandmaster}.
+
+%\paragraph{Training multi-goal agents.}In multi-goal RL, agents are trained and tested on tasks that vary by their goals. Because agents can control the goals they target, they learn a behavioral repertoire through one or several goal-conditioned policies. The adoption of ACL in this setting can improve performance on a testing set of pre-defined goals~\cite{her,asymetricSP,eb-per,fournier-accuracy-acl,goalgan,zhao2019curiosity,settersolver,cideron2019self,curriculu-her,curious}.
+\paragraph{Training multi-goal agents.}In multi-goal RL, agents are trained and tested on tasks that vary by their goals. Because agents can control the goals they target, they learn a behavioral repertoire through one or several goal-conditioned policies. The adoption of ACL in this setting can improve performance on a testing set of pre-defined goals. Recent works demonstrated the benefits of using ACL in scenarios such as multi-goal robotic arm manipulation \cite{her,eb-per,fournier-accuracy-acl,CGM,zhao2019curiosity,curriculu-her,curious} or multi-goal navigation \cite{asymetricSP,goalgan,settersolver,cideron2019self}.
+% Recent works demonstrated the benefits of using ACL in scenarios such as multi-goal robotic arm manipulation \cite{her,eb-per,fournier-accuracy-acl,zhao2019curiosity,curriculu-her} or multi-goal locomotion \cite{asymetricSP,goalgan,settersolver,cideron2019self}.
+
+\paragraph{Organizing open-ended exploration.}In some multi-goal settings, the space of achievable goals is not known in advance. Agents must discover achievable goals as they explore and learn how to represent and reach them. For this problem, ACL can be used to organize the discovery and acquisition of repertoires of robust and diverse behaviors, e.g. from visual observations~\cite{diayn,skewfit,metarl-carml} or from natural language interactions with social peers~\cite{le2,imagine}.
+
+% \section{Why use ACL?}
+% \label{sec:main_objective}
+% ACL mechanisms can be used for different purposes that can be seen as particular instantiations of the general objective defined in Eq~\ref{eq:1}.
+
+% \paragraph{Improving performance on a restricted task set.} Classical RL problems are about solving a given task, or a restricted task set (e.g. which vary by their initial state). In these simple settings, ACL has been used to improve sample efficiency or asymptotical performance~\cite{per,apex}.
+
+% \paragraph{Solving hard tasks.} Sometimes the target tasks cannot be solved directly (e.g. too hard or sparse rewards). 
+% % via aux tasks
+% In that case, ACL can be used to pose auxiliary tasks to the agent, gradually guiding its learning trajectory from simple to difficult tasks until the target tasks are solved~\cite{tscl,reverse-cur,sacx,BaRC,montezuma-single-demo}. 
+% % via intrinsic rewards
+% Another line of work proposes to use ACL to organize the exploration of the state space so as to solve sparse reward problems~\cite{countbased,icm,disagreement,pathakdisagreement,rnd}. In these works, the performance reward is augmented with an intrinsic reward guiding the agent towards uncertain areas of the state space.
+
+% \paragraph{Training generalist agents.} Generalist agents must be able to solve tasks they have not encountered during training (e.g. continuous task spaces or distinct training and testing set). ACL can shape learning trajectories to improve generalization, e.g. by avoiding unfeasible task subspaces~\cite{portelas2019}. ACL can also help agents to generalize from simulation settings to the real world (Sim2Real)~\cite{OpenAI2019SolvingRC,ADRmila} or to maximize performance and robustness in multi-agent settings via Self-Play~\cite{alpha-go-zero,rarl,openaiSumos,Baker2019HidenSeek,vinyals2019grandmaster}.
+
+% \paragraph{Training multi-goal agents.}In multi-goal RL, agents are trained and tested on tasks that vary by their goals. Because agents can control the goals they target, they learn a behavioral repertoire through one or several goal-conditioned policies. The adoption of ACL in this setting can improve performance on a testing set of pre-defined goals~\cite{her,asymetricSP,eb-per,fournier-accuracy-acl,goalgan,zhao2019curiosity,settersolver,cideron2019self,curriculu-her,curious}.
+
+% \paragraph{Organizing open-ended exploration.}In some multi-goal settings, the space of achievable goals is not known in advance. Autonomous agent must discover achievable goals as they explore and learn how to reach them. For this problem, ACL can be used to organize the discovery and acquisition of repertoires of robust and diverse behaviors~\cite{diayn,le2,skewfit,metarl-carml,imagine}.
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% ACL action lever
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+\section{What does ACL control?}
+\label{sec:lever}
+
+While \textit{on-policy} DRL algorithms directly use training data generated by the current behavioral policy, \textit{off-policy} algorithms can use trajectories collected from other sources. This practically decouples \textit{data collection} from \textit{data exploitation}. Hence, we organize this section into two categories: one reviewing ACL for data collection, the other ACL for data exploitation. 
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=\columnwidth]{figures/ACL.pdf}
+\caption{ACL for data collection. ACL can control each elements of task MDPs to shape the learning trajectories of agents. Given metrics of the agent's behavior like performance or visited states, ACL methods generate new tasks adapted to the agent's abilities.}
+\label{fancy-fig}
+\end{figure}
+
+
+\subsection{ACL for Data Collection}
+\label{sec:lever_data_collection}
+
+%Applying ACL for data collection amounts to control the sequential selection of tasks that are presented to a DRL agent. In MultiRegardless the nature of the ACL approach used, it In Multi-Task scenarios these tasks can come from a discrete set or from a continuous \textit{parametric} task space. ACL is also applicable in single task cases for which one can define parametric auxiliary tasks. Stemming from many subfields of DRL, multiple forms of task characterizations have been proposed:
+
+
+During data collection, ACL organizes the sequential presentation of tasks as a function of the agent's capabilities. To do so, it generates tasks by acting on elements of task MDPs (e.g. $\mathcal{R}, \mathcal{P}, \rho_0$, see Fig.~\ref{fancy-fig}). The curriculum can be designed on a discrete set of tasks or on a continuous task space. In single-task problems, ACL can define a set of auxiliary tasks to be used as stepping stones towards the resolution of the main task. The following paragraphs organize the literature according to the nature of the control exerted by ACL:
+
+\paragraph{Initial state $(\rho_0)$.}The distribution of initial states $\rho_0$ can be controlled to modulate the difficulty of a task. Agents start learning from states close to a given target (i.e. easier tasks), then move towards harder tasks by gradually increasing the distance between the initial states and the target. This approach is especially effective to design auxiliary tasks for complex control scenarios with sparse rewards~\cite{reverse-cur,BaRC,montezuma-single-demo}.
+
+\paragraph{Reward functions $(\mathcal{R})$.}ACL can be used for automatic reward shaping: adapting the reward function $\mathcal{R}$ as a function of the learning trajectory of the agent. In curiosity-based approaches especially, an internal reward function guides agents towards areas associated with high uncertainty to foster exploration~\cite{countbased,icm,disagreement,pathakdisagreement,rnd}. As the agent explores, uncertain areas --and thus the reward function-- change, which automatically devises a learning curriculum guiding the exploration of the state space. In~\mycite{fournier-accuracy-acl}, an ACL mechanism controls the tolerance in a goal reaching task. Starting with a low accuracy requirement, it gradually and automatically shifts towards stronger accuracy requirements as the agent progresses. In \mycite{diayn} and \mycite{metarl-carml}, authors propose to learn a skill space in unsupervised settings (from state space and pixels respectively), from which are derived reward functions promoting both behavioral diversity and skill separation. 
+
+
+%In \cite{diayn} and \cite{metarl-carml}, authors propose to learn a skill space (from state space and pixels respectively) to derive reward functions. %TODO SOLVE DIAYN CARML AND CITE
+
+\paragraph{Goals $(\mathcal{G})$.}In multi-goal DRL, ACL techniques can be applied to order the selection of goals from discrete sets~\cite{le2}, continuous goal spaces~\cite{asymetricSP,goalgan,skewfit,settersolver} or even sets of different goal spaces~\cite{CGM,curious}. Although goal spaces are usually pre-defined, recent work proposed to apply ACL on a goal space learned from \textit{pixels} using a generative model \cite{skewfit}. 
+
+\paragraph{Environments $(\mathcal{S}, \mathcal{P})$.}ACL has been successfully applied to organize the selection of environments from a discrete set, e.g. to choose among Minecraft mazes~\cite{tscl} or Sonic the Hedgehog levels~\cite{tscllike}. A more general --and arguably more powerful-- approach is to leverage parametric \textit{Procedural Content Generation} (PCG) techniques~\cite{risiPCG} to generate rich task spaces. In that case, ACL allows to detect relevant niches of progress~\cite{OpenAI2019SolvingRC,portelas2019,ADRmila}.
+
+\paragraph{Opponents~$(\mathcal{S}, \mathcal{P})$.}Self-play algorithms train agents against present or past versions of themselves~\cite{alpha-go-zero,openaiSumos,vinyals2019grandmaster,Baker2019HidenSeek}. The set of opponents directly maps to a set of tasks, as different opponents results in different transition functions $\mathcal{P}$ and possibly state spaces $\mathcal{S}$. Self-play can thus be seen as a form of ACL, where the sequence of opponents (i.e. tasks) is organized to maximize performance and robustness. In single-agent settings, an adversary policy can be trained to perturb the main agent~\cite{rarl}.
+
+\subsection{ACL for Data Exploitation}
+\label{sec:lever_data_exploitation}
+
+ACL can also be used in the data exploitation stage, by acting on training data previously collected and stored in a \textit{replay memory}. It enables the agent to ``mentally experience the effects of its actions without actually executing them'', a technique known as \textit{experience replay}~\cite{lin1992self}. At the data exploitation level, ACL can exert two types of control on the distribution of training data: \textit{transition selection} and \textit{transition modification}.
+
+\paragraph{Transition selection $(\mathcal{S}\times\mathcal{A})$.}Inspired from the \textit{prioritized sweeping} technique that organized the order of updates in planning methods~\cite{moore1993prioritized}, \mycite{per} introduced \textit{prioritized experience replay} (PER) for model-free off-policy RL to bias the selection of transitions for policy updates, as some transitions might be \textit{more informative} than others. Different ACL methods propose different metrics to evaluate the importance of each transition~\cite{per,eb-per,curious,zhao2019curiosity,le2,imagine}. Transition selection ACL techniques can also be used for on-policy algorithms to filter online learning batches \cite{SAUNA}.
+
+\paragraph{Transition modification $(\mathcal{G})$.}In multi-goal settings, \textit{Hindsight Experience Replay} (HER) proposes to reinterpret trajectories collected with a given target goal with respect to a different goal \cite{her}. In practice, HER modifies transitions by substituting target goals $g$ with one of the outcomes $g'$ achieved later in the trajectory, as well as the corresponding reward $r'=R_{g'}(s,a)$. By explicitly biasing goal substitution to increase the probability of sampling rewarded transitions, HER shifts the training data distribution from simpler goals (achieved now) towards more complex goals as the agent makes progress. Substitute goal selection can be guided by other ACL mechanisms (e.g. favoring diversity~\cite{curriculu-her,cideron2019self}).
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% ACL Surrogate objectives
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %collected % % % % % % % % % % % % % 
+
+\section{What Does ACL Optimize?}
+\label{sec:surrogate_objective}
+%Objectives such as the average performance on a set of testing tasks after $E$ training episodes can be difficult to optimize directly. To alleviate this difficulty, ACL methods use a variety of surrogate objectives.
+
+ \begin{table*}[htb!]
+\small
+\centering
+\begin{tabular}{llll}
+\toprule
+ \thead{Algorithm} & \thead{Why use ACL?} & \thead{What does ACL control?} & \thead{What does ACL optimize?} \\
+ \midrule
+ACL for Data Collection (\S~\ref{sec:lever_data_collection}):   &   &   &  \\
+ \midrule
+ 
+ADR (OpenAI) ~\cite{OpenAI2019SolvingRC}         &   Generalization              & Environments $(\mathcal{S},\mathcal{P})$ (PCG)    & Intermediate difficulty      \\
+ 
+ADR (Mila) ~\cite{ADRmila}                       &   Generalization              & Environments $(\mathcal{P})$ (PCG)           & Intermediate diff. \& Diversity               \\
+ALP-GMM ~\cite{portelas2019}                     & Generalization                & Environments $(\mathcal{S})$ (PCG)           & LP                       \\
+
+  RARL ~\cite{rarl}                                &  Generalization      & Opponents $(\mathcal{P})$          & ARM                     \\
+ AlphaGO Zero ~\cite{alpha-go-zero}          &  Generalization                       & Opponents $(\mathcal{P})$          & ARM                     \\
+ Hide\&Seek ~\cite{Baker2019HidenSeek}            &  Generalization                       & Opponents $(\mathcal{P})$           & ARM                \\
+ AlphaStar ~\cite{vinyals2019grandmaster}       &  Generalization                       & Opponents $(\mathcal{P})$          & ARM \& Diversity               \\
+ Competitive SP ~\cite{openaiSumos}                &  Generalization                       & Opponents $(\mathcal{P})$           & ARM \& Diversity               \\
+  RgC ~\cite{tscllike}                             & Generalization                & Environments $(\mathcal{S})$ (DS)            & LP                      \\
+ 
+RC ~\cite{reverse-cur}                &  Hard Task   & Initial states $(\rho_0)$         & Intermediate difficulty                  \\
+$1$-demo RC~\cite{montezuma-single-demo}               &   Hard Task              & Initial states $(\rho_0)$              & Intermediate difficulty                  \\
+ Count-based ~\cite{countbased}                   &  Hard Task                   & Reward functions $(\mathcal{R})$                  & Diversity              \\
+  RND ~\cite{rnd}                                 &  Hard Task                   & Reward functions $(\mathcal{R})$                  & Surprise (model error)              \\
+ ICM ~\cite{icm}                                  &  Hard Task                   & Reward functions $(\mathcal{R})$                  & Surprise (model error)              \\
+ Disagreement ~\cite{pathakdisagreement}          &  Hard Task                   & Reward functions  $(\mathcal{R})$                 & Surprise (model disagreement)              \\
+ MAX ~\cite{disagreement}                &  Hard Task                   & Reward functions  $(\mathcal{R})$                & Surprise (model disagreement)              \\
+
+BaRC ~\cite{BaRC}                                &   Hard Task              & Initial states $(\rho_0)$              & Intermediate difficulty                  \\
+
+ TSCL ~\cite{tscl}                                & Hard Task                 & Environments $(\mathcal{S})$ (DS)            & LP                       \\
+ 
+  Acc-based CL ~\cite{fournier-accuracy-acl}       & Multi-Goal        & Reward function $(\mathcal{R})$            & LP                      \\
+
+ 
+Asym. SP ~\cite{asymetricSP}                     &  Multi-Goal     & Goals $(\mathcal{G})$, initial states $(\rho_0)$   & Intermediate difficulty   \\
+   
+GoalGAN ~\cite{goalgan}                          &   Multi-Goal      & Goals  $(\mathcal{G})$            & Intermediate difficulty             \\
+ 
+Setter-Solver ~\cite{settersolver}               &   Multi-Goal               & Goals  $(\mathcal{G})$                      & Intermediate difficulty                    \\
+
+CGM ~\cite{CGM}                          & Multi-Goal & Goals $(\mathcal{G})$           & Intermediate difficulty      \\
+
+CURIOUS ~\cite{curious}                          & Multi-Goal & Goals $(\mathcal{G})$           & LP      \\
+
+ Skew-fit ~\cite{skewfit}                         & Open-Ended Explo.       & Goals $(\mathcal{G})$ (from pixels)          & Diversity                    \\
+  DIAYN \cite{diayn} & Open-Ended Explo. & Reward functions $(\mathcal{R})$ & Diversity \\
+ CARML ~\cite{metarl-carml}             & Open-Ended Explo.                        & Reward functions $(\mathcal{R})$          & Diversity       \\
+
+ LE2 ~\cite{le2}                                  & Open-Ended Explo. & Goals $(\mathcal{G})$             & Reward \& Diversity      \\
+ \midrule
+ ACL for Data Exploitation  (\S~\ref{sec:lever_data_exploitation}):    &               &                  &                          \\
+ \midrule
+  Prioritized ER ~\cite{per}                       & Performance boost    & Transition selection $(\mathcal{S}\times\mathcal{A})$    & Surprise (TD-error)                 \\
+  SAUNA ~\cite{SAUNA}                              & Performance boost    & Transition selection $(\mathcal{S}\times\mathcal{A})$    & Surprise (V-error)               \\ 
+  CURIOUS ~\cite{curious}                          &   Multi-goal         & Trans. select. \& mod. $(\mathcal{S}\times\mathcal{A}, \mathcal{G})$          & LP \& Energy      \\
+ HER ~\cite{her}      & Multi-goal   & Transition modification $(\mathcal{G})$   & Reward             \\
+ 
+HER-curriculum ~\cite{curriculu-her}     & Multi-goal  & Transition modification $(\mathcal{G})$ &     Diversity                  \\
+ 
+Language HER ~\cite{cideron2019self}              & Multi-goal        & Transition modification   $(\mathcal{G})$           & Reward              \\
+ 
+Curiosity Prio. ~\cite{zhao2019curiosity} & Multi-goal  & Transition selection $(\mathcal{S}\times\mathcal{A})$            & Diversity         \\
+ 
+En. Based ER ~\cite{eb-per}      &  Multi-goal            & Transition selection  $(\mathcal{S}\times\mathcal{A})$   & Energy                \\
+
+ LE2 ~\cite{le2}                                  & Open-Ended Explo.            & Trans. select. \& mod. $(\mathcal{S}\times\mathcal{A}, \mathcal{G})$          & Reward      \\
+  IMAGINE ~\cite{imagine}                         & Open-Ended Explo.            & Trans. select. \& mod. $(\mathcal{S}\times\mathcal{A}, \mathcal{G})$          & Reward      \\
+
+ \bottomrule
+\end{tabular}
+\caption{Classification of the surveyed papers. The classification is organized along the three dimensions defined in the above text. In \textit{Why use ACL}, we only report the main objective of each work. When ACL controls the selection of environments, we precise whether it is selecting them from a discrete set (\textit{DS}) or through parametric Procedural Content Generation (\textit{PCG}). We abbreviate \textit{adversarial reward maximization} by \textit{ARM} and \textit{learning progress} by \textit{LP}.}
+\label{bigtable}
+\end{table*}
+
+Objectives such as the average performance on a set of testing tasks after $N$ training steps can be difficult to optimize directly. To alleviate this difficulty, ACL methods use a variety of surrogate objectives.
+
+\paragraph{Reward.}As DRL algorithms learn from reward signals, rewarded transitions are usually considered as more informative than others, especially in sparse reward problems.
+%
+In such problems, ACL methods that act on transition selection may artificially increase the ratio of high versus low rewards in the batches of transitions used for policy updates~\cite{narasimhan2015language,unreal,imagine}.
+% 
+In multi-goal RL settings where some goals might be much harder than others, this strategy can be used to balance the proportion of positive rewards for each of the goals~\cite{curious,le2}.
+%
+Transition modification methods favor rewards as well, substituting goals to increase the probability of observing rewarded transitions~\cite{her,cideron2019self,le2,imagine}.
+%
+In data collection however, adapting training distributions towards more rewarded experience leads the agent to focus on tasks that are already solved. Because collecting data from already solved tasks hinders learning, data collection ACL methods rather focus on other surrogate objectives.
+
+\paragraph{Intermediate difficulty.} A more natural surrogate objective for data collection is \textit{intermediate difficulty}. Intuitively, agents should target tasks that are neither too easy (already solved) nor too difficult (unsolvable) to maximize their learning progress. Intermediate difficulty has been used to adapt the distribution of initial states from which to perform a hard task \cite{reverse-cur,montezuma-single-demo,BaRC}. This objective is also implemented in {GoalGAN}, where a curriculum generator based on a Generative Adversarial Network is trained to propose goals for which the agent reaches intermediate performance~\cite{goalgan}.
+% This proxy 
+\mycite{settersolver} further introduced a \textit{judge network} trained to predict the feasibility of a given goal for the current learner. Instead of labelling tasks with an intermediate level of difficulty as in GoalGAN, this Setter-Solver model generates goals associated to a random feasibility uniformly sampled from $[0,1]$. The type of goals varies as the agent progresses, but the agent is always asked to perform goals sampled from a distribution balanced in terms of feasibility. 
+%
+In \mycite{asymetricSP}, tasks are generated by an RL policy trained to propose either goals or initial states so that the resulting navigation task is of intermediate difficulty w.r.t. the current agent. 
+%
+Intermediate difficulty ACL has also been driving successes in Sim2Real applications, where it sequences \textit{domain randomizations} to train policies that are robust enough to generalize from simulators to real-world robots~\cite{ADRmila,OpenAI2019SolvingRC}. \mycite{OpenAI2019SolvingRC} trains a robotic hand control policy to solve a Rubik's cube by automatically adjusting the task distribution so that the agent achieves decent performance while still being challenged.
+
+\paragraph{Learning progress.}The $Obj$ objective of ACL methods can be seen as the  maximization of a \textit{global learning progress}: the difference between the final score $\int_{T\sim \mathcal{T}} \! P_T^N\, \mathrm{d}T$ and the initial score $\int_{T\sim \mathcal{T}} \! P_T^0\, \mathrm{d}T$. To approximate this complex objective, measures of competence learning progress (LP) localized in space and time were proposed in earlier developmental robotics works~\cite{baranes2013active,imgep}. Like \textit{Intermediate difficulty}, maximizing LP drives learners to practice tasks that are neither too easy nor too difficult, but LP does not require a threshold to define what is "intermediate" and is robust to tasks with intermediate scores but where the agent cannot improve. 
+LP maximization is usually framed as a multi-armed bandit (MAB) problem where tasks are arms and their LP measures are associated values. Maximizing LP values was shown optimal under the assumption of concave learning profiles~\cite{lopes2012strategic}. Both \mycite{tscl} and \mycite{tscllike} measure LP as the estimated derivative of the performance for each task in a discrete set (Minecraft mazes and Sonic the Hedgehog levels respectively) and apply a MAB algorithm to automatically build a curriculum for their learning agents. At a higher level, CURIOUS uses \textit{absolute} LP to select goal \textit{spaces} to sample from in a simulated robotic arm setup~\cite{curious} (absolute LP enables to redirect learning towards tasks that were forgotten or that changed). There, absolute LP is also used to bias the sampling of transition used for policy updates towards high-LP goals. ALP-GMM uses absolute LP to organize the presentation of procedurally-generated Bipedal-Walker environments sampled from a continuous task space through a stochastic parameterization~\cite{portelas2019}. They leverage a Gaussian Mixture Model to recover a MAB setup over the continuous task space. LP can also be used to guide the choice of accuracy requirements in a reaching task~\cite{fournier-accuracy-acl}, or to train a \textit{replay policy} via RL to sample transitions for policy updates~\cite{exp-replay-opti}.
+
+%\paragraph{Learning progress.}The $Obj$ objective of ACL methods can be seen as the  maximization of a \textit{global learning progress}: the difference between the final score $\int_{T\sim \mathcal{T}} \! P_T^E\, \mathrm{d}T$ and the initial score $\int_{T\sim \mathcal{T}} \! P_T^0\, \mathrm{d}T$. This global learning progress is difficult to optimize as the impact of each task selection may not be easily traced to the final score after $E$ episodes, especially when $E$ is large. Instead, one can use measures of competence learning progress (LP) localized in space and time, as in earlier developmental robotics works~\cite{baranes2013active,imgep}. This follows the intuition that maximizing LP here and now (modulo some exploration required to measure LP) will eventually result in maximizing global, long-term LP. In multi-task or multi-goal settings, the agent first focuses on tasks/goals where it learns the most and then moves towards more difficult tasks after the earlier tasks have been mastered (i.e. when $LP\to0$). \textit{Intermediate difficulty} can be seen as a proxy for an expected LP, but might get stuck in areas of the task space where the agent achieves intermediate scores but cannot improve.
+
+
+%LP maximization is usually framed as a multi-armed bandit (MAB) problem where tasks are arms and LP measures are associated values. Maximizing LP values was shown optimal under the assumption of concave learning profiles~\cite{lopes2012strategic}. Both \mycite{tscl} and \mycite{tscllike} measure LP as the estimated derivative of the performance for each task in a discrete set (Minecraft mazes and Sonic the Hedgehog levels respectively) and apply a MAB algorithm to automatically build a curriculum for their learning agents. In a similar way, CURIOUS uses LP to select goal spaces to sample from in a simulated robotic arm setup~\cite{curious}. There, LP is also used to bias the sampling of transition used for policy updates towards high-LP goals. ALP-GMM uses LP to organize the presentation of procedurally-generated Bipedal-Walker environments sampled from a continuous task space through a stochastic parameterization~\cite{portelas2019}. Based on pairs of task parameters and their associated LP scores previously collected, ALP-GMM fits a Gaussian Mixture Model (GMM) and samples task parameters from a Gaussian selected proportionally to its mean LP. LP can also be used to guide the choice of accuracy requirements in a reaching task~\cite{fournier-accuracy-acl}, or to train a \textit{replay policy} via RL to sample transitions for policy updates~\cite{exp-replay-opti}.
+
+
+
+\paragraph{Diversity.}Some ACL methods choose to maximize measures of diversity (also called novelty or low density). 
+%
+In multi-goal settings for example, ACL might favor goals from low-density areas either as targets~\cite{skewfit} or as substitute goals for data exploitation~\cite{curriculu-her}. Similarly, \mycite{zhao2019curiosity} biases the sampling of trajectories falling into low density areas of the trajectory space. %
+In single-task RL, \textit{count-based} approaches introduce internal reward functions as decreasing functions of the state visitation count, guiding agent towards rarely visited areas of the state space~\cite{countbased}.
+% [new version of CARML]
+Through a variational expectation-maximization framework, \mycite{metarl-carml} propose to alternatively update a latent skill representation from experimental data (as in \mycite{diayn}) and to meta-learn a policy to adapt quickly to tasks constructed by deriving a reward function from sampled skills.
+%
+Other algorithms do not optimize directly for diversity but use heuristics to maintain it. For instance, \mycite{portelas2019} maintains exploration by using a residual uniform task sampling and \mycite{openaiSumos} sample opponents from past versions of different policies to maintain diversity. 
+% [old version of CARML] In~\cite{metarl-carml}, authors proposed to learn a latent skill space that is maintained diverse through an information-maximization objective and perform meta-RL on the resulting skill distributions.
+%TODO better explain CARML
+% proposed to alternatively update a latent skill representation from experimental data (as in \mycite{diayn}) and to meta-learn a policy to adapt quickly to tasks drawn from the skill space. Here, tasks are parameterized by reward functions constructed from the learned skills that encourages both behavioral diversity and skill separation.
+%Through a variational expectation-maximization framework, \mycite{metarl-carml} proposed to first learn a latent skill space from experimental data (as in \mycite{diayn}) and then to meta-train the policy with a reward function constructed from the learned skills that encourages both behavioral diversity and skill separation.
+%Through a variational expectation-maximization framework, \mycite{metarl-carml} proposed to alternatively update a latent skill representation from experimental data (as in \mycite{diayn}) and to meta-learn a policy to adapt quickly to tasks drawn from the skill space. Here, tasks are parameterized by reward functions constructed from the learned skills that encourages both behavioral diversity and skill separation.
+
+\paragraph{Surprise.} Some ACL methods train transition models and compute intrinsic rewards based on their prediction errors~\cite{icm,rnd} or based on the disagreement (variance) between several models from an ensemble~\cite{disagreement,pathakdisagreement}. The general idea is that models tend to give bad prediction (or disagree) for states rarely visited, thus inducing a bias towards less visited states. However, a model might show high prediction errors on stochastic parts of the environment (TV problem~\cite{icm}), a phenomenon that does not appear with model disagreement, as all models of the ensemble eventually learn to predict the (same) mean prediction \cite{pathakdisagreement}. 
+%
+Other works bias the sampling of transitions for policy update depending on their temporal-difference error (TD-error), i.e. the difference between the transition's value and its next-step bootstrap estimation~\cite{per,apex}. Similarly, \mycite{SAUNA} adapt transition selection based on the discrepancy between the observed return and the prediction of the value function of a PPO learner (V-error). Whether the error computation involves value models or transition models, ACL mechanisms favor states related to maximal~\textit{surprise}, i.e. a maximal difference between the expected (model prediction) and the truth.
+%Other works bias the sampling of transitions for policy update depending on their temporal-difference error (TD-error), i.e. the difference between the transition's value and its next-step bootstrap estimation~\cite{per,apex}. Whether the error computation involves value models or transition models, ACL mechanisms favor states related to maximal~\textit{surprise}, i.e. a maximal difference between the expected (model prediction) and the truth. 
+
+%ACL mechanisms used for in Self-Play applications optimize agents' performance when opposed to current or past versions of themselves,
+% Recap from previous version of data exploitation, to update
+\paragraph{Energy.} In the data exploitation phase of multi-goal settings, \mycite{eb-per} prioritize transitions from \textit{high-energy} trajectories (e.g. kinetic energy) while \mycite{curious} prioritize transitions where the object relevant to the goal moved (e.g. cube movement in a cube pushing task).
+
+\paragraph{Adversarial reward maximization (ARM).} Self-Play is a form of ACL which optimizes agents' performance when opposed to current or past versions of themselves, an objective that we call \textit{adversarial reward maximization (ARM)} \cite{self-play-framework}. While agents from \mycite{alpha-go-zero} and \mycite{Baker2019HidenSeek} always oppose copies of themselves, \mycite{openaiSumos} train several policies in parallel and fill a pool of opponents made of current and past versions of all policies. This maintains a diversity of opponents, which helps to fight catastrophic forgetting and to improve robustness.
+%
+% TODO FINISH THIS PART
+In the multi-agent game Starcraft~II, \mycite{vinyals2019grandmaster} train three main policies in parallel (one for each of the available player types). They maintain a \textit{league} of opponents composed of current and past versions of both the three main policies and additional adversary policies. Opponents are not selected at random but to be challenging (as measured by winning rates).
+ %They maintain a \textit{league} of opponents composed of current and past versions of the three main policies and, as well as other policies trained to either defeat them or the league. Opponents are not selected at random but to be challenging (as measured by winning rates).
+ 
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% DISCUSSION
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+
+\section{Discussion}
+
+\paragraph{The bigger picture.}In this survey, we unify the wide range of ACL mechanisms used in symbiosis with DRL under a common framework. ACL mechanisms are used with a particular goal in mind (e.g. organizing exploration, solving hard tasks, etc. \S~\ref{sec:main_objective}). It controls a particular element of task MDPs (e.g. $\mathcal{S}, \mathcal{R}, \rho_0$, \S~\ref{sec:lever}) and maximizes a surrogate objective to achieve its goal (e.g. diversity, learning progress, \S~\ref{sec:surrogate_objective}). Table~\ref{bigtable} organizes the main works surveyed here along these three dimensions. Both previous sections and Table~\ref{bigtable} present what has been implemented in the past, and thus, by contrast, highlight potential new avenues for ACL.
+
+%\textit{Expanding the set of control media.} In his seminal 1993 work, \citeauthor{elman} --inspired by the maturational mechanisms at play in human infants-- proposed a curriculum for a language learning task based on the gradual expansion of the working memory of its recurrent model. 
+%Although this concept has been used in developmental robotics \cite{mature} and Policy Distillation works \cite{pol-dil-review,mixmatch}, it is absent from the current ACL literature. Multiple potential instantiations of this idea remain to be tried, including the adaptive control of the growth in action space complexity, agent model capacity, agent's observable space or the modulation of the discount factor which control the agent's considered time horizon (for which hand-made schedules were shown advantageous in \mycite{cl-discount}).
+
+\noindent\textit{Expanding the set of ACL targets.} Inspired by the maturational mechanisms at play in human infants, \mycite{elman} proposed to gradually expand the working memory of a recurrent model in a word-to-word natural language processing task. The idea of changing the properties of the agent (here its memory) was also studied in developmental robotics~\cite{mature}, policy distillation methods~\cite{mixmatch,pol-dil-review} and evolutionary approaches \cite{ha-design}  but is absent from the ACL-DRL literature. ACL mechanisms could indeed be used to control the agent's body ($\mathcal{S}, \mathcal{P}$), its action space (how it acts in the world, $\mathcal{A}$), its observation space (how it perceives the world, $\mathcal{S}$), its learning capacities (e.g. capacities of the memory, or the controller) or the way it perceives time (controlling discount factors~\cite{cl-discount}).
+
+%\textit{Combining approaches.} Due to a development in silos, many potential synergies between existing ACL approaches are yet to be found. Could we use Learning Progress or Intermediate difficulty ACL approaches as a way to make opponent selection more efficient in self-play approaches, or to drive goal selection in learned goal spaces (as used in \mycite{Finot2019} for non-DRL agents) ? Could we use destabilizing adversarial (as in \cite{rarl} policies for domain randomization in sim2real transfer scenarios ? (TODO maybe find one more question).
+\noindent\textit{Combining approaches.} Many combinations of previously defined ACL mechanisms remain to be investigated. Could we use LP to optimize the selection of opponents in self-play approaches? To drive goal selection in learned goal spaces (e.g. \mycite{Finot2019}, population-based)? Could we train an adversarial domain generator to robustify policies trained for Sim2Real applications?
+
+% This first glance on recent work featuring ACL approaches strikingly exhibit the versatility of such a concept, as it is found in most major subfields of DRL such as Meta-RL, Multi-Task RL, Hard-Exploration RL, Robotics and Multi-agent
+%?  development of new both 
+
+
+\paragraph{On the need of systematic ACL studies.}Given the positive impact that ACL mechanisms can have in complex learning scenarios, one can only deplore the lack of comparative studies and standard benchmark environments. Besides, although empirical results advocate for their use, a theoretical understanding of ACL mechanisms is still missing. Although there have been attempts to frame CL in supervised settings \cite{bengiocl,hacohen19a-scoring-pacing}, more work is needed to see whether such considerations hold in DRL scenarios.
+%\paragraph{On the need of systematic ACL studies.}Given the positive impact that ACL mechanisms can have in complex learning scenarios, one can only deplore the lack of comparative studies and standard benchmark environments. Besides, although empirical results advocate for their use, a theoretical understanding of ACL mechanisms is still missing. In the supervised learning literature, \cite{bengiocl} interprets Curriculum Learning as a way to both fasten the training procedure by reducing noise in the gradient updates and as a form of \textit{continuation method}, whose gradual growth in the optimization landscape complexity leads to better local minimum. Recent work \cite{hacohen19a-scoring-pacing} also proposed to see CL (under some assumptions) as an optimization landscape modifier that, if the sampling prior over the dataset is positively correlated to the optimal utility, can steepen the landscape towards the global optimum. Much more work is needed to see whether such considerations can hold for \textit{Automatic} CL in DRL scenarios, which features additional optimization components such as the well known \textit{exploration-exploitation} dilemma.
+
+
+% \paragraph{ACL as a step towards open-ended learning agents.} 
+%  Although in this work we mainly presented ACL as a toolbox to solve complex problems in the DRL field, this family of techniques might also constitute a fundamental stepping stone towards developing open-ended autonomous agents. Rather than trying to excavate such human adult-like machines from a single tabula rasa optimization process, ACL could potentially drive the self-organisation of developmental trajectories to incrementally \textit{grow} such versatile agents, which would be closer to the long maturing process of humans.
+ 
+\paragraph{ACL as a step towards open-ended learning agents.}\hspace{-0.2cm}Alan Turing famously wrote \textit{``Instead of trying to produce a programme to simulate the adult mind, why not rather try to produce one which simulates the child's?''} \cite{turing1950computing}. The idea of starting with a simple machine and to enable it to learn autonomously is the cornerstone of developmental robotics but is rarely considered in DRL \cite{imagine,diayn,metarl-carml}. Because they actively organize learning trajectories as a function of the agent's properties, ACL mechanisms could prove extremely useful in this quest. We could imagine a learning architecture leveraging ACL mechanisms to control many aspects of the learning odyssey, guiding agents from their simple original state towards fully capable agents able to reach a multiplicity of goals. As we saw in this survey, these ACL mechanisms could control the development of the agent's body and capabilities (motor actions, sensory apparatus), organize the exploratory behavior towards tasks where agents learn the most (maximization of information gain, competence progress) or guide acquisitions of behavioral repertoires.
+ 
+ 
+ 
+ 
+ 
+
+ % Maybe the discussion could discuss the links between ACL and developmental intrinsically motivated learning, especially the broader picture of autonomous learning, i.e. ACL not for maximising a measure of performance, but ACL as self-organisation of developmental trajectories for autonomous agents that progressively expand the diversity and complexity of their skills as human children do.
+
+
+%     \item Could we perform meta-ACL ? that is learning to learn to teach, ie. sequentially teaching a classroom of agents. TODO maybe speak about meta
+
+%\todo{Add section about expert knowledge}
+
+
+
+
+
+% \begin{table*}[t!]
+% \small
+% \centering
+% \begin{tabular}{llll}
+% \toprule
+%  \thead{Algorithm} & \thead{Why use ACL?} & \thead{What does ACL control?} & \thead{What does ACL optimize?} \\
+%  \midrule
+% ACL for Data Collection (\S~\ref{sec:lever_data_collection}):   &   &   &  \\
+%  \midrule
+ 
+% ADR (OpenAI) ~\cite{OpenAI2019SolvingRC}         &   Generalization              & Environments $(\mathcal{S},\mathcal{P})$ (PCG)    & Intermediate difficulty      \\
+ 
+% ADR (Mila) ~\cite{ADRmila}                       &   Generalization              & Environments $(\mathcal{P})$ (PCG)           & Intermediate diff. \& Diversity               \\
+% ALP-GMM ~\cite{portelas2019}                     & Generalization                & Environments $(\mathcal{S})$ (PCG)           & LP                       \\
+
+%   RARL ~\cite{rarl}                                &  Generalization      & Opponents $(\mathcal{P})$          & ARM                     \\
+%  AlphaGO Zero ~\cite{alpha-go-zero}          &  Generalization                       & Opponents $(\mathcal{P})$          & ARM                     \\
+%  Hide\&Seek ~\cite{Baker2019HidenSeek}            &  Generalization                       & Opponents $(\mathcal{P})$           & ARM                \\
+%  AlphaStar ~\cite{vinyals2019grandmaster}       &  Generalization                       & Opponents $(\mathcal{P})$          & ARM \& Diversity               \\
+%  Competitive SP ~\cite{openaiSumos}                &  Generalization                       & Opponents $(\mathcal{P})$           & ARM \& Diversity               \\
+%   RgC ~\cite{tscllike}                             & Generalization                & Environments $(\mathcal{S})$ (DS)            & LP                      \\
+ 
+% RC ~\cite{reverse-cur}                &  Hard Task   & Initial states $(\rho_0)$         & Intermediate difficulty                  \\
+% $1$-demo RC~\cite{montezuma-single-demo}               &   Hard Task              & Initial states $(\rho_0)$              & Intermediate difficulty                  \\
+%  Count-based ~\cite{countbased}                   &  Hard Task                   & Reward functions $(\mathcal{R})$                  & Diversity              \\
+%   RND ~\cite{rnd}                                 &  Hard Task                   & Reward functions $(\mathcal{R})$                  & Surprise (model error)              \\
+%  ICM ~\cite{icm}                                  &  Hard Task                   & Reward functions $(\mathcal{R})$                  & Surprise (model error)              \\
+%  Disagreement ~\cite{pathakdisagreement}          &  Hard Task                   & Reward functions  $(\mathcal{R})$                 & Surprise (model disagreement)              \\
+%  MAX ~\cite{disagreement}                &  Hard Task                   & Reward functions  $(\mathcal{R})$                & Surprise (model disagreement)              \\
+
+% BaRC ~\cite{BaRC}                                &   Hard Task              & Initial states $(\rho_0)$              & Intermediate difficulty                  \\
+
+%  TSCL ~\cite{tscl}                                & Hard Task                 & Environments $(\mathcal{S})$ (DS)            & LP                       \\
+ 
+%   Acc-based CL ~\cite{fournier-accuracy-acl}       & Multi-Goal        & Reward function $(\mathcal{R})$            & LP                      \\
+
+ 
+% Asym. SP ~\cite{asymetricSP}                     &  Multi-Goal     & Goals $(\mathcal{G})$, initial states $(\rho_0)$   & Intermediate difficulty   \\
+   
+% GoalGAN ~\cite{goalgan}                          &   Multi-Goal      & Goals  $(\mathcal{G})$            & Intermediate difficulty             \\
+ 
+% Setter-Solver ~\cite{settersolver}               &   Multi-Goal               & Goals  $(\mathcal{G})$                      & Intermediate difficulty                    \\
+
+% CURIOUS ~\cite{curious}                          & Multi-Goal & Goals $(\mathcal{G})$           & LP      \\
+
+%  Skew-fit ~\cite{skewfit}                         & Open-Ended Explo.       & Goals $(\mathcal{G})$ (from pixels)          & Diversity                    \\
+%   DIAYN \cite{diayn} & Open-Ended Explo. & Reward functions $(\mathcal{R})$ & Diversity \\
+%  CARML ~\cite{metarl-carml}             & Open-Ended Explo.                        & Reward functions $(\mathcal{R})$          & Diversity       \\
+
+%  LE2 ~\cite{le2}                                  & Open-Ended Explo. & Goals $(\mathcal{G})$             & Reward \& Diversity      \\
+%  \midrule
+%  ACL for Data Exploitation  (\S~\ref{sec:lever_data_exploitation}):    &               &                  &                          \\
+%  \midrule
+%   Prioritized ER ~\cite{per}                       & Performance boost    & Transition selection $(\mathcal{S}\times\mathcal{A})$    & Surprise (TD-error)                 \\
+%   CURIOUS ~\cite{curious}                          &   Multi-goal         & Trans. select. \& mod. $(\mathcal{S}\times\mathcal{A}, \mathcal{G})$          & LP \& Energy      \\
+%  HER ~\cite{her}      & Multi-goal   & Transition modification $(\mathcal{G})$   & Reward             \\
+ 
+% HER-curriculum ~\cite{curriculu-her}     & Multi-goal  & Transition modification $(\mathcal{G})$ &     Diversity                  \\
+ 
+% Language HER ~\cite{cideron2019self}              & Multi-goal        & Transition modification   $(\mathcal{G})$           & Reward              \\
+ 
+% Curiosity Prio. ~\cite{zhao2019curiosity} & Multi-goal  & Transition selection $(\mathcal{S}\times\mathcal{A})$            & Diversity         \\
+ 
+% En. Based ER ~\cite{eb-per}      &  Multi-goal            & Transition selection  $(\mathcal{S}\times\mathcal{A})$   & Energy                \\
+
+%  LE2 ~\cite{le2}                                  & Open-Ended Explo.            & Trans. select. \& mod. $(\mathcal{S}\times\mathcal{A}, \mathcal{G})$          & Reward      \\
+%   IMAGINE ~\cite{imagine}                         & Open-Ended Explo.            & Trans. select. \& mod. $(\mathcal{S}\times\mathcal{A}, \mathcal{G})$          & Reward      \\
+
+%  \bottomrule
+% \end{tabular}
+% \caption{\textbf{Classification of the surveyed papers.} The classification is organized along the three dimensions defined in the above text. In \textit{Why use ACL}, we only report the main objective of each work. When ACL controls the selection of environments, we precise whether it is selecting them from a discrete set (\textit{DS}) or through parametric Procedural Content Generation (\textit{PCG}). We abbreviate \textit{adversarial reward maximization} by \textit{ARM} and \textit{learning progress} by \textit{LP}.}
+% \label{bigtable}
+% \end{table*}
+
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% ACK + BIBLIO
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+%\subsection*{Acknowledgments}
+%C\'edric Colas is partly funded by the French Minist\`ere des Arm\'ees - Direction G\'en\'erale de l’Armement. This work was supported by Microsoft Research through its PhD Scholarship Programme
+
+
+
+%% The file named.bst is a bibliography style file for BibTeX 0.99c
+%\small
+\scalefont{0.95}
+\bibliographystyle{named}
+\bibliography{ijcai20}
+
+\end{document}
+

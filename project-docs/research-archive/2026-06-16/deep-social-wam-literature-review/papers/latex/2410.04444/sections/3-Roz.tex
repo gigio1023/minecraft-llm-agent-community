@@ -1,0 +1,94 @@
+\begin{figure*}[t]
+\begin{center}
+\setlength{\abovecaptionskip}{-0.1cm}
+\setlength{\belowcaptionskip}{-0.5cm}
+\includegraphics[width=0.9\textwidth]{figures/method_1.pdf}
+\end{center}
+\caption{An illustration of our implementation of \framework. It employs monkey patching to directly read and modify its own code in runtime memory, enabling self-awareness and self-modification.}
+% \wxy{Remove the dividing lines between agents.}}
+\label{fig:method}
+\end{figure*}
+
+
+There are various ways to initiate a \framework. Any specific agent instance during the recursive optimization process can be viewed as an instantiation of the \framework. Our implementation leverages runtime memory interaction techniques to enable self-awareness and self-modification, as illustrated in Figure \ref{fig:method}. These techniques include dynamic memory reading and writing (\textit{monkey patching}) to facilitate recursive self-improvement. Additionally, we have incorporated several auxiliary tools to accelerate the convergence of the \framework’s optimization process.
+
+
+\subsection{Implementation Details}
+The core functionalities of our \framework are outlined below:
+
+\noindent\textbf{Self-Awareness via Runtime Memory Inspection} \quad
+\framework achieves self-awareness by inspecting runtime memory, particularly local and global variables in Python. This capability allows the agent to extract and interpret the variables, functions, and classes that constitute both the environment and the agent itself, according to the modular structure of the system. By introspecting these elements, the agent gains an understanding of its own operational state and can adapt accordingly.
+
+\noindent\textbf{Self-Improvement via Dynamic Code Modification} \quad
+\framework can engage in reasoning and planning to determine whether it should modify its own logic. If modification is deemed necessary, \framework generates new code, dynamically writes it into the runtime memory, and integrates it into its operational logic. This dynamic modification allows it to evolve by adding, replacing, or removing logic components as it encounters new challenges, thus achieving self-improvement.
+
+\noindent\textbf{Environmental Interaction} \quad
+To assess performance and gather feedback, \framework is equipped with interfaces for interacting with its environment. Each task provides tailored environmental interfaces, enabling it to evaluate its performance and adjust its strategies accordingly. 
+In practical implementations, a validation set can be used to provide feedback.
+% This interaction is a crucial part of the feedback loop in the recursive improvement process.
+
+\noindent\textbf{Recursive Improvement Mechanism} \quad
+At each time step, \framework determines the sequence of operations to execute, which includes reasoning, decision-making, and action execution. After completing the operations, \framework evaluates whether its logic has improved and decides whether to proceed to the next recursive iteration. 
+% Over successive iterations, \framework's logic evolves, with each step potentially improving its decision-making capacity.
+Over the next iteration, the entire new logic will be applied.
+
+\noindent\textbf{Goal Prompt and Task Handling} \quad
+The goal prompt informs \framework that it possesses the necessary privileges to enhance its logic and introduces available tools. As shown in Appendix \ref{sec:roleprompt}, the prompt encourages \framework to fully explore its potential and utilize tools for self-optimization. To ensure effectiveness across diverse tasks, we provide \framework with an initial policy, where it will start to explore different policies.
+% to analyze its efficiency in optimizing performance. 
+% These policies range from advanced methods~\citep{hu2024automated}, basic approaches (such as Chain of Thought, CoT), to even intentionally flawed methods, allowing us to evaluate \framework’s capacity to correct its initial errors.
+
+\subsection{Additional Designs}
+\label{sec:addi}
+While the core functionality of \framework theoretically allows limitless self-improvement, current LLMs exhibit limitations. To address these challenges, we have integrated several supportive mechanisms to enhance \framework’s performance:
+
+
+
+
+
+\noindent\textbf{Thinking Before Acting} \quad
+\framework is capable of deferring actions to first reason about the situation, allowing it to output reasoning paths and analysis without immediately executing any operations. This approach enhances the quality of decision-making by prioritizing planning over hasty action.
+
+\noindent\textbf{Error Handling Mechanism} \quad
+Errors during execution can lead to unexpected terminations of the process. To mitigate this, we implement a robust error recovery mechanism. If an operation results in an error, \framework halts the current sequence and moves on to the next time step, carrying forward the error information to help future decisions.
+
+\noindent\textbf{Additional Tools} \quad
+We also equipped \framework with additional potentially useful tools, such as the ability to execute Python or Bash code and call LLM API. 
+
+Although these additional tools are not strictly necessary for self-improvement, their inclusion accelerates the convergence of \framework’s recursive optimization process. We conduct ablation studies to assess the effectiveness of these tools, as discussed in Section \ref{sec:ablation}.
+
+
+
+
+
+
+\begin{table*}[t!]
+\small
+    \centering
+        
+    \begin{tabular}{>{\raggedright\arraybackslash}p{5.2cm} >{\centering\arraybackslash}p{1.7cm} >{\centering\arraybackslash}p{1.7cm} >{\centering\arraybackslash}p{1.7cm} >{\centering\arraybackslash}p{1.7cm}}
+        \toprule
+        \multirow{2}{*}{\textbf{Agent Name}} & \textbf{F1 Score} & \multicolumn{3}{c}{\textbf{Accuracy (\%)}} \\ \cmidrule(lr){2-5}
+        & \textbf{DROP} & \textbf{MGSM} & \textbf{MMLU} & \textbf{GPQA} \\
+        \midrule
+        \rowcolor[gray]{0.9} \multicolumn{5}{c}{\textbf{Hand-Designed Agent Systems}} \\
+        Chain-of-Thought \citep{wei2022chain} & 64.2 $\pm$ 0.9 & 28.0 $\pm$ 3.1 & 65.4 $\pm$ 3.3 & 29.2 $\pm$ 3.1 \\
+        COT-SC \citep{wang2023selfconsistencyimproveschainthought} & 64.4 $\pm$ 0.8 & 28.2 $\pm$ 3.1 & 65.9 $\pm$ 3.2 & 30.5 $\pm$ 3.2 \\
+        Self-Refine \citep{madaan2024self} & 59.2 $\pm$ 0.9 & 27.5 $\pm$ 3.1 & 63.5 $\pm$ 3.4 & 31.6 $\pm$ 3.2 \\
+        LLM Debate \citep{du2023improvingfactualityreasoninglanguage} & 60.6 $\pm$ 0.9 & 39.0 $\pm$ 3.4 & 65.6 $\pm$ 3.3 & 31.4 $\pm$ 3.2 \\
+        Step-back-Abs \citep{zheng2024stepbackevokingreasoning} & 60.4 $\pm$ 1.0 & 31.1 $\pm$ 3.2 & 65.1 $\pm$ 3.3 & 26.9 $\pm$ 3.0 \\
+        Quality-Diversity \citep{lu2024aiscientistfullyautomated} & 61.8 $\pm$ 0.9 & 23.8 $\pm$ 3.0 & 65.1 $\pm$ 3.3 & 30.2 $\pm$ 3.1 \\
+        Role Assignment \citep{xu2023expertpromptinginstructinglargelanguage} & 65.8 $\pm$ 0.9 & 30.1 $\pm$ 3.2 & 64.5 $\pm$ 3.3 & 31.1 $\pm$ 3.1 \\
+        \midrule
+        \rowcolor[gray]{0.9} \multicolumn{5}{c}{\textbf{Meta-Learning Optimized Agents}} \\
+        Meta Agent Search \citep{hu2024automated} & \underline{79.4 $\pm$ 0.8}  & \underline{53.4 $\pm$ 3.5}  & \underline{69.6 $\pm$ 3.2}  & \underline{34.6 $\pm$ 3.2}  \\
+        \midrule
+        \rowcolor[gray]{0.9} \multicolumn{5}{c}{\textbf{\framework (Ours)}} \\
+        \godel-base (Closed-book; GPT-3.5) & \textbf{80.9 $\pm$ 0.8} & \textbf{64.2 $\pm$ 3.4} & \textbf{70.9 $\pm$ 3.1} & \textbf{34.9 $\pm$ 3.3} \\
+        \godel-free (No constraints) & \textit{90.5 $\pm$ 1.8} & \textit{90.6 $\pm$ 2.0} & \textit{87.9 $\pm$ 2.2} & \textit{55.7 $\pm$ 3.1} 
+        \\
+        \bottomrule
+    \end{tabular}
+\caption{Results of three paradigms of agents on different tasks. The highest value is highlighted in \textbf{bold}, and the second-highest value is \underline{underlined}. \godel-base is the constrained version of \framework, allowing for fair comparisons with other baselines. \godel-free represents the standard implementation without any constraints, whose results are \textit{italicized}. We report the test accuracy and the 95\% bootstrap confidence interval on test sets\protect\footnotemark.}
+    \label{tab:main}
+\end{table*}
+

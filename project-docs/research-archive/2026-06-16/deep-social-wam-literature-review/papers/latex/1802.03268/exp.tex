@@ -1,0 +1,99 @@
+\section{\label{sec:exp}Experiments}
+We first present our experimental results from employing \enas~to design recurrent cells on the Penn Treebank dataset and convolutional architectures on the CIFAR-10 dataset. We then present an ablation study which asserts the role of \enas~in discovering novel architectures.
+
+\subsection{\label{sec:ptb}Language Model with Penn Treebank}
+\paragraph{Dataset and Settings.} Penn Treebank~\citep{penntreebank} is a well-studied benchmark for language model. We use the standard pre-processed version of the dataset, which is also used by previous works, \eg~\citet{rnn_regularization}.
+
+Since the goal of our work is to discover cell architectures, we only employ the standard training and test process on Penn Treebank, and do not utilize post-training techniques such as neural cache~\citep{neural_cache} and dynamic evaluation~\citep{ptb_dynamic_eval}. Additionally, as~\citet{rnn_params_count} have established that RNN models with more parameters can learn to store more information, we limit the size of our \enas~cell to $24M$ parameters. We also do not tune our hyper-parameters extensively like~\citet{ptb_hparams}, nor do we train multiple architectures and select the best one based on their validation perplexities like~\citet{nas}. Therefore, \enas~is not at any advantage, compared to~\citet{nas,mos,ptb_hparams}, and its improved performance is only due to the cell's architecture.
+
+\paragraph{Training details.} Our controller is trained using Adam, with a learning rate of $0.00035$. To prevent premature convergence, we also use a tanh constant of $2.5$ and a temperature of $5.0$ for the sampling logits~\citep{neural_combi,neural_optimizer_search}, and add the controller's sample entropy to the reward, weighted by $0.0001$. Additionally, we augment the simple transformations between nodes in the constructed recurrent cell with highway connections~\citep{rhn}. For instance, instead of having $h_2 =\text{ReLU}(h_1 \cdot \W^{(\h)}_{2, 1})$ as shown in the example from Section~\ref{sec:enas_rnn}, we have $h_2 = c_2 \otimes \text{ReLU}(h_1 \cdot \W^{(\h)}_{2, 1}) + (1 - c_2) \otimes h_1$, where $c_2 = \text{sigmoid}(h_1 \cdot \W^{(\c)}_{2, 1})$ and $\otimes$ denotes elementwise multiplication.
+
+The shared parameters of the child models $\omega$ are trained using SGD with a learning rate of $20.0$, decayed by a factor of $0.96$ after every epoch starting at epoch $15$, for a total of $150$ epochs. We clip the norm of the gradient $\nabla_\omega$ at $0.25$. We find that using a large learning rate whilst clipping the gradient norm at a small threshold makes the updates on $\omega$ more stable.
+We utilize three regularization techniques on $\omega$: an $\ell_2$ regularization weighted by $10^{-7}$; variational dropout~\citep{variational_dropout_rnn}; and tying word embeddings and softmax weights~\citep{lstm_weight_tying}. More details are in Appendix~\ref{sec:ptb_details}.
+
+\paragraph{Results.} Running on a single Nvidia GTX 1080Ti GPU, \enas~finds a recurrent cell in about $10$ hours. In Table~\ref{tab:ptb_results}, we present the performance of the \enas~cell as well as other baselines that do not employ post-training processing. The \enas~cell achieves a test perplexity of $55.8$, which is on par with the existing state-of-the-art of $56.0$ achieved by \textit{Mixture of Softmaxes} (MoS)~\citep{mos}. Note that we do not apply MoS to the \enas~cell. Importantly, \enas~cell outperforms NAS~\citep{nas} by more than $6$ perplexity points, whilst the search process of \enas, in terms of GPU hours, is more than $1000$x faster.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[height=0.45\textwidth,angle=270]{figs/enas_rnn_cell.eps}
+  \caption{\label{fig:ptb_enas_cell}The RNN cell \enas~discovered for Penn Treebank.}
+\end{figure}
+
+Our \enas~cell, visualized in Figure~\ref{fig:ptb_enas_cell}, has a few interesting properties. First, all non-linearities in the cell are either ReLU or tanh, even though the search space also has two other functions: identity and sigmoid. Second, we suspect this cell is a local optimum, similar to the observations made by~\citet{nas}. When we randomly pick some nodes and switch the non-linearity into identity or sigmoid, the perplexity increases up to $8$ points. Similarly, when we randomly switch some ReLU nodes into tanh or vice versa, the perplexity also increases, but only up to $3$ points. Third, as shown in Figure~\ref{fig:ptb_enas_cell}, the output of our \enas~cell is an average of $6$ nodes. This behavior is similar to that of \textit{Mixture of Contexts} (MoC)~\citep{mos}. Not only does \enas~independently discover MoC, but it also learns to balance between i) the number of contexts to mix, which increases the model's expressiveness, and ii) the depth of the recurrent cell, which learns more complex transformations~\citep{rhn}.
+
+\subsection{\label{sec:cifar10}Image Classification on CIFAR-10}
+\paragraph{Dataset.} The CIFAR-10 dataset~\citep{cifar10} consists of $50,000$ training images and $10,000$ test images. We use the standard data pre-processing and augmentation techniques, \ie~subtracting the channel mean and dividing the channel standard deviation, centrally padding the training images to $40 \times 40$ and randomly cropping them back to $32 \times 32$, and randomly flipping them horizontally.
+
+\paragraph{Search spaces.} We apply~\enas~to two search spaces: 1) the~\textit{macro search space} over entire convolutional models (Section~\ref{sec:cifar10_macro}); and 2) the~\textit{micro search space} over convolutional cells (Section~\ref{sec:cifar10_micro}).
+
+\paragraph{Training details.} The shared parameters $\omega$ are trained with Nesterov momentum~\citep{nesterov}, where the learning rate follows the cosine schedule with $l_{\text{max}} = 0.05$, $\l_{\text{min}} = 0.001$, $T_0 = 10$, and $T_{\text{mul}} = 2$~\citep{cosine_lr}. Each architecture search is run for $310$ epochs. We initialize $\omega$ with He initialization~\citep{he_init}. We also apply an $\ell_2$ weight decay of $10^{-4}$. We train the architectures recommended by the controller using the same settings.
+
+The policy parameters $\theta$ are initialized uniformly in $[-0.1, 0.1]$, and trained with Adam at a learning rate of $0.00035$. Similar to the procedure in Section~\ref{sec:ptb}, we apply a tanh constant of $2.5$ and a temperature of $5.0$ to the controller's logits, and add the controller entropy to the reward, weighted by $0.1$. Additionally, in the macro search space, we enforce the sparsity in the skip connections by adding to the reward the KL divergence between: 1) the skip connection probability between any two layers and 2) our chosen probability $\rho = 0.4$, which represents the prior belief of a skip connection being formed. This KL divergence term is weighted by $0.8$. More training details are in Appendix~\ref{sec:cifar10_details}.
+
+\begin{table*}[htb!]
+  \centering
+  \begin{minipage}{1.\textwidth}
+    \centering
+    \small
+    \begin{tabular}{lcccc}
+    \toprule
+      \multirow{2}{*}{\textbf{Method}} & \multirow{2}{*}{\textbf{GPUs}} & \textbf{Times} & \textbf{Params} & \textbf{Error} \\
+      & & (days) & (million) & ($\%$) \\
+    \midrule
+      DenseNet-BC~\citep{dense_net} & $-$ & $-$ & 25.6 & 3.46 \\
+      DenseNet + Shake-Shake~\citep{shake_shake} & $-$ & $-$ & 26.2 & 2.86 \\
+      DenseNet + CutOut~\citep{cut_out} & $-$ & $-$ & 26.2 & \textbf{2.56} \\
+    \midrule \midrule
+      Budgeted Super Nets~\citep{super_network} & $-$ & $-$ & $-$ & 9.21 \\
+      ConvFabrics~\citep{conv_fabrics} & $-$ & $-$ & 21.2 & 7.43 \\
+      Macro NAS + Q-Learning~\citep{nas_dqn} & 10 & 8-10 & 11.2 & 6.92 \\
+      Net Transformation~\citep{nas_by_transformation} & 5 & 2 & 19.7 & 5.70 \\
+      FractalNet~\citep{fractal_net} & $-$ & $-$ & 38.6 & 4.60 \\
+      SMASH~\citep{smash_net} & 1 & 1.5 & 16.0 & 4.03 \\
+      NAS~\citep{nas} & 800 & 21-28 & 7.1 & 4.47 \\
+      NAS + more filters~\citep{nas} & 800 & 21-28 & 37.4 & \textbf{3.65} \\
+    \midrule
+      \enas~+ macro search space & 1 & 0.32 & 21.3 & 4.23 \\  % exp31_v1
+      \enas~+ macro search space + more channels & 1 & 0.32 & 38.0 & \textbf{3.87} \\
+    \midrule \midrule
+      Hierarchical NAS~\citep{hierarchical_nas} & 200 & 1.5 & 61.3 & 3.63 \\
+      Micro NAS + Q-Learning~\citep{nas_module_dqn} & 32 & 3 & $-$ & 3.60 \\
+      Progressive NAS~\citep{pnas} & 100 & 1.5 & 3.2 & 3.63 \\
+      NASNet-A~\citep{nas_module} &  450 & 3-4 & 3.3 & 3.41 \\
+      NASNet-A + CutOut~\citep{nas_module} & 450 & 3-4 & 3.3 & \textbf{2.65} \\
+    \midrule
+      \enas~+ micro search space & 1 & 0.45 & 4.6 & 3.54 \\
+      \enas~+ micro search space + CutOut & 1 & 0.45 & 4.6 & \textbf{2.89} \\
+    \bottomrule
+    \end{tabular}
+    \caption{\label{tab:cifar10_results}Classification errors of \enas~and baselines on CIFAR-10. In this table, the first block presents DenseNet, one of the state-of-the-art architectures designed by human experts. The second block presents approaches that design the entire network. The last block presents techniques that design modular cells which are combined to build the final network.}
+  \end{minipage}
+\end{table*}
+
+\begin{figure*}[htb!]
+  \centering
+  \includegraphics[height=0.75\textwidth,angle=270]{figs/enas_entire_conv_net.eps}
+  \caption{\label{fig:enas_macro}\enas's discovered network from the macro search space for image classification.}
+\end{figure*}
+
+\begin{figure}[htb!]
+  \centering
+  \includegraphics[width=0.45\textwidth]{figs/enas_net_conv_cell.eps} \\~\\
+  \includegraphics[width=0.45\textwidth]{figs/enas_net_reduction_cell.eps}
+  \caption{\label{fig:enas_micro}\enas~cells discovered in the micro search space.}
+\end{figure}
+
+\paragraph{Results.} Table~\ref{tab:cifar10_results} summarizes the test errors of \enas~and other approaches. In this table, the first block presents the results of DenseNet~\citep{dense_net}, one of the highest-performing architectures that are designed by human experts. When trained with a strong regularization technique, such as Shake-Shake~\citep{shake_shake}, and a data augmentation technique, such as CutOut~\citep{cut_out}, DenseNet impressively achieves the test error of $2.56\%$.
+
+The second block of Table~\ref{tab:cifar10_results} presents the performances of approaches that attempt to design an entire convolutional network, along with the the number of GPUs and the time these methods take to discover their final models. As shown, \enas~finds a network architecture, which we visualize in Figure~\ref{fig:enas_macro}, and which achieves $4.23\%$ test error. This test error is better than the error of $4.47\%$, achieved by the second best NAS model~\citep{nas}. If we keep the architecture, but increase the number of filters in the network's highest layer to $512$, then the test error decreases to $3.87\%$, which is not far away from NAS's best model, whose test error is $3.65\%$. Impressively, \enas~takes about $7$ hours to find this architecture, reducing the number of GPU-hours by more than 50,000x compared to NAS.
+
+The third block of Table~\ref{tab:cifar10_results} presents the performances of approaches that attempt to design one more more modules and then connect them together to form the final networks. \enas~takes $11.5$ hours to discover the convolution cell and the reduction cell, which are visualized in Figure~\ref{fig:enas_micro}. With the convolutional cell replicated for $N=6$ times (\cf~Figure~\ref{fig:micro_search_space}), \enas~achieves $3.54\%$ test error, on par with the $3.41\%$ error of NASNet-A~\citep{nas_module}. With CutOut~\citep{cut_out}, \enas's error decreases to $2.89\%$, compared to $2.65\%$ by NASNet-A.
+
+In addition to \enas's strong performance, we also find that the models found by \enas~are, in a sense, the local minimums in their search spaces. In particular, in the model that \enas~finds from the marco search space, if we replace all separable convolutions with normal convolutions, and then adjust the model size so that the number of parameters stay the same, then the test error increases by $1.7\%$. Similarly, if we randomly change several connections in the cells that \enas~finds in the micro search space, the test error increases by $2.1\%$. This behavior is also observed when \enas~searches for recurrent cells (\cf~Section~\ref{sec:ptb}), as well as in~\citet{nas}. We thus believe that the controller RNN learned by \enas~is as good as the controller RNN learned by NAS, and that the performance gap between NAS and \enas~is due to the fact that we do not sample multiple architectures from our trained controller, train them, and then select the best architecture on the validation data. This extra step benefits NAS's performance.
+
+\subsection{The Importance of \enas}
+A question regarding \enas's importance is whether \enas~is actually capable of finding good architectures, or if it is the design of the search spaces that leads to \enas's strong empirical performance.
+
+\paragraph{Comparing to Guided Random Search.} We uniformly sample a recurrent cell, an entire convolutional network, and a pair of convolutional and reduction cells from their search spaces and train them to convergence using the same settings as the architectures found by \enas. For the macro space over entire networks, we sample the skip connections with an activation probability of $0.4$, effectively balancing \enas's advantage from the KL divergence term in its reward (see Section~\ref{sec:cifar10}). Our random recurrent cell achieves the test perplexity of $81.2$ on Penn Treebank, which is far worse than \enas's perplexity of $55.8$. Our random convolutional network reaches $5.86\%$ test error, and our two random cells reache $6.77\%$ on CIFAR-10, while \enas~achieves $4.23\%$ and $3.54\%$, respectively.
+
+\paragraph{Disabling \enas~Search.} In addition to random search, we attempt to train only the shared parameters $\omega$ without updating the controller. We conduct this study for our macro search space (Section~\ref{sec:cifar10_macro}), where the effect of an untrained random controller is similar to dropout with a rate of $0.5$ on the skip connections, and to drop-path on the operations~\citep{nas_module,fractal_net}. At convergence, the model has the error rate of $8.92\%$. On the validation set, an ensemble of $250$ Monte Carlo configurations of this trained model can only reach $5.49\%$ test error. We therefore conclude that the appropriate training of the \enas~controller is crucial for good performance.

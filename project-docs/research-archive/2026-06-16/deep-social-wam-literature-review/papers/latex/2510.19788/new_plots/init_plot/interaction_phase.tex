@@ -1,0 +1,92 @@
+% Interaction phase diagram: two boxes and two labeled arrows (CURVED VERSION)
+% This is a fragment intended to be \subimport'ed or \input into a tikzpicture
+% Requires the caller to load: \usetikzlibrary{arrows.meta,calc}
+
+% Local styles
+\tikzset{
+  ip/box/.style={draw, rounded corners=6pt, minimum width=4.2cm, minimum height=3.0cm, line width=0.8pt, align=center, font=\large},
+  ip/arrow/.style={->, line width=0.9pt},
+  ip/label/.style={font=\normalsize, fill=white, inner sep=2pt, rounded corners=2pt},
+  % Outer framing styles (match test phase look)
+  ip/outerbox/.style={draw=black, rounded corners=8pt, line width=0.8pt},
+  ip/title/.style={font=\large\bfseries, text=black}
+}
+
+% Browser header configuration (shared with test phase)
+\providecommand{\BrowserBarH}{0.5cm}
+\providecommand{\BrowserBarAddrTop}{0.12cm}
+\providecommand{\BrowserBarAddrBottomPad}{0.12cm}
+\providecommand{\IPButtonLabelFont}{\tiny}
+
+% Soft background colors for boxes
+\colorlet{IPLeftBg}{blue!22}
+\colorlet{IPRightBg}{red!30!brown!35}
+
+% Coordinate system (units in cm)
+\begin{scope}[x=1cm,y=1cm]
+
+  % Title drawn later relative to content bounds
+
+  % Boxes
+  % Left/top: drawless container, then render stacked grids inside it
+  % Place stacked frames above the agent (vertical layout)
+  % Positioned to start from origin area
+  \node[ip/box, draw=none, inner sep=0pt] (stack) at (2.1,4.5) {};
+  % Clip to the box extents (min size 4.2cm x 3.0cm)
+  \begin{scope}
+    % Background to simulate browser content area
+    \path[fill=black!5]
+    ([xshift=-2.1cm,yshift=-2.0cm]stack.center)
+    rectangle
+    ([xshift= 2.1cm,yshift= 1.5cm]stack.center);
+    % Center and scale the stacked grids fragment inside the box
+    % Apply an unscaled offset to center the fragment's bounding box
+    \def\cellsz{0.35cm}
+    \begin{scope}[shift={(stack.center)}]
+      \begin{scope}[shift={(-0.85,-1.15)}]
+        \begin{scope}[scale=1]
+          \subimport{.}{stacked_treasure.tex}
+
+          \begin{scope}[shift={(0.2,0.0)}]
+
+            \begin{scope}[x=\cellsz, y=\cellsz, line cap=round, line join=round]
+
+              \def\btnYlow{-2}
+              \def\btnYhigh{-1}
+
+              % derive button height and font size as a fraction of grid cell size
+              \pgfmathsetmacro{\btnHeight}{\btnYhigh-\btnYlow}
+              \pgfmathsetlengthmacro{\btnFont}{0.55*\btnHeight*\cellsz}
+              \pgfmathsetlengthmacro{\btnFontBaseline}{1.1*\btnFont}
+              % text widths to keep labels inside outlines
+              \pgfmathsetlengthmacro{\btnTextWidthLeft}{2.2*\cellsz}
+              \pgfmathsetlengthmacro{\btnTextWidthRight}{3.2*\cellsz}
+              % Reset button
+              \node[
+              draw=\maraGridBorderColor,
+              fill=black!40,
+              rounded corners=\maraBorderRadius,
+              inner sep=0pt,
+              fit={(-0.5,\btnYlow) (2,\btnYhigh)},
+              label={[font=\IPButtonLabelFont,text=black,align=center]center:{Reset}}
+              ] (IPResetButton) {};
+              % Go to Test button
+              \node[
+              draw=\maraGridBorderColor,
+              fill=black!40,
+              rounded corners=\maraBorderRadius,
+              inner sep=0pt,
+              fit={(2.5,\btnYlow) (6.0,\btnYhigh)},
+              label={[font=\IPButtonLabelFont,text=black,align=center]center:{Go to Test}}
+              ] (IPUIButton) {};
+            \end{scope}
+          \end{scope}
+        \end{scope}
+      \end{scope}
+    \end{scope}
+  \end{scope}
+  % (Browser header removed)
+  % Agent and interaction arrows are drawn by the parent diagram
+
+
+\end{scope}

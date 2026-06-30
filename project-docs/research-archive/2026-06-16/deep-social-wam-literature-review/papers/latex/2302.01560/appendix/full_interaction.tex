@@ -1,0 +1,116 @@
+%##################################################################################################
+\definecolor{codeblue}{rgb}{0.25,0.5,0.5}
+\definecolor{codekw}{rgb}{0.85, 0.18, 0.50}
+\definecolor{keywordgreen}{rgb}{0,0.6,0}
+\lstset{
+  backgroundcolor=\color{gray!10},
+  basicstyle=\fontsize{8pt}{9pt}\ttfamily\selectfont,
+  columns=fullflexible,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\fontsize{7.5pt}{7.5pt}\color{codeblue},
+  keywords = {User, Planner, RePlanner, Descriptor, Explainer}, 
+  keywordstyle = {\textbf},
+  caption={Full dialogue of task \texttt{ObtainDiamond}},
+  label={lst:diamond}
+}
+\begin{lstlisting} % [language=python]  
+
+User: You are a helper agent in Minecraft. You need to generate the sequences of goals for a certain task in Minecraft.
+Planner: OK.
+======================================
+User: How to obtain 1 diamond in Minecraft step-by-step? 
+Planner: The code for task obtaining diamond is as bellows:
+def obtain_1_diamond(inventory = {}):
+    mine({'log':3}, null); # step 1: mine 3 log without tool
+    craft({'planks':12}, {'log':3}, null); # step 2: craft 12 planks from 3 log
+    craft({'stick':4}, {'planks':2}, null); # step 3: craft 4 stick from 2 planks
+    craft({'crafting_table':1}, {'planks':4}, null); # step 4: craft 1 crafting_table from 4 planks 
+    craft({'wooden_pickaxe':1}, {'planks':3, 'stick':2}, 'crafting_table'); # step 5: craft 1 wooden_pickaxe from 3 planks and 2 stick, on crafting_table
+    mine({'cobblestone':2}, 'wooden_pickaxe'); # step 6: mine 2 cobblestone with wooden_pickaxe
+    craft({'stone_pickaxe':1}, {'cobblestone':3, 'stick':2}, 'crafting_table'); # step 7: craft 1 stone_pickaxe from 3 cobblestone and 2 stick, on crafting_table
+    mine({'diamond':1}, 'stone_pickaxe'); # step 8: mine 1 diamond with stone_pickaxe
+    return 'diamond'
+
+Descriptor: I succeed on step 1, 2, 3, 4, 5, 6, but I fail on step 7 "craft({'stone_pickaxe':1}, {'cobblestone':3, 'stick':2}, 'crafting_table');". My inventory now has 7 planks, 2 stick, 1 crafting_table, 1 wooden_pickaxe, 2 cobblestone, 5 dirt.
+Explainer: Because crafting stone_pickaxe needs 3 cobblestone, but I only have 2 cobblestone in inventory.
+User: Please fix above errors and re-plan the task "obtain 1 diamond".
+RePlanner: The code for task obtaining 1 diamond is as follows:
+def obtain_1_diamond(inventory = {'planks':7, 'stick':2, 'crafting_table':1, 'wooden_pickaxe':1, 'cobblestone':2, 'dirt':5}):
+    mine({'cobblestone':1}, 'wooden_pickaxe'); # step 1: mine 1 cobblestone with wooden_pickaxe
+    craft({'stone_pickaxe':1}, {'cobblestone':3, 'stick':2}, 'crafting_table'); # step 2: craft 1 stone_pickaxe from 3 cobblestone and 2 stick, on crafting_table
+    mine({'diamond':1}, 'stone_pickaxe'); # step 3: mine 1 diamond with stone_pickaxe
+    return 'diamond'
+
+Descriptor: I succeed on step 1, 2 in new plan, but I fail on step 3 "mine({'diamond':1}, 'stone_pickaxe');". My inventory now has 7 planks, 1 crafting_table, 1 wooden_pickaxe, 1 cobblestone, 5 dirt, 1 stone_pickaxe.
+Explainer: Because mining diamond needs to use the tool iron_pickaxe, but I do not have it.
+User: Please fix above errors and re-plan the task "obtain 1 diamond".
+RePlanner: The code for obtaining 1 diamond is as follows:
+def obtain_1_diamond(inventory = {'planks':7, 'crafting_table':1, 'wooden_pickaxe':1, 'cobblestone':1, 'dirt':5, 'stone_pickaxe':1}):
+    mine({'iron_ore':1}, 'stone_pickaxe'); # step 1: mine 1 iron_ore with stone_pickaxe
+    smelt({'iron_ingot':1}, {'iron_ore':1}, 'furnace'); # step 2: craft 1 iron_ingot from 1 iron_ore, on furnace
+    craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table'); # step 3: craft 1 iron_pickaxe from 3 iron_ingot and 2 stick, on crafting_table
+    mine({'diamond':1}, 'iron_pickaxe'); # step 4: mine 1 diamond with iron_pickaxe
+    return 'diamond'
+
+Descriptor: I success on step 1 in new plan, but I fail on step 2 "smelt({'iron_ingot':1}, {'iron_ore':1}, 'furnace');". My inventory now has 7 planks, 1 crafting_table, 1 wooden_pickaxe, 6 cobblestone, 1 iron_ore, 20 dirt, 64 stone.
+Explainer: Because smelting iron ingot needs to use the tool furnace, but I do not have it.
+User: Please fix above errors and replan the task "obtain 1 diamond".
+RePlanner: The code for obtaining 1 diamond is as follows:
+def mine_1_diamond(inventory = {'planks':7, 'crafting_table':1, 'wooden_pickaxe':1, 'cobblestone':6, 'iron_ore':1, 'dirt':20, 'stone':64}):
+    craft({'furnace':1}, {'cobblestone':8}, null); # step 1: craft 1 furnace from 8 cobblestone 
+    craft({'iron_ingot':1}, {'iron_ore':1}, 'furnace'); # step 2: craft 1 iron_ingot from 1 iron_ore, on furnace
+    craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table'); # step 3: craft 1 iron_pickaxe from 3 iron_ingot and 2 stick, on crafting_table
+    mine({'diamond':1}, 'iron_pickaxe'); # step 4: mine 1 diamond with iron_pickaxe
+    return 'diamond'
+
+Descriptor: I fail on step 1 "craft({'furnace':1}, {'cobblestone':8}, null);". My inventory now has 7 planks, 1 crafting_table, 1 wooden_pickaxe, 6 cobblestone, 1 iron_ore, 20 dirt, 64 stone.
+Explainer: Because crafting furnace needs 8 cobblestone, but I only have 6 cobblestone.
+User: Please fix above errors and re-plan the task "obtain 1 diamond".
+RePlanner: The code for obtaining 1 diamond is as follows:
+def obtain_1_diamond(inventory = {'planks':7, 'crafting_table':1, 'wooden_pickaxe':1, 'cobblestone':6, 'iron_ore':1, 'dirt':20, 'stone':64}):
+    mine({'cobblestone':8}, 'stone_pickaxe'); # step 1: mine 8 cobblestone with stone_pickaxe
+    craft({'furnace':1}, {'cobblestone':8}, null); # step 2: craft 1 furnace from 8 cobblestone 
+    smelt({'iron_ingot':1}, {'iron_ore':1}, 'furnace'); # step 3: craft 1 iron_ingot from 1 iron_ore, on furnace
+    craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table'); # step 4: craft 1 iron_pickaxe from 3 iron_ingot and 2 stick, on crafting_table
+    mine({'diamond':1}, 'iron_pickaxe'); # step 5: mine 1 diamond with iron_pickaxe
+    return 'diamond'
+
+Descriptor: I succeed on step 1 in new plan, but I fail on step 2 "craft({'furnace':1}, {'cobblestone':8}, null);". My inventory now has 7 planks, 1 crafting_table, 1 wooden_pickaxe, 1 stone_pickaxe, 8 cobblestone, 1 iron_ore, 20 dirt, 64 stone.
+Explainer: Because crafting furnace needs to use the tool crafting_table, but I do not have it.
+User: Please fix above errors and re-plan the task "obtain 1 diamond".
+RePlanner: The code for obtaining 1 diamond is as follows:
+def obtain_1_diamond(inventory = {'planks':7, 'crafting_table':1, 'wooden_pickaxe':1, 'cobblestone':8, 'iron_ore':1, 'dirt':20, 'stone':64}):
+    craft({'furnace':1}, {'cobblestone':8}, 'crafting_table'); # step 1: craft 1 furnace from 8 cobblestone, on crafting_table
+    smelt({'iron_ingot':1}, {'iron_ore':1}, 'furnace'); # step 2: smelt 1 iron_ingot from 1 iron_ore, on furnace
+    craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table'); # step 3: craft 1 iron_pickaxe from 3 iron_ingot and 2 stick, on crafting_table
+    mine({'diamond':1}, 'iron_pickaxe'); # step 4: mine 1 diamond with iron_pickaxe
+    return 'diamond'
+
+Descriptor: I succeed on step 1, 2 in new plan, but I fail on step 3 "craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table');". My inventory now has 6 planks, 1 crafting_table, 1 wooden_pickaxe, 1 stone_pickaxe, 1 furnace, 1 iron_ingot, 20 dirt, 64 stone.
+Explainer: Because crafting iron pickaxe needs 3 iron_ingot, but I only have 1 iron_ingot.
+User: Please fix above errors and re-plan the task "obtain 1 diamond".
+RePlanner: The code for obtaining 1 diamond is as follows:
+def mine_1_diamond(inventory = {'planks':6, 'crafting_table':1, 'wooden_pickaxe':1, 'stone_pickaxe':1, 'furnace':1, 'iron_ingot':1, 'dirt':20, 'stone':64}):
+    mine({'iron_ore':2}, 'stone_pickaxe'); # action 1: mine 2 iron_ore with stone_pickaxe
+    smelt({'iron_ingot':2}, {'iron_ore':2}, 'furnace'); # action 2: craft 2 iron_ingot from 2 iron_ore, on furnace
+    craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table'); # action 3: craft 1 iron_pickaxe from 3 iron_ingot and 2 stick, on crafting_table
+    mine({'diamond':1}, 'iron_pickaxe'); # action 4: mine 1 diamond with iron_pickaxe
+    return 'diamond'
+
+Descriptor: I succeed on step 1, 2 in new plan, but I fail on step 3 "craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table');". My inventory now has 5 planks, 1 crafting_table, 1 wooden_pickaxe, 1 stone_pickaxe, 1 furnace, 3 iron_ingot, 20 dirt, 64 stone.
+Explainer: Because crafting iron_pickaxe needs 2 stick, but I do not have it.
+User: Please fix above errors and re-plan the task "obtain 1 diamond".
+RePlanner: The code for obtaining 1 diamond is as follows:
+def obtain_1_diamond(inventory = {'planks':5, 'crafting_table':1, 'wooden_pickaxe':1, 'stone_pickaxe':1, 'furnace':1, 'iron_ingot':3, 'dirt':20, 'stone':64}):
+    craft({'stick':2}, {'planks':1}, null); # action 15: craft 2 stick from 1 planks 
+    craft({'iron_pickaxe':1}, {'iron_ingot':3, 'stick':2}, 'crafting_table'); # action 16: craft 1 iron_pickaxe from 3 iron_ingot and 2 stick, on crafting_table
+    mine({'diamond':1}, 'iron_pickaxe'); # action 17: mine 1 diamond with iron_pickaxe
+    return 'diamond'
+Descriptor: I succeed in step 1, 2, 3. 
+User: Good. I finish all steps and I obtain 1 stone_pickaxe successfully.
+Planner: OK.
+\end{lstlisting}
+%##################################################################################################
+
+

@@ -1,0 +1,168 @@
+% Ensure required packages if compiled standalone
+\makeatletter
+\@ifundefined{pgfplotsversion}{\RequirePackage{pgfplots}}{}
+\@ifundefined{pgfplotstableread}{\RequirePackage{pgfplotstable}}{}
+\makeatother
+% Needed for named paths and fill-between ribbons
+\usetikzlibrary{intersections,plotmarks,calc,arrows.meta}
+\usepgfplotslibrary{fillbetween}
+% Data: new_plots/data/env_lines_bicolor__cost_vs_score__increasing.csv, ...__non_increasing.csv
+\begingroup
+% ------- configurable knobs -------
+% overall size (avoid digits in macro names)
+\newcommand{\PerfTaskPlotWidth}{0.82\linewidth}
+\newcommand{\PerfTaskPlotHeight}{10.5em}
+% typography
+\newcommand{\PerfTaskFont}{\scriptsize}
+\newcommand{\PerfTaskXFont}{\tiny}
+% much smaller font for leader notes
+\newcommand{\PerfLeaderFont}{\fontsize{5}{5}\selectfont}
+\newcommand{\LegendClamp}[1]{\makebox[10em][l]{#1}}
+% margins
+\newcommand{\PerfTaskEnlargeX}{0.02}
+\newcommand{\PerfTaskEnlargeY}{0.02}
+% ---------------------------------
+
+% Disable externalization for this figure to avoid shell-escape requirement
+% (remove these two lines to re-enable externalization if running with -shell-escape)
+\tikzsetnextfilename{env_lines_bicolor__cost_vs_score}
+% Ensure externalization is disabled locally if globally enabled
+\makeatletter
+\@ifundefined{tikzexternaldisable}{}{\tikzexternaldisable}
+\makeatother
+\begin{tikzpicture}[]
+  % Load data
+  \pgfplotstableread[col sep=comma]{new_plots/data/env_lines_bicolor__cost_vs_score__increasing.csv}{\inc}
+  \pgfplotstableread[col sep=comma]{new_plots/data/env_lines_bicolor__cost_vs_score__non_increasing.csv}{\noninc}
+  % X-range with extra padding left/right of data
+  \def\xminCost{0.1}
+  \def\xmaxCost{18}
+
+
+  \begin{axis}[
+      width=\PerfTaskPlotWidth,
+      height=\PerfTaskPlotHeight,
+      xmin=\xminCost, xmax=\xmaxCost,
+      ymin=0, ymax=1,
+      xmode=log,
+      log basis x=10,
+      % xlabel and ylabel removed for compactness
+      xlabel={Cost (USD)},
+      ylabel={Score},
+      % modern, ggplot-like styling
+      tick label style={font=\PerfTaskFont},
+      label style={font=\PerfTaskFont},
+      title style={font=\PerfTaskFont},
+      grid=none,
+      grid style={opacity=0.15},
+      axis lines=left,
+      axis line style={},
+      axis x line*=bottom,
+      x axis line style={draw=black, -},
+      axis y line*=left,
+      y axis line style={draw=black, -, xshift=-3pt},
+      scaled y ticks=false,
+      ytick={0,1},
+      minor y tick num=0,
+      xtick={0.1,1,10},
+      xticklabels={\$0.1,\$1,\$10},
+      x tick label style={yshift=2pt},
+      major tick length=2pt,
+      minor x tick num=0,
+      axis background/.style={fill=PlotBackground},
+      ytick pos=left,
+      tick align=outside,
+      ytick style={draw=none},
+      xtick style={draw=black, line width=0.3pt},
+      tick style={draw=none},
+      clip=false,
+      legend style={font=\PerfTaskFont, draw=none, fill=none, at={(0.5,1.08)}, anchor=south, legend cell align=left, legend columns=3},
+      unbounded coords=discard,
+    ]
+    % Legend entries (two rows above the plot) — place qwen on second row
+    \addlegendimage{only marks, mark=*, mark size=1.2pt, mark options={draw=black, fill=black}}
+    \addlegendentry{gemini-2.5-flash}
+    \addlegendimage{only marks, mark=diamond*, mark size=1.6pt, mark options={draw=black, fill=black}}
+    \addlegendentry{claude-4-sonnet}
+    \addlegendimage{only marks, mark=pentagon*, mark size=1.6pt, mark options={draw=black, fill=black}}
+    \addlegendentry{gemini-2.5-pro}
+    \addlegendimage{only marks, mark=square*, mark size=1.2pt, mark options={draw=black, fill=black}}
+    \addlegendentry{o3}
+    \addlegendimage{only marks, mark=triangle*, mark size=1.6pt, mark options={draw=black, fill=black}}
+    \addlegendentry{\LegendClamp{qwen3-235b-a22b-thinking-2507}}
+    % Human baseline
+    \addplot[domain=\xminCost:\xmaxCost, samples=2, dashed, line width=1pt, color=PerfHuman, forget plot] {0.935210};
+    % (label moved later to draw on top)
+
+    % Increasing line and ribbon (blue)
+    \addplot+[name path=inc_hi, no marks, draw=none]
+    table[x=cost,y=y_hi]{\inc};
+    \addplot+[name path=inc_lo, no marks, draw=none]
+    table[x=cost,y=y_lo]{\inc};
+    \addplot[fill=PerfMFP, fill opacity=0.18] fill between[of=inc_lo and inc_hi];
+    \addplot+[no marks, draw=PerfMFP, line width=1.0pt, forget plot]
+    table[x=cost,y=y_mean]{\inc};
+    % node[pos=0.76, above, font=\PerfTaskFont, text=PerfMFP] {inc};
+    % Increasing: model-specific markers (with shapes)
+    % gemini-2.5-flash (circle) — smaller
+    \addplot+[only marks, mark=*, mark size=1.0pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(0.183,0.14517658781565737)};
+    % qwen3-235b-a22b-thinking-2507 (triangle) — bigger
+    \addplot+[only marks, mark=triangle*, mark size=1.5pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(1.226,0.1795227416072176)};
+    % gemini-2.5-pro (pentagon) — bigger
+    \addplot+[only marks, mark=pentagon*, mark size=1.5pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(1.59,0.3055555555555555)};
+    % claude-4-sonnet (diamond) — bigger
+    \addplot+[only marks, mark=diamond*, mark size=1.5pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(1.837,0.2916666666666667)};
+    % o3 (square) — smaller
+    \addplot+[only marks, mark=square*, mark size=1.0pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(11.667,0.4257670506431646)};
+    % Point labels removed to reduce clutter; legend now maps shapes to models
+
+    % Non-increasing line and ribbon (red)
+    \addplot+[name path=noninc_hi, no marks, draw=none]
+    table[x=cost,y=y_hi]{\noninc};
+    \addplot+[name path=noninc_lo, no marks, draw=none]
+    table[x=cost,y=y_lo]{\noninc};
+    \addplot[fill={rgb,1:red,0.776;green,0.157;blue,0.157}, fill opacity=0.18] fill between[of=noninc_lo and noninc_hi];
+    \addplot+[no marks, draw={rgb,1:red,0.776;green,0.157;blue,0.157}, densely dotted, line width=.6pt, forget plot]
+    table[x=cost,y=y_mean]{\noninc};
+    % node[pos=0.76, above, font=\PerfTaskFont, text={rgb,1:red,0.776;green,0.157;blue,0.157}] {dec};
+    % Non-increasing: model-specific markers (same shapes)
+    % gemini-2.5-flash (circle) — smaller
+    \addplot+[only marks, mark=*, mark size=1.0pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(0.183,0.26781808335868523)};
+    % qwen3-235b-a22b-thinking-2507 (triangle) — bigger
+    \addplot+[only marks, mark=triangle*, mark size=1.5pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(1.226,0.12957935825819258)};
+    % gemini-2.5-pro (pentagon) — bigger
+    \addplot+[only marks, mark=pentagon*, mark size=1.5pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(1.59,0.19298245614035087)};
+    % claude-4-sonnet (diamond) — bigger
+    \addplot+[only marks, mark=diamond*, mark size=1.5pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(1.837,0.07017543859649122)};
+    % o3 (square) — smaller
+    \addplot+[only marks, mark=square*, mark size=1.0pt, mark options={draw=black, fill=black}, forget plot]
+    coordinates {(11.667,0.08549315606427191)};
+    % Label at the right end of the human baseline (drawn last and positioned relative to axis box)
+    \node[anchor=north east, font=\PerfTaskFont, text=PerfHuman] at (axis description cs:0.98,0.95) {Avg. human score ($0.935$)};
+    % In-plot overlay legend for line sets
+    \node[anchor=north west, font=\PerfTaskFont, fill opacity=0, text opacity=1,
+      rounded corners=0.5pt, inner sep=2pt] at (axis description cs:0.02,0.8) {
+      \begin{tikzpicture}[baseline, x=1em, y=1em]
+        \draw[draw=PerfMFP, line width=1pt] (0,0) -- (2,0);
+        \node[anchor=west] at (2.1,0) {SetA};
+        \draw[draw={rgb,1:red,0.776;green,0.157;blue,0.157}, densely dotted, line width=1pt] (0,-0.9) -- (2,-0.9);
+        \node[anchor=west] at (2.1,-0.9) {SetB};
+      \end{tikzpicture}
+    };
+    % (leader notes removed in favor of a compact legend above)
+  \end{axis}
+  % Re-enable externalization if it was globally enabled
+  \makeatletter
+  \@ifundefined{tikzexternalenable}{}{\tikzexternalenable}
+  \makeatother
+\end{tikzpicture}
+\endgroup

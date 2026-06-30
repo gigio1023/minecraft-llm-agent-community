@@ -1,0 +1,233 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{authblk} % For affiliations
+
+\usepackage[a4paper, margin=1in]{geometry}
+
+\title{Exploring AIGS: From System Design to Experimental Trade-offs in AI-Generated Science}
+\author[1]{Peng Li}
+
+\affil[1]{Institute for AI Industry Research (AIR), Tsinghua University}
+\date{October 2024}
+
+% 整体写作思路：
+
+% 1. Paper 要展示的内容：
+%   1.1. AIGS 这个概念，通用的 AIGS System 长什么样，当前的 AIGS System 缺少什么
+%   1.2. DSL 抽象的通用性及相关讨论
+%   1.3. Ablation Module 的必要性及相关讨论
+%   1.4. 执行实验过程中发现的各种 Tradeoff（Multi-Sampling 和 Cost 之间；Idea Novelty 和 Execution 之间；Ablation 中）
+
+% 2. 写作思路：
+%   2.1. Abstract
+%   2.2. Introduction
+%   2.3. How Human Conduct Scientific Research
+%       描述人类是如何执行科学研究的，对科学研究进行建模
+%   2.4. Literature Review for AIGS
+%       对过去的论文进行分类总结
+%           - Foundational Perspectives on AI in Scientific Discovery
+%           - AI as a Research Assistant: Tools for Human-AI Collaboration
+%           - Task-Specific AI for Performance Optimization
+%           - Autonomous AI in Scientific Discovery: The Automated Scientist
+%   2.5. AIGS System Design
+%       描述一个通用的 AIGS System Design（但考虑到实现，忽略了 2.3 中的某几条）
+%           - DSL Design / Experiment 结合
+%           - Proposal Agent
+%           - Review Agent
+%           - Ablation Agent
+%   2.6. Proof-of-Concept Studies
+%       实验证明
+%           - RAG
+%               - Experiment Setup
+%               - Results and Analysis
+%           - NanoGPT
+%           - Self-Instruct
+%   2.7. Discussion and Actionable Insights
+%           - The Generalizability of DSL Abstractions
+%           - The Necessity of the Ablation Module
+%           - Trade-offs Identified During Experimental Execution
+%               - Agent Flexibility, Idea Novelty and Execution Feasibility
+%               - Multi-Sampling Strategies and Cost Efficiency
+%               - Insights from Ablation Trials
+%   2.8. Limitations and Ethical Considerations
+%           - Incompleteness of System Design
+%           - Incompleteness of Task Selection
+%           - Detailed Examination of System Modules
+%   2.9. Future Plan
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+% 思路：写作要素：
+%   - 科学知识变化日新月异，科研人员压力增加；
+%   - Agent 发展引发人们关注，AI 自主生成科学知识得到希望
+%   - 文章的目的：
+%       - 对科研场景进行建模；
+%       - 提出一种在当前 LLM 能力条件下的通用的 AIGS 框架；
+%       - 通过实验探索为未来 AIGS 的发展提出 Insights
+
+\end{abstract}
+
+% 【图表】：一张图展示 AIGS 这一概念（e.g. 半张图展示概念，半张图展示我们的 System）
+
+\section{Introduction}
+
+% 思路：交代清楚当前的背景，介绍文章行文思路（每一个 section 做什么），引出后续内容即可
+%   - 背景（LLM，Agent 发展迅速，自主智能体备受关注；然而科研人员压力日渐增大，使用 Agent 自主生成科学发现开始被人们关注）
+%   - 介绍我们的行文思路：
+%       - 本文将首先介绍人类科学家如何进行科学发现，尝试对科学研究进行建模；
+%       - 然后对当前 AIGS 领域的研究进行 Review；
+%       - 之后提出一个 AIGS 系统设计方案；
+%       - 在三种场景上对我们提出的系统进行验证研究；
+%       - 深入讨论我们在系统设计以及实验过程中的发现；
+%       - 工作的局限性以及未来工作。
+
+\section{How Human Scientist Conduct Scientific Research}
+
+% 思路：TODO 感觉可能得尽可能讨论的详细一些，但是又能收回到我们自己提出的系统
+
+% 【图表】配合展示
+
+\section{Literature Review for AIGS}
+
+% 思路：介绍我们的分类依据，分类 Metric
+
+% 【图表】一张大表统计过去的文章的类型，Metric：
+%   - Copilot/Autopilot
+%   - 是否自主提出 proposal
+%   - 是否有 review 过程
+%   - 是否 iter
+%   - 是否有 ablation
+%   - 能否提出一些优化的方法
+%   - 能否提出一些 science knowledge
+%   - 是否对提出的 method/science knowledge 进行进一步验证
+%   - 人是否有创造性劳动
+%   - ...
+
+\subsection{Foundational Perspectives on AI in Scientific Discovery}
+
+% 思路：介绍当前的基础科研工作（例如 Can LLMs Generate Novel Research Ideas?; Can Large Language Models Unlock Novel Scientific Research Ideas? 等）
+
+\subsection{AI as a Research Assistant: Tools for Human-AI Collaboration}
+
+% 思路：AI 辅助人类科研的一系列工作
+
+\subsection{Task-Specific AI for Performance Optimization}
+
+% 思路：专注于提高任务性能表现的工作
+
+\subsection{Autonomous AI in Scientific Discovery: The Automated Scientist}
+
+% 思路：能够自主完成 pipeline，可以提出一些 proposal 的工作
+
+\section{AIGS System Design}
+
+% 思路：我们的目的：为了验证当前 AIGS 工作往往缺失的模块的必要性，提出一个满足我们理想的 AIGS 的最小 Pipeline（可以自主迭代优化 proposal，自主完成实验并提出反馈，自主提出 ablation study 验证 science knowledge）；
+%   - 然后基本概括一下我们这个 System（要强调 History 这一要素），讲一下之后要从哪几个部分开始写
+
+% 【图标】需要一张图来展示我们的 System
+
+\subsection{DSL Design}
+
+% 思路：包含的要素：
+%   - DSL 设计的 Motivation；
+%   - DSL 的目的：作为 Proposal 与 Experiment 之间的桥梁。
+
+\subsection{Proposal Agent}
+
+% 思路：包含的要素：
+%   - Proposal Agent 基本功能；
+%   - Multi-Sampling 的设计模式。
+
+\subsection{Review Agent}
+
+% 思路：包含的要素：
+%   - Review Agent 基本功能；
+%   - Review 的内容（Feature 的设计等）。
+
+\subsection{Ablation Agent}
+
+% 思路：包含的要素：
+%   - Ablation Agent 基本功能；
+%   - 目的，设计思想？
+
+\section{Proof-of-Concept Studies}
+
+% 思路：介绍为了验证我们的系统，挑选了哪些任务来进行验证；我们每个任务挑选的依据以及其目的是什么。
+
+\subsection{RAG} % 可能得换个名字
+
+\paragraph{Experiment Setup}
+
+\paragraph{Results and Analysis}
+
+\subsection{NanoGPT} % 可能得换个名字
+
+\paragraph{Experiment Setup}
+
+\paragraph{Results and Analysis}
+
+\subsection{Self-Instruct} % 可能得换个名字
+
+\paragraph{Experiment Setup}
+
+\paragraph{Results and Analysis}
+
+\section{Discussion and Actionable Insights}
+
+% 思路：用于整理实验过程中的发现，并期望输出一些有价值的 Insights
+
+\subsection{The Generalizability of DSL Abstractions}
+
+% 思路：DSL 抽象的讨论
+
+\subsection{The Necessity of the Ablation Agent}
+
+% 思路：对 Ablation Agent 的讨论
+
+\subsection{Trade-offs Identified During Experimental Execution}
+
+% 思路：讨论实验过程中发现的各种 Trade-off
+
+\paragraph{Agent Flexibility, Idea Novelty and Execution Feasibility}
+
+% 思路：Agent 自由度，Idea 新颖程度与执行的可行性之间的 Trade-off
+
+\paragraph{Multi-Sampling Strategies and Cost Efficiency}
+
+% 思路：多采样鸟枪法与消耗之间的 tradeoff
+
+\paragraph{Insights from Ablation Trials}
+
+% 思路：Ablation 实验过程中的自由度带来的 Trade-off
+
+\subsection{Challenges and Technical Bottlenecks in end-to-end scientific discovery}
+
+% 一个有价值的 insights 是目前 AIGS 系统中（每个部分）遇到的主要难点和挑战，例如模型写代码能力不足导致支撑不了实验。就目前的研究现状（刚刚起步）而言，这些“失败的经验”也是一块 contribution
+
+\section{Limitations and Ethical Considerations}
+
+% 思路：实验的限制，这包含：
+%   - 系统设计不够完善，例如缺少文献等模块；
+%   - 任务选择不够完整，并且最终没有很哇塞的科学发现；
+%   - 缺少对每个模块的详细分析与深入研究。
+
+\subsection{Incompleteness of System Design}
+
+\subsection{Incompleteness of Task Selection and Final Science Generated}
+
+\subsection{Detailed Examination of System Modules}
+
+\section{Future Plan}
+
+% 思路：介绍未来的计划
+
+\appendix
+\section{Appendix}
+
+\end{document}z

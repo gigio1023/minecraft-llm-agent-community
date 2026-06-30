@@ -1,0 +1,16 @@
+@@ -45,9 +45,14 @@
+   # EVOLVE-BLOCK-START
+   def _get_optimizer(self) -> optax.GradientTransformation:
+     """Returns optimizer."""
+-    return optax.adam(self.hypers.learning_rate)
++    return optax.adamw(
++        self.hypers.learning_rate, weight_decay=self.hypers.weight_decay
++    )
+ 
+   def _get_init_fn(self) -> jax.nn.initializers.Initializer:
+     """Returns initializer function."""
+-    return initializers.normal(0.0, self.hypers.init_scale, jnp.complex64)
++    # Initialize with a smaller scale to encourage finding low-rank solutions.
++    # Increase scale slightly for better exploration.
++    scale = self.hypers.init_scale
++    return initializers.normal(0 + 1j * 0, scale * 0.2, jnp.complex64)

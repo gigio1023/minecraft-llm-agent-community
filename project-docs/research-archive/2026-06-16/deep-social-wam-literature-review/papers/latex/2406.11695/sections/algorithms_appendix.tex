@@ -1,0 +1,87 @@
+\newpage
+
+\section{Algorithms}
+\label{sec:algo_appendix}
+
+In this section we describe how each of the algorithms that we explore in this paper maps directly into the framework presented in Algorithm \ref{alg:general}.  The Bootstrap Demonstrations algorithm is a generalization of \texttt{BootstrapFewshotWithRandomSearch} from DSPy \citep{khattab2024dspy}, and Single-module OPRO describes a generalization of the OPRO methodology for single stage instruction optimization \citep{yang2023large}.  All other algorithms are introduced in this work.
+
+\subsection{Bootstrap Demonstrations}
+
+\citet{khattab2024dspy} achieve exceptional results with an approach to LM program optimization that is centered around generating and filtering task demonstrations. This approach fits into our general framework and serves as a strong baseline in our experiments.
+
+For this optimizer, we assume that every prompt $p_{i}$ used by $\Phi$ has $K$ variables over demonstrations $\{d_{i1},\ldots,d_{iK}\}$.
+\begin{enumerate}
+\item Initialize: 
+\begin{enumerate}
+\item The hyperparameters $\theta$ are the number of correct examples to bootstrap and the number of demonstrations to use for each module.
+\item Given an $(x, y) \in \mathcal{D}$, we run $\Phi(x)$. The full trace of each run provides a value for each module-level demonstration variable. If the output of the model is equivalent to $y$, we assume the demonstrations to be valid and add them to a global store $A$.
+\end{enumerate}
+\item Propose: We sample demonstrations $D$ from $A$ (according to the hyperparameters) and use these to create a partial assignment $\mathbf{D}\mapsto D$ from demonstration variables to demonstrations.
+\item Update: The partial assignment $\mathbf{D}\mapsto D$ is added to a global store $B$ with its evaluation score on the dev set.
+\item ExtractOptimizedSets: The top-scoring assignment in $B$ is used to create the optimized program.
+\end{enumerate}
+
+\subsection{Single-module OPRO}
+
+The goal of OPRO is to find optimal instruction for a given task. We begin with the single-module case covered in the original paper. We require only that the prompt for this single module have a variable $\iota$ for task instructions.
+
+The starting point for OPRO is a meta-prompt, which gives the state of the optimizer at each iteration. The meta-prompt consists of meta-instructions, task instructions with their scores from training data evaluations, and task exemplars. The model is asked to generate a new candidate task instruction that is different from the ones already included in the meta-prompt.\footnote{In the OPRO paper, a set of candidate instructions is generated and scored at each step. For simplicity, we consider only a single candidate per step.} This is scored, and then the meta-prompt is updated with the (possibly) revised set of top-scoring task instructions.
+
+\begin{enumerate}
+\item Initialize: 
+\begin{enumerate}
+\item The hyperparameters $\theta$ are the meta-instructions, a seed task instruction $s$, the maximum number of scored task instructions to include in prompts,  a function for choosing exemplars from $\mathcal{D}$, and any hyperparameters for the underlying LM.
+\item The dataset $\mathcal{D}$ is used to score $\Phi_{\iota\mapsto s}$. This assignment--score pair is stored in a global variable $A$ and added into the meta-prompt.
+\end{enumerate}
+\item Propose: The meta-prompt is used to generate a new candidate instruction $s'$. This forms a partial assignment function $\iota \mapsto s'$.
+\item Update: The partial assignment $\iota \mapsto s'$ is added to $A$ with its score, and the 
+top-scoring assignments in $A$ are used in the updated meta-prompt.
+\item ExtractOptimizedSets: A top-scoring partial assignment $\iota \mapsto s_{i}$ is extracted from $A$.
+\end{enumerate}
+
+
+\subsection{Module-Level History Based}
+
+How can we extend OPRO to case where we have an LM program $\Phi$ with $m > 1$ stages? We assume that each prompt template $p_{i}$ used by $\Phi$ has a variable for instructions, and our goal is to optimize each one. This raises a problem of credit assignment: we have only task-level labels and cannot be sure how the instruction for each module contributes to assigning these labels correctly.
+
+To begin to address this, we make the simplifying assumption that each instruction contributes equally to the score achieved by the entire program. This leads to a very simple modification of single-module OPRO:
+\begin{enumerate}
+\item Initialize: 
+\begin{enumerate}
+\item We now have a single meta-prompt per module, each with hyperparameters $\theta$ as described for OPRO. Each module has instruction variable $\iota_{i}$ and a seed instruction $s_{i}$
+\item The dataset $\mathcal{D}$ is used to score $\Phi_{[\iota_{1}\mapsto s_{1}, \ldots \iota_{m}\mapsto s_{m}]}$. Call this global score $r$. Each $\iota_{i}\mapsto s_{i}$ is added to the global store $A$ with $r$ as its score.
+\end{enumerate}
+\item Propose: The meta-prompts are used to generate candidate instructions $s_{1}' \ldots s_{m}'$. These create a partial assignment $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$.
+\item Update: As in single-module OPRO, but with each $\iota_{i} \ldots s_{i}'$ used for its respective module's meta-prompt.
+\item ExtractOptimizedSets: As in single-module OPRO, again with each $\iota_{i} \ldots s_{i}'$ used for its respective module's meta-prompt.
+\end{enumerate}
+
+\subsection{Program-level History Based}
+Our Module-level adaptation of OPRO makes the credit assignment assumption that each instruction contributes equally to the score.  In practice this is often not the case since a poor performing module can ruin the performance of the entire program.  To account for this we attempt to answer the following question: can LLMs perform credit assignment over the instructions in a multistage program?
+
+In Program-level OPRO we return to the single metaprompt setting of single-module OPRO from the original paper.  We make a small modification such that the LLM proposer sees all the instructions in an LM program in order to produce the instructions for all other modules.  With this information we hypothesize that a very capable LLM could perform credit assignment and determine which instructions need the most significant modifications.  We adapt Single-module OPRO:
+
+\begin{enumerate}
+    \item Initialize:
+    \begin{enumerate}
+        \item We have one meta-prompt for the entire program, with hyperparameters $\theta$.  Each module has instruction variable $\iota_{i}$ and a seed instruction $s_i$
+        \item The dataset $\mathcal{D}$ is used to score $\Phi_{[\iota_{1}\mapsto s_{1}, \ldots \iota_{m}\mapsto s_{m}]}$. Call this global score $r$.  The partial assignment of all instructions $[\iota_{1}\mapsto s_{1}, \ldots \iota_{m}\mapsto s_{m}]$ is added to the global store $A$ with $r$ as its score.
+    \end{enumerate}
+    \item Propose: The single meta-prompt is called once to generate candidate instructions $s_{1}' \ldots s_{m}'$. This creates a partial assignment $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$.
+    \item Update: The partial assignment $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$ is added to $A$ with its score, and the top-scoring assignments in $A$ are used in the updated meta-prompt.
+    \item ExtractOptimizedSets: A top-scoring partial assignment $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$ is extracted from $A$.
+\end{enumerate}
+
+\subsection{Surrogate Model (MIPRO)}
+To abstract the credit assignment away from the LLM itself we also propose the use of a Bayesian Surrogate model for estimating which latent variables are most impactful and useful for the final assignment.  We name this particular algorithm MIPRO (Multi-prompt Instruction PRoposal Optimizer):
+
+\begin{enumerate}
+    \item Initialize:
+    \begin{enumerate}
+        \item MIPRO proposes a complete set of T instructions per module $\{[\iota_{1,m}, \ldots \iota_{t,m}]\}_{m=1}^{M}$ using the proposal hyperparameters $\theta$ and bootstraps a complete set of K task demonstrations per module $\{[d_{1,m}, \ldots d_{k,m}]\}_{m=1}^{M}$ all upfront.
+        \item All latent variables in the Bayesian Model are initialized with a uniform prior for utility.
+    \end{enumerate}
+    \item Propose: We use the sampling rule from the Tree Structured Parzen Estimator \citep{bergstra2011algorithms} to propose a partial assignment of instructions $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$ and demonstrations $[d_{1..k,1} \mapsto s_{1..k,1}', \ldots, d_{1..k,m} \mapsto s_{1..k,m}']$
+    \item Update: The partial assignments $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$ and $[d_{1..k,1} \mapsto s_{1..k,1}', \ldots, d_{1..k,m} \mapsto s_{1..k,m}']$ are used to update the Bayesian model such that the weight over good candidates increases and the weight of bad candidates decreases.
+    \item ExtractOptimizedSets: For each latent variable to parameterize $\Phi$, the highest probability candidates are selected from the Bayesian model and evaluated on a Validation set to return the optimal assignment $[\iota_{1} \mapsto s_{1}', \ldots, \iota_{m} \mapsto s_{m}']$ and demonstrations $[d_{1..k,1} \mapsto s_{1..k,1}', \ldots, d_{1..k,m} \mapsto s_{1..k,m}']$.
+\end{enumerate}

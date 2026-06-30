@@ -7,7 +7,7 @@ are merged here at the end.
 Channels: Hugging Face CLI (`hf`, primary), then WebSearch/WebFetch (arXiv,
 Semantic Scholar, Papers with Code, GitHub, project pages, docs).
 
-## 2026-06-16 — Coordinator seed
+## 2026-06-16 - Coordinator seed
 
 Environment: `hf` v1.16.1, authenticated as `naem1023`. Rationale for hf-first:
 the task mandates Hugging Face CLI as a primary discovery channel; `hf papers`
@@ -77,50 +77,50 @@ fetched via `bash scripts/fetch_arxiv_latex.sh <id> <slug>`.
 - Read `papers/latex/2605.12090/`: 020-def (formal defs), 010-intro, 070-oppo (open challenges), 030-wm (background lineage + WM-for-VLA quad), 060-eval (eval taxonomy + IDM Turing Test), 050-data (four data sources). Rationale: this is the definitional anchor for the whole lane.
 
 ## LaTeX downloads (primary sources)
-- `fetch_arxiv_latex.sh 2602.15922 dreamzero` — DreamZero (WAMs are zero-shot policies). 7 tex.
-- `fetch_arxiv_latex.sh 2603.22078 do-wams-generalize` — robustness comparative study. 1 tex.
-- `fetch_arxiv_latex.sh 2605.06222 when-to-trust-imagination` — FFDC adaptive WAM execution (verifier framing). 1 tex.
-- `fetch_arxiv_latex.sh 2604.25859 privileged-foresight` — PFD (future signal is compressible). 1 tex.
-- `fetch_arxiv_latex.sh 2410.12822 avid` — adapt frozen video diffusion to WM (weight reuse). 10 tex.
-- `fetch_arxiv_latex.sh 2602.22208 solaris` — multiplayer Minecraft video WM. 31 tex (split sections).
-- `fetch_arxiv_latex.sh 2603.23497 wildworld` — explicit-state ARPG dataset (structured-state contrast). 7 tex.
-- `fetch_arxiv_latex.sh 2504.08388 mineworld` — open-source Minecraft pixel WM. 3 tex.
-- `fetch_arxiv_latex.sh 2509.24527 dreamer4` — latent WM agent, diamonds from offline data. 27 tex.
-- `fetch_arxiv_latex.sh 2601.15533 actionable-simulators` — "visual conflation" / actionable-simulator survey. 1 tex.
-- `fetch_arxiv_latex.sh 2506.18701 matrix-game` — interactive world foundation model (Minecraft). 1 tex.
+- `fetch_arxiv_latex.sh 2602.15922 dreamzero` - DreamZero (WAMs are zero-shot policies). 7 tex.
+- `fetch_arxiv_latex.sh 2603.22078 do-wams-generalize` - robustness comparative study. 1 tex.
+- `fetch_arxiv_latex.sh 2605.06222 when-to-trust-imagination` - FFDC adaptive WAM execution (verifier framing). 1 tex.
+- `fetch_arxiv_latex.sh 2604.25859 privileged-foresight` - PFD (future signal is compressible). 1 tex.
+- `fetch_arxiv_latex.sh 2410.12822 avid` - adapt frozen video diffusion to WM (weight reuse). 10 tex.
+- `fetch_arxiv_latex.sh 2602.22208 solaris` - multiplayer Minecraft video WM. 31 tex (split sections).
+- `fetch_arxiv_latex.sh 2603.23497 wildworld` - explicit-state ARPG dataset (structured-state contrast). 7 tex.
+- `fetch_arxiv_latex.sh 2504.08388 mineworld` - open-source Minecraft pixel WM. 3 tex.
+- `fetch_arxiv_latex.sh 2509.24527 dreamer4` - latent WM agent, diamonds from offline data. 27 tex.
+- `fetch_arxiv_latex.sh 2601.15533 actionable-simulators` - "visual conflation" / actionable-simulator survey. 1 tex.
+- `fetch_arxiv_latex.sh 2506.18701 matrix-game` - interactive world foundation model (Minecraft). 1 tex.
 
 ## HF papers searches
-- `hf papers search "MineWorld interactive Minecraft world model" --limit 6` — surfaced Matrix-Game (2506.18701), MineWorld (2504.08388), Dreamer 4 (2509.24527), iVideoGPT (2405.15223), "Simulating the Visual World" roadmap (2511.08585), and crucially **"From Generative Engines to Actionable Simulators" (2601.15533)**.
-- `hf papers search "Oasis real-time generated Minecraft" --limit 6` — confirmed Matrix-Game beats Oasis+MineWorld; surfaced Dreamer 4 again, BugCraft, MCU.
+- `hf papers search "MineWorld interactive Minecraft world model" --limit 6` - surfaced Matrix-Game (2506.18701), MineWorld (2504.08388), Dreamer 4 (2509.24527), iVideoGPT (2405.15223), "Simulating the Visual World" roadmap (2511.08585), and crucially **"From Generative Engines to Actionable Simulators" (2601.15533)**.
+- `hf papers search "Oasis real-time generated Minecraft" --limit 6` - confirmed Matrix-Game beats Oasis+MineWorld; surfaced Dreamer 4 again, BugCraft, MCU.
 - (coordinator dump already contained Solaris 2602.22208, WildWorld 2603.23497, Matrix-Game 2.0 2508.13009, and the Minecraft-agent long tail: Optimus-2/3, JARVIS-1, Voyager, GITM, ADAM, MineExplorer, MineNPC-Task, PEAM.)
 
 ## HF model/dataset availability checks (weight reuse question)
-- `hf models list --author nyu-visionx --limit 15` — `nyu-visionx/solaris` (minecraft, world-model, multi-agent, apache-2.0) confirmed public.
-- `hf models list --search MineWorld` — no direct hit under that name (paper states code+weights released by Microsoft; recorded as released-per-paper).
-- `hf models list --search Matrix-Game` — `Skywork/Matrix-Game` and `Skywork/Matrix-Game-2.0` (MIT) + distilled diffusers variants confirmed.
-- `hf models list --search Oasis-500m` / `open-oasis` — `Etched/oasis-500m` (MIT, ~500M, 496 likes) confirmed.
+- `hf models list --author nyu-visionx --limit 15` - `nyu-visionx/solaris` (minecraft, world-model, multi-agent, apache-2.0) confirmed public.
+- `hf models list --search MineWorld` - no direct hit under that name (paper states code+weights released by Microsoft; recorded as released-per-paper).
+- `hf models list --search Matrix-Game` - `Skywork/Matrix-Game` and `Skywork/Matrix-Game-2.0` (MIT) + distilled diffusers variants confirmed.
+- `hf models list --search Oasis-500m` / `open-oasis` - `Etched/oasis-500m` (MIT, ~500M, 496 likes) confirmed.
 - Finding: all public Minecraft/game WM weights output **pixels**; none outputs structured social-material state.
 
 ## Web searches (canonical breadth facts)
-- WebSearch "DreamerV3 Hafner first to collect diamonds Minecraft from scratch without human data Nature 2025" — confirmed DreamerV3 (arXiv 2301.04104) Nature 2025, first diamonds from scratch without human data; code `danijar/dreamerv3`.
-- WebSearch "Genie 3 DeepMind 2025 real-time interactive general world model 720p" — confirmed Genie 3: real-time 720p/24fps, autoregressive, several-minutes memory, text/image prompts, weights not public.
+- WebSearch "DreamerV3 Hafner first to collect diamonds Minecraft from scratch without human data Nature 2025" - confirmed DreamerV3 (arXiv 2301.04104) Nature 2025, first diamonds from scratch without human data; code `danijar/dreamerv3`.
+- WebSearch "Genie 3 DeepMind 2025 real-time interactive general world model 720p" - confirmed Genie 3: real-time 720p/24fps, autoregressive, several-minutes memory, text/image prompts, weights not public.
 
 ## Notes on coverage
 - LaTeX deep-read: 11 sources (2605.12090, 2602.15922, 2603.22078, 2605.06222, 2604.25859, 2410.12822, 2602.22208, 2603.23497, 2504.08388, 2509.24527, 2601.15533). Matrix-Game LaTeX downloaded, treated abstract-level.
 - Abstract / card / docs level: Matrix-Game 2.0, Oasis, Genie, Genie 3, GameNGen, DreamerV3, iVideoGPT, PAN, NitroGen.
-- Did NOT chase the full Minecraft-LLM-agent long tail (Voyager, JARVIS-1, Optimus, GITM, ADAM, MineExplorer) — those are Lane 2 (Minecraft agents) territory; recorded only as context.
+- Did NOT chase the full Minecraft-LLM-agent long tail (Voyager, JARVIS-1, Optimus, GITM, ADAM, MineExplorer) - those are Lane 2 (Minecraft agents) territory; recorded only as context.
 
 ---
 
 ### From raw-search-results/lane-2-search-log.md
 
-# Lane 2 Search Log — Minecraft Agent / VLA / Visual Policy / Benchmarks
+# Lane 2 Search Log - Minecraft Agent / VLA / Visual Policy / Benchmarks
 
 Date: 2026-06-16. Tools: Hugging Face CLI (`hf`, primary), then WebSearch/WebFetch.
 Authenticated `hf` user as seen in coordinator log (`naem1023`). Each block lists
 the exact command/query and a one-line rationale.
 
-## Hugging Face CLI — model/dataset availability
+## Hugging Face CLI - model/dataset availability
 
 ```
 hf models list --search VPT --limit 15
@@ -133,7 +133,7 @@ Rationale: confirm which Minecraft visual-policy weights are actually public.
 Finding: generic name searches return unrelated repos (VPTQ quantization, GPT-2
 bots, Marvel "Groot" dreambooth). The canonical re-hosting org is
 **CraftJarvis**, which publishes VPT (`MineStudio_VPT.*`), STEVE-1
-(`MineStudio_STEVE-1.official`, 12,822 downloads — most used), GROOT
+(`MineStudio_STEVE-1.official`, 12,822 downloads - most used), GROOT
 (`MineStudio_GROOT.18w_EMA`), ROCKET (`MineStudio_ROCKET-1.12w_EMA`,
 `ROCKET-3-1.5x`), JarvisVLA (`JarvisVLA-Qwen2-VL-7B`, 519 downloads), and a 2509
 OpenHA / CrossAgent / motion-action family.
@@ -151,11 +151,11 @@ hf papers info 2502.19902
 ```
 Rationale: record public trajectory/dataset shapes and sizes.
 Findings:
-- `CraftJarvis/minecraft-vla-sft` — 216 train parquet shards, ~106 GB, 1M–10M
+- `CraftJarvis/minecraft-vla-sft` - 216 train parquet shards, ~106 GB, 1M-10M
   rows, MIT, 2,177 downloads (JARVIS-VLA SFT data).
-- `iLearn-Lab/Optimus-2-MGOA` — webdataset, 10M–100M scale, MIT, 974 downloads
+- `iLearn-Lab/Optimus-2-MGOA` - webdataset, 10M-100M scale, MIT, 974 downloads
   (Optimus-2 GOA pairs).
-- `zhwang4ai/minecraft-trajectory` + `minecraft-language-trajectory` — GROOT-2 /
+- `zhwang4ai/minecraft-trajectory` + `minecraft-language-trajectory` - GROOT-2 /
   CraftJarvis trajectory data (manual-download gated, small download counts).
 - MineStudio converted VPT contractor data lives under
   `CraftJarvis/minestudio-data-6xx..10xx` (per existing repo analysis;
@@ -164,7 +164,7 @@ Findings:
 - `osanseviero/minedojo_knowledge` exists but is a tiny knowledge dump, not the
   MineDojo YouTube/Wiki/Reddit corpus.
 
-## Hugging Face CLI — paper discovery (reused coordinator dumps + new)
+## Hugging Face CLI - paper discovery (reused coordinator dumps + new)
 
 ```
 hf papers search "multi-agent Minecraft cooperation" --limit 12
@@ -179,7 +179,7 @@ Rationale: pull upvote-ranked recent + canonical IDs and confirm arXiv numbers.
 Confirmed canonical IDs: VPT 2206.11795, STEVE-1 2306.00937, MineDojo 2206.08853,
 JARVIS-VLA 2503.16365, GROOT 2310.08235 (note: coordinator-seed "2503.10684" is a
 DIFFERENT paper, "Open-World Skill Discovery from Unsegmented Demonstration
-Videos", a CraftJarvis skill-segmentation work — kept separately).
+Videos", a CraftJarvis skill-segmentation work - kept separately).
 Multi-agent in-HF: MineCollab/MINDcraft 2504.17950, S-Agents 2402.04578, HAS
 2403.08282, MindForge 2411.12977, MindAgent 2309.09971, CWM 2307.02485.
 
@@ -204,7 +204,7 @@ bash scripts/fetch_arxiv_latex.sh 2310.08367 mcu
 All 14 returned `latex=tarball_extracted`. Read intro/method/action-observation/
 data/eval sections directly.
 
-## Web (arXiv / ACL / GitHub / OpenReview) — benchmarks not in hf papers
+## Web (arXiv / ACL / GitHub / OpenReview) - benchmarks not in hf papers
 
 ```
 WebSearch "VillagerBench Minecraft multi-agent benchmark VillagerAgent arxiv"
@@ -225,7 +225,7 @@ primitive + 183 compositional skills, LLaMA-3 fine-tune, code zju-vipa/Odyssey),
 MineLand 2403.19267 (64+ agents, limited senses + physical needs, code
 cocacola-lab/MineLand), ROCKET-1 2410.17856 (CVPR'25), Narayan-Chen Minecraft
 Dialogue Corpus ACL 2019 (P19-1537, 509 dialogues, architect/builder, no arXiv).
-Also surfaced: PillagerBench 2509.06235 (competitive team Minecraft) — noted, not
+Also surfaced: PillagerBench 2509.06235 (competitive team Minecraft) - noted, not
 deep-read.
 
 ## Existing repo analyses reused (NOT re-cloned, per brief)
@@ -240,7 +240,7 @@ model code, MineRL/Malmo simulator, VLM auto-eval. Lane-2 sharpens, not repeats.
 
 ### From raw-search-results/lane-3-search-log.md
 
-# Lane 3 Search Log — LLM Social Simulation and Social Benchmarks
+# Lane 3 Search Log - LLM Social Simulation and Social Benchmarks
 
 Lane 3 (N=3). Discovery channels: Hugging Face CLI (`hf`, primary), then
 WebSearch/WebFetch (arXiv, ACL Anthology, OpenReview, Semantic Scholar, GitHub,

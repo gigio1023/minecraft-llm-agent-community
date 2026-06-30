@@ -1,0 +1,166 @@
+\section{Polynomaly: Mitigating reward misspecification}\label{sec:detection}
+% \begin{wrapfigure}{r}{0.45\textwidth}
+% %\begin{figure}[htbp]
+%     \centering
+%     \includesvg[scale=0.12]{figures/graphics_gray/detector_gray.svg}
+%     \caption{Our proposed detection task. See Figure~\ref{fig:main} for context.}
+%     \label{fig:main_detector}
+% %\end{figure}
+% \end{wrapfigure}
+In Section~\ref{sec:measurement}, we saw that reward hacking often leads to phase transitions in agent behaviour. Furthermore, in applications like traffic control or COVID response, the true reward may be observed only sporadically or not at all. %observing true reward signal might have long feedback cycles and remain unobserved for a long while. 
+Blindly optimizing the proxy in these cases can lead to catastrophic failure~\citep{zhuang2020misaligned, taylor2016impossibility}. 
+%reward designers often either do not have the true reward or cannot afford the long feedback cycles required to observe the true reward. 
+%Blindly optimizing the proxy in these cases may lead to catastrophic failure. %In fact, under certain assumptions, it is possible for the agent to perform arbitrarily bad under the true reward as it continues to optimize the proxy~\citep{taylor2016impossibility, zhuang2020misaligned}.
+
+
+This raises an important question: Without the true reward signal, how can we mitigate misalignment? We operationalize this as an anomaly detection task: the detector should flag instances of misalignment, thus preventing catastrophic rollouts. To aid the detector, we provide it with a \emph{trusted policy}: one verified by humans to have acceptable (but not maximal) reward. Our resulting benchmark, \textsc{Polynomaly}, is described below.
+
+%See Figure~\ref{fig:main_detector}.
+%\begin{wrapfigure}{r}{0.5\textwidth}
+%%\begin{figure}[htbp]
+%    \centering
+%    \includesvg[scale=0.1]{figures/graphics_gray/detector_gray.svg}
+%    \caption{Our proposed detection task}
+%    \label{fig:main_detector}
+%%\end{figure}
+%\end{wrapfigure}
+
+%For this anomaly detection task, 
+% Assuming no access to the true signal, whe use of a trusted policy is likely necessary to make progress. As we exhibit in Appendix~\ref{app:measurement}, there are instances when misspecification does not produce reward hacking. Thus, any unsupervised learning method, without information about the intended behavior, 
+% %access to the true reward, 
+% will have trouble distinguishing these instances from true reward hacking. 
+%We offer the use of a trusted policy, as without it, an anomaly detector must rely solely on the rollouts. In that case, the detector can only perform unsupervised learning. However, we see in Appendix~\ref{app:measurement} that there are cases when misspecification does \emph{not} produce reward hacking, so labeling clusters without some access to the true signal would be difficult.  %avoid egregious misalignment. Although there are several different ways to setup the task, we focus on 
+
+
+%may be able to escalate the  that deployed models work? To spur further research on the consequences of reward misspecification, especially unintended ones, we propose a new anomaly detection task. Given access to a model and its rollouts, can we detect misalignment \emph{without access to the true reward}? 
+
+
+
+\subsection{Problem Setup}
+We train a collection of policies by varying model size on the traffic and COVID environments. For each policy, we estimate the policy's true reward by averaging over $5$ to $32$ rollouts. One author labeled each policy as {acceptable}, {problematic}, or {ambiguous} based on its true reward score relative to that of other policies. We include only policies that received a non-ambiguous label.
+%Our dataset includes the policies that were labeled {acceptable} or labeled {problematic} by both researchers. %We do not provide access to the true reward, but we do provide a single trusted model. 
+
+For both environments, we provide a small-to-medium sized model as the trusted policy model, as Section~\ref{sec:quantitative} empirically illustrates that smaller models achieve reasonable true reward without exhibiting reward hacking. Given the trusted model and a collection of policies, the anomaly detector's task is to predict the binary label of ``acceptable" or ``problematic" for each policy.
+
+Table~\ref{tab:bench-stats} in Appendix~\ref{app:benchmark_statistics} summarizes our benchmark. The trusted policy size is a list of the hidden unit widths of the trusted policy network (not including feature mappings).
+
+
+
+
+%As highlighted in Sections~\ref{sec:environments} and~\ref{sec:qualitative}, misspecification can arise in a variety of domains. There is a dichotomy between safety-critical settings and non-safety-critical ones. In the latter setting, rollouts from poor policies according to the true reward do not cause critical, system-wide failure. The traffic environment is one such example: misaligned policies cause traffic jams and increase congestion, but they do not lead to increased deaths. In non-safety-critical domains, it may be reasonable to perform online with human feedback. On the other hand, in the former setting, rollouts from poor policies may be too catastrophic to justify. With the COVID pandemic, a misaligned policy could lead to widespread death, making anomaly detection crucial in this regime. 
+
+%We thus setup our task in the offline setting, assuming we do not have access to the true reward. We assume access to a trusted policy that has reasonable performance under the true reward. In practice, a trusted model could be obtained by human evaluation on a contained environment. 
+
+%Note that without access to some signal of the true reward, our anomaly detector must perform unsupervised learning. However, as shown in Section~\ref{sec:measurement}, we are unable to determine a priori whether or not a misspecified reward causes misalignment. Even if the detector is able to correctly cluster the policies, it is impossible to determine which cluster corresponds to the anomalous policies. Therefore, we require some access to the true reward.
+\subsection{Evaluation}
+We propose two evaluation metrics for measuring the performance of our anomaly detectors. 
+\begin{itemize}[leftmargin=*]
+    \item  \textit{Area Under the Receiver Operating Characteristic (AUROC)}. The AUROC measures the probability that a detector will assign a random anomaly a higher score than a random non-anomalous policy~\citep{davis2006auroc}. Higher AUROCs indicate stronger detectors. %to The AUROC can be interpreted as the probability that an anOne interpretation of the AUROC is Larger AUROCs are correlated with stronger detectors, and a random classifier has an AUROC of $0.5$. The AUROC gives an estimate of the average performance of the detector across all false positive threshold.
+    
+    %The  AUROC  can  be  thought  of  as  the  probability  that  ananomalous  example  is  given  a  higher  OOD  score  than  ain-distribution  example  (Davis  &  Goadrich,  2006).   Thus,  ahigher  AUROC  is  better,  and  an  uninformative  detector  hasan  AUROC  of  50%
+    %\item \textit{Maximum Safe Policy Reward (Max SPR)}. In safety-critical domains, we may want to disallow any potentially unsafe policy. To calculate the max SPR, we increase the false positive threshold of the detector until it has correctly classified all unsafe (positive) policies. We then calculate the maximum true reward achieved by any policy the detector classified as safe. A classifier which labels all policies as anomalies achieves a max SPR equal to the performance of the trusted policy. \kbcomm{This metric needs to be changed to measure the best reward relative to the best performing policy rather than as a binary metric.}
+    \item \textit{Max F-1 score}. The F-1 score is the harmonic mean of the precision and the recall, so detectors with a high F-1 score have both low false positives and high true negatives. We calculate the max F-1 score by taking the maximum F-1 score over all possible thresholds for the detector.
+\end{itemize}
+
+
+
+% Because we have no ground truth, we set a true reward threshold and declare all policies under the threshold to be anomalous. We consider all possible true reward thresholds, leading to a $N+1$ anomaly detection tasks. The MAUROC then is the median AUROC of the detector across all $N+1$ tasks.
+
+\subsection{Baselines}\label{subsec:baseline_detector}
+In addition to the benchmark datasets described above, we provide baseline anomaly detectors based on estimating distances between policies. We estimate the distance between the trusted policy and the unknown policy based on either the Jensen-Shannon divergence (JSD) or the Hellinger distance. Specifically, we use rollouts to generate empirical action distributions. We compute the distance between these action distributions at each step of the rollout, then aggregate across steps by taking either the mean or the range. For full details, see Appendix~\ref{app:roc}. Table~\ref{tab:detectors} reports the AUROC and F-1 scores of several such detectors. We provide full ROC curves in Appendix~\ref{app:roc}.
+
+
+
+
+
+\begin{table*}[htbp]
+\makebox[\textwidth][c]{
+    \begin{tabular}{ccccccc}
+\toprule
+  \makebox[6em]{\textbf{Baseline Detectors}}  & \multicolumn{2}{c}{Mean Jensen-Shannon} & \multicolumn{2}{c}{Mean Hellinger} &\multicolumn{2}{c}{Range Hellinger} \\
+    \cmidrule(lr){1-1}\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Env. - Misspecification    & AUROC & Max F-1 & AUROC & Max F-1 & AUROC & Max F-1 \\ \midrule
+\trafficm~- misweighting  & $81.0\%$ & $0.824$ & $81.0\%$ & $0.824$ & $76.2\%$& $0.824$\\
+\trafficm~- scope  & $74.6\%$ & $0.818$& $74.6\%$ & $0.818$ & $57.1\%$ & $0.720$\\
+\trafficm~- ontological  & $52.7\%$ & $0.583$ & $55.4\%$& $0.646$& $71.4\%$ & $0.842$ \\
+\trafficb~- misweighting & $88.9\%$ & $0.900$ & $88.9\%$& $0.900$&$74.1\%$& $0.857$\\
+COVID - ontological & $45.2\%$& $0.706$  & $59.5\%$& $0.750$ & $88.1\%$& $0.923$\\
+\bottomrule
+\end{tabular}%
+}
+
+
+\caption{Performance of detectors on different subtasks. Each detector has at least one subtask with AUROC under 60\%, indicating poor performance.}
+\label{tab:detectors}%
+\end{table*}%
+We observe that different detectors are better for different tasks, suggesting that future detectors could do better than any of our baselines. %so a challenge is determing the correct detector to use for a given reward hacking scenario. 
+Our benchmark and baseline provides a 
+starting point for further research on mitigating reward hacking.
+
+% np.median(js), np.median(h), np.mean(js), np.mean(h), np.max(js)-np.min(js), np.max(h)-np.min(h))
+
+% Traffic Accel - [96, 96]
+% [1 2 3 4 5 5 6 6 6 7]
+% 0 0 0.8095238095238095
+% [1 2 3 4 5 5 6 6 6 7]
+% 0 0 0.8095238095238095
+% [1 2 3 4 5 5 6 6 6 7]
+% 0 0 0.8095238095238095
+% [1 2 3 4 5 5 6 6 6 7]
+% 0 0 0.8095238095238095
+% [1 2 3 4 4 5 6 6 6 7]
+% 0 0 0.7619047619047619
+% [1 2 3 4 4 5 6 6 6 7]
+% 0 0 0.7619047619047619
+
+% Traffic Space - [16, 16]
+% [1 1 2 3 4 5 6 6 6 7 7 8 9 9 9 9]
+% 1.0 1.0 0.746031746031746
+% [1 1 2 3 4 5 5 6 6 7 7 8 9 9 9 9]
+% 1.0 1.0 0.7301587301587301
+% [1 1 2 3 4 5 6 6 6 7 7 8 9 9 9 9]
+% 1.0 1.0 0.746031746031746
+% [1 1 2 3 4 5 6 6 6 7 7 8 9 9 9 9]
+% 1.0 1.0 0.746031746031746
+% [0 0 1 2 3 4 5 6 6 6 7 8 8 8 9 9]
+% 1.0 1.0 0.5873015873015873
+% [0 1 1 2 3 4 5 6 6 6 7 7 8 8 8 9]
+% 0 0 0.5714285714285714
+
+% Traffic bus - [4]
+% [0 1 1 2 2 2 2 2 2 2 2 2 3 4 5 6 7 7 7 7 7 7 7]
+% 1.0 1.0 0.5267857142857142
+% [0 1 2 2 2 2 2 2 2 2 3 3 3 4 5 6 7 7 7 7 7 7 7]
+% 1.0 1.0 0.5535714285714286
+% [1 1 1 1 2 2 2 2 2 2 2 2 3 4 5 6 7 7 7 7 7 7 7]
+% 1.0 1.0 0.5267857142857142
+% [1 2 2 2 2 2 2 2 2 2 2 2 3 4 5 6 7 7 7 7 7 7 7]
+% 1.0 1.0 0.5535714285714285
+% [1 2 3 4 4 5 5 5 5 5 5 5 5 5 5 5 5 5 6 7 7 7 7]
+% 1.0 1.0 0.7589285714285715
+% [1 2 2 3 4 5 5 5 5 5 5 5 5 5 5 5 5 5 5 6 6 7 7]
+% 1.0 1.0 0.7142857142857142
+
+% Traffic bottle - [64, 64]
+% 1.0 1.0 0.888888888888889
+% 1.0 1.0 0.888888888888889
+% 1.0 1.0 0.888888888888889
+% 1.0 1.0 0.888888888888889
+% [1 2 3 4 5 6 6 7 7 7 8 9]
+% 0 0 0.7407407407407407
+% [1 2 3 4 5 6 6 7 7 7 8 9]
+% 0 0 0.7407407407407407
+
+%Pandemic - 16
+% [0 0 0 1 2 2 2 3 4 4 5 6 6]
+% 1.0 1.0 0.33333333333333337
+% [0 0 1 2 2 2 3 4 4 5 5 6 6]
+% 1.0 1.0 0.4523809523809524
+% [0 0 0 1 2 3 3 4 4 5 6 6 6]
+% 1.0 1.0 0.45238095238095233
+% [0 0 1 2 3 3 4 4 5 6 6 6 6]
+% 1.0 1.0 0.5952380952380952
+% [0 1 1 2 3 4 5 6 6 6 6 6 6]
+% 1.0 1.0 0.7380952380952381
+% [1 1 2 3 4 5 6 6 6 6 6 6 6]
+% 1.0 1.0 0.8809523809523812

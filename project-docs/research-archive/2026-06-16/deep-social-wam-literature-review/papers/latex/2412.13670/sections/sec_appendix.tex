@@ -1,0 +1,81 @@
+\clearpage
+\appendix
+
+\input{input/tab_benchmark_statistics}
+
+\section{Building Workflow Details} \label{app_workflow}
+    We use the Wikidata dump released on 2024-08-05 as our data source.
+    To sample relations from Wikidata,
+    we browse the relation list from Wikidata~\cite{wikidata2014} ~\footnote{\url{https://www.wikidata.org/wiki/Wikidata:Database_reports/List_of_properties/all}}
+    and manually select common relations associated with physical entities and exclude the less meaningful ones, such as those related to virtual entries (\eg geographic coordinates and IMDB ID).
+    The sampled relations mainly focus on common topics, such as sports, politics, and entertainment
+    \cite{wu2020short,wu2022mitigating,wu2023infoctm,wu2024dynamic,wu2024traco,wu2024topmost,wu2024survey,wu2024fastopic}.
+    We predefine the question templates for each sampled relation,
+    for instance, \textit{What sports team is {} a member of?} for the relation \textit{member of sports team}.
+    For more details, see the configuration files in our code.
+    We follow simple-wikidata-db~\footnote{\url{https://github.com/neelguha/simple-wikidata-db}}
+    and
+    extract the claims of sampled relations, qualifiers, aliases, and Wikipedia titles from the dump.
+    To find updated knowledge, we combine the claims and their \textit{start time} and \textit{end time} qualifiers
+    and then sort them by \textit{start time}.
+    We check if the object changes after the preset cutoff time and identify updated knowledge if it changes, for instance, Messi's sports team changed in \Cref{fig_workflow}.
+
+    Given an entity, we employ the MediaWiki APIs~\footnote{\url{https://www.mediawiki.org/wiki/MediaWiki}} and use its extracted Wikipedia title to retrieve its Wikipedia article and revision history.
+    Note that our workflow supports building multilingual benchmarks.
+    We only need to prepare the configuration files in another language and then execute the workflow by specifying that language.
+    The workflow automatically retrieves corresponding Wikipedia articles in that language.
+
+    The statistics of produced benchmarks are reported in \Cref{tab_stats_size,tab_stats_word_count}.
+
+\input{input/tab_LLM_date}
+
+\input{input/tab_annotation_agreement}
+
+\section{Data Quality Verification} \label{app_data_verification}
+    We recruit three annotators (graduate students) to verify the data quality of our benchmark.
+    Specifically, we provide 100 samples of Single-Hop Gold and 100 samples of Multi-Hop Gold;
+    then we ask annotators to determine
+    (i) if the provided context can sufficiently answer the question;
+    (ii) if the given answer is accurate and can appropriately address the question given the context.
+    \Cref{tab_data_quality} summarizes the average accuracy scores concerning Single-Hop Gold and Multi-Hop Gold.
+
+    \Cref{tab_annotation_agreement} reports the inter-annotator agreement analysis.
+    We mainly use two agreement coefficients: Raw Agreement and Gwet's AC1.
+    This is because the annotations are extremely unbalanced (most of them are positive); other coefficients like Krippendorff’s Alpha and Fleiss’ Coefficient may be inappropriate \cite{gwet2008computing}.
+    It shows that the annotations maintain high agreement.
+
+\clearpage
+\section{Prompts} \label{app_prompt}
+
+    Following \citet{bai2024longbench},
+    we use the following prompts for generation and multi-choice question formats mentioned in \Cref{sec_construct_samples}.
+
+\lstset{
+    style=prompt_style,
+}
+\begin{lstlisting}
+You are given an article and a question. Answer the question based on the given article as concisely as you can, using a single phrase or sentence if possible. Do not provide any explanation.
+
+(*@\color{codepurple}{\textbf{Article}}@*): <context>
+
+(*@\color{codepurple}{\textbf{Question}}@*): <question>
+
+(*@\color{codepurple}{\textbf{Answer}}@*):
+\end{lstlisting}
+
+\lstset{
+    style=prompt_style,
+}
+\begin{lstlisting}
+You are given an article, a question, and four options. Select one option to answer the question based on the given article. Only give the option (A, B, C, or D), and do not output any other words.
+
+(*@\color{codepurple}{\textbf{Article}}@*): <context>
+
+(*@\color{codepurple}{\textbf{Question}}@*): <question>
+<options>
+
+(*@\color{codepurple}{\textbf{Answer}}@*):
+\end{lstlisting}
+
+
+\input{sections/sec_examples}

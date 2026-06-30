@@ -72,14 +72,14 @@ where `<repo>` = `/Users/user/git/ad-agent-metrics/research/wam`.
 From the WAM survey (arXiv 2605.12090, "World Action Models: The Next Frontier
 in Embodied AI"), already downloaded at `<ROOT>/papers/latex/2605.12090/`:
 
-- VLA: `p(a | o, l)` — reactive observation->action, no dynamics model.
-- World Model (WM): `p(o' | o, a)` — predictive transition only, no action
+- VLA: `p(a | o, l)` - reactive observation->action, no dynamics model.
+- World Model (WM): `p(o' | o, a)` - predictive transition only, no action
   selection (a learned simulator).
-- WAM: `p(o', a | o, l)` — joint/conditional of future state AND action. Two
+- WAM: `p(o', a | o, l)` - joint/conditional of future state AND action. Two
   criteria: (1) Forward Predictive Modeling (forecast `o'`, explicitly as pixels
   OR implicitly as physics-grounded latents), (2) Coupled Action Generation
   (actions aligned to anticipated `o'`).
-- Cascaded WAM: `p(o',a|o,l) = p(a|o',o,l)·p(o'|o,l)` (imagine-then-execute).
+- Cascaded WAM: `p(o',a|o,l) = p(a|o',o,l)-p(o'|o,l)` (imagine-then-execute).
 - Joint WAM: directly model `p(o',a|o,l)` (co-optimized shared representation).
 - Disambiguation the survey draws: WAM is a modality-INDEPENDENT superset of
   Video Action Models (video is "merely one possible proxy"); future state may be
@@ -94,19 +94,19 @@ the definition. The user wants you to test which instantiation is feasible.
 
 ## 3. The 4-layer hierarchy this review must populate
 
-1. **Physical WAM**: predicts physical consequences of Minecraft actions —
+1. **Physical WAM**: predicts physical consequences of Minecraft actions -
    movement, reachability, mining, crafting, placing, combat/damage risk,
    inventory deltas, block/container changes, health/hunger/status, tool
    durability, time cost, failure modes, newly available/blocked affordances.
-2. **Material / Economic WAM**: possession + resource-flow — who has which item,
+2. **Material / Economic WAM**: possession + resource-flow - who has which item,
    who controls which tool/station/container/place, scarcity, private possession,
    material claims, borrowing/lending, weak commons, public affordances, hoarding
    vs contribution, costs imposed on others.
-3. **Social WAM**: embodied social consequences — request, promise, refusal,
+3. **Social WAM**: embodied social consequences - request, promise, refusal,
    acceptance, warning, handoff, borrow/lend/return, repair, blame, gratitude,
    conflict, cooperation, trust, reputation, relationship expectation, memory
    commitment, future social cost.
-4. **Institutional / Settlement WAM**: longer-horizon patterns — routines, roles,
+4. **Institutional / Settlement WAM**: longer-horizon patterns - routines, roles,
    division of labor, conventions, norms, ownership practices, public-affordance
    use, weak-commons maintenance, settlement persistence, organization-like
    behavior, post-goal continuation.

@@ -1,0 +1,44 @@
+\begin{lstlisting}
+diff --git a/coding_agent.py b/coding_agent.py
+index 620da2f..800b06e 100644
+--- a/coding_agent.py
++++ b/coding_agent.py
+@@ -196,13 +196,16 @@ def chat_with_claude(task, chat_history, user_instr):
+                 "input": tool_input
+             })
+ 
+-            # Process the tool call
++            # Process the tool call and record in structured format
+             tool_result = process_tool_call(tools_dict, tool_name, tool_input)
+-            output_ls.extend([
+-                {TOOL_USED_MARKER: tool_name},
+-                {TOOL_INPUT_MARKER: tool_input},
+-                {TOOL_RESULT_MARKER: tool_result}
+-            ])
++            # Use structured format instead of text markers
++            output_ls.append({
++                "tool_invocation": {
++                    "name": tool_name,
++                    "input": tool_input,
++                    "result": tool_result
++                }
++            })
+ 
+             # Continue with tool results
+             messages.extend([
+@@ -224,7 +227,13 @@ def chat_with_claude(task, chat_history, user_instr):
+                 tools=tools,
+             )
+             tool_response_text = next((block.text for block in tool_response.content if hasattr(block, "text")), None)
+-            output_ls.append({TOOL_RESPONSE_MARKER: tool_response_text})
++            # Record tool response in structured format
++            if tool_response_text:
++                output_ls.append({
++                    "tool_response": {
++                        "content": tool_response_text
++                    }
++                })
+             response = tool_response
+ 
+             # Validate tool response
+\end{lstlisting}

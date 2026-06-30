@@ -1,0 +1,154 @@
+% \section{The prompt used for GSM8K and MATH examples}
+
+\section{Algorithm}
+\input{icml2023/method_algorithm}
+
+% \section{Gains in Each V-STaR Iteration}
+% \begin{figure*}[h]
+% % \vspace{-.9in}
+% \centering
+
+
+%   \includegraphics[scale=0.5]{icml2023/figs/mbpp-ver-gen-heatmap.png}
+  
+
+% \caption{Best-of-64 for each \vstar{} iteration on MBPP. The performance gets better with each iteration of generator and verifier without showing signs of collapsing.}
+% \label{fig:mbpp_heatmap}
+% \end{figure*}
+
+
+\section{The prompt used for MBPP few-shot generation.}
+Following~\citet{ni2023lever}, we use the following prompt to sample completions per problem for data generation during training.
+\label{app:mbpp_shots}
+% \begin{tcolorbox}[
+% fonttitle=\small\fon{pbk}\bfseries,
+% fontupper=\sffamily,
+% enhanced,
+% left=2pt, right=2pt,
+% title=Prompt Proposal Template $\bpitpl{}$]
+\begin{lstlisting}[language=python,escapechar=@,basicstyle=\scriptsize,frame=single]
+# Write Python function to complete the task and pass the assertion tests.
+
+### Task Start ###
+# These are the assertions for your function:
+assert similar_elements((3, 4, 5, 6),(5, 7, 4, 10)) == (4, 5)
+
+""" Write a function to find the similar elements from the given two tuple lists. """
+def similar_elements(test_tup1, test_tup2):
+    res = tuple(set(test_tup1) & set(test_tup2))
+    return (res)
+### Task End ###
+
+### Task Start ###
+# These are the assertions for your function:
+assert is_not_prime(2) == False
+
+""" Write a python function to identify non-prime numbers. """
+import math
+def is_not_prime(n):
+    result = False
+    for i in range(2,int(math.sqrt(n)) + 1):
+        if n % i == 0:
+            result = True
+    return result
+### Task End ###
+
+### Task Start ###
+# These are the assertions for your function:
+assert heap_queue_largest( [25, 35, 22, 85, 14, 65, 75, 22, 58],3)==[85, 75, 65]
+
+""" Write a function to find the largest integers from a given list of numbers using
+heap queue algorithm. """
+import heapq as hq
+def heap_queue_largest(nums,n):
+    largest_nums = hq.nlargest(n, nums)
+    return largest_nums
+### Task End ###
+\end{lstlisting}
+% \end{tcolorbox}
+
+
+
+
+\section{Test accuracy of 13B \vstar{} and baselines}
+\vspace{.9in}
+\begin{figure*}[h]
+\vspace{-.9in}
+\centering
+\begin{subfigure}[b]{0.5\textwidth}
+  \centering
+  \includegraphics[scale=0.39]{icml2023/figs/bechmark_13B/bechmark_train_13B.png}
+  % \caption{Tasks}
+    \label{fig:main_tasks_13B}
+\end{subfigure}%
+\begin{subfigure}[b]{0.5\textwidth}
+  \centering
+  \includegraphics[scale=0.39]{icml2023/figs/bechmark_13B/bechmark_transfer_13B.png}
+    \label{fig:transfer_main_13B}
+\end{subfigure}%
+\caption{Test accuracy of 13B \vstar{} compared to baselines. 
+We report Best-of-$64$ for verification-based methods and Pass$@1$ for others. \textbf{(Left)} Test accuracy for training tasks. \textbf{(Right)} Transfer evaluation of GSM8K and MBPP trained models on MATH subset and HumanEval respectively.}
+\label{fig:results_13B}
+\end{figure*}
+
+\section{Candidate solutions $\hat{\textbf{y}}_1$ and $\hat{\textbf{y}}_2$ for a GSM8K problem $x$}
+\label{app:gsm_candidates}
+\begin{displayquote}
+$\textbf{x}$ = Andy walks 50 meters from his house to school. After school, he comes back to the house and goes to the market. If he walks 140 meters in total, how many meters is the distance between the house and the market? 
+
+$\hat{\textbf{y}}_1$ = He walks to school and back, which is $2 \times 50$ meters = 100 meters. So he walks 140 meters - 100 meters = 40 meters to the market. \textcolor[HTML]{006600}{Answer=40}
+
+$\hat{\textbf{y}}_2$ = If he walks 50 meters from his house to school, and 140 meters in total, he walks 140 - 50 = 90 meters from the school to the market. \textcolor[HTML]{7f0000}{Answer=90}
+\end{displayquote}
+
+
+% \vspace{-1 .9in}
+% \vspace{2in}
+\section{Example for Best-of-$k$ using 
+\autoref{eq:ver_at_k}}
+% \vspace{1in}
+\label{app:ver_at_k_understand_pls}
+\begin{figure*}[h]
+% \vspace{-.9in}
+\centering
+
+
+  \includegraphics[scale=0.26]{icml2023/figs/ver_at_k_example.png}
+  
+
+\caption{An example showing how \autoref{eq:ver_at_k} estimates Best-of-$k$ accuracy efficiently and without variance for $k=4$ from $N=10$ candidate solutions.}
+% \label{fig:ver_at_k_understand_pls}
+\end{figure*}
+
+\vspace{2em}
+\section{\vstar{} \emph{vs.} majority voting example}
+\label{app:vstar_vs_maj_example}
+\begin{displayquote}
+$\textbf{x}$ = Every day, Wendi feeds each of her chickens three cups of mixed chicken feed, containing seeds, mealworms and vegetables to help keep them healthy. She gives the chickens their feed in three separate meals. In the morning, she gives her flock of chickens 15 cups of feed. In the afternoon, she gives her chickens another 25 cups of feed. How many cups of feed does she need to give her chickens in the final meal of the day if the size of Wendi's flock is 20 chickens?
+
+\vspace{10pt}
+{\textbf{\vstar{} solution}} = 
+Wendi feeds each of her 20 chickens 3 cups of feed per day for a total of 20x3=60 cups of feed.
+She gives the chickens 15 cups in the morning and 25 cups in the afternoon for a total of 15+25=40 cups.
+Therefore, she needs to give the chickens 60-40=20 cups of feed in the final meal of the day.
+\textcolor[HTML]{006600}{Answer=20}
+
+\vspace{10pt}
+{\textbf{Majority voting solution}} = The total amount of feed Wendi gives the chickens is 15 + 25 = 40 cups of feed.
+Wendi has 20 chickens so she needs to give each chicken 40 / 20 = 2 cups of feed. \textcolor[HTML]{7f0000}{Answer=2}
+\end{displayquote}
+
+
+% \vspace{0in}
+\section{Best-of-$k$ using \autoref{eq:ver_at_k} \emph{vs.} Best-of-$k$ from \cite{DBLP:journals/corr/abs-2305-20050} }
+\label{app:ver_at_k_vs_best_of_k}
+\begin{figure*}[h]
+% \vspace{-.9in}
+\centering
+
+  \includegraphics[scale=0.5]{icml2023/figs/amortized_ver_acc.png}
+  
+
+\caption{\autoref{eq:ver_at_k} estimates Best-of-$k$ accuracy efficiently and without variance. For Best-of-$K$ accuracy without the formula, the process is repeated 32 times.}
+\end{figure*}
+

@@ -1,0 +1,130 @@
+As described, sharpening in the sense of \cref{def:sharpening} is a
+purely computational problem, which makes it difficult to evaluate the
+quality and optimality of
+self-improvement algorithms. To address this, we introduce a novel
+statistical
+framework for sharpening, inspired by the success of oracle complexity in optimization
+\citep{nemirovski1983problem,traub1988information,raginsky2011information,agarwal2012information}
+and statistical query complexity in computational learning theory \citep{blum1994weakly,kearns1998efficient,feldman2012complete,feldman2017general}.
+
+
+\begin{definition}[Sample-and-evaluate framework]\label{def:oracle-model}
+  In the \textbf{\framework} framework, the algorithm designer does
+  not have explicit access to the base model $\piref$. Instead, they
+access $\piref$ only through \emph{sample-and-evaluate queries}: The learner is allowed to sample $n$ prompts $x \sim
+\cdist$. For each prompt $x$, they can sample $N$
+responses $y_1,y_2,\dots y_N \sim \piref(\cdot \mid x)$ and observe
+the likelihood $\piref(y_i\mid{}x)$ for each such response. The
+efficiency, or \emph{sample complexity}, of the algorithm is measured through the total number of
+sample-and-evaluate queries
+$m\ldef{}n\cdot{}N$.
+\end{definition}
+This framework can be seen to capture algorithms like \bestofnalg and
+\rlhfalg (implemented with DPO\dfdelete{ or PPO}), which only
+access the base model $\piref$ through i) sampling responses via
+$y\sim\piref(\cdot\mid{}x)$ \textbf{(generation)}, and ii) evaluating the likelihood
+$\piref(y\mid{}x)$ \textbf{(verification)} for these responses. We view the sample complexity
+$m=n\cdot{}N$ as a natural statistical abstraction for the
+computational complexity of self-improvement (a clear parallel to oracle complexity for optimization algorithms), one which is amenable to
+information-theoretic lower bounds.\footnote{Concretely, the sample
+  complexity $m=n\cdot{}N$ is a lower bound on the running time
+  of any algorithm that operates in the \framework framework.} We will
+aim to show that, under appropriate assumptions, \bestofnalg and
+\rlhfalg can learn an $(\eps,\delta)$-sharpened model with 
+sample complexity
+\[
+  m = \poly(\eps^{-1},\delta^{-1},\Cprob)
+\]
+where $\Cprob$ is a potentially problem-dependent constant.
+
+
+
+
+
+\subsection{Fundamental Limits}
+\label{sec:lower}
+
+Before diving into our analysis of \bestofnalg and \rlhfalg in the
+\framework framework, let us take a brief detour to give a sense for
+how sample complexity guarantees for sharpening should scale. To this end, we will prove a lower bound or fundamental limit on
+the sample complexity of any algorithm in the \framework framework.
+
+Intuitively, the performance of any sharpening algorithm based on
+sampling should depend on how well the base model $\piref$
+covers the arg-max response $\ystar(x)$. To capture this, we define
+the following \emph{coverage coefficient}:\footnote{This quantity can
+  be interpreted as a special case of the $L_1$-concentrability
+  coefficient \citep{farahmand2010error,xie2020q,zanette2021provable,amortila2024scalable}
+  studied in the theory of offline reinforcement learning.}\loose
+\begin{align}
+  \label{eq:cstar}
+  \Cstar = \En_{x\sim\cdist}\brk*{\frac{1}{\piref(\Ystar(x)\mid{}x)}}.
+\end{align}
+More generally, for a model $\pi$, we define
+$\Ypi(x)=\argmax_{y\in\cY}\pi(y\mid{}x)$ and 
+$  \Cstar(\pi) =
+\En_{x\sim\cdist}\brk*{\frac{1}{\pi(\Ypi(x)\mid{}x)}}$. 
+
+Our main lower
+bound shows that for worst-case choice of $\Pi$, the coverage coefficient acts as a lower bound on the sample
+complexity of any sharpening algorithm.
+\begin{theorem}[Lower bound for sharpening]
+  \label{thm:lower}
+  Fix an integer $d \ge 1$ and parameters $\epsilon \in (0,1)$ and $C
+  \ge 1$. There exists a class of models $\Pi$ such that (i) $\log |\Pi|
+  \asymp d (1+\log(C \epsilon^{-1}))$, (ii) $\sup_{\pi \in \Pi}
+  \Cstar(\pi) \lesssim C$, and (iii) $\Ypi(x)$ is a singleton for all
+  $\pi\in\Pi$, $x\in\cX$. Any sharpening algorithm $\pihat$ that
+  achieves $\En\brk*{\Pr_{x \sim \cdist}[\pihat(\Ypi[\piref](x)\mid{}x) > 1/2]}  \ge 1
+  - \epsilon$ for all $\piref \in \Pi$ must collect a total number of
+  samples $m = n\cdot{}N$ at least\loose
+  \begin{align}
+    m \gtrsim
+    \frac{ C\log |\Pi|}{\epsilon^{2}\cdot{}(1+\log(C \epsilon^{-1}))}.
+  \end{align}  
+\end{theorem}
+This result shows that the complexity of any $(\eps,1/2-\delta)$-sharpening algorithm (for $\delta>0$) in the
+\framework framework must depend polynomially on the coverage
+coefficient $\Cstar$, as well as the accuracy\arxiv{ parameter} $\eps$. The
+lower bound also depends on the expressivity of $\piref$,
+as captured by the model class complexity term $\log\abs{\Pi}$. We will show in \abedit{the sequel} that it is possible to match this lower bound. \dfedit{Note
+  that this result also implies a lower bound for the general
+    sharpening problem (i.e., general $\rself$), since \mlsharp is a
+  special case.}
+
+\begin{remark}[Relaxed notions of sharpening and coverage]
+The notion of coverage in \cref{eq:cstar} is somewhat stringent, since
+it requires that $\piref$ place large mass on $\Ystar(x)$ on average.
+\iclr{In
+\cref{sec:proof_preliminaries}, we introduce a more general and permissive
+notion of \emph{approximate sharpening}
+(\cref{def:sharpening_general}) which
+leads to weaker coverage requirements, and use this to
+give generalized versions of our main results.\loose
+}
+\arxiv{In
+\cref{sec:proof_preliminaries}, we introduce a more general and permissive
+notion of approximate sharpening (\cref{def:sharpening_general}),
+which allows the model to sharpen toward approximate arg-max responses
+(in the sense that
+$\log\piref(y\mid{}x)\geq{}(1-\gamma)\max_{y\in\cY}\log\piref(y\mid{}x)$
+for an approximation parameter $\gamma>0$). This notion of sharpening
+leads to significantly weaker coverage requirements, and we state
+generalized versions of all our main results which accommodate this in
+the appendix.
+}
+\end{remark}
+
+\dfedit{We close this section by noting that numerous
+  recent works---focusing on inference-time computation---show that
+standard language models exhibit favorable coverage \abedit{with
+  respect to desirable responses}
+\citep{brown2024large,snell2024scaling,wu2024empirical}. \akedit{We
+  replicate these findings in our experimental setup
+  in~\Cref{app:experiments}.} These works suggest that, despite the
+exponentially large response space, the coverage coefficient $\Cstar$
+may be small in standard language modeling tasks.}
+
+
+
+    

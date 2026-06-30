@@ -1,0 +1,378 @@
+
+
+
+
+\subsection{Open-source notebook and data}
+\label{app:data_code}
+
+\textbf{Colab notebook} for producing and analyzing performance profiles, robust aggregate metrics, and interval estimates based on stratified bootstrap CIs, as well as replicating the results in the paper can be found at \href{https://colab.research.google.com/drive/1ZmIhLVfxbj6ATIBg97RBJhFNs-6QWrik#scrollTo=CJzoQDw3zXtN}{\ttfamily bit.ly/statistical\_precipice\_colab}.
+
+\textbf{Individual runs for Atari 100k}. We released the 100 runs per game for each of the 6 algorithms in the case study in a public cloud bucket at \href{https://console.cloud.google.com/storage/browser/rl-benchmark-data/atari_100k}{\ttfamily gs://rl-benchmark-data/atari\_100k}.
+
+\textbf{Individual runs for ALE, Procgen and DM Control}. For ALE, we used the individual runs from Dopamine~\citep{castro2018dopamine} baselines except for DreamerV2~\citep{hafner2020mastering}, REM~\citep{agarwal2020optimistic} and M-IQN~\citep{vieillard2020munchausen}, for which the individual run scores were obtained from the corresponding authors. We release all the individual run scores as well as final scores for ALE at \href{https://console.cloud.google.com/storage/browser/rl-benchmark-data/ALE}{\ttfamily gs://rl-benchmark-data/ALE}. The Procgen results were obtained from the authors of IDAAC~\citep{raileanu2021decoupling} and MixReg~\citep{jiang2020prioritized} and are released at \href{https://console.cloud.google.com/storage/browser/rl-benchmark-data/procgen}{\ttfamily gs://rl-benchmark-data/procgen}. For DM Control\footnote{Dreamer~\citep{hafner2019dream} results on DM control, obtained from the corresponding author, are based on hyperparameters tuned for sample-efficiency. Compared to the original paper~\citep{hafner2019dream}, the actor-critic learning rates were increased to $3e-4$, the amount of free bits to 1.5, the training frequency, and the amount of pre-training to 1k steps on 10k randomly collected frames. The imagination horizon was decreased to 10.}, all the runs were obtained from the corresponding authors and are released at \href{https://console.cloud.google.com/storage/browser/rl-benchmark-data/dm_control}{\ttfamily  gs://rl-benchmark-data/dm\_control}. 
+
+See \href{https://agarwl.github.io/rliable}{\ttfamily agarwl.github.io/rliable} for a website for the paper.
+
+
+% Marc: we should discuss how variability is also problematic i.e. averages might hide an unreliable algorithm
+
+% % resulted in a large number of unreliable results on widely used deep RL benchmarks. 
+% To help increase confidence in reported results, we present a more rigorous statistical methodology that reliably captures uncertainty in results while still using only a handful of runs. Adopting this methodology is easy and will help make progress in the field far more robust. 
+
+% That said, wide adoption of reliable evaluation protocols requires action from the research community, such as conferences explicitly requiring reporting uncertainty in results.  While accounting for uncertainty in results is not a panacea, it provides a strong foundation for reliable and reproducible results in deep RL research.
+
+% at risk is trust in the research that the community produces ?
+
+
+\subsection{Atari 100k: Additional Details and Results}\label{appendix_atari_100k}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.75\linewidth]{new_figures/appendix_figures/correlation_perf_seeds.pdf}
+    \caption{ \textbf{Runs can be different from using fixed random seeds}. We find that correlation between two sets of 100 runs of \der\ on Atari 100k using the same set of random seeds, that is, using a fixed random seed per run for Python, NumPy and JAX, is quite small. Small values of correlation coefficient highlight that fixing seeds does not ensure deterministic results due to non-determinism in GPUs. Similarly, setting random seed in PyTorch ensures reproducibility only on the same hardware.}
+    \vspace{-0.2cm}
+    \label{fig:fixed_seeds}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/der-full-dist.pdf}
+    \caption{\textbf{Per-game score distributions}. Histogram plot with kernel density estimate of human-normalized scores of \der\ on 26 games in the Atari 100k benchmark. Each histogram plot is based on 100 runs per game. For most games, the distributions are either skewed~(\eg \textsc{KungFuMaster}), heavy-tailed~(\eg \textsc{BankHeist}, \textsc{Frostbite}) or multimodal~(\eg \textsc{Hero})}.
+    \label{fig:dist_der}
+    \vspace{-0.5cm}
+\end{figure}
+
+\textbf{Code}. Due to unavailability of open-source code for \der, and \otr\ for Atari 100k, we re-implemented these algorithms using Dopamine~\citep{castro2018dopamine}, a reproducible deep RL framework. For \curl\ and \spr, we used the open-source code released by the authors while for \drq, we used the source-code obtained from the authors.  Our code for Atari 100k experiments is open-sourced as part of the Dopamine library under the
+\href{https://github.com/google/dopamine/tree/master/dopamine/labs/atari_100k}{\ttfamily labs/atari\_100k} folder. We also released a JAX~\citep{jax2018github} implementation of the \href{https://github.com/google/dopamine/blob/master/dopamine/jax/agents/full_rainbow/full_rainbow_agent.py}{full Rainbow}~\citep{hessel2018rainbow} in Dopamine.
+
+\textbf{Hyperparameters}. All algorithms build upon the Rainbow~\citep{hessel2018rainbow} architecture and we use the exact same hyperparameters specified in the corresponding publication unless specified otherwise. Akin to \drq\ and \spr, we used $n$-step returns with $n=10$ instead of $n=20$ for \der. \drq\ codebase uses non-standard evaluation hyperparameters, such as a 5\% probability of selecting random actions during evaluation~({\ttfamily $\varepsilon$-eval}$=0.05$).  \drq$(\varepsilon)$ differs \drq\ in terms of using standard $\varepsilon$-greedy parameters~\citep[][Table 1]{castro2018dopamine} including
+training $\varepsilon$ decayed to 0.01 rather than 0.1 and evaluation $\varepsilon$ set to 0.001 instead of 0.05.
+Refer to the gin configurations in \href{https://github.com/google/dopamine/tree/master/dopamine/labs/atari_100k/configs}{\ttfamily labs/atari\_100k/configs} for more details.
+
+
+\textbf{Compute}. For the case study on Atari 100k, we used Tesla P100 GPUs for all the runs. Each run spanned about 3-5 hours depending on the algorithm, and we ran a total of 100 runs / game $\times$ 26 games/algorithm $\times$ 6 algorithms = 15,600 runs. Additionally, we ran an additional 100 runs per game for \der\ to compute a good approximation of point estimates for aggregate scores, which increases the total number of runs by 2600. Overall, we trained and evaluated 18,200 runs, which roughly amounts to 2400 days -- 3600 days of GPU training. 
+
+\textbf{Comparing performance of two algorithms}. When confidence intervals~(CIs) overlap for two random variables $X$ and $Y$ overlap, we estimate the $95\%$ CIs for $X - Y$ to account for uncertainty in their difference~(\figref{fig:diff_medians}). For example, when using 5 runs, the median score improvement from \drq$(\varepsilon)$ over \der\ is estimated to lie within $(0.01, 0.21)$ while that of SPR over DrQ lies within $(-0.09, 0.18)$. 
+Furthermore, while improvement from SPR over DER with $5$ to $15$ runs is not statistically significant, claiming ``no improvement'' would be misleading as evaluating more runs indeed shows that the improvement is significant.
+
+\textbf{Analyzing efficiency and bias of IQM}. Theoretically, trimmed means, are known to have higher statistical efficiency for mixed distributions and heavy-tailed distributions (Cauchy distribution), at the cost of lower efficiency for some other less heavily-tailed distributions (normal distribution) than mean, as shown by the seminal work of \citet{tukey1960survey}. Empirically, on Atari 100k, IQM provides good statistically efficiency among trimmed estimators across different algorithms~(\figref{fig:iqm_efficiency}) as well as has considerably small bias than median~(\textit{c.f.} \figref{fig:iqm_bias} \versus \figref{fig:median_bias}).
+
+\begin{figure}[t]
+    \centering
+    \begin{minipage}{0.58\linewidth}
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/diff_median_cis.pdf}
+    \caption{ \textbf{Detecting score differences}.
+    \textbf{Left}. 95\% CIs for differences in median scores. \textbf{Right}. 95\% CIs for differences in IQM scores. Median requires many more runs than IQM for small uncertainty.}
+    \label{fig:diff_medians}
+    \end{minipage}\hfill
+    \begin{minipage}{0.38\linewidth}
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/efficiency_of_trimmed_mean.pdf}
+    \caption{\textbf{Statistical Efficiency of IQM}. Efficiency of an estimator is typically measured in terms of its mean squared error~(MSE). We estimate MSE for trimmed estimators with 10 runs
+    by subsampling 20,000 sets of 10 runs with replacement from 100 runs.}
+    \label{fig:iqm_efficiency}
+    \vspace{-0.4cm}
+    \end{minipage}
+    \vspace{-0.25cm}
+\end{figure}
+
+
+
+\begin{figure}[t]
+    \centering
+    \vspace{-0.1cm}
+    % \begin{minipage}{0.65\linewidth}
+    \includegraphics[width=0.85\linewidth]{new_figures/appendix_figures/iqm_bias_all_algorithms_small.pdf}
+    \vspace{-0.25cm}
+    \caption{\textbf{Negligible bias in IQM scores}. Expected IQM scores with varying number of runs. The expected score for $N$ runs is computed by repeatedly subsampling $N$ runs with replacement out of 100 runs for 100,000 times. Compared to expected median score differences~(\figref{fig:median_bias}), the difference in expected IQM scores with 3 runs and 100 runs is typically an order of magnitude smaller. For example, the expected median differences for SPR is 0.05 points while expected IQM differences are only 0.006 points.}
+    \label{fig:iqm_bias}
+    % \end{minipage}\hfill
+    % \begin{minipage}{0.32\linewidth}
+    % \includegraphics[width=\linewidth]{figures/appendix_figures/efficiency_of_trimmed_mean.pdf}
+    % \caption{\textbf{Statistical Efficiency of IQM}. Efficiency of an estimator is typically measured in terms of its mean squared error~(MSE). We estimate MSE for trimmed estimators with 10 runs
+    % by subsampling 50,000 sets of 10 runs with replacement from 100 runs.}
+    % \label{fig:iqm_efficiency}
+    % \end{minipage}
+    \vspace{-0.45cm}
+\end{figure}
+
+\subsection{Related work on rigorous evaluation in deep RL}\label{related_work}
+
+While prior work~\citep{islam2017reproducibility, henderson2018deep, lynnerup2020survey} highlights various reproducibility issues in policy-gradient methods, this paper focuses specifically on the reliability of evaluation procedures on RL benchmarks and provides an extensive analysis on common deep RL algorithms on widely-used benchmarks.
+
+For more rigorous performance comparisons on a single RL task, \citet{henderson2018deep, colas2019hitchhiker} provide guidelines for statistical significance testing while \citet{colas2018many} focuses on determining the minimum number of runs needed for such comparisons to be statistically significant. Instead, this paper focuses on reliable comparisons on a suite of tasks and mainly recommends reporting stratified bootstrap CIs due to the dichotomous nature and wide misinterpretation of statistical significance tests~(see Remark in Section~\ref{sec:formalism}). \citet{henderson2018deep, colas2018many, colas2019hitchhiker} also discuss bootstrap CIs but for reporting single task mean scores – however, 3-5 runs is a small sample size for bootstrapping: on Atari 100k, for achieving true coverage close to 95\%, such CIs require at least 20-30 runs per task (\figref{fig:dist_der_ci}) as opposed to 5-10 runs for stratified bootstrap CIs for aggregate metrics like median, mean and IQM~(\figref{fig:bootstrap_metrics_all}).
+
+
+
+\citet{chan2019measuring} propose metrics to measure the reliability of RL algorithms in terms of their stability during training and their variability and risk in returns across multiple episodes. While this paper focuses on reliability of evaluation itself, performance profiles showing the tail distribution of episodic returns, applicable for even a single task with multiple runs, can be useful for measuring reliability of an algorithm’s performance.  
+
+\citet{jordan2020evaluating} propose a game-theoretic evaluation procedure for ``complete'' algorithms that do not require any hyperparameter tuning and recommend evaluating between 1,000 to 10,000 runs per task to detect statistically significant results. Instead, this work focuses on reliably evaluating performance obtained after the hyperparameter tuning phase, even with just a handful of runs. That said, run-score distributions based on runs with different hyperparameter configurations might reveal sensitivity to hyperparameter tuning.
+
+An alternative to \emph{score distributions}, proposed by \citet{recht-2018}, is to replace scores in a performance profile~\citep{dolan2002benchmarking} by the probability that average task scores of a given method outperforms the best method~(among a given set of methods), computed using the Welsh's t-test~\citep{welch1947generalization}. However, this profile is (1) also a biased estimate, (2) less robust to outlier runs, (3) is insensitive to the size of performance differences, \ie two methods that are uniformly 1\% and 100\% worse than the best method are assigned the same probability, (4) is only sensible when task score distributions are Gaussian, as required by Welsh's t-test, and finally, (5) the ranking of methods depends on the specific set of methods being compared in such profiles. 
+
+
+\vspace{-0.2cm}
+\subsection{Non-standard Evaluation Protocols Involving Maximum}
+\label{sec:non_standard_eval_appendix}
+Even when adequate number of runs are used, the use of non-standard evaluation protocols can result in misleading comparisons.  Such protocols commonly involve the insertion of a maximum operation inside evaluation, \emph{across} or \emph{within} runs, leading to a positive bias in reported scores compared to the standard approach without the maximum. %One seemingly reasonable but faulty argument~\citep{birattari2007assess} for $\max$ is that in a real-world application, one might wish to run an stochastic algorithm $A$ for $N$ runs and then select the best result. However, in this case, we are not discussing $A$ but another algorithm $A^N$, which evaluates $N$ random runs of $A$. If we are indeed interested in $A^N$, taking $\max$ over $N$ runs only considers a single run out of $N$. Since $A^N$ is itself stochastic, proper experimental methodology requires multiple runs of $A^N$, resulting in much large number of runs of $A$.
+
+One seemingly reasonable but faulty argument~\citep{birattari2007assess} for maximum across runs is that in a real-world application, one might wish to run an stochastic algorithm $A$ for $N$ runs and then select the best result. However, in this case, we are not discussing $A$ but another algorithm $A^N$, which evaluates $N$ random runs of $A$. If we are interested in $A^N$, taking maximum over $N$ runs only considers a single run of $A^N$. Since $A^N$ is itself stochastic, proper experimental methodology requires multiple runs of $A^N$. Furthermore, because learning curves are not in general monotonic, results produced under the maximum-during-training protocol are in general incomparable with end-performance reported results. In addition, such protocols introduces an additional source of positive statistical bias, since the maximum of a set of random variables is a biased estimate of their true maximum. 
+
+On Atari 100k, \curl~\citep{laskin2020curl} and \sunrise~\citep{lee2020sunrise} used non-standard evaluation protocols. \curl\ reported the maximum performance over 10 different evaluations during training. As a result, natural variability in both evaluation itself and in the agent's performance during training contribute to overestimation. Applying the same procedure to \curl's baseline DER leads to scores far above those reported for \curl~(\figref{fig:non_standard_eval}, ``\der~(\curl's protocol)''). In the case of \sunrise, the maximum was taken over eight hyperparameter configurations separately for each game, with three runs each.  We simulate this procedure for \der~(also \sunrise's baseline), using a dummy hyperparameter. We find that a lot of \sunrise's improvement over \der\ can be explained by this evaluation scheme (\figref{fig:non_standard_eval}, ``\der~(\sunrise's protocol)'').
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/bootstrap_mean_26_games.pdf}
+     \caption{\textbf{Validating 95\% bootstrap CIs for per-game mean scores} for a varying number of runs for \der, shown as a scatter plot where each point corresponds to one of the 26 games in Atari 100k. For a given game, the true coverage \% is computed by sampling 10,000 sets of K runs without replacement from 200 runs and checking the fraction of 95\% CIs that contains the true mean score for that game based on 200 runs. For many games, the true coverage for per-game CIs is below the nominal coverage of 95\% even with 30 runs per game.}\label{fig:per_game_bootstrap_metrics}
+    \label{fig:dist_der_ci}
+    \vspace{-0.2cm}
+\end{figure}
+
+\vspace{-0.25cm}
+\subsection{Bootstrap Confidence Intervals}
+\vspace{-0.15cm}
+\label{sec:bootstrap_ci_app}
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.75\linewidth]{new_figures/appendix_figures/all_aggregate_bootstrap_coverage.pdf}
+     \caption{\textbf{Validating 95\% stratified bootstrap CIs for aggregate scores} for a varying number of runs. We show CIs for median, mean and IQM scores, aggregated using scores across 26 games, for \der . The true coverage \% is computed by sampling 10,000 sets of K runs without replacement from 200 runs and checking the fraction of 95\% CIs that contains the true estimate approximation based on 200 runs. Please note that coverage above 95\%, even with 50+ runs, is likely due to approximation error in the true estimate using finite  runs.}\label{fig:bootstrap_metrics_all}
+    \vspace{-0.45cm}
+\end{figure}
+
+
+Bootstrap CIs for a real parameter $\theta$ are based on re-sampling with replacement from a fixed set of $K$ samples to create a bootstrap sample of size $K$ and compute the bootstrap parameter $\theta^{*}$ and repeating this process a numerous to create the bootstrap distribution over $\theta^{*}$. In this paper, we evaluate the following non-parametric methods for constructing CIs for $\theta$ using this bootstrap distribution:
+
+\begin{enumerate}[leftmargin=18pt]
+    \item \textbf{Basic} bootstrap, also known as the reverse percentile interval, uses the empirical quantiles from the bootstrap distribution of the parameter ${\widehat \delta} = \hat{\theta} - \theta$ for defining the $\alpha \times 100\%$ CI:
+    $(2{\widehat {\theta \,}}-\theta _{(\alpha /2)}^{*},2{\widehat {\theta \,}}-\theta _{(1 - \alpha /2)}^{*})$,
+where $\theta _{(1-\alpha /2)}^{*}$ denotes the $1-\alpha /2$ percentile of the bootstrapped parameters $\theta ^{*}$ and ${\widehat\theta}$ is the empirical estimate of the parameter based on finite samples.
+\item \textbf{Percentile} bootstrap. The percentile bootstrap proceeds in a similar way to the basic bootstrap, using percentiles of the bootstrap distribution, but with a different formula:
+$ (\theta _{(1-\alpha /2)}^{*},\theta _{(\alpha /2)}^{*})$ for defining the $\alpha \times 100\%$ CI.
+\item \textbf{Bias-corrected}~(bc) bootstrap – adjusts for bias in the bootstrap distribution.
+\item \textbf{Bias-corrected and accelerated}~(bca) bootstrap, by \citet{eforn1979bootstrap}, adjusts for both bias and skewness in the bootstrap distribution. This approach is typically considered to be more accurate and has better asymptotic properties. However, we find that it is not as effective as percentile methods in the few-run deep RL regime.
+\end{enumerate}
+
+More technical details about bootstrap CIs can be found in \citep{bootstrap-2021}. We find that bootstrap CIs for mean scores per game~(computed using $N$ random samples) require many more runs than aggregate scores~(computed using $MN$ random samples) for achieving true coverage close to the nominal coverage of 95\%~(\textit{c.f.} \figref{fig:dist_der_ci} \versus \figref{fig:bootstrap_metrics_all}).
+
+\textbf{Number of bootstrap re-samples}. Unless specified otherwise, for computing uncertainty estimates using stratified bootstrap, we use 50,000 samples for aggregate metrics and 2000 samples for pointwise confidence bands and average probability of improvement. Using larger number of samples then the above specified values might result in more accurate uncertainty estimates but would be slower to compute.
+
+\textbf{Stratified bootstrap over tasks and runs\footnote{Thanks to David Silver and Tom Schaul for suggesting stratified bootstrapping over tasks.}}. With access to only 1-2 runs per task, stratified bootstrapping can be done over tasks~(\figref{fig:bootstrap_across_tasks}), to answer the question: ``If I repeat the experiment with a different set of tasks, what performance an algorithm is I expected to get?'' It shows the sensitivity of the aggregate score to a given task and can also be viewed as an estimate of performance if we had used a larger unknown population of tasks~\citep[\eg][]{sellam2021multiberts, schaul2021return}. Compared to the interval estimates in \figref{fig:atari_aggregates}, bootstraping over tasks results in much larger uncertainty due to high variations in performance across different tasks (\eg easy vs hard exploration tasks).
+
+\begin{figure}[t]
+    \centering
+    % \includegraphics[width=0.47\linewidth]{figures/atari_200m_perf.pdf}
+    \includegraphics[width=0.9\linewidth]{new_figures/atari_200m_legend.pdf}
+    \includegraphics[width=0.45\linewidth]{new_figures/appendix_figures/atari_sample_efficiency_median.pdf}~~~~~
+    \includegraphics[width=0.45\linewidth]{new_figures/atari_sample_efficiency_iqm.pdf}
+    \vspace{-0.1cm}
+    \caption{\textbf{Comparing Median vs IQM on Atari 200M}. Sample-efficiency of agents as a function of number of frames measured via median \textbf{(left)} and IQM \textbf{(right)} human-normalized scores. Shaded regions show pointwise 95\% percentile stratified bootstrap CIs. IQM results in significantly smaller CIs than median scores.}\label{fig:sample_efficiency_med_iqm}
+    \vspace{-0.4cm}
+\end{figure}
+
+
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/procgen_perf_profile.pdf}
+    \caption{\textbf{Score Distributions on the Procgen benchmark}~\citep{cobbe2020leveraging} based on results in the easy mode setting~\citep{raileanu2021decoupling}. Shaded regions indicate 95\% CIs estimated using the percentile bootstrap with stratified sampling. We compare PPO~\citep{schulman2017proximal}, MixReg~\citep{wang2020improving}, UCB-DrAC~\citep{raileanu2020automatic}, PLR~\citep{jiang2020prioritized}, PPG~\citep{cobbe2020phasic} and IDAAC~\citep{raileanu2021decoupling}. We recommend using min-max normalized scores as opposed to PPO normalized scores.
+    }\label{fig:procgen_profile_appendix}
+    \vspace{-0.3cm}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{new_figures/appendix_figures/bootstrap_across_tasks.pdf}
+    \caption{\textbf{Stratified Bootstrap across tasks and runs}. Aggregate metrics on Atari 200M with 95\% CIs based on 55 games with sticky actions~\citep{machado2018revisiting}. Higher mean, median and IQM scores and lower optimality gap are better. The CIs are estimated using the percentile bootstrap with stratified sampling across tasks and runs. MuZero~\citep{schrittwieser2020mastering} results use 1 run/game while Muesli~\citep{hessel2021muesli} uses 2 runs/game, as provided by the corresponding authors. All other results are based on 5 runs per game except for M-IQN and DreamerV2 which report results with 3 and 11 runs. These estimates are much wider than that obtained via bootstrap over runs~(\figref{fig:atari_aggregates}).}
+    \label{fig:bootstrap_across_tasks}
+    \vspace{-0.4cm}
+\end{figure}
+
+\vspace{-0.2cm}
+\subsection{Visualizing score distributions}
+\label{app:score_distributions}
+
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/atari_200m_perf_non_linear_vs_linear.pdf}
+    \caption{\textbf{Score distributions with linear and with non-linear scaling} on Atari 200M. In the plots above, the x-axis is scaled such that spacing between any two $\tau$ values, $\tau_1$ and $\tau_2$, is proportional to the fraction of runs averaged across algorithms between those two $\tau$ values. This scaling shows the regions of the score distribution where most of the runs lie as opposed to comparing tail ends of the distribution. However, this scaling implies sub-linear utility of achieving higher scores, which may not be accurate as the utility depends on the difficulty of obtaining higher scores -- it is much higher to obtain higher scores on hard exploration games. Furthermore, we cannot visually inspect mean/IQM scores based on the area under the curve due to the non-linear scaling.
+    }\label{fig:perf_profile_non_linear_scaling_atari_200m}
+    \vspace{-0.5cm}
+\end{figure}
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/atari_100k_linear_non_linear.pdf}
+    \caption{\textbf{Score distributions with linear and with non-linear scaling} on Atari 100k. In the plots above, the x-axis is scaled such that spacing between any two $\tau$ values, $\tau_1$ and $\tau_2$, is proportional to the fraction of runs averaged across algorithms between those two $\tau$ values.
+    }\label{fig:perf_profile_non_linear_scaling_atari_200k}
+    \vspace{-0.2cm}
+\end{figure}
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.95\linewidth]{new_figures/appendix_figures/alternative_metrics_atari.pdf}
+    \caption{\textbf{Alternative aggregate metrics on ALE} based on 55 games with 95\% CIs.  Higher metrics are better. The CIs are estimated using the percentile bootstrap with stratified sampling. } 
+    \label{fig:atari_200m_alternative}
+    \vspace{-0.3cm}
+\end{figure}
+
+
+
+
+
+\textbf{Choice of Normalization}. We used existing normalization schemes which are prevalent on benchmarks including human normalized scores for Atari 100k and ALE, PPO normalized scores and Min-Max normalized scores for Procgen, and Min-Max Normalized scores~(minimum scores set to zero) scores for DM Control. We do not use record normalized scores for ALE~(\figref{fig:record_normalized_atari}) in the main text as ALE results are reported by evaluating agents for 30 minutes of game-play as opposed to record scores which were obtained using game play spanning numerous hours~(\eg\ \citet{toromanoff2019deep} recommend evaluating agents for 100 hours). Furthermore, we recommend using Min-Max Normalized scores for Procgen instead of PPO Normalized scores~(\figref{fig:procgen_profile_appendix}) to allow for comparisons to methods which do not build upon PPO~\citep{schulman2017proximal}.
+
+
+
+\textbf{Scaling x-axis in score distributions}. \figref{fig:perf_profile_non_linear_scaling_atari_200m} (right) and \figref{fig:perf_profile_non_linear_scaling_atari_200k} (right) shows an alternative for visualizing score distributions where we simply scale the $x$-axis depending on the fraction of runs in a given region. This scaling more clearly shows the differences in algorithms by focusing on the regions where most of the runs lie\footnote{Thanks to Mateo Hessel for suggesting this visualization scheme and the difficulty progress metric.}.
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{new_figures/appendix_figures/atari_200m_legend_appendix.pdf}
+    \begin{minipage}{0.47\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{new_figures/appendix_figures/optimality_gap_vary_thresh.pdf}
+        \caption{Optimality gap~($\gamma$) divided by $\gamma$ as a function of $\gamma$. Lower curves are better.}\label{fig:optimality_gap_threshold}
+    \end{minipage}\hfill
+    \begin{minipage}{0.47\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{new_figures/appendix_figures/record_normalized_atari.pdf}
+        \caption{Score distributions using record normalized scores.}\label{fig:record_normalized_atari}
+    \end{minipage}
+    % \vspace{-0.2cm}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.98\linewidth]{new_figures/appendix_figures/atari_200m_prob_annotate.pdf}
+    \caption{\small \textbf{Average Probability of Improvement on ALE}. Each subplot shows the probability of improvement of a given algorithm compared to all other algorithms. The interval estimates are based on stratified bootstrap with independent sampling with 2000 bootstrap re-samples}
+    \label{fig:prob_improve_atari_200m}
+    \vspace{-0.2cm}
+\end{figure}
+
+
+
+
+
+\vspace{-0.25cm}
+\subsection{Aggregate metrics: Additional visualizations and details}
+% \vspace{-0.25cm}
+\label{app:agg_metrics_and_score_dist}
+
+
+
+\textbf{Alternative aggregate metrics}. Different aggregate metrics emphasize different characteristics and no single metric would be sufficient for evaluating progress. While score distributions provide a full picture of evaluation results, we provide suggestions for alternative aggregate metrics to highlight other important aspects of performance across different tasks and runs. 
+
+
+\begin{itemize}
+    \item \textbf{Difficulty Progress}: One might be more interested in evaluating progress on the hardest tasks on a benchmark~\citep{badia2020agent57}. In addition to optimality gap which emphasizes all tasks below a certain performance level, a possible aggregate measure to consider is the mean scores of the bottom 25\% of the runs~(\figref{fig:atari_200m_alternative}, left), which we call \emph{Difficulty Progress}~(DP-25).
+    \item \textbf{Superhuman Probability}: We also recommend reporting \emph{probability of being superhuman}, $P(X>1)$, given by the number of runs above average human performance~(\figref{fig:atari_200m_alternative}, right) instead of number of games above average human performance~\citep{hessel2018rainbow, schwarzer2021dataefficient}, a commonly used metric on ALE. 
+\end{itemize}
+
+\textbf{Choice of $\gamma$ for optimality gap}. When using min-max normalized scores or human-normalized scores, setting a score threshold of $\gamma=1$ is sensible as it considers performance on games below maximum performance or human performance respectively. If there is no preference for a specific threshold, an alternative is to consider a curve of optimality gap as the threshold is varied, as shown in \figref{fig:optimality_gap_threshold}, which shows how far from optimality an algorithm is given any threshold -- a small value of optimality gaps for all achievable score thresholds is desirable.
+
+
+
+\textbf{Probability of improvement}. To compute the probability of improvement for a task $m$ for algorithms $X$ and $Y$ with $N$ and $K$ runs respectively, we use the Mann-Whitney U-statistic~\citep{mann1947test}, that is, 
+\begin{equation}
+   P(X_m > Y_m) = \frac{1}{NK} \sum_{i=1}^{N}\sum_{j=1}^{K}S(x_{m,i}, y_{m, j})\quad \text{where}\quad
+S(x,y)={\begin{cases}1,&{\text{if }}y<x,\\{\tfrac {1}{2}},&{\text{if }}y=x,\\0,&{\text{if }}y>x.\end{cases}}\label{eq:prob_improve}
+\end{equation}
+Please note that if the probability of improvement is higher than 0.5 and the CIs do not contain 0.5, then the results are statistically significant. Furthermore,
+if the upper CI is higher than a threshold of 0.75, then the results are said to be statistically meaningful as per the Neyman-Pearson statistical testing criterion by \citet{bouthillier2021accounting}. We show the average probability of improvement metrics for Atari 100k and ALE in \figref{fig:prob_improve_atari_100k} and \figref{fig:prob_improve_atari_200m}. These estimates show how likely an algorithm improves upon another algorithm. 
+
+\textbf{Aggregate metrics} on Atari 100k, Procgen and DM Control as well as ranking on individual tasks on DM Control are visualized in Figures~\ref{fig:atari_aggregates_app_100k}--\ref{fig:dmc_ranking}.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.65\linewidth]{new_figures/appendix_figures/prob_improve_atari_100k_annotate.pdf}
+    \caption{\textbf{Average Probability of Improvement on Atari 100k}. Each subplot shows the probability of improvement of a given algorithm compared to all other algorithms. The interval estimates are based on stratified bootstrap with independent sampling with 2000 bootstrap re-samples.}
+    \label{fig:prob_improve_atari_100k}
+    % \vspace{-0.3cm}
+\end{figure}
+
+
+
+
+
+
+\begin{figure}[h]
+    \centering
+    % \vspace{-0.5cm}
+    \includegraphics[width=0.95\linewidth]{new_figures/appendix_figures/atari_100k_aggregates.pdf}
+    \caption{\small \textbf{Aggregate metrics on Atari 100k} based on 26 games with 95\% CIs. Higher mean, median and IQM scores and lower optimality gap are better. The CIs are estimated using the percentile bootstrap with stratified sampling. All results are based on \textbf{10 runs per game} except SimPLe, for which we use the 5 runs from their reported results. IQM results in smaller CIs than median scores while optimality gap results in smaller CIs than mean scores. Mean scores are higher than IQM and median scores, indicating that they might be dominated by performance on outlier tasks.} 
+    \label{fig:atari_aggregates_app_100k}
+\end{figure}
+
+
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[c]{0.95\textwidth}
+        \includegraphics[width=\linewidth]{new_figures/appendix_figures/dmc_100k_aggregates.pdf}
+        \caption{\small 100k step benchmark.}
+    \vspace{0.1cm}
+    \end{subfigure}
+
+    \begin{subfigure}[c]{0.95\textwidth}
+        \includegraphics[width=\linewidth]{new_figures/appendix_figures/dmc_500k_aggregates.pdf}
+        \caption{\small 500k step benchmark.}
+
+    \end{subfigure}
+    \caption{\textbf{Aggregate metrics on DM Control} based on 6 tasks with 95\% CIs.  Higher mean, median and IQM scores and lower optimality gap are better. The CIs are estimated using the percentile bootstrap with stratified sampling with 50,000 bootstrap resamples. All results are based on 10 runs per game. All scores are bounded above by 1, so 1 - optimality gap corresponds to mean scores. }
+    \label{fig:dmc_agg_appendix}
+\end{figure}
+
+
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[c]{0.95\textwidth}
+        \includegraphics[width=\linewidth]{new_figures/appendix_figures/procgen_ppo_normalized_scores.pdf}
+        \caption{\small Aggregate metrics based on \textbf{PPO normalized scores}. Mean is dominated by outliers while median has large CIs compared to IQM. All algorithms perform better than PPO, resulting in a small optimality gap. }
+    \vspace{0.1cm}
+    \end{subfigure}
+
+    \begin{subfigure}[c]{0.95\textwidth}
+        \includegraphics[width=\linewidth]{new_figures/appendix_figures/procgen_min_max_normalized_scores.pdf}
+        \caption{\small Aggregate metrics based on \textbf{min-max normalized scores}. IQM results in smaller CIs than median scores. With min-max normalization, scores are below $1$, so optimality gap corresponds to $1$ - mean scores.}
+
+    \end{subfigure}
+    \caption{\textbf{Aggregate metrics on Procgen} based on 16 tasks with 95\% CIs.  Higher mean, median and IQM scores and lower optimality gap are better. The CIs are estimated using the percentile bootstrap with stratified sampling with 50,000 bootstrap resamples.  We compare PPO~\citep{schulman2017proximal}, MixReg~\citep{wang2020improving}, UCB-DrAC~\citep{raileanu2020automatic}, PLR~\citep{jiang2020prioritized}, PPG~\citep{cobbe2020phasic} and IDAAC~\citep{raileanu2021decoupling}. All results are based on 10 runs per game.}
+    \label{fig:procgen_agg_appendix}
+\end{figure}
+
+
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[c]{0.95\textwidth}
+    \centering
+    \includegraphics[width=0.95\linewidth]{new_figures/appendix_figures/dmc_100k.pdf}
+    \vspace{-0.1cm}
+    \caption{100k step benchmark.}
+    \vspace{0.25cm}
+    \end{subfigure}
+    
+    \begin{subfigure}[c]{0.95\textwidth}
+    \centering
+    \includegraphics[width=0.95\linewidth]{new_figures/appendix_figures/dmc_500k.pdf}
+    \vspace{-0.1cm}
+    \caption{500k step benchmark.}
+    \end{subfigure}
+
+    \caption{\textbf{Ranking on individual tasks on DM Control} 100k and 500k step benchmark.  The $i^{th}$ column in the rank distribution plots show the probability that a given method is assigned rank $i$, when compared to other methods. These distributions are estimated using stratified bootstrap with 200,000 repetitions. We observe that no single algorithm consistently ranks above other algorithms on all tasks, making comparisons difficult without aggregating results across tasks.} 
+    \label{fig:dmc_ranking}
+    \vspace{-0.1cm} 
+\end{figure}
+
+
+% \subsection{Societal Impacts}
+
+% This paper calls for statistical sophistication in deep RL research by accounting for statistical uncertainty in reported results. However, statistical sophistication can introduce new forms of statistical abuses and monitoring the literature for such abuses should be an ongoing priority for the research community.
+% Moving towards reliable evaluation and reproducible research is an ongoing process and this paper only partly addresses it by providing tools for more reliable evaluation. That said, while accounting for uncertainty in results is not a panacea, it provides a strong foundation for trustworthy results on which the community can build upon, with increased confidence.
+
+% In terms of broader impact of this work, we do not see any foreseeable strongly negative impacts. However, this paper could positively impact society by constituting a step forwards in rigorous few-run evaluation regime, which reduces computational burden on researchers and is ``greener'' than evaluating a large number of runs. 

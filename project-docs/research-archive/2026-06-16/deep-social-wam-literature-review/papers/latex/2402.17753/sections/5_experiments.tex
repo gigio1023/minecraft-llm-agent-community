@@ -1,0 +1,24 @@
+\section{Experimental Setup}
+\label{sec:baselines}
+
+For the question-answering and event summarization tasks, we replace images in \dataset{} with their captions \cite{li2023blip}, and use state-of-art LLMs to reason over text-only dialogues interleaved with image captions. We use images directly for the multimodal dialog generation task only. See additional details in Appendix~\ref{sec:experiments_appendix}.
+
+\paragraph{Question Answering.}
+We evaluate three types of models:
+(1) \textbf{Base} LLMs operating with constrained context lengths where earlier dialogues are omitted i.e., Mistral-7B~\cite{jiang2023mistral}, LLama-70B-chat~\cite{touvron2023llama}, \texttt{gpt-3.5-turbo}~\footnote{https://platform.openai.com/docs/models/gpt-3-5}, and \texttt{gpt-4-turbo}~\footnote{https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo}; 
+(2) \textbf{Long-context} LLMs with an extended context window i.e., \texttt{gpt-3.5-turbo-16k}; 
+(3) \textbf{Retrieval-augmented Generation (RAG)} involves retrieving relevant context from a database of dialog history, observations (assertions about speakers; see \Sref{ssec:llm-agent}, Figure~\ref{fig:observation_prompt}), or session-level summaries (see \Sref{ssec:llm-agent}, Figure~\ref{fig:summary_prompt}). We employ DRAGON~\cite{lin-etal-2023-train} as retriever and \texttt{gpt-3.5-turbo-16k} as reader.
+
+
+\paragraph{Event Summarization.}
+We present experiments using \textbf{Base} and \textbf{Long-context} setups from the question-answering task, but refrain from including RAG since summarization requires a comprehensive understanding of the entire dialogue, rather than just retrieving a specific portion. We implement incremental summarization i.e., iteratively create a summary of a preceding sessions and then use that summary as a basis to summarize the subsequent sessions \cite{chang2023booookscore}.
+
+\paragraph{Multi-modal Dialogue Generation.}
+We generate 50 conversations using our automated pipeline (without human filtering; \Sref{sec:dataset}) for training data and train three versions of MiniGPT-5~\cite{zheng2023minigpt}:
+(1) \textbf{Base} trains on prior dialogue turns only;
+(2) \textbf{+ summary} trains on prior dialogue turns and a global summary of the ongoing conversation;
+(3) \textbf{+ observation} trains on prior dialogue turns and observations retrieved from conversation history.
+Each run is initialized with a MiniGPT-5 checkpoint finetuned on MMDialog \cite{feng2023mmdialog}.
+
+
+

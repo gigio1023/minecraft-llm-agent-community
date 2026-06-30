@@ -1,0 +1,305 @@
+
+\arxiv{
+  In this section we display omitted figures discussed in \Cref{sec:experiments}.
+  }
+
+\iclr{
+\begin{figure}[t]
+  \centering
+  \subfigure[]{
+      \includegraphics[width=0.45\textwidth]{figs/BoN-Normalized-Colored-Table.pdf}
+      \label{sfig:bon-normalized-improvement} 
+  }
+  \hfill \subfigure[]{
+      \includegraphics[width=0.45\textwidth]{figs/BoN-Majority-Colored-Table.pdf}
+      \label{sfig:bon-majority-improvement}
+  } \\
+
+  \subfigure[]{
+      \includegraphics[width=0.45\textwidth]{figs/BoN-Coverage-Colored-Table.pdf}
+      \label{sfig:bon-coverage}
+  }
+  \hfill
+  \subfigure[]{
+      \includegraphics[width=0.45\textwidth]{figs/BoN-greedy-Colored-Table.pdf}
+      \label{sfig:bon-greedy}
+  }
+  
+  
+  \caption{Performance of alternative decoding schemes beyond BoN.  Percent accuracy improvement over greedy decoding for self-improvement with length-normalized log probability (a) and majority voting (b), with both demonstrating efficacy on a range of model-task pairs.  (c) Measure of coverage of correct answer, demonstrating that most model-task pairs produce the correct answer most of the time with at least one completion out of 50.  (d) Accuracy of greedy decoding baseline on each model-task pair.
+  }
+  \label{fig:other_rewards}
+\end{figure}
+
+}
+\arxiv{
+\vfill
+  \begin{table}[hp]
+    \centering
+    \begin{tabular}{ccccc}
+        \toprule
+        \textbf{Model} & \textbf{Dataset} & \textbf{Weight Decay} & \textbf{LoRA Rank} \\
+        \midrule
+        \phithreefivemini & \mathdataset & 0.1 & 16\\
+        \phithreefivemini & \gsm & 0.5 & 16 &  \\
+        \phithreefivemini & \prontoqa & 0.0 & 16\\
+        \mistral & \mathdataset & 1.0 & 8 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Hyperparameters for training-time sharpening experiments with \bestofnalg.}
+    \label{tab:hyperparameters}
+  \end{table}
+  \vfill
+\begin{figure}[hp]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figs/BoN-game24-improvement.pdf}
+    \hfill
+    \includegraphics[width=0.45\textwidth]{figs/BoN-game24-logprobs.pdf}
+    \caption{Effect of inference-time BoN-sharpening on \gametwentyfour with finetuned \llamagame model from \citet{wan2024alphazero}.}
+    \label{fig:game24_inf}
+  \end{figure}
+\vfill
+}
+
+
+
+
+
+\begin{figure}[h]
+    \centering
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/BoN-math-logprobs.pdf}
+    }
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/BoN-gsm8k-logprobs.pdf}
+    }
+    \\
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/BoN-prontoqa-logprobs.pdf}
+    }
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/BoN-mmlu-bio-logprobs.pdf}
+    }
+    \\
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/BoN-mmlu-phys-logprobs.pdf}
+    }
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/BoN-mmlu-chem-logprobs.pdf}
+    }
+    
+    \caption{Effect of $N$ on average sequence level log-probabilities for inference-time BoN-sharpening on various model-task pairs, compared to greedy decoding baseline. As predicted by theory, the likelihood of sequences sampled with BoN-sharpening increases with $N$.}
+    \label{fig:BoN-inference-logprobs}
+\end{figure}
+
+\iftoggle{iclr}{
+In this section we detail the precise setup required to replicate our empirical results.  All of our experiments were run either on 40G NVIDIA A100 GPUs, 192G AMD MI300X GPUs, or through the OpenAI API.  We considered the following models. All models, except for \gptthree, are available on \url{https://huggingface.co} and we provide HuggingFace model identifiers below.
+\begin{enumerate}
+\item Phi models: We experiment with several models from the Phi family of models~\citep{abdin2024phi}, specifically \phithreemini (``microsoft/Phi-3-mini-4k-instruct''), \phithreesmall (``microsoft/Phi-3-small-8k-instruct''), \phithreemedium (``microsoft/Phi-3-medium-4k-instruct''), and \phithreefivemini (``microsoft/Phi-3.5-mini-instruct''). 
+\item \llamathree (``meta-llama/Llama-3.2-3B-Instruct'')~\citep{dubey2024llama}
+\item \mistral (``mistralai/Mistral-7B-Instruct-v0.3'')~\citep{jiang2023mistral}
+\item \gptthree~\citep{brown2020language}: We access this model via the OpenAI API.
+\item \llamagame (``OhCherryFire/llama2-7b-game24-policy-hf''): We use the model of \iftoggle{workshop}{\cite{wan2024alphazero}}{\citet{wan2024alphazero}}, which is a Llama-2 model finetuned on the \gametwentyfour task \citep{yao2024tree}. We use this model only the \gametwentyfour task. 
+\end{enumerate}
+
+We consider the following tasks:
+
+
+\begin{enumerate}
+    \item \mathdataset: We use the above models to generate responses to prompts from the \mathdataset \citep{hendrycks2021measuring}, which consists of more difficult math questions.  We consider ``all'' subsets and take the first 256 examples of the test set where the solution matches the regular expression \verb|(\d*)|.\footnote{\url{https://huggingface.co/datasets/lighteval/MATH}.}  %
+    \item \gsm: We use the above models to generate responses to prompts from the GSM-8k dataset \citep{cobbe2021training} where the goal is to generate a correct answer to an elementary school math question. We take the first 256 examples from the test set in the main subset.\footnote{\url{https://huggingface.co/datasets/openai/gsm8k}.} %
+    \item \prontoqa: We use the above models to generate responses to prompts from the \prontoqa dataset \citep{saparov2023language}, which consists of chain-of-thought-style reasoning questions with boolean answers.  We take the first 256 examples from the training set.\footnote{\url{https://huggingface.co/datasets/longface/prontoqa-train}.} %
+    \item \mmlu: We use the above models to generate responses to prompts from three subsets of the \mmlu dataset \citep{hendrycks2020measuring}, specifically \texttt{college\_biology} (Bio),\texttt{college\_physics} (Phys), and \texttt{college\_chemistry} (Chem) all of which consist of multiple choice questions\footnote{\url{https://huggingface.co/datasets/cais/mmlu}.}. We take the first 256 examples of the test set. 
+    \item \gametwentyfour: We use only the model of \iftoggle{workshop}{\cite{wan2024alphazero}}{\citet{wan2024alphazero}} (i.e., \llamagame), on the \gametwentyfour task \citep{yao2024tree}.  The prompts are four numbers and the goal is to combine the numbers with standard arithmetic operations to reach the number `24.'  Here we use both the train and test splits of the dataset.\footnote{\url{https://github.com/princeton-nlp/tree-of-thought-llm/tree/master/src/tot/data/24}}  %
+\end{enumerate}
+
+\subsection{Inference-time validation experiments}\label{ssec:inference}
+To form the plots in \Cref{fig:validation} and in \Cref{fig:BoN-inference-granular,fig:BoN-inference-logprobs}, for each (model, task) pair, we sampled $N$ generations per prompt with temperature 1 and returned the best of the $N$ generations according to the \mlsharp self-reward function $\rself(y\mid{}x)=\log\piref(y\mid{}x)$; we compare against greedy decoding as a baseline, whose accuracy is displayed in \Cref{sfig:bon-greedy}.  
+
+\paragraph{Implementation details}
+For all models and datasets except for \gametwentyfour, we used 1-shot prompting to ensure that models conform to the desired output format and to elicit chain of thought reasoning (for \gametwentyfour we do not provide a demonstration in the prompt). We set the maximum length of decoding to be $512$ tokens. We used 10 seeds for all (model, task) pairs with a maximum value of $N=50$ in \BestofN sampling. We simulated $N$ responses for $N<50$ by subsamplng the 50 generated samples. For \BestofN sampling, we always use temperature $1.0$. Since greedy decoding is a deterministic strategy, we only use 1 seed for each (model, task) pair. In all experiments, we collect both the responses and their log-likelihoods under the \emph{reference model} (i.e., the original model from which samples were generated). 
+
+\paragraph{Results}
+Results for most datasets are presented in \Cref{fig:BoN-inference-granular,fig:BoN-inference-logprobs}.  Because we only consider a single model for \gametwentyfour, we separate this task into \Cref{fig:game24_inf} For all datasets, we visualize both performance---measured as normalized improvement in accuracy over greedy decoding---and log-likelihoods---under $\piref$---of the selected responses. 
+
+In all cases, \BestofN sampling (using $\rself(y\mid{}x)=\log\piref(y\mid{}x)$) improves over the na{\"i}ve sampling strategy, wherein we simply sample a single generation with temperature 1.0.  In all datasets, we also see improvements over the standard \emph{greedy decoding} strategy, at least for some models. 
+Analogously, for every model, there is at least one dataset for which \BestofN sampling improves over greedy decoding. 
+
+We further explore the relationship between sequence level log probabilities and generation quality in \Cref{fig:distributions}, where we plot the empirical distributions of responses sampled with temperature 1 from the base model for a variety of model-dataset pairs, conditioned on whether or not the response is correct.  It is clear from the figures that the distribution of log probabilities conditioned on correctness stochastically dominates that conditioned on incorrectness in each case, which provides yet more evidence that log likelihoods represent a reasonable sel-improvement target.
+
+We mention several other observations from the experiments. First, in most cases, performance and log-likelihood saturate at relatively small values of $N$, typically around 10 or 20. This suggests that significant improvements can be obtained with relatively low computational overhead. Second, in some cases, performance can degrade as $N$ increases. We found that this happens for two reasons: (1) the performance of the reference model is quite low and so $\rself$ provides a poor signal (e.g., with \llamathree) and (2) the \BestofN criteria selects for short responses, which have higher log-likelihood but cannot leverage the computational/representational benefits of chain-of-thought, and thus yield worse performance (e.g., with \gptthree on \gsm). }
+{
+
+}
+
+
+\iclr{
+\begin{figure}[hp]
+  \centering
+  \includegraphics[width=0.45\textwidth]{figs/BoN-game24-improvement.pdf}
+  \hfill
+  \includegraphics[width=0.45\textwidth]{figs/BoN-game24-logprobs.pdf}
+  \caption{Effect of inference-time BoN-sharpening on \gametwentyfour with the finetuned \llamagame from \citet{wan2024alphazero}.}
+  \label{fig:game24_inf}
+\end{figure}
+}
+\iclr{
+\subsection{Experiments with other self reward functions}
+Although we focus on $\rself(y \mid{}x) = \log\piref(y \mid{}x)$ throughout the paper, the sharpening framework is significantly more general. As such, we also ran experiments with other choices for $\rself$, specifically:
+\begin{enumerate}
+  \item Length-normalized log-likelihood: $\rself(y \mid{}x) = \log\piref(y \mid{}x) / |y|$ where $|y|$ is the length, in tokens, of the response.
+  \item Majority (self-consistency): All datasets except \gametwentyfour have multiple-choice, boolean, or numerical answers. Although we allow responses to contain chain-of-thought tokens, we can extract the answer from each response and use the most-frequently-occuring answer. This can be seen as a sample-based approximation to the following self-reward function: $\rself(y\mid{}x) = \sum_{y': y'_{\texttt{ans}}=y_{\texttt{ans}}} \piref(y'\mid{}x)$, where $y_{\texttt{ans}}$ are the ``answer'' tokens in the full response $y$. 
+\end{enumerate}
+Finally, as a skyline we consider the \emph{coverage} criterion~\citep{brown2024large}, where we simply check if any of the sampled responses corresponds to the correct answer. This criterion is a skyline and does not fit into the self-improvement framework due to the fact that it uses knowledge of the ground truth (external) task reward function. 
+
+Results are displayed in \Cref{fig:other_rewards}. For length-normalized log-likelihood and majority, we see qualitatively similar behavior to (unnormalized) log-likelihood in the sense that inference-time sharpening via these self-reward functions offers improvements over both vanilla (temperature 1.0) sampling and greedy decoding. In both cases, the improvements are generally much larger than those obtained with log-likelihood. Finally, examining the coverage criteria, we see that with $N=50$ samples, these models almost always produce a correct answer on these tasks, raising the possibility of other self-reward functions that further improve performance. 
+}
+
+\begin{figure}
+    \centering
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/Logprob-Distribution-phi35mini-math.pdf}
+    }
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/Logprob-Distribution-phi35mini-gsm8k.pdf}
+    }
+    \\
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/Logprob-Distribution-phi35mini-prontoqa.pdf}
+    }
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/Logprob-Distribution-mistral7b-math.pdf}
+    }
+    \caption{Distribution of sequence-level log-probabilities for responses sampled with temperature 1, conditioned on whether or not the response is correct. We consider four model-dataset pairs: (a) (\phithreefivemini, \mathdataset); (b) (\phithreefivemini, \gsm); (c) (\phithreefivemini, \prontoqa); (d) (\mistral, \mathdataset).  In all cases except perhaps (c), conditioning on correctness of the response leads to a noticeable increase in log-probabilities, further justifying the use of sequence-level log-probabilities as a self-reward for self-improvement.}
+    \label{fig:distributions}
+\end{figure}
+
+
+
+\iclr{
+\subsection{Effect of \bestofnalg}
+\begin{table}[t]
+    \centering
+    \begin{tabular}{cccc}
+        \toprule
+        \textbf{Model} & \textbf{Dataset} & \textbf{\% Lift over Greedy (Accuracy)} & \textbf{Lift over Greedy (Likelihood)} \\
+        \midrule
+        \phithreefivemini & \mathdataset & $19.24 \pm 2.41$ & $48.33 \pm 0.17$ \\
+        \phithreefivemini & \gsm & $1.82 \pm 0.64$ & $1.49 \pm 0.55$ \\
+        \phithreefivemini & \prontoqa & $12.46 \pm 1.08$ & $ 5.64 \pm 0.01$ \\
+        \texttt{Mistral-7B} & \mathdataset & $8.88 \pm 5.55$ & $5.71 \pm 3.00$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{Experimental results for \bestofnalg}
+    \label{tab:performance}
+\end{table}
+In addition to inference-time experiments demonstrating the validity of the amortization objective considered in our theory, we also demonstrate empirically that amortization can be effected with \bestofnalg.  Due to the realities of limited computational resources, we choose a strict subset of the model-task pairs considered in \Cref{ssec:inference} that have particularly promising inference-time BoN performance and apply \bestofnalg to amortize the inference time cost of multiple generations.
+
+For each of the chosen model-dataset pairs (cf. \Cref{tab:performance}), we sample $N=50$ responses with temperature 1 for each prompt in the dataset and select the most likely (according to the relevant reference model).  We then combine these likely responses with the prompts in order to form a training corpus and train a Low Rank Adaptation \citep{hu2021lora} to the model, sweeping over LoRA rank, learning rate scheduler, and weight decay in order to return the best optimized model.\footnote{In all experiments involving \phithreefivemini we use a batch size of 4; unfortunately, due to a known numerical issue with LoRA on \mistral involving batch size $>1$, we use a batch of 1 in this case.  Because of this choice, instead of the 30 epochs we use to train our other models, for \mistral, we run only 10 epochs.}  We report the specific hyperparamters chosen in \Cref{tab:hyperparameters}.  On all models, we used a learning rate of $3 \times 10^{-4}$ with linear decay to zero and gradient clamping at 0.1.
+
+\paragraph{Results}  In \Cref{tab:performance} we report our results for the best model during training of each model-dataset pair, averaged across 3 random seeds, where responses are sampled with temperature 1 from the fine-tuned model.  We report both the percent lift in accuracy on the dataset with respect to the greedy generation of the reference model and the increase in average sequence level log likelihood with respect to the same.  In all cases, we see improvement on both metrics, demonstrating that some amortization is possible with \bestofnalg.  In \Cref{fig:training_curve_phi,fig:training_curve_mistral}, we display the evolution throughout training of these same metrics for each of the model-dataset pairs.  While \phithreefivemini is quite well-behaved on \mathdataset and \prontoqa, there appears to be a fair amount of noise in the training on \gsm, with the log probability being a significantly less useful proxy for accuracy on this dataset than the others, as has been previously found in \citet{block2023butterfly}.  In the case of \mistral on \mathdataset, while we do see some improvement after sufficient training, the optimization suffers an initial substantial drop and then spends $\sim90\% $ of the gradient steps recovering; we speculate that this is a function of insufficient hyper-parameter tuning of the optimization itself, rather than a fundamental barrier.
+
+Finally, in \Cref{fig:sft-N}, we investigate the effect that the choice of $N$ has on \bestofnalg for \phithreefivemini on \mathdataset.  In particular, in forming our training set, we choose $N \in \{10, 25, 50 \}$ and repeat the procedure described above, averaging our results over three seeds.  We find that increasing $N$ leads to a modest increase in the sequence-level log-likelihood and a consequent increment in the accuracy of the fine-tuned model, in accordance with our theory.
+}
+
+
+\iclr{
+\begin{table}[t]
+    \centering
+    \begin{tabular}{ccccc}
+        \toprule
+        \textbf{Model} & \textbf{Dataset} & \textbf{Weight Decay} & \textbf{LoRA Rank} \\
+        \midrule
+        \phithreefivemini & \mathdataset & 0.1 & 16\\
+        \phithreefivemini & \gsm & 0.5 & 16 &  \\
+        \phithreefivemini & \prontoqa & 0.0 & 16\\
+        \mistral & \mathdataset & 1.0 & 8 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Hyperparameters for \bestofnalg}
+    \label{tab:hyperparameters}
+\end{table}
+}
+
+\begin{figure}[ht]
+    \centering
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-math-sft-accuracy.pdf}
+    } 
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-math-sft-logprob.pdf}
+    } 
+    \vspace{-0.15cm}
+    \\
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-gsm8k-sft-accuracy.pdf}
+    } 
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-gsm8k-sft-logprobs.pdf}
+    } 
+    \vspace{-0.15cm}
+    \\
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-prontoqa-sft-accuracy.pdf}
+    } 
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-prontoqa-sft-logprob.pdf}
+    } 
+    \vspace{-0.15cm}
+    \caption{Evolution of \phithreefivemini under \bestofnalg ($N=50$) on different datasets, as measured by (i) \% lift over Greedy in accuracy; and (ii) difference in average sequence-level log-probability of generated responses under the reference model.  The fine-tuned model learns to produce generations with high probability under the reference model, and consequently enjoys an increase in accuracy compared to the base model. However, the model does not fully reach the performance of inference-time BoN sharpening.}
+    \label{fig:training_curve_phi}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/mistral7b-math-sft-accuracy.pdf}
+    } 
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/mistral7b-math-sft-logprob.pdf}
+    } 
+    \caption{Evolution of \mistral under \bestofnalg ($N=50$) on \mathdataset, as measured by (i) \% lift over Greedy in accuracy; and (ii) difference in average sequence-level log-probability of generated responses under the reference model.}
+    \label{fig:training_curve_mistral}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-math-sft-improvement-N.pdf}
+    }
+    \hfill
+    \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figs/phi35mini-math-sft-logprob-N.pdf}
+    }
+    \caption{Effect of $N$ on \bestofnalg for \phithreefivemini on \mathdataset.  We report (a) \% lift in accuracy over greedy; and (b) lift in sequence-level log-likelihood (averaged over the dataset).  In both cases, we see that increasing $N$ leads to greater lift, in accordance with theory.}
+    \label{fig:sft-N}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,134 @@
+\clearpage
+\newpage
+\section{Additional Results}\label{sec:add_res}
+
+
+\subsection{Instruction Induction}\label{sec:app_ii}
+% We assess the effectiveness of zero-shot and few-shot in-context learning on 24 instruction induction tasks proposed in \citet{honovich2022instruction}. The tasks span many facets of language understanding, from simple phrase structure to similarity and causality identification. We provide a detailed descriptions of each task in Appendix B. For each task, we sample five input-output pairs from the training data and select the best instruction using algorithm \ref{alg:ape}. Then, we evaluate the quality of the instruction by executing the instruction on InstructGPT \footnote{We use the \textit{text-davinci-002} via the OpenAI API (\url{https://beta.openai.com/}). Though not stated explicitly in the API, we assume the models are those reported by \citet{ouyang2022training}.}. We repeat our experiments five times with different random seeds to report the mean and standard deviation. The exact templates for our experiments can be found in Appendix (Table \ref{table:raw_templates}).
+
+% \paragraph{Zero-shot Learning}
+% We compare our method against two baselines: human prompt engineers (Human)\footnote{\mbox{We use the gold annotations from \citet{honovich2022instruction}, which were manually verified for correctness.}} and the model-generated instruction algorithm proposed by \citet{honovich2022instruction}. This algorithm can be thought of as a greedy version of \algname, without a search and selection process; thus, we refer to it as ``Greedy''. Figure \ref{fig:main-zero-shot} shows the zero-shot performance of InstructGPT using human instructions and model generated instructions. Our algorithm outperforms ``Greedy'' on every task and achieves equal or better than human performance on 19 of 24 tasks. Moreover, the Interquartile Mean (IQM) \citep{agarwal2021deep} across all 24 tasks in Figure \ref{fig:highlight} suggests that \algname~with InstructGPT outperforms human-engineered prompts, obtaining an IQM of 0.765 vs humans' 0.749. We summarize the instruction selected by \algname~for each task in Appendix (Table \ref{table:best_instructions_all}).
+
+% We observe \algname~can propose varying quality candidates depending on the subset of demonstration chosen for tasks such as Passivization and Start With. 
+% % Similar to in-context learning findings \citep{liu2021makes}, a different combination of the in-context examples can yield significantly different results. 
+% As shown in Figure \ref{fig:main-zero-shot}, our method achieves worse average performance than humans in Passivization and Sentence Similarity. However, selecting the best instruction still outperforms the human in Figure \ref{fig:app-zero-shot-best}. These results highlight the importance of the initial proposal stage. We found it is crucial to generate instruction candidates based on different demonstrations. Additionally, tasks such as Membership and Second Letter are intrinsically challenging for the model, and \algname~consistently performs worse than humans. 
+
+% \paragraph{Zero-shot Qualitative Analysis}
+% To better understand the weaknesses of \algname, we examined instructions in three tasks where \algname~underperforms compared to humans in the zero-shot setting: Passivization, Membership, and Second Letter. As shown in Tables \ref{table:best_instructions}, \ref{table:worst_instructions}, we find large variance in the quality of \algname~instructions due to the difference in demonstration. The best instructions selected by \algname~for each task are semantically correct and recover accuracy relative to humans. In contrast, the worst instructions are all semantically incorrect and perform poorly. Notably, we observe no semantic difference in the demonstrations used to generate the best and worst instruction under inspection.
+% This presents further evidence that selecting the right context demonstrations is both vital to some tasks and may escape human intuition, hence the need for an LLM score function.
+
+
+
+\paragraph{Few-shot In-context Learning}
+We evaluated APE-generated instructions in the few-shot in-context learning, where we insert the instruction before the in-context demonstrations. Those instructions are selected based on zero-shot execution accuracy, and we denote this setting as ``Instruction + In-context'' in Figure \ref{fig:main-few-shot}. As shown in Figure \ref{fig:main-few-shot}, adding an instruction achieves a comparable or better test performance than the standard in-context learning performance on 21 of 24 tasks. Counter-intuitively, adding in-context examples for Rhymes, Large Animal, and Second Letters hurts model performance. We conjecture that it may be because the selected instructions overfit the zero-shot learning scenario and thus do not perform well on the few-shot case. Therefore, we experiment using few-shot execution accuracy as the selection metric. Figure \ref{fig:app-few-shot-as-metric} shows that the few-shot metric achieves comparable or slightly better than the zero-shot metric except for Rhymes. To have an intuitive understanding of what is happening, we provide a qualitative analysis below. 
+
+\paragraph{Few-shot Qualitative Analysis}
+\label{few-shot_qualitative_analysis}
+We find an adversarial case on Rhymes when combining the instruction and in-context prompts. Table \ref{table:rhyme_instructions} shows that 4 of 5 filtered instructions ask to echo the input word. These proposals effectively hack the evaluation with near-perfect test accuracy, as every word rhymes with itself. However, adding in-context examples for these instructions creates a misalignment between instruction (induces trivial rhymes) and context (induces non-trivial rhymes), resulting in a significant drop in performance. If we instead score the instructions based on the few-shot metric, this performance drop can be alleviated since the model can choose a more aligned instruction. 
+% Another interesting case happens in the Second Letters task (Table \ref{table:second_letters_instructions}), where the model's responses to two semantically ``correct'' instructions experience a drop in accuracy when paired with the in-context demonstration. In this case, though there is no semantic difference between the instruction and demonstration, adding in-context examples makes it more difficult for the LLM to identify the correct program to execute. However, this effect is mild for a task such as Large Animal (Table \ref{table:larger_animal_instructions}).
+
+\begin{figure}[H]
+  \vspace{-0.10in}
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/main/exec_acc_few_shot.pdf}
+  \caption{Few-shot in-context test accuracy on 24 Instruction Induction tasks. \algname~improves the few-shot in-context learning performance on 21 out of 24 tasks.}\label{fig:main-few-shot}
+\end{figure}
+
+\clearpage
+\newpage
+
+\subsection{BIG-Bench Instruction Induction}
+We use \algname to generate new prompts for the tasks in BIG-Bench Instruction Induction (BBII). When compared to human prompts, \algname-generated prompts improve or match zero-shot performance on 17 out of 21 tasks. We report the normalized preferred metric defined in \citet{srivastava2022beyond}. Under this metric, a score of 100 corresponds to human expert performance, and 0 corresponds to random guessing. Note that a model can achieve a score less than 0 if it performs worse than random guessing on a multiple-choice task. 
+
+\begin{figure}[th]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/main/bigbench.pdf}
+  \caption{\algname improves or matches normalized zero-shot performance on 17 out of 21 BIG-Bench Instruction Induction tasks.}
+  \label{fig:bigbench}
+\end{figure}
+
+\begin{table}[H]
+\centering
+ \label{tab:title} 
+\caption{Zero-shot normalized test performance on 21 BIG-Bench Instruction Induction tasks. \algname~improves or matches performance on 17 out of 21 tasks.}\label{table:bbii_results}
+\begin{tabular}{lcc} 
+\toprule
+ & \multicolumn{2}{c}{Normalized Performance}  \\ \cmidrule{2-3}
+Task                              & \multicolumn{1}{c}{Human} & \multicolumn{1}{c}{APE}  \\ \midrule
+causal judgment & 18.0                        & 18.0                       \\
+disambiguation qa                 & -0.4                     & \textbf{5.6}                     \\
+dyck languages                    & 3.0                         & \textbf{18.0}                       \\
+epistemic reasoning               & 36.0                        & \textbf{38.0}                       \\
+gender inclusive sentences german & 13.0                        & \textbf{22.0}                       \\
+implicatures                      & 60.0                        & 60.0                       \\
+linguistics puzzles               & 0.0                         & 0.0                        \\
+logical fallacy detection         & \textbf{24.0}                        & 12.0                       \\
+movie recommendation              & -2.7                     & \textbf{12.0}                       \\
+navigate                          & -8.0                        & \textbf{12.0}                       \\
+object counting                   & 2.0                         & \textbf{44.0}                       \\
+operators                         & \textbf{48.0}                        & 47.0                       \\
+presuppositions as nli            & \textbf{13.0}                        & 5.5                      \\
+question selection                & -2.6                     & \textbf{-0.9}                    \\
+ruin names                        & \textbf{1.3}                       & -14.7                   \\
+snarks                            & 2.0                         & \textbf{4.0}                        \\
+sports understanding              & 36.0                        & 36.0                       \\
+tense                             & 84.0                        & \textbf{85.0}                       \\
+winowhy                           & -12.0                       & \textbf{12.0}                       \\
+word sorting                      & 11.0                        & \textbf{30.0}                       \\
+word unscrambling                 & 10.0                        & \textbf{15.0}              \\ \bottomrule       
+\end{tabular}
+\vspace{-0.10in}
+\end{table}
+
+\clearpage
+\newpage
+\subsection{Zero-shot Chain of Thought Reasoning}
+We use \algname to discover a better chain of thought (CoT) prompt than "Let's think step by step." from \citet{kojima2022large}. \algname finds a general prompt "Let's work this out in a step by step way to be sure we have the right answer." which is able to improve text-davinci-002’s zero-shot-CoT performance on MultiArith \citet{roy2016solving} from 78.7 to 82.0 and GSM8K \citet{cobbe2021training} 40.7 to 43.0 compared to the original CoT prompt. We include full results on 12 tasks with this new \algname CoT prompt in Figure \ref{fig:cot-all}.
+
+\begin{figure}[th]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/appendix/cot_all.pdf}
+  \caption{The performance of \algname discovered prompt "Let's work this out in a step by step way to be sure we have the right answer." on the 12 tasks from \citet{kojima2022large}. We collect a CoT dataset from the original paper and filter out incorrect answers. We then use \algname to optimize the CoT prompt. We improve performance on 6/12 tasks and nearly match human performance on 4/12 tasks. We hypothesize Shuffled Objects and Last Letter are hard to optimize on with a general prompt.}
+  \label{fig:cot-all}
+\end{figure}
+
+\begin{table}[H]
+\centering
+%\footnotesize
+\caption{Zero-shot chain of thoughts performance on the MultiArith \citep{roy2016solving} dataset using InstructGPT (text-davinci-002). Template (*1) was proposed in \citet{kojima2022large} to enable the zero-shot chain of thoughts reasoning of large language models, while template (*2) and (*3) were used in \citet{ahn2022can} and \citet{reynolds2021prompt}, respectively. }\label{tab:cot-arith}
+\begin{tabular}{m{1cm}m{2.5cm}m{6cm}m{2cm}}
+\toprule
+No.&Category&Zero-shot CoT Trigger Prompt&Accuracy \\
+\midrule
+1&APE&Let's work this out in a step by step way to be sure we have the right answer.&\textbf{82.0}\\
+\midrule
+2&Human-Designed&Let's think step by step. (*1)&78.7 \\
+3&&First, (*2)&77.3 \\
+4&&Let's think about this logically. &74.5 \\
+5&&Let's solve this problem by splitting it into steps. (*3)& 72.2\\
+6&&Let's be realistic and think step by step. & 70.8\\
+7&&Let's think like a detective step by step. & 70.3\\
+%6&Let's think step by step in a realistic way. &61.0 \\
+%7&Proof followed by the answer. & 60.3\\
+8&&Let's think & 57.5\\
+9&&Before we dive into the answer, & 55.7\\
+10&&The answer is after the proof. & 45.7\\
+\midrule
+-&&(Zero-shot) & 17.7\\
+\bottomrule
+\end{tabular}
+\vspace{-0.2cm}
+\label{tab:template_study}
+\end{table}
+
+\clearpage
+\newpage
+\subsection{Quantitative Analysis}
+
+\paragraph{Can we use other LLMs for instruction proposal?} We investigate other LLMs for instruction generation, including those with forward generation ability (OPT-175B \citep{zhang2022opt}, OpenAI Codex \citep{chen2021evaluating}) and one with reverse generation ability (INT4 quantized GLM-130B \citep{glm130b}).
+We evaluate their performance on six tasks selected from instruction induction on both zero-shot and few-shot settings \footnote{These six tasks are chosen such that two of them are worse than humans, and the other four are human-level. They cover six categories (spelling, morphosyntax, lexical semantics, semantics, multi-lingual, and GLUE).\label{sixtasks}}. Figures \ref{fig:app-zero-shot-diff-encoder} and \ref{fig:app-few-shot-diff-encoder} show that InstructGPT achieves the best performance except for passivization, where it underperforms compared to the two other forward-generation models. Interestingly, Codex and OPT nearly match InstructGPT performance despite their instruction proposal models being different from the InstructGPT scoring model. However, we observe some of the instructions generated by OPT contain in-context examples (Table \ref{tab:opt_instructions}), making them closer to few-shot rather than a zero-shot. In contrast, GLM achieves the poorest zero-shot performance as its infilling capabilities are trained to generate very short text, as shown in Table \ref{tab:glm_instructions}. 
+
+% May want to remove in the camera-ready version
+\paragraph{How important is the meta prompt?} In our experiments, we observe that the meta prompt for instruction generation can substantially influences the distribution of proposed instructions. To investigate how it can affect the final performance, we experiment with our TruthfulQA template instead of the reverse generation template (Figures \ref{fig:app-zero-shot-meta_prompt}, \ref{fig:app-few-shot-meta_prompt}). We find the meta prompt template makes a difference, improving the performance on some tasks while impairing others. Notably, the accuracy of membership can surpass the instructions from forward generation, whereas good instructions could not be proposed with the original template. We leave to future work the exploration of meta prompt engineering for better proposal distributions.
+
+\paragraph{How transferable are the generated instructions?} We investigate whether \algname can be used to steer the model not involved in the instruction generation and selection process. As shown in Figure \ref{fig:app-zero-shot-diff-decoder}, there is a significant performance drop when we use the instructions from InstructGPT to steer the GPT-3 model, and vice versa. This performance drop can be mitigated by a human written instruction. It suggests that the alignment between the scoring model and execution model is crucial, and the instructions generated by InstructGPT work best for the InstructGPT itself but do not transfer well to a different model like GPT-3. In contrast, GPT-3-generated instructions can steer GPT-3 exceptionally well, outperforming the InstructGPT instructions and human instructions by a large margin. Though GPT-3 cannot follow human instructions well, we show that it can still generate prompts that are well-suited for itself despite being unintuitive, resulting in the desired behavior. We provide the generated prompts in Table \ref{tab:davinci-self}.

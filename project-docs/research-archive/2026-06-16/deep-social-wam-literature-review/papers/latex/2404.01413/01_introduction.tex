@@ -1,0 +1,40 @@
+\section{Introduction}
+\label{sec:introduction}
+
+The advent of large-scale generative models such as GPT-4 \citep{openai2023gpt4}, DALL-E \citep{ramesh2022hierarchical} and Stable Diffusion \citep{rombach2022high} has revolutionized the field of artificial intelligence. These models, trained on vast web-scale datasets, exhibit remarkable capabilities in generating text, images, and other media \citep{brown2020language, saharia2022photorealistic}. However, as these models become more widely used, an increasing amount of generated data populates the web. This raises a critical question: what are the consequences of training generative models on datasets containing their own outputs?
+
+Recent studies have investigated this question, revealing that training generative models on their own outputs can cause the performance of such models to progressively degrade with each model-fitting iteration, eventually rendering newer models useless \citep{hataya2023will,martinez2023combining,shumailov2023curse, alemohammad2023self,martinez2023towards,bertrand2023stability,briesch2023large, dohmatob2024model, dohmatob2024tale} (see Appendix \ref{app:sec:prior_work} for review and discussion of prior work). This phenomenon was consequently labeled \textit{model collapse}. Model collapse warns that democratizing access to generative models runs the risk of polluting the very data necessary to train future iterations of generative models.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/schematic_draft2.pdf}
+    \caption{\textbf{Two Settings to Study Model Collapse.} Model collapse is a phenomenon where sequences of generative models trained on their own outputs progressively degrade until the latest model becomes useless. Left: Many prior works studied model collapse where data are \textit{\replace{replaced}} with each model-fitting iteration. Right: We study model collapse where data \textit{\accumulate{accumulate}} with each iteration and demonstrate accumulating data avoids model collapse.}
+    \label{fig:schematic}
+\end{figure}
+
+
+To better understand this phenomenon
+many prior works have considered a setup
+that assumes each model's generated data \textit{\replace{replaces}} previous data.  %
+In theory,
+this leads to very natural comparisons across generations as the total number of training points for each model remains fixed.
+In practice,
+subsequent generations of LLMs are often trained with
+increasing data over time -- e.g., 1.4 trillion tokens for Llama 1 \citep{touvron2023llama1}, 2 trillion for Llama 2 \citep{touvron2023llama2}, 15 trillion for Llama 3 -- 
+in which presumably both 
+human-generated and machine-generated data are accumulating in training sets collected from the internet. It was noted in some of those works \cite{hataya2023will, martinez2023combining, alemohammad2023self, bertrand2023stability, dohmatob2024tale} that model collapse can be either slowed down or negated by mixing in clean data with the generated data.
+
+
+To that end, in this work we study the effect of \textit{\accumulate{accumulating}} data on model collapse, rather than replacing data. Our data-accumulating setting is, in some sense, maximally pessimistic: it considers a hypothetical future where synthetic data are uncontrollably dumped on the internet to be vacuumed up for training the next iteration of generative models. Nevertheless, we find that \textit{\accumulate{model collapse is avoided when accumulating data}}. 
+
+We begin by studying model collapse experimentally with deep generative models trained on realistic data: transformers on causal language modeling (Sec. \ref{sec:real:subsec:language_transformers}), diffusion models on molecular conformation (Sec. \ref{sec:real:subsec:molecular_diffusion}) and variational autoencoders on images (Sec. \ref{sec:real:subsec:image_vaes}).
+After confirming that \replace{replacing data at every iteration indeed causes test error to increase with the number of iterations}, we empirically find that \accumulate{accumulating synthetic data with real data avoids model collapse for all models and for all data modalities we test}.
+To understand why replacing data and accumulating data have different consequences for model collapse, we turn to an analytically tractable framework of a sequence of linear models, each trained on synthetic outputs generated from the previous-iteration's fitted linear model \citep{mobahi2020self, dohmatob2024model}. Within this framework, \citet{dohmatob2024model} demonstrated that \replace{if data are replaced with each model-fitting iteration, the test error increases linearly} with the number of iterations $n$. We extend \citet{dohmatob2024model}'s analysis to prove that if \accumulate{data instead accumulate, then the test error has a finite and (to us, surprisingly) well-controlled upper bound independent of the number of model-fitting iterations}.\footnote{An approach `halfway' between the `replace' and `accumulate' settings replaces the previous dataset with a pure synthetic dataset of size $T\times i$ at the $i$-th iteration; in other words,
+the comparison at each generation is now between models trained on the same number of training points.
+While this \emph{halfway} setting has a milder sublinear behavior -- explicitly, the test MSE scaling is $MSE \asymp O(\log(n))$ --  
+the test error does still diverge with iterations. (See Appendix~\ref{app:sec:linear_reg_replace_multiple} for more details.)
+We thank Elvis Dohmatob, Yunzhen Feng, and Julia Kempe for communicating this observation.  We also consider the halfway setting as an ablation in our language modeling experiments, as detailed in Appendix~\ref{app:sec:lm_ablations}.}
+
+
+Altogether, our work suggests that data accumulation may be robust to model collapse and emphasizes the importance of considering accumulating data and other real-world data dynamics in the analysis of model collapse in generative models trained on web-scale data.
+

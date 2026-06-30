@@ -1,0 +1,165 @@
+\section{Learning to learn with recurrent neural networks}
+\label{sec:learning-to-learn}
+
+% Consider the minimization operator $\calM=\min_\theta$ which can be applied to
+% a function $f$ and returns its minimum value. The standard problem in
+% optimization is then that of solving $\calM(f)$. However this operator is in
+% some sense an idealized oracle. Instead, in this work we will parameterize this
+% operator $\calM_\phi$ and ask, for a given distribution of functions $f$ what
+% is the quality of this operator, or
+
+In this work we consider directly parameterizing the optimizer. As a result, in
+a slight abuse of notation we will write the final \emph{optimizee parameters}
+$\theta^*(f, \phi)$ as a function of the \emph{optimizer parameters} $\phi$ and
+the function in question. We can then ask the question: What does it mean for
+an optimizer to be good? Given a distribution of functions $f$ we will write
+the expected loss as
+\begin{equation}
+    \calL(\phi) =
+    \mathbb{E}_{f} \Big[ f\big(\theta^*(f, \phi)\big) \Big] \,.
+    \label{eq:meta-optimization-final}
+\end{equation}
+As noted earlier, we will take the update steps $g_t$ to be the output of a
+recurrent neural network $m$, parameterized by $\phi$, whose
+state we will denote explicitly with $h_t$. Next, while the objective function
+in \eqref{eq:meta-optimization-final} depends only on the final parameter
+value, for training the optimizer it will be convenient to have an objective
+that depends on the entire trajectory of optimization, for some horizon T,
+\begin{equation}
+    \calL(\phi)
+    = \mathbb{E}_{f} \left[\sum_{t=1}^T w_t f(\theta_t)\right]
+    \qquad\text{where}\qquad
+    \begin{aligned}[t]
+        \theta_{t+1} &= \theta_t + g_t \,,
+        \\
+        \begin{bmatrix}
+            g_t \\ h_{t+1}
+        \end{bmatrix}
+        &= m(\nabla_t, h_t, \phi) \,.
+    \end{aligned}
+    \label{eq:meta-optimization}
+\end{equation}
+Here $w_t \in \mathbb{R}_{\ge 0}$ are arbitrary weights associated with each
+time-step and we will also use the notation $\nabla_t=\nabla_\theta
+f(\theta_t)$. This formulation is equivalent to
+\eqref{eq:meta-optimization-final} when $w_t = \boldsymbol{1}[t = T]$,
+but later we will describe why using different weights can prove useful.
+%Later it will be useful to relax this weighting in order to train the optimizer
+%efficiently, but first we will discuss how to train the optimizer when the
+%$w_t$ are arbitrary non-negative weights on the trajectory of iterates.
+
+We can minimize the value of $\mathcal{L}(\phi)$ using gradient descent on
+$\phi$. 
+The gradient estimate
+$\partial\mathcal{L(\phi)}/\partial\phi$ can be computed by sampling a random
+function $f$ and applying backpropagation to the computational graph in
+Figure~\ref{fig:graph}.  We allow gradients to flow along the solid edges in
+the graph, but gradients along the dashed edges are dropped.  Ignoring
+gradients along the dashed edges amounts to making the assumption that the
+gradients of the optimizee do not depend on the optimizer parameters, i.e.\
+$\partial \nabla_{t}\big/\partial\phi = 0$.
+%This has the effect of ignoring how changing $\phi$ would have affected earlier
+%points of the trajectory when computing the update at time $t$.
+This assumption allows us to avoid computing second
+derivatives of $f$.
+
+\begin{figure}
+\includegraphics[width=1.0\linewidth]{figures/computational-graph}
+\caption{Computational graph used for computing the gradient of the optimizer.}
+\label{fig:graph}
+\end{figure}
+
+% for lengthy
+% trajectories, training the optimizer is difficult for two reasons:
+% {
+% \setlength{\topsep}{0pt}
+% \setlength{\itemsep}{0pt}
+% \begin{enumerate}
+
+%     \item Training is computationally intensive because we must fully optimize
+%     any given $h$ to obtain a single update for the optimizer parameters
+%     $\phi$.
+
+%     \item Training is memory intensive because we implement the optimizer with
+%     a recurrent neural network and unrolling over a trajectory requires storing
+%     the activations for every step \citep[but see][]{maclaurin:2015,chen:2016}.
+% \end{enumerate}}
+% These are generic problems encountered when training recurrent networks on long
+% sequences, both of which are typically addressed by using truncated
+% backpropagation through time (BPTT). However, in our setting we see that
+
+Examining the objective in \eqref{eq:meta-optimization} we see that
+the gradient is non-zero only for terms where $w_t \neq 0$. If we
+use $w_t = \boldsymbol{1}[t = T]$ to match the original problem, then gradients
+of trajectory prefixes are zero and only the final optimization step
+provides information for training the optimizer. This renders
+Backpropagation Through Time (BPTT) inefficient.
+We solve this problem by relaxing the objective such that $w_t > 0$ at
+intermediate points along the trajectory.  This changes the objective function,
+but allows us to train the optimizer on partial trajectories.
+For simplicity, in all our experiments we use $w_t = 1$ for every $t$.
+
+% One could imagine
+% several ways of setting the $w_t$ to allow this and in this work we choose the
+% somewhat extreme option of setting $w_t = 1$ for all $t$. This modified
+% objective can be seen to be rewarding improvement per unit of time (over the
+% truncated horizon) rather than just the final objective value.
+
+\subsection{Coordinatewise LSTM optimizer}
+\label{sec:coordinatewise}
+
+One challenge in applying RNNs in our setting is that we want to be able to
+optimize at least tens of thousands of parameters. Optimizing at this scale with a fully
+connected RNN is not feasible as it would require a huge hidden state and an
+enormous number of parameters. To avoid this difficulty we will use an
+optimizer $m$ which operates coordinatewise on the parameters of the objective
+function, similar to other common update rules like RMSprop and ADAM. This
+\emph{coordinatewise network architecture} allows us to use a very small network that only looks at a single coordinate to
+define the optimizer and share optimizer parameters across different parameters
+of the optimizee.
+
+Different behavior on each coordinate is achieved by using separate activations
+for each objective function parameter. In addition to allowing us to use a
+small network for this optimizer, this setup has the nice effect of making the
+optimizer invariant to the order of parameters in the network, since the same
+update rule is used independently on each coordinate.
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+\centering
+\includegraphics[width=\linewidth,clip]{figures/lstm-optimizer.pdf}
+\caption{One step of an LSTM optimizer. All LSTMs have shared
+parameters, but separate hidden states.}
+\label{fig:lstm}
+\end{wrapfigure}
+
+We implement the update rule for each coordinate using a two-layer Long Short
+Term Memory (LSTM) network \citep{hochreiter:1997}, using the now-standard
+forget gate architecture. The network takes as input the optimizee gradient for
+a single coordinate as well as the previous hidden state and outputs the update
+for the corresponding optimizee parameter. We will refer to this architecture,
+illustrated in Figure~\ref{fig:lstm}, as an LSTM optimizer.
+
+%As noted above, each LSTM node in this figure shares the same set of parameters
+%and learning of the optimizer is performed by unrolling all LSTMs over several
+%time steps and computing gradients via backpropagation through time (BPTT).
+The use of recurrence allows the LSTM to learn dynamic update rules which
+integrate information from the history of gradients, similar to momentum. This
+is known to have many desirable properties in convex optimization
+\citep[see e.g.][]{nesterov:1983} and in fact many recent learning
+procedures---such as ADAM---use momentum in their updates.
+%This can be seen by
+%examining the flow of forward flow of optimizee derivatives in the
+%computational graph.
+
+\paragraph{Preprocessing and postprocessing}
+
+Optimizer inputs and outputs can have very different magnitudes depending on
+the class of function being optimized, but neural networks usually work
+robustly only for inputs and outputs which are neither very small nor very
+large. In practice rescaling inputs and outputs of an LSTM optimizer using
+suitable constants (shared across all timesteps and functions $f$) is
+sufficient to avoid this problem. In Appendix~\ref{sec:pre} we propose a
+different method of preprocessing inputs to the optimizer inputs which is more
+robust and gives slightly better performance.
+
+

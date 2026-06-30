@@ -1,0 +1,125 @@
+% Test phase fragment: three task rows (CD, PL, MFP) with thumbnails
+% Intended to be \subimport'ed into a parent tikzpicture
+% Assumes parent sets [x=1cm,y=1cm] (coordinates in cm)
+% Requires: \usepackage{graphicx}, \usepackage{import}, \usetikzlibrary{positioning,fit}
+% Local load for wavy arrow decoration
+\usetikzlibrary{decorations.pathmorphing}
+
+% Default sizes if not provided by parent
+\providecommand{\TaskThumbH}{3cm}
+\providecommand{\TaskRowW}{3.2cm}
+\providecommand{\TaskRowSep}{0.9cm}   % vertical spacing between task rows
+% Browser header configuration
+\providecommand{\BrowserBarH}{0.5cm} % adjustable title bar height
+\providecommand{\BrowserBarAddrTop}{0.12cm}
+\providecommand{\BrowserBarAddrBottomPad}{0.12cm}
+\providecommand{\cdArrowHeadLength}{1.5mm}
+\providecommand{\cdArrowHeadWidth}{1.2mm}
+\providecommand{\cdArrowAmplitude}{0.3mm}
+\providecommand{\cdArrowSegmentLength}{2mm}
+\providecommand{\cdArrowPreLength}{0.6mm}
+\providecommand{\cdArrowPostLength}{3mm}
+\providecommand{\cdArrowLineWidth}{0.6pt}
+\providecommand{\TaskCaptionFont}{\scriptsize}
+\providecommand{\TaskCaptionYOffset}{-0.1cm}
+% NOTE: do NOT override \TaskInnerTitle* here; each subimported file already
+% provides its own \providecommand defaults that match its standalone layout.
+% Overriding them in the parent pushes titles off their natural positions
+% (and causes the "Reach the target configuration:" / "Interact until detect
+% change:" text overflow).
+\providecommand{\TaskCDPanelGap}{3.0cm}
+\providecommand{\TaskSingleRowXOffset}{1.5cm}
+% Horizontal offset from a row's content origin (lower-left of backdrop)
+% to the visual center of that row's bounding box. Used to center each row
+% on CDbb's center. Defaults derived from backdrop widths in each file.
+\providecommand{\TaskPLCenterOffset}{2.55cm}   % planning_example: 14.6 cells * 0.35cm / 2
+\providecommand{\TaskMFPCenterOffset}{2.45cm}  % mfp_example: 14 cells * 0.35cm / 2
+% Local styles for task name boxes
+\colorlet{TaskCDColor}{cyan!18}
+\colorlet{TaskPLColor}{orange!20}
+\colorlet{TaskMFPColor}{green!20}
+
+\tikzset{task/namebox/.style={draw=none, rounded corners=12pt, font=\small, text=black, align=center, inner sep=6pt, minimum height=\TaskThumbH, minimum width=3.0cm}}
+\tikzset{task/content/.style={inner sep=0, anchor=west}}
+\tikzset{task/row/.style={inner sep=0, anchor=north west}}
+
+% Styles for the enclosing box and title
+\tikzset{task/outerbox/.style={draw=black, rounded corners=8pt, line width=0.8pt}}
+\tikzset{task/title/.style={font=\large\bfseries, text=black}}
+% Style for per-row captions
+\tikzset{task/caption/.style={font=\TaskCaptionFont, text=black}}
+
+% Style for CD arrow
+\tikzset{cd/arrow/.style={decorate, decoration={snake, amplitude=\cdArrowAmplitude, segment length=\cdArrowSegmentLength, pre length=\cdArrowPreLength, post length=\cdArrowPostLength}, -{Stealth[length=\cdArrowHeadLength,width=\cdArrowHeadWidth]}, shorten >=1.6mm, line cap=round, line width=\cdArrowLineWidth, color=gray}}
+
+\begin{scope}[node distance=\TaskRowSep]
+  % CD row at the bottom (anchor for centering the others)
+  \begin{scope}[local bounding box=CDbb]
+    % First CD panel
+    \begin{scope}[shift={(1.5,0)}]
+      \begin{scope}[local bounding box=CD1bb]
+        \subimport{.}{cd_example.tex}
+      \end{scope}
+      \node[inner sep=0, outer sep=0, fit=(CD1bb)] (CD1Row) {};
+    \end{scope}
+
+    % Second CD panel
+    \begin{scope}[shift={({1.5cm+\TaskCDPanelGap},0)}]
+      \begin{scope}[local bounding box=CD2bb]
+        \subimport{.}{cd_example_slider.tex}
+      \end{scope}
+      \node[inner sep=0, outer sep=0, fit=(CD2bb)] (CD2Row) {};
+    \end{scope}
+
+    % Arrow between the two CD panels: span the full inter-panel gap.
+    \draw[cd/arrow] ([xshift=-0.20cm]CD1Row.east) -- ([xshift=0.25cm]CD2Row.west |- CD1Row.east);
+  \end{scope}
+  \node[inner sep=0, outer sep=0, fit=(CDbb)] (CDRow) {};
+
+  % PL row above CD. Direct subimport (so the parent's scale propagates).
+  % Shift puts PL's content origin (its backdrop's lower-left) at
+  % x = CDbb.center.x - \TaskPLCenterOffset, y = CDbb.north.y + \TaskRowSep,
+  % which centers PL's bbox horizontally on CDbb's center.
+  \begin{scope}[shift={($(CDbb.center |- CDbb.north)+(-\TaskPLCenterOffset,\TaskRowSep)$)}]
+    \begin{scope}[local bounding box=PLbb]
+      \subimport{.}{planning_example.tex}
+    \end{scope}
+    \node[inner sep=0, outer sep=0, fit=(PLbb)] (PLRow) {};
+  \end{scope}
+
+  % MFP row above PL, centered on the same vertical axis as CDbb.
+  \begin{scope}[shift={($(CDbb.center |- PLbb.north)+(-\TaskMFPCenterOffset,\TaskRowSep)$)}]
+    \begin{scope}[local bounding box=MFPbb]
+      \subimport{.}{mfp_example.tex}
+    \end{scope}
+    \node[inner sep=0, outer sep=0, fit=(MFPbb)] (MFPRow) {};
+  \end{scope}
+
+  % Captions sit just below each row's south edge — drawn FIRST so the
+  % dividers can be placed below the captions (caption above divider).
+  \node[task/caption, anchor=north] (capMFP) at ($(MFPRow.south)+(0,\TaskCaptionYOffset)$) {Masked Frame Prediction};
+  \node[task/caption, anchor=north] (capPL)  at ($(PLRow.south)+(0,\TaskCaptionYOffset)$) {Planning};
+  \node[task/caption, anchor=north] (capCD)  at ($(CDRow.south)+(0,\TaskCaptionYOffset)$) {Change Detection};
+
+  % Overall content bounding box for separator lines (excluding captions/dividers)
+  \node[inner sep=0, outer sep=0, fit=(CDRow) (PLRow) (MFPRow)] (contentfit) {};
+
+  % Horizontal separators: placed BELOW each caption so the caption sits
+  % above the divider and stays grouped with its row.
+  \coordinate (sepPLMFP) at ($(capMFP.south)!0.5!(PLRow.north)$);
+  \coordinate (sepCDPL)  at ($(capPL.south)!0.5!(CDRow.north)$);
+  \draw[color=gray!55, line width=0.5pt]
+    (contentfit.west |- sepPLMFP) -- (contentfit.east |- sepPLMFP);
+  \draw[color=gray!55, line width=0.5pt]
+    (contentfit.west |- sepCDPL) -- (contentfit.east |- sepCDPL);
+  % % Outer frame
+  % \node[
+  %   draw=black, line width=0.8pt, rounded corners=8pt, inner sep=1em,
+  %   fit=(CDRow) (PLRow) (MFPRow)
+  % ] {};
+  % % Draw the enclosing box with asymmetric padding
+  % \draw[task/outerbox]
+  % ([shift={(-\TaskBoxPadX,-\TaskBoxPadYBottom)}]contentfit.south west)
+  % rectangle
+  % ([shift={(\TaskBoxPadX,\TaskBoxPadYTop)}]contentfit.north east);
+\end{scope}

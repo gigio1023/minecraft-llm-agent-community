@@ -1,0 +1,170 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2025_conference,times}
+
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+
+
+\title{AIGS Milestone1}
+
+\author{Peng Li\\
+Institute for AI Industry Research (AIR), Tsinghua University\\}
+
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+
+\section{Introduction}
+
+\section{Motivation}
+
+% LLM的发展；Agent系统的完善；近年来AI for science/AI for application的尝试
+% It is time for some trials in AI Generated Science
+
+\section{AI Agents for Scientific Research}
+
+In this section, we conducted a brief review of the former attempts that utilize AI Agents for scientific research.
+
+\subsection{Idea Generation Agents}
+
+\textbf{ResearchAgent}\citep{baek2024researchagentiterativeresearchidea} proposed ...
+
+\subsection{Performance Optimization Agents}
+
+\textbf{RD-Agent}\citep{chen2024datacentric} proposed ...
+ 
+\subsection{Human Copilot}
+
+\textbf{MLR-Copilot}\citep{li2024mlrcopilotautonomousmachinelearning} proposed ...
+
+\subsection{Automated AI Agent Scientists}
+
+\textbf{AI-Scientist}\citep{lu2024aiscientist} proposed a fully automated AI driven scientific research framework.
+
+\subsection{Position Papers}
+
+\subsection{Pitfalls of Current Systems}
+
+% 从效果而非设计上分析缺陷
+
+\section{AIGS System}
+
+\subsection{How Human Conduct Scientific Research}
+
+In order to put forward an AI Agent system that can autonomously  conduct the \textbf{end-to-end} scientific research, we first reflect on the way human researchers conduct scientific research.
+
+\subsubsection{Idea Formation}
+
+\subsubsection{Literature Search}
+
+\subsubsection{Experiment Conduction}
+
+\subsubsection{Conclusion Formation}
+
+\subsubsection{Ablation Study}
+
+\subsubsection{Paper Writing}
+
+\subsubsection{Comparison between Human Practice and Existed Systems}
+
+% 分析设计上的需求与当前已有系统的gap
+% 各个系统包含模块之间的差异的表格
+
+\subsection{System Design}
+
+We follow the practice of human researchers and tried to build our system more human-like.
+
+\subsubsection{Domain Specific Language}
+\label{sec:dsl}
+
+Firstly, we introduce the concept of \textbf{D}omain \textbf{S}pecific \textbf{L}anguage(\textit{DSL}). In the AIGS system, agents have access to a wide action space, particularly when tasked with interpreting the methodology to the executable actions. For instance, in machine learning tasks, an agent may take actions ranging from editing multiple Python files to altering the format or distribution ratio of input data, as part of the methodology execution. However, in the design of a fully automated system, the unexpected behaviour of the agents must be avoided, and compatibility should be ensured for all the potential actions.
+
+To address this challenge, we design \textit{DSL} to restrict the action space of the agents. Specifically, \textit{DSL} is as a pre-designed JSON object, tailored to the specific task. This approach allows agents to execute the methodology and conduct experiments by compiling a simple JSON object, thus ensuring a controllable action space for the agents, while allowing them to expediently execute the proposed methodology at the same time.
+
+From a higher-level perspective, \textit{DSL} acts as the bridge that fills the gap between proposal generation and experiment execution. Given the current limitations of model ability, it is unrealistic to expect that agents can fully autonomously carry out the proposed experiment. In practice, we tried asking agents to compile a model training script, while encountered frequent failure, which remained unsolved after iterations. Recognizing that language models excel in natural language, we design \textit{DSL} System to empower agents with the abilities to manipulate the experiment module in a natural language format, which connects the proposal level generation with practical steps in the experiment module. 
+
+\subsubsection{Proposal Agent}
+
+As the first and the most important step in the scientific research research, idea formation and methodology design usually lay the foundation for valuable insights or impactful discoveries. Given the critical importance of these tasks, a well-designed module is essential to the success of the whole system. We refer to this module as \textit{Proposal Agent}, drawing inspiration from human practice of drafting a proposal before starting out on the experiments.
+
+\textit{Proposal Agent} is provided with the detailed description of the research topic, a record of previously executed experiments, and the review from \textit{Review Agent} as described in \ref{sec:reviewagent}. Based on these information, \textit{Proposal Agent} is tasked with generating the following key components:
+
+\begin{itemize}
+    \item \textbf{Idea} serves as a general observation of the task, as well as an outline of the current iteration. It provides an explanation for the experimental results or any phenomenon observed of the task. Idea offers a high-level understanding of the research problem and the potential solutions, guiding the generation of other components within \textit{Proposal Agent}.
+    \item \textbf{Methodology} gives a brief but concise description of actions to be carried out in the experiment in natural language. It follows the outline laid out in Idea and make attempts to deal with the related phenomenon. Methodology should try either to improve the experiment results or advance towards the discovery of scientific rules.
+    \item \textbf{DSL} interprets Methodology into system-executable code as elaborated in \ref{sec:dsl}. The structure and content of DSL varies across different tasks and is pre-designed and formatted when composing the prompt in implementation of \textit{Proposal Agent}.
+    \item \textbf{Setting} also acts as the parameters and conditions under which the experiment is to be executed. Different from Methodology which determines the primary approach, Setting modifies experiment configurations, such as specifying which iteration should the experiment be build upon, which is a must in our AIGS system called baseline. We emphasize the importance of the Methodology, as it is vital for the ablation study to be conducted in \textit{Ablation Agent}. In this regard, Setting acts as a key factor towards the more advanced scientific discovery.
+    \item \textbf{Hypothesis} represents the prediction of \textit{Proposal Agent} regarding the expected outcomes of the experiment after the execution of the proposed methodology. In our expectation, hypothesis plays a crucial role in enabling \textit{Proposal Agent} to acquire knowledge: it formulates hypothesis based on the current understanding, evaluates whether the experiment result align with the hypothesis, and then identifies the discrepancies, figuring out the underlying faults that lead to the wrong hypothesis. 
+    \item \textbf{Metric} is closely aligned with Hypothesis and outlines the aspects of the experiment results that need to be evaluated in order to verify the validity of the Hypothesis. It guides \textit{Review Agent} in identifying relevant Features and conducting a Hypothesis-specific review. By the establishment of Metric, \textit{Proposal Agent} can consequently receive the desired review of Features from \textit{Review Agent}. 
+    \item \textbf{Feedback} is the review of the review that is conducted by \textit{Review Agent}, focusing mainly on whether the review has identified the appropriate features and provided a sufficient summary of the results. Through Feedback, we aim to promote mutual enhancement between agents, hoping that they can facilitate this fully self-evolving process.
+\end{itemize}
+
+Built upon the aforementioned components, \textit{Proposal Agent} puts forward a comprehensive yet highly executable proposal, which is then submitted to the experiment module for execution. Upon receiving the review form \textit{Review Agent}, as well as detailed experiment logs and results, \textit{Proposal Agent} can initiate the next iteration, either of generating a brand new proposal to verify the new idea or modifying the current proposal to optimize the experiment results. Through this iterative process, we expect \textit{Proposal Agent} to gradually evolve on the continuous trial and error, and eventually develop a scientific understanding of the given task.
+
+\subsubsection{Review Agent}
+\label{sec:reviewagent}
+
+Drawing inspiration from human research practices, we recognize that significant insights and breakthroughs often emerge from in-depth analysis and reflection on experimental results. To facilitate this process, we designed \textit{Review Agent} to analyze experiments and provide feedback to the \textit{Proposal Agent}, with the goal of iteratively improving the quality of proposed hypotheses.
+
+Aiming at a comprehensive and constructive review, the \textit{Review Agent} conducts analysis at different levels of granularity. For coarse-grained analysis, it evaluates the overall performance of proposed hypothesis, providing feedback by comparing current experimental results against baselines. The performance review assesses current outcomes and suggests directions for potential improvements. For fine-grained analysis, \textit{Review Agent} examines comprehensive experiment logs, analyzing intermediate results from multiple perspectives using both human-proposed and model-generated features.\textcolor{red}{[TODO: CHECK THIS]} The feature review identifies hidden patterns in the details, recommending more targeted adjustments to the proposed hypothesis.
+
+\subsubsection{Ablation Agent}
+
+Recognizing the importance of progressing from improved experiment results to scientific principles, we introduce \textit{Ablation Agent} in our AIGS system. \textit{Ablation Agent} has access to experiment records, including the proposals put forward by \textit{Proposal Agent}, the experiment results from the experiment module, and the reviews generated by the \textit{Review Agent}. Provided with these information, it is required to first identify the reasons behind the improvement of the experiment results, and then formulate a list of the scientific discoveries based on these insights. Finally, \textit{Ablation Agent} need to propose the ablation studies, similar to the proposal generated by \textit{Proposal Agent}, representing what it regard as essential in pursue of validating its discoveries.
+
+In that \textit{Ablation Agent} must first identify the reasons for the improvement, we begin with picking out the iterations with significant advancement in the experiment result. For a certain iteration that exhibits improvement, we also include the baseline iteration, as specified in the Setting of proposal, into the analysis pool. This process is processed iteratively, until an iteration with a zero as baseline is visited. These iterations collectively form a chain and serve as the experiment record set which is provided to \textit{Ablation Agent}. We conclude the rationale behind such practice as follows: we make the assumptions that each iteration chain represents the thought process of \textit{Proposal Agent} and the improvement in experiment results should be attributed to the entire chain instead of a certain iteration. Therefore, we suppose that the full iteration chain is necessary for \textit{Ablation Agent} to complete the given task.
+
+After giving the scientific discoveries concluded based on the combined information, \textit{Ablation Agent} is tasked with generating the proposals for ablation studies. We require one proposal for each discovery, to ensure that the ablation study can focus on the verification of a single principle. Specifically, \textit{Ablation Agent} must select an iteration as the baseline for the ablation study, and in the proposal generated by \textit{Ablation Agent}, only Methodology and DSL are required, for Setting is predetermined to follow that of the baseline iteration. Also. due to the lack of interaction with \textit{Review Agent} in the ablation study process, other keys are not needed as well.
+
+Targeting at a robust and reliable conclusion of the ablation study, both baseline and ablation experiments are repeatedly conducted multiple times. \textit{Ablation Agent} is given the full record of these experiments, to decide the validity of the associated scientific principle. If a particular discovery withstands this process and consistently produces results similar to those in the main experiment, it is regarded as a verified and valuable scientific discovery.
+
+\subsection{Implementation Details}
+
+\subsubsection{Domain Specific Language}
+
+\subsubsection{Selection of Experiment Settings}
+
+\subsubsection{Multi-Sampling}
+
+\subsubsection{Feature Review}
+
+\subsubsection{History Access}
+
+\section{Experiments}
+
+\section{Discussions}
+
+\subsection{Pros and Cons of Freedom}
+
+\subsection{Mechanism of Multi-Sampling}
+
+\subsection{Mechanism of Proposal Agent Evolution}
+
+\subsection{Task Selection}
+
+\subsection{Current Bottleneck of AIGS}
+
+
+
+\bibliography{iclr2025_conference}
+\bibliographystyle{iclr2025_conference}
+
+\appendix
+\section{Appendix}
+You may include other additional sections here.
+
+
+\end{document}

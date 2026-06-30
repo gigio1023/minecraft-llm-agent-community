@@ -39,12 +39,12 @@ board.**
   backbones; Matrix-Game 2.0 and Solaris use autoregressive diffusion + distillation /
   Self Forcing for streaming, real-time generation.
 - These are **learned simulators** `p(o'|o,a)` (predict the next frame). They do **not**
-  select actions — to act, you wrap planning/search around their rollouts.
+  select actions - to act, you wrap planning/search around their rollouts.
 
 **Latent world-model agents** (the Dreamer line):
 - DreamerV3 / Dreamer 4 learn a **latent dynamics model** (RSSM -> transformer) and
   train an **actor-critic in imagination**. Dreamer 4's inputs are "low-resolution
-  images **and inventory states**" — i.e., structured state alongside pixels, not
+  images **and inventory states**" - i.e., structured state alongside pixels, not
   pixels alone. This is the closest existing thing to a capable Minecraft WAM, and it is
   latent + partly structured, not pixel-primary.
 
@@ -55,8 +55,8 @@ board.**
 
 ## 3. Capability and efficiency facts (primary-source)
 
-- **Real-time pixel generation is hard-won**: MineWorld 4–7 fps only with a custom
-  parallel decoder (40k–160k tokens/16 frames otherwise); Matrix-Game 2.0 25 fps via
+- **Real-time pixel generation is hard-won**: MineWorld 4-7 fps only with a custom
+  parallel decoder (40k-160k tokens/16 frames otherwise); Matrix-Game 2.0 25 fps via
   few-step distillation; Genie 3 720p/24fps but "many GPUs to simulate a single scene"
   (per Dreamer 4); Oasis has well-known long-horizon drift.
 - **Latent is cheaper and more capable for control**: DreamerV3 is first to get diamonds
@@ -68,8 +68,8 @@ board.**
 ## 4. The closest-to-social system: Solaris, and exactly why it is not social
 
 Solaris is the only **multiplayer** Minecraft world model, so it deserves precise
-treatment. It simulates **consistent multi-view pixel observations** — what each of
-several players *sees* — and evaluates Movement, Grounding, **Memory**, **Building**,
+treatment. It simulates **consistent multi-view pixel observations** - what each of
+several players *sees* - and evaluates Movement, Grounding, **Memory**, **Building**,
 Consistency via FID + a VLM-as-judge answering verifiable visual questions.
 
 What "multiplayer" means here is **visual co-presence and cross-view consistency**: if
@@ -94,8 +94,8 @@ evidence for the project's open niche.
 - **No surveyed Minecraft/game world model predicts social-material state.** They
   predict pixels (MineWorld, Oasis, Matrix-Game, Solaris, Genie, GameNGen) or latent
   physical state for task control (DreamerV3, Dreamer 4), or add geometric/combat state
-  annotations (WildWorld). The economic/social layer — possession, claims, obligations,
-  trust, public affordances, weak commons — is absent everywhere.
+  annotations (WildWorld). The economic/social layer - possession, claims, obligations,
+  trust, public affordances, weak commons - is absent everywhere.
 - **The structured-state argument is externally validated by WildWorld**: actions act
   through hidden state not in the pixels. Social actions are the paradigm case
   (`lend_item` changes possession + obligation, invisible in any frame).
@@ -119,10 +119,10 @@ evidence for the project's open niche.
   - Public pixel weights (Oasis/Matrix-Game/Solaris/MineWorld) as optional visual
     sidecars only.
 - **NOT the research contribution / overclaim to avoid**:
-  - Do not build "another Minecraft video world model" — that frontier is crowded and
+  - Do not build "another Minecraft video world model" - that frontier is crowded and
     pixel-centric, and the repo's runtime is Mineflayer, not pixel control.
   - Do not call Solaris (or any of these) social; none models social-material state.
-  - Do not pivot to RL-in-imagination policies (Dreamer) as runtime authority — conflicts
+  - Do not pivot to RL-in-imagination policies (Dreamer) as runtime authority - conflicts
     with "LLM proposes, runtime owns truth, WAM stays advisory."
   - The defensible contribution is **action-conditioned social-material transition
     modeling in Minecraft**, the empty cell in the table above.

@@ -1,0 +1,67 @@
+\section{EvoTrace}
+\label{sec:dataset}
+
+To understand what evolutionary coding agents evolve, we construct \emph{EvoTrace}, a dataset of structured search traces from LLM-driven evolutionary coding systems.
+EvoTrace contains the artifacts needed to inspect and replay parts of the search process: generated programs, parent-child relations, prompts and retrieved context, evaluator outputs, scores, execution logs, and environment metadata.
+The dataset covers mathematical constructions and competitive programming tasks.
+These domains were chosen to capture distinct forms of code improvement: mathematical tasks reward new search algorithms, while competitive programming tasks require generated programs to compile and pass external judging, with limited access to the evaluator.
+
+Different frameworks also log different parts of the search state, making direct cross-system comparison difficult.
+To address these issues, EvoTrace treats evolutionary search traces not merely as logs to annotate after the fact, but as structured computational objects that can be normalized, replayed, and intervened on. The collection and replay infrastructure is built on top of SkyDiscover \citep{skydiscover2026}, a flexible framework for AI-driven scientific and algorithmic discovery; we extend it with a unified cross-backend schema, replay environments, and the analysis tooling described in \S\ref{sec:evoreplay}.
+
+
+\subsection{Data Collection Across Tasks, Frameworks, and Models}
+\label{sec:dataset_collection}
+
+EvoTrace covers 16 different tasks across two language--domain pairs: 6 Python mathematical-discovery tasks (circle packing, Heilbronn placement, autocorrelation and uncertainty inequalities, signal processing) and 10 C++ competitive programming problems from ALE-bench Lite \citep{imajuku2025} (AtCoder Heuristic Contest), each with a judge-defined score. We measure four evolutionary coding systems (Table~\ref{tab:frameworks}): OpenEvolve \citep{openevolve}, GEPA \citep{agrawal2026}, EvoX \citep{liu2026}, and ShinkaEvolve \citep{lange2025b}.
+They share the propose--evaluate--feedback pattern but differ in selection, context, diversity, and adaptation. 
+We employ 5 different LLMs (Table~\ref{tab:models}) to generate the mutations, and 100 search iterations per run, with a total of 121 runs and over 10,000 recorded program edits.
+
+\begin{table}[t]
+\centering
+\caption{Evolutionary coding frameworks in EvoTrace.}
+\label{tab:frameworks}
+\small
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Framework} & \textbf{Search strategy} & \textbf{Distinctive feature} \\
+\midrule
+OpenEvolve   & Archive-based, MAP-Elites style & Open-source reference baseline \\
+GEPA         & Reflective prompt evolution     & Natural-language lessons drive mutation \\
+EvoX         & Meta-evolution                  & Adapts the search strategy during the run \\
+ShinkaEvolve & Sample-efficient bandit search  & Parent sampling, novelty rejection, model routing \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Models used in EvoTrace.}
+\label{tab:models}
+\small
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Model} & \textbf{Role} \\
+\midrule
+\texttt{deepseek-reasoner}      & Primary generator \\
+\texttt{claude-sonnet-4-6}      & Frontier alternative \\
+\texttt{claude-haiku-4-5}       & Small reasoning model \\
+\texttt{gemini-3-flash-preview} & Cross-vendor alternative \\
+\texttt{deepseek-chat}          & Non-reasoning baseline \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Trace schema and design choices}
+\label{sec:trace_representation}
+
+EvoTrace normalizes each run, regardless of which backend produced it, into a unified JSONL schema. The schema covers run-level metadata, candidate programs (full source, byte-identical), evaluator outputs (raw execution logs, errors, timings, task-specific metrics), parent--child edges with operator labels, the prompts and contexts the LLM saw at generation time, and the replay environment needed to rerun selected candidates against their original evaluator.
+
+Recording the full source rather than a score-only log is what enables literal extraction for the BO baseline (\S\ref{sec:tuning-gap}), the cycling classifier (\S\ref{sec:cycling}), and same-prompt replay (\S\ref{sec:replay}). Replayability is treated as a collection criterion: traces we cannot rerun against their original evaluator are excluded.
+
+The schema supports two complementary uses: aggregate analysis (cross-framework comparison of population sizes, score progression, diversity, validity, lineage depth, best-so-far trajectories) and local reconstruction by EvoReplay (\S\ref{sec:evoreplay}). The full per-field schema is given in Appendix~\ref{appendix:trace-schema}.
+

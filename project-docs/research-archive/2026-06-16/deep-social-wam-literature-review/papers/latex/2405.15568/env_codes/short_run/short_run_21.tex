@@ -1,0 +1,84 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Push a domino to start a chain reaction.
+
+    Description:
+    - The environment consists of a large platform measuring 1000 x 10 x 0.1 meters.
+    - The robot is initialized at a fixed position on the platform.
+    - A domino with dimensions 0.5 x 2 x 4 meters and a mass of 5 kg is positioned on the platform, 5 meters away from the robot.
+    - The dominos are spaced by 3 meters, and positioned to create a chain reaction.
+    - The task of the robot is to push the domino to start a chain reaction.
+
+    Success:
+    The task is successfully completed when the robot pushes the domino and starts the chain reaction.
+
+    Rewards:
+    - The robot is rewarded for forward progress towards the domino, encouraging it to approach and push the domino.
+    - The robot is rewarded for the number of dominos that fall, incentivizing it to initiate the chain reaction.
+    - The robot is penalized for falling off the platform, ensuring it stays on the platform.
+
+    Termination:
+    The task terminates immediately if the robot falls off the platform.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.platform_size = [1000.0, 10.0, 0.1]
+        self.platform_position = [0.0, 0.0, 0.0]
+        self.platform_id = self.create_box(mass=0.0, half_extents=[self.platform_size[0] / 2, self.platform_size[1] / 2, self.platform_size[2] / 2], position=self.platform_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.platform_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.domino_size = [0.5, 2.0, 4.0]
+        self.domino_mass = 5.0
+        self.domino_spacing = 3.0
+        self.num_dominos = 10
+        self.domino_ids = []
+        for i in range(self.num_dominos):
+            domino_position = [self.platform_position[0] + 5.0 + i * self.domino_spacing, self.platform_position[1], self.platform_position[2] + self.platform_size[2] / 2 + self.domino_size[2] / 2]
+            domino_id = self.create_box(mass=self.domino_mass, half_extents=[self.domino_size[0] / 2, self.domino_size[1] / 2, self.domino_size[2] / 2], position=domino_position, color=[1.0, 0.0, 0.0, 1.0])
+            self.domino_ids.append(domino_id)
+        self.robot_position_init = [self.platform_position[0], self.platform_position[1], self.platform_position[2] + self.platform_size[2] / 2 + self.robot.links['base'].position_init[2]]
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot.links['base'].orientation_init)
+        for i, domino_id in enumerate(self.domino_ids):
+            domino_position = [self.platform_position[0] + 5.0 + i * self.domino_spacing, self.platform_position[1], self.platform_position[2] + self.platform_size[2] / 2 + self.domino_size[2] / 2]
+            self._p.resetBasePositionAndOrientation(domino_id, domino_position, [0.0, 0.0, 0.0, 1.0])
+        return observation
+
+    def step(self, action):
+        self.distance_to_first_domino = self.get_distance_to_object(self.domino_ids[0])
+        self.num_fallen_dominos = sum([self._p.getBaseVelocity(domino_id)[0][2] < -0.1 for domino_id in self.domino_ids])
+        observation, reward, terminated, truncated, info = super().step(action)
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_first_domino = self.get_distance_to_object(self.domino_ids[0])
+        new_num_fallen_dominos = sum([self._p.getBaseVelocity(domino_id)[0][2] < -0.1 for domino_id in self.domino_ids])
+        forward_progress = (self.distance_to_first_domino - new_distance_to_first_domino) / self.dt
+        domino_fall_reward = (new_num_fallen_dominos - self.num_fallen_dominos) * 10.0
+        return {'forward_progress': forward_progress, 'domino_fall_reward': domino_fall_reward}
+
+    def get_terminated(self, action):
+        return self.robot.links['base'].position[2] < self.platform_position[2]
+
+    def get_success(self):
+        return any([self._p.getBaseVelocity(domino_id)[0][2] < -0.1 for domino_id in self.domino_ids])
+\end{lstlisting}

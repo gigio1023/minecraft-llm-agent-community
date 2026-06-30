@@ -1,4 +1,4 @@
-# Lane 3 Search Log — LLM Social Simulation and Social Benchmarks
+# Lane 3 Search Log - LLM Social Simulation and Social Benchmarks
 
 Lane 3 (N=3). Discovery channels: Hugging Face CLI (`hf`, primary), then
 WebSearch/WebFetch (arXiv, ACL Anthology, OpenReview, Semantic Scholar, GitHub,

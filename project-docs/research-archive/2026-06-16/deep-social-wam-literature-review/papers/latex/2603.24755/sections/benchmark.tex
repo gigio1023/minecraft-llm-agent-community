@@ -1,0 +1,91 @@
+\section{SlopCodeBench}
+\label{sec:benchmark}
+
+\scb{} contains \transProblems{} language-agnostic problems spanning \overallTotalCheckpoints{} checkpoints. Each problem is specified solely in terms of observable behavior at a CLI or API boundary, so it can be evaluated in any implementation language. An agent implements the first specification from scratch, then repeatedly modifies and extends \emph{its own prior code} as specifications evolve. Our focus is on measuring both correctness and code quality throughout that trajectory. The remainder of this section is structured as follows: 1) our desiderata, 2) how we constructed the dataset, 3) how we quantify quality issues, and 4) finally, conclude with our evaluation procedure. 
+
+\begin{runningexample}[Running example: \href{https://www.scbench.ai/problems/code_search}{\codesearch{}}]
+\label{sec:running-example}
+The agent is tasked with building a CLI tool for semantic source-file search, inspired by \href{https://ast-grep.github.io}{ast-grep}, across five checkpoints:
+\begin{itemize}[leftmargin=2.2em, topsep=2pt, itemsep=1pt]
+    \item[$\ckpt{1}$ -] Python files only exact and regex matching. Establishes the core CLI contract.
+    \item[$\ckpt{2}$ -] Support for Javascript and C++.
+    \item[$\ckpt{3}$ -] AST-based pattern matching with metavariable capture.
+    \item[$\ckpt{4}$ -] Selector rules and auto-fix functionality.
+    \item[$\ckpt{5}$ -] Add support for Go, Rust, and Java.
+\end{itemize}
+
+An agent that hardcodes language-specific logic at $\ckpt{1}$ faces cascading rewrites at $\ckpt{2}$ and $\ckpt{5}$; one that builds an extensible parser interface does not.
+\end{runningexample}
+\subsection{Design Principles}\label{sec:design-principles}
+
+The core goal of \scb{} is to evaluate an agent's ability to make design decisions that will directly influence the quality of their code. For this, we have a core set of design principles that every problem must follow. Without these, architectural details are leaked to the agent and corrupt the signal we explicitly want to measure. They are:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{No prescribed internal interfaces.} Unlike existing benchmarks~\citep{swe-ci,evoclaw}, we only specify the external contract (CLI arguments or API I/O), so that the agent is forced to make \emph{architectural decisions}.
+    \item \textbf{No visible test suite.} The dominant SWE evaluation paradigm provides fail-to-pass tests~\citep{swe-bench,swe-bench-plus}. \scb{} agents see only specification prose and embedded examples, never the actual test suite or its feedback. They must infer unstated edge cases from the specification alone.
+    \item \textbf{Black-box, language-agnostic problem design.} Problems constrain only observable behavior, not implementation language or ecosystem. Following the principle that evaluation should not depend on a specific language's ecosystem~\citep{multi-swe-bench, swe-polybench, swe-rebench-v2}, outputs are evaluated solely via CLI or API interfaces, with normalization removing inconsequential differences in formatting and ordering. We evaluate only on Python due to cost.
+\end{enumerate}
+
+In our running \hyperref[sec:running-example]{\codesearch{}} problem, $\ckpt{1}$ specifies the CLI contract: \texttt{<root\_dir> --rules <file> [--encoding <name>]}, with output as JSON lines containing fields \texttt{rule\_id}, \texttt{file}, \texttt{start}, \texttt{end}, and \texttt{match}. The only prescribed internals are the input/output structures that the harness needs to supply inputs and parse outputs. Specifications add normalization guidance only where arbitrary choices could cause false failures, such as key ordering, text casing, or match-span sorting. In $\ckpt{3}$, for example, an example fixes the sort order for multiple pattern matches even though the rule is not stated explicitly. This prevents penalizing inconsequential implementation choices.
+
+\subsection{Task Formulation}\label{sec:eval-setup}
+
+All of our problems are written by hand, either as novel tasks or inspired by popular repositories. Each problem $\problem$ is an ordered list of checkpoints $[\ckptinit,\ldots,\ckpt{n}]$. At $\ckpt{i}$, the agent $\agent$ receives only the $\spec{i}$ and its previous workspace $\solution{i-1}$, then produces an updated workspace $\solution{i}$. At $\ckpt{1}$, the agent starts from the empty workspace $\solutioninit$.
+\begin{equation}\label{eq:problem-setup}
+    \begin{aligned}
+        \solution{1} &= \agent(\spec{1}, \solutioninit) \\
+        \solution{2} &= \agent(\spec{2}, \solution{1})\\
+        \ldots \\
+        \solution{i} &= \agent(\spec{i}, \solution{i-1})
+    \end{aligned}
+\end{equation}
+Each checkpoint is a fresh feature starting from the prior checkpoint's workspace. The agent must reason about changes solely from the code's current structure, as we do not provide the prior conversation's context. A poor architectural choice at checkpoint $i$ becomes the foundation for checkpoint $i+1$, and the agent must build on it. If a reference solution replaces the agent's code between turns, the causal chain from early decisions to later degradation is removed. In \scb{}, unlike other benchmarks~\citep{codeflowbench, maintaincoder, evoclaw}, the agent's workspace is carried forward to the next checkpoint, and quality is measured at every step.
+
+\paragraph{Problem Construction.} Problems were authored by the paper's authors through a two-phase process, with each problem reviewed by at least one author other than its drafter. In the proposal phase, an author drafted a problem along with its checkpoint partition; problems that did not meaningfully test design decisions, or that frontier agents could solve in a single shot, were removed from the pool. In the validation phase, we wrote the initial test suite and attempted each checkpoint with an agent, using these runs to identify and refine ambiguous or under-specified test cases. A final review pass confirmed that every problem was solvable in principle and that test suites matched the specifications. \autoref{tab:problem-design-decisions-a} details each problem and what design decisions are stressed.
+
+\subsection{Measuring Code Quality}\label{sec:quality-dims}
+
+Standard quality models decompose software quality into broad characteristics such as
+maintainability, reliability, and portability~\citep{iso25010}. We focus on two
+trajectory-level failure modes that are computable at every checkpoint and comparable
+across agents and problems. \emph{Structural erosion} captures the concentration of
+control-flow complexity in already-complex functions. \emph{Verbosity} captures
+duplicated and rule-flagged redundant code patterns. These metrics are computed
+independently of functional correctness, letting us measure structural changes that
+pass rates alone do not expose.
+
+\paragraph{Structural erosion.} Agents under iteration tend to patch new logic into existing functions rather than distributing it across focused callables. \autoref{lst:dispatch-erosion} shows how a function in \codesearch{} at $\ckpt{5}$ can grow to 117 lines with branches for each rule kind and each match source chained inside one loop. In the iterative paradigm, the clearest notion of erosion is haphazard edits to a function that patch functionality. These edits compound slowly until they become too large to work on. Thus, we define erosion as \textbf{the fraction of the codebase's total complexity mass that resides in high-complexity functions}. To this end we first assign each callable a \emph{complexity mass} that accounts for both its cyclomatic complexity (CC,~\citep{mccabe1976-complexity}) and its size:
+\begin{equation}
+\label{eq:mass} 
+\text{mass}(f) = \text{CC}(f) \times \sqrt{\text{SLOC}(f)}
+\end{equation}
+where $\text{CC}(f)$ is the cyclomatic complexity of callable $f$ and $\text{SLOC}(f)$ is its source lines of code. The square root compresses the size factor so that complexity dominates rather than pure lines of code. Erosion is then the share of total mass held by functions exceeding a high-complexity threshold:
+\begin{equation}
+\label{eq:erosion}
+\text{Erosion}
+=  \frac{\sum_{f \in \mathcal{F}} \mathbb{I}[\text{CC}(f) > 10]\cdot\text{mass}(f)}{\sum_{f \in \mathcal{F}} \text{mass}(f)}
+\end{equation}
+where $\mathcal{F}$ is the set of all callables. We use a cutoff of 10 for CC following the established bounds in the popular code analysis tool \href{https://radon.readthedocs.io/en/latest/}{Radon}. In the solution to \codesearch{} shown in \autoref{lst:dispatch-erosion}, the majority of decision-points have collapsed into \texttt{find\_matches\_in\_file()}, driving its mass upward even as the agent adds other functions around it.
+
+\paragraph{Verbosity.} The other dimension of slop is code that is too \emph{verbose}, copy-pasted, or unnecessary lines that do not add anything to the overall codebase. A typical \codesearch{} fragment rebuilds the array rather than using \texttt{filter}, guards each iteration with empty-list checks, and assigns intermediate names used once. To capture both effects, we use a static verbosity score with two parts. First, we measure clear patterns of wasteful code generated by agents through constructing 137 targeted \href{https://ast-grep.github.io}{AST-Grep} rules. These rules are based on observed cases of verbose code, best practices, and commonly cited anti-patterns on social media. Second, we measure structural duplication as clone lines normalized by LOC~\citep{juergens2009code,Alam2023GPTCloneBenchA}. The resulting score is
+\begin{equation}
+\label{eq:verbosity}
+\text{Verbosity}
+= \frac{|\{\text{AST-Grep Flagged Lines} \cup \text{Clone Lines}\}|}{\text{LOC}}
+\end{equation}
+We deduplicate lines hit by multiple AST-grep rules before counting. This score is bounded in $[0,1]$, thus comparable across runs and independent of erosion. The two metrics measure different failure modes, so tracking both gives a fuller picture of the ``slop'' agents generate.
+
+\paragraph{Alternative Metrics.}  A natural alternative is to use existing software quality metrics directly. Composite metrics such as the Maintainability Index combine traditional measures into a single maintainability score~\citep{oman1992maintainability}. While useful as broad summaries, they are less appropriate for measuring specific ways code changes over iterations. More targeted metrics also capture only part of the phenomenon: Cyclomatic Complexity measures independent control-flow paths~\citep{mccabe1976-complexity}, Cognitive Complexity penalizes control-flow breaks and nesting~\citep{campbell2018cognitive}, the Chidamber-Kemerer suite measures class-level object-oriented design properties~\citep{chidamber1994metrics}, clone metrics capture duplication~\citep{juergens2009code,Alam2023GPTCloneBenchA}, and LOC captures code growth. In contrast, our goal is to separate two independent failure modes: code can become more verbose without concentrating complexity, and complexity can concentrate in some functions without much overall growth. We therefore measure structural erosion and verbosity separately rather than relying on a single aggregate maintainability score or fine-grained yet incomplete single-property metrics.
+
+\subsection{Evaluating Solutions}
+Every checkpoint's tests interact with the solution only through \texttt{subprocess} or its served API. Test suites normalize outputs where needed and maintain held-out tests beyond the specification's examples. Each test is categorized as:
+\begin{itemize}
+    \item \textbf{Core} --- Functionality explicitly mentioned or shown in the specification.
+    \item \textbf{Error} --- Failure-mode behaviors.
+    \item \textbf{Functionality} --- Hidden tests that exhaustively check correctness.
+    \item \textbf{Regression} --- All tests from prior checkpoints. $\ckpt{1}$ has no regression tests.
+\end{itemize}
+
+The produced workspace $\solution{i}$ is \textbf{correct} if all tests pass. Because regression tests carry earlier requirements forward, a mistake at $\ckpt{2}$ can zero out later checkpoints even if later code partly works. To separate implementation quality from cascading failures, we also report \textbf{correct in isolation (ISO)} if $\solution{i}$ passes all non-regression tests for $\ckpt{i}$, and \textbf{core correct (CORE)} if it passes only the core tests. A problem is \textbf{Partially} solved if at least one checkpoint is strictly solved.
+
+When an agent fails or crashes mid-problem, remaining checkpoints receive a correctness score of zero. Erosion and verbosity are computed only for checkpoints where the agent produced a workspace; missing checkpoints are excluded rather than imputed.

@@ -1,0 +1,14 @@
+\section{\swellama{}: Fine-tuning CodeLlama for \benchmark{}}
+\label{sec:swellama-fine-tuning-codellama-for-benchmark}
+
+It is important to benchmark the performance of open models on \benchmark{} alongside proprietary models.
+At the time of writing, only the CodeLlama models~\citep{rozière2023code} are able to handle the very long contexts necessary.
+However, we observe that the off-the-shelf CodeLlama variants are not capable of following the detailed instructions to generate repository-wide code edits, and typically output placeholder responses or unrelated code. To better evaluate the capabilities of these models, we perform supervised fine-tuning on the $7$ billion- and $13$ billion-parameter CodeLlama-Python models. The resulting models are specialized repository editors that can run on consumer hardware and resolve GitHub issues.
+
+\textbf{Training data.} We follow our data collection procedure and collect $\num{19000}$ issue-PR pairs from an additional 37 popular Python package repositories. In contrast to Section~ \ref{sec:benchmark:construction}, we do not require that pull requests contribute test changes.
+This allows us to create a much larger training set to use for supervised fine-tuning.
+To eliminate the risk of data contamination, the set of repositories in the training data is disjoint from those included in the evaluation benchmark.
+
+\textbf{Training details.}  
+Given the instructions, an issue text from GitHub and the relevant code files as the prompt, we finetune \swellama{} to generate the patch that solved the given issue (the ``gold patch'').
+For memory efficiency, we fine-tune only the weights of the attention sublayer using LoRA~\cite{hu2022lora}, and exclude training sequences with more than $\num{30000}$ tokens, reducing the effective size of the training corpus to $\num{10000}$ instances. More details are provided in Appendix \ref{appx:swe-llama}.

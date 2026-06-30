@@ -23,7 +23,7 @@
      reward or constrain action.
 - **Coleman's boat** (macro-micro-macro): macro social conditions (A) shape
   individual situations/beliefs (B), which drive individual actions (C), which
-  aggregate to macro outcomes (D). The hard, often-missing link is C→D (the
+  aggregate to macro outcomes (D). The hard, often-missing link is C->D (the
   micro-to-macro transition).
 
 ## Interpretation (labeled inference)
@@ -33,9 +33,9 @@
   repo, social capital is *the standing state in the ledgers*: outstanding credit
   slips (obligation ledger), who-knows-what (asymmetric-knowledge state), and
   active norms (sanction history).
-- The boat is the warning behind the maturity ladder (`proto-social → organization
-  → settlement → village → society`): the project's hardest, least-proven claim is
-  the C→D transition, that individual actor turns *aggregate* into a settlement-
+- The boat is the warning behind the maturity ladder (`proto-social -> organization
+  -> settlement -> village -> society`): the project's hardest, least-proven claim is
+  the C->D transition, that individual actor turns *aggregate* into a settlement-
   level pattern. The repo should not assert macro emergence from a single run.
 
 ## Mechanically useful vs research contribution
@@ -46,11 +46,11 @@
   alone has observed), and norms the actor participates in enforcing (sanction
   events authored). All loggable.
 - Avoid / overclaim: do NOT claim macro "social capital of the community" emerged.
-  The defensible unit is dyadic/individual ledger state. The C→D micro-to-macro
+  The defensible unit is dyadic/individual ledger state. The C->D micro-to-macro
   claim requires multi-episode evidence the repo does not yet have, mark it
   unclaimable for now.
 
 ## WAM layer(s) informed
 
-- **Institutional / Settlement WAM** (the micro→macro transition; norms as capital)
+- **Institutional / Settlement WAM** (the micro->macro transition; norms as capital)
   and **Social WAM** (obligations/expectations and information as dyadic capital).

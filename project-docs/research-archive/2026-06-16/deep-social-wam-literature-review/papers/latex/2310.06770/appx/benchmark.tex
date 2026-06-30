@@ -1,0 +1,244 @@
+\section*{Appendix}
+\label{appx:intro}
+In the appendix, we provide more thorough details regarding the dataset construction process, evaluation pipeline, and characterization of the \benchmark{} benchmark.
+
+\section{Benchmark Details}
+\label{appx:benchmark}
+
+This section complements Section~\ref{sec:benchmark} with a more technical and fine-grained summary of the data collection, execution-based validation, and evaluation procedures, along with a fuller characterization of the task instances.
+
+\subsection{High Level Overview}
+
+\textbf{Pull request scraping.} From a list of the top $\num{5000}$ most downloaded PyPI libraries during August 2023\footnote{\href{https://hugovk.github.io/top-pypi-packages/}{https://hugovk.github.io/top-pypi-packages/}}, we select the top $100$ packages, identify each library's corresponding open-source GitHub repository, verify which packages have licenses allowing for free software use, and collect all PRs for these repositories via the GitHub developer API.
+We elect to source problems from well-trafficked repositories because widespread use usually suggests that the repository has extensive documentation, structured open-source development guidelines, and working, well-formatted code.
+
+\textbf{Task instance construction.} We construct candidate task instances from PRs that satisfy three conditions.
+First, the PR's status must be \textit{Merged}.
+A \textit{Merged} status indicates that the PR's associated code changes were accepted and incorporated into its parent repository. 
+Second, the PR resolves one or more \textit{issues} in its repository.
+An issue is defined according to its canonical usage in GitHub as a digital ticket for tracking bugs, enhancements, or any general development goals for a software project.
+We scan a PR's title, body, and commit messages for linked issues (i.e. ``fixes \#$24$'').
+Third, the PR must introduce one or more new tests.
+A new test is counted when a PR's code changes edits a file path containing a testing-related keyword (e.g. ``test", ``testing").
+
+A PR that satisfies these criteria is then converted into a candidate task instance such as the example in Figure~\ref{fig:example}.
+The codebase $C$ is identified by the repository's owner/name moniker and the pull request's base commit.
+Recovering the actual codebase from this information is straightforward.
+We create mirrors of the original GitHub repositories, where each mirror is uniquely identified as \texttt{owner\_\_name}.
+Cloning a repository's corresponding mirror and checking out the base commit yields $C$ in its pre-PR state.
+The problem statement $P$ is an aggregate of all related issues' titles and descriptions along with any subsequent comments written before the timestamp of the PR's initial commit to avoid leakage of solution details.
+A PR's code changes are separated into a test patch and a gold patch $\delta$. $T$ consists of all tests from files edited in the test patch.
+As shown in Figure~\ref{fig:example}, both $T$ and $\delta$ are stored as \texttt{patch} files.
+Further details about parsing PR and semantic data is in Appendix~\ref{appx:benchmark:construction}.
+
+\input{figures/example-task}
+
+\textbf{Execution-based validation.} We verify the usability of a task instance via execution. 
+For each candidate, we first define a virtual environment to serve as an execution context, then install $C$ before applying any patches, and finally run $T$ once before and once after the solution $\delta$ is applied.
+A candidate is removed from consideration for the final dataset if any step in the verification process fails.
+In addition, to ensure that a solution $\delta$ is non-trivial, we compare the pre-solution and post-solution validation logs to check for whether there are one or more tests in $T$ where the status changes from \textit{fail} to \textit{pass}.
+Lastly, we exclude task instances with tests that invoke newly created functions or classes first introduced in the solution $\delta$.
+Since naming such constructs is typically an arbitrary process and usually not explicitly specified in the problem statement, resolving tests such as these may be an impossible task even for human developers.
+Information about execution contexts, codebase installation, determining test statuses from logs, and more are in Appendix~\ref{appx:benchmark:exec-validation}.
+
+\textbf{Continuous Updates.} \benchmark{}'s collection process is easily extensible to any open source code repositories, allowing for easy and low-maintenance extension to new programming languages and code domains.
+This design also provides \benchmark{} with temporal robustness; as new language models trained on more recent source code are released over time, \benchmark{} can simply be updated to produce new task instances based on PRs created after any LM's training date.
+
+
+\subsection{Construction Process}
+\label{appx:benchmark:construction}
+We discuss additional details regarding the conversion of a pull request object into a candidate task instance.
+At a high level, the main goal of this conversion is to acquire relevant information for putting together the codebase $C$, problem statement $P$, unit tests $T$, and solution $\delta$ components introduced in Section~\ref{sec:benchmark}.
+To this end, a \benchmark{} task instance consists of the following fields, presented in the following Table~\ref{table:task-instance-fields}.
+Collectively, the fields correspond to the four task instance modules.
+
+\input{tables/appx/task-instance-fields}
+
+\textbf{Problem Statement.} The problem statement $P$ for each task instance is readily available as the \texttt{problem\_statement} field.
+The problem statement is an aggregate of all issues' first comments along with any comments attached to those issues that were created before the creation date of the PR's initial commit.
+We crawl for issues from PR's title, body, and commit messages. After concatenating these components' text data, we first remove any Markdown-style comments, then look through the remaining text for references to issue numbers (a pound \# sign followed by a number) and check whether the word preceding the issue number reference is included in a set of keywords suggesting that the issue was resolved by the PR (e.g. ``closes'', ``fixes'', ``resolves'').
+The found issues are recorded in the \texttt{issue\_numbers} field, then separate web requests are made to retrieve each issue's data.
+To form the \texttt{problem\_statement}, each issue's title and body are added together and then concatenated with the next issue's if there are multiple.
+It is also during this step that the \texttt{hints\_text} field is created and collected from the PR's comment section, where text from comments created before the PR's initial commit.
+The intuition for this collection methodology is that such PR comments would likely contain natural language and pseudo-code suggestions to the original human task worker regarding how to complete the problem at hand. 
+The experiments presented in this work do not make use of \texttt{hints\_text}, but we believe this information may be interesting for future investigations.
+
+\textbf{Codebase.} The codebase $C$ content is \textit{not} stored in plaintext for every task instance. 
+Rather, the task instance contains a reference to the relevant codebase via the \texttt{repo} and \texttt{base\_commit} field.
+Both fields are available in the original PR's data. To make retrieval of the codebase $C$ from these two elements reproducible and reliable, we create mirrors\footnote{\href{https://docs.github.com/en/repositories/creating-and-managing-repositories/duplicating-a-repository}{Documentation} for creating a mirror repository using GitHub} of the original repository.
+Mirrors for the repository constituting both the evaluation and fine tuning data are collected and open-sourced under the \benchmark{} GitHub organization.
+Because an original repository's code may be subject to changes in its commit and edit history outside of the authors' control, we choose to create a mirror repository to ensure that later modifications to the codebase do not potentially render a task instance unusable due to a corruption or removal of the associated \texttt{base\_commit}.
+Additionally, we create a mirror instead of cloning and storing the latest version of a repository. This is because a mirror retains the original commit hashes, history, branches, and tags, serving as a faithful and complete history of the technical details of the original repository.
+A mirror does not retain stars, watchers, issues, or pull requests from the original repository.
+
+We create a mirror from a repository after and within the same day when task instances were collected.
+The mirror retains the original repository's ``\texttt{owner}/\texttt{name}'' moniker, except that the ``/'' character is converted to a ``\_\_'' to confirm to GitHub naming conventions.
+Given this infrastructure, retrieving a task instance's codebase is straightforward.
+First, the correct mirror can be cloned from the \benchmark{} organization using \texttt{repo}.
+Next, within the local copy of the mirror, checking out the \texttt{base\_commit} will reset the repository to codebase $C$.
+To proceed to another task instance from the same repository, \texttt{git} version control is used to automatically remove any modifications associated with the current task instance before checking out the next task instance's base commit.
+
+\textbf{Solution, Test Patches.}
+The solution $\delta$ and tests $T$ are derived from the file changes data, or \texttt{diff}, of a PR.
+As mentioned in Section~\ref{sec:benchmark:construction}, the original \texttt{diff} along with solution $\delta$ and tests $T$ are represented as a \texttt{.patch} file, a format for efficiently specifying transformations to line-based text files.
+Generally speaking, a \texttt{.patch} is structured as a list of blocks, where each block consists of a header and one or more hunks that collectively correspond to changes to a single file.
+The header contains metadata specifying a file path and line numbers, while the actual modifications to the target file are encoded as multiple lines prefixed by ``+'' and ``-'' to indicate additions and removals.
+To create the tests $T$, we first identifying every unique block within the patch, then pick out and conglomerate blocks with file paths that contain testing-related keywords (e.g. ``tests'', ``testing'').
+The remaining blocks are merged to form the solution $\delta$.
+We validate the robustness of the script written to parse correctly $T$ and $\delta$ by applying both patches to the corresponding codebase $C$ and running the tests; we then check that the results reproduce the behavior of the base PR's \texttt{diff} data.
+The solution $\delta$ is saved as the \texttt{patch} field while the tests $T$ are saved as the \texttt{test\_patch} field.
+
+\textbf{Remaining Fields.} The \texttt{created\_at} field is a timestamp that specifies when the base PR was created.
+We retain the \texttt{created\_at} field from the original data and use this field to perform temporal analysis of model performance.
+The \texttt{version} field is a string that corresponds to the release version, with respect to the \texttt{repo}, during which the PR was released.
+Depending on availability and the amount of effort required for each method, we create the \texttt{version} field by retrieving the information directly from the source code, building the repository locally and invoking code to display the version to standard output, or comparing the \texttt{created\_at} field with a timeline of release versions from a repository's webpage.
+We create executable contexts for every \texttt{version} of a repository, as discussed in greater detail in \S~\ref{appx:benchmark:exec-validation}.
+
+\subsection{Execution-Based Validation}
+\label{appx:benchmark:exec-validation}
+
+After filtering through all the PRs from a repository and converting those that satisfy the aforementioned criteria into candidate task instances, the next step is to validate the usability of each task instance via execution.
+This procedure is broken down into three steps.
+First, we create executable contexts for each release version of a repository.
+Next, we check whether the solution $\delta$ and tests $T$ can be applied, installed, and run successfully on top of codebase $C$.
+Finally, we examine each task instance's execution log to verify a specific set of behaviors to ensure that the task is usable and fair for model evaluation.
+
+\textbf{Executable Contexts.} We choose to create executable contexts per release version after experimenting with various degrees of granularity with regards to what definition level to define virtual environments for. 
+Defining task instance-specific contexts is most conducive to ensuring end-to-end installation success, but comes at the cost of laborious manual handcrafting.
+On the other hand, a repository-specific context based on the latest version of a repository is typically too coarse of a definition that is not compatible with older versions' requirements.
+We find that release versions are a good proxy for capturing the dependency requirements across a subset of task instances, striking a manageable balance between installation success and manual effort.
+We manually create each executable context by examining the codebase of the \textit{latest} task instance for each version.
+Based on the source code and documentation typically found in the repository's \texttt{README} and \texttt{CONTRIBUTING} guides, we find out the Python version, necessary dependencies, and installation command.
+
+\textbf{Validation Engine.}
+The purpose of the validation engine is to verify candidate task instances. Specifically, this step checks first, that the solution $\delta$ and tests $T$ can be applied to codebase $C$, and second, that the codebase can be properly installed and run within the corresponding virtual environment.
+To do this, we perform validation repository-by-repository, where for each repository's set of task instances, we perform the following procedure:
+
+\begin{enumerate}
+    \item Create executable contexts as \texttt{conda} envs. based on latest task instance per \texttt{version}.
+    \item Group task instances by \texttt{version}.
+    \item Iterate across each task instances group, where for each task instance, we perform the following within the corresponding \texttt{conda} env.
+    \begin{enumerate}
+        \item Remove any file changes and checkout the task instance's \texttt{base\_commit}. This sets the repository to codebase $C$.
+        \item Run the installation command to instantiate codebase $C$.
+        \item Apply the test patch $T$ to codebase $C$.
+        \item Run the testing script, determined from test patch $T$, to generate test result logs $log_{pre}$.
+        \item Apply the solution $\delta$ patch to the codebase $C$ with tests $T$.
+        \item Run the testing script from part (d) again to generate test result logs $log_{post}$.
+    \end{enumerate}
+\end{enumerate}
+
+The testing command consists of the testing framework used by the repository (e.g. \texttt{pytest}, \texttt{tox}) with paths specified in $T$ appended.
+The testing command would run any and all tests that are specified within the contents of each file path.
+If any of the steps $(a)$ through $(f)$ fails, the candidate task instance is discarded from consideration.
+With moderate variation across repositories, we observe that this step generally removes half of the candidate task instances.
+
+\input{tables/appx/repo-conversion-stats}
+
+\textbf{Examining Validation Logs.}
+Last but not least, we check the logs $log_{pre}$ and $log_{post}$ created by the validation engine for specific properties.
+First, to guard against arbitrary naming choices, we check $log_{pre}$ for \texttt{ImportError} and \texttt{AttributeError} occurrences, which are potentially indicative of dependency naming related errors that would trivial and near-impossible to address correctly.
+To this end, we remove all task instances with such errors in their $log_{pre}$ from consideration.
+Next, we compare the test results to check that the task instance is non-trivial, indicated by at least one or more tests having a \texttt{fail} status before the solution $\delta$ is applied, then a \texttt{pass} status after.
+To check this, we first define several repository-specific parsers to convert $log_{pre}$ and $log_{post}$ into mappings of test $t_i \in T$ to a status $s \in$ [\textit{fail},\textit{pass}].
+Given these two data structures, we then check that there exists at least one $t_i$ where $s$ changes from \textit{fail} to \textit{pass}.
+If no such tests are found, the task instance is removed from consideration.
+
+If a task instance fulfills these two criteria, then it is included in the evaluation dataset.
+Table~\ref{table:repo-conversion-stats} displays a summary of how many task instances were removed from consideration across the construction process and execution based validation steps.
+We save all finalized task instances to a single \texttt{.json} file that is open sourced and available for download.
+
+Alongside the task instances, we also create a corresponding folder containing the ground truth test results.
+For each task instance, from their respective $log_{pre}$ and $log_{post}$ test-to-status mappings, we create a test results data structure where the keys are \texttt{FAIL\_TO\_FAIL}, \texttt{FAIL\_TO\_PASS}, \texttt{PASS\_TO\_FAIL}, and \texttt{PASS\_TO\_PASS}, and the values are lists of tests.
+By ``caching" these results, we remove the need to re-run the solution $\delta$ at evaluation time (although re-running is an available option).
+We use this data structure to verify task completion, as discussed in Section~\ref{appx:benchmark:eval-procedure}.
+
+\subsection{Evaluation Procedure}
+\label{appx:benchmark:eval-procedure}
+
+\input{figures/evaluation-pipeline}
+
+We provide a visualization of the evaluation procedure in Figure~\ref{fig:eval-pipeline}.
+The evaluation procedure scores the model's $\hat{\delta}$ \texttt{.patch} generation with respect to the behavior of the solution $\delta$.
+At a finer-grained level, the evaluation procedure can be broken down into four separate steps, highlighted by the numbered steps in Figure~\ref{fig:eval-pipeline}.
+First, the codebase and problem statement are visible and given to the LM; the LM then generates a \texttt{.patch} prediction $\hat{\delta}$.
+In the evaluation step, the following steps are performed per prediction on the target task instance:
+
+\begin{enumerate}
+    \item Remove any file changes and checkout the task instance’s base commit. This sets the repository to codebase $C$.
+    \item Activate the executable context corresponding to the task instance's \texttt{version}.
+    \item Run installation command to instantiate codebase $C$.
+    \item Apply test patch $T$ to codebase $C$.
+    \item Apply prediction patch $\hat{\delta}$ to codebase $C$ with tests $T$.
+    \item If the previous step fails, we attempt to fix prediction patch $\hat{\delta}$ automatically and reapply it.
+    \item Run the testing script, determined from test patch $T$, to generate test result logs $log_{\hat{\delta}}$.
+\end{enumerate}
+
+Steps 1 through 4 reliably do not fail due to verification during the task instance validation process. If applying the prediction patch (Step 5) fails, we attempt to repair the prediction patch file by removing unnecessary context lines and recalculating the header values (Step 6). If the remaining patch fails again or running the test command (Step 7) fails, then the prediction is automatically given a score of $0$. Assuming these steps succeed, the output log $log_{\hat{\delta}}$ can then be converted to a test-to-status mapping, identical in structure to the  via the appropriate, repository-specific parser introduced in \S~\ref{appx:benchmark:exec-validation}.
+
+\textbf{Evaluation Metrics Calculation.}
+To determine task completion, we compare the test-to-status mapping parsed from $log_{\hat{\delta}}$ with the list of tests corresponding to the \texttt{FAIL\_TO\_PASS} and \texttt{PASS\_TO\_PASS} keys from the ground truth test results data structure.
+Determining task completion is straightforward; we check that all \texttt{FAIL\_TO\_PASS} and \texttt{PASS\_TO\_PASS} tests are found and have a \textit{pass} status in the evaluation test-to-status mapping.
+If a test is missing or has a non-\textit{pass} status, it is considered a \textit{fail} status. As defined and used in the main paper, a task is considered solved if all tests across \texttt{FAIL\_TO\_PASS} and \texttt{PASS\_TO\_PASS} pass.
+
+\subsection{Evaluation Test Set Characterization}
+\label{appx:benchmark:repo-stats}
+
+\input{tables/appx/repo-dataset-stats}
+
+We include an expanded form of Table~\ref{table:dataset-stats} that includes repository specific statistics in Table~\ref{table:repo-dataset-stats}.
+Table ~\ref{table:repo-summaries} presents a brief description of each repository extracted from the repository's documentation along with the repository's associated open source license.
+The associated licenses all permit non-commercial usage of the original library source code as long as the permissions in the original licenses are upheld and retained.
+In addition to the original statistics presented in Table~\ref{table:dataset-stats}, we introduce three new values.
+The $\delta$ \# Lines Added and $\delta$ \# Lines Removed together sum up to $\delta$ Lines Edited. ``Added" refers to the number of new lines that are introduced, while ``Removed" are pre-existing lines taken out by the solution.
+The $\vert T \vert$ (Pass to Pass) statistic refers to the number of tests that were passing before the solution $\delta$ was applied during the validation pipeline.
+Unlike \textit{fail} to \textit{pass} tests that are intended to characterize the problem statement $P$ and determine if a revision addresses the issue, \textit{pass} to \textit{pass} tests are included to ensure that the revision does not break or violate any existing expected behavior.
+These tests are extracted during the validation log examination phase as discussed in \S~\ref{appx:benchmark:exec-validation}.
+We note that \textit{fail} to \textit{fail} tests and \textit{pass} to \textit{fail} tests are not considered during evaluation, and those statistics are not reflected in the above table.
+
+\input{tables/appx/repo-summaries}
+
+\textbf{Task Instance Issue Categories.} To provide a better sense of the types of problems that \benchmark{} task instances include, we perform simple analyses on the issues, identified by the \texttt{issue\_numbers} field, for each task instance.
+Per issue, we inspect metadata, specifically tags, to characterize the type of contribution put forth by the PR.
+Table~\ref{table:issue-tags} groups and shows several examples of the $\num{2289}$ tags we found across all issues.
+While the absolute majority of issues are associated with bug fixes, \benchmark{}'s task instances are associated with a diverse set of code changes with purposes beyond debugging and error correction.
+
+\input{tables/appx/issue-tags}
+
+\textbf{Attribute Distributions.} In Figure~\ref{table:dataset-stats-cdfs}, we present plots of the cumulative distribution function for attributes introduced in Table~\ref{table:dataset-stats}.
+From these plots, we see that the median \benchmark{} task instance has a problem description of $140$ words, and will take place within a codebase containing just shy of $1900$ files and $400$K lines.
+The corresponding reference solution $\delta$ will usually edit a single function within a file, changing $\sim$$15$ lines, and has a single \textit{fail} to \textit{pass} test to verify the correctness of the change along with $51$ \textit{pass} to \textit{pass} tests to check whether existing behavior is preserved.
+
+\input{figures/dataset-stats-cdfs}
+
+\textbf{Patch Fix Rate.} We present Table~\ref{table:patch-fix-rates}, which presents summary statistics of how many task instances each model generated patches for (out of 2294), how many of these patches applied successfully, and how many of the successfully applied patches required undergoing the patch fixing procedure introduced in Appendix~\ref{appx:benchmark:eval-procedure}.
+We find that fixed patches tend to make up a smaller percentage of the \swellama{} patches that successfully applied, suggesting that \swellama{}'s fine tuning procedure has a positive effect on generating well-formatted patches.
+For closed source models, fewer patches apply successfully, and of the ones that do, a greater percentage require the post-generation fix, suggesting that models still struggle with patch generation and structured outputs in general.
+
+\input{tables/appx/patch-fix-rates}
+
+\subsection{Development Set Characterization}
+
+In addition to the evaluation test set, we also provide a development set for evaluating models and tuning hyperparameters before running on the final test set.
+Following the style of tables and graphs from before, we present similar statistics to characterize the $225$ development task instances (slightly more than $10$\% of the main evaluation set) collected from $6$ open source repositories with licenses permitting such usage.
+The development set was collected following the exact same set of methodologies and filters as the main evaluation set.
+In addition to the pre-existing steps, we also filter the development set to keep task instances that were created after January $1$, $2019$.
+Similar to Table~\ref{table:repo-summaries}, in Table~\ref{table:dev-repo-summaries}, we briefly summarize the purpose and licenses of the $6$ selected repositories.
+
+\input{tables/appx/dev-repo-summaries}
+
+Following Table~\ref{table:issue-tags}, we also list the tags associated with the the development set tasks in Table~\ref{table:dev-issue-tags}, again showcasing the diversity and coverage of task types beyond fixing bugs.
+Compared to the main evaluation tasks, we can also see tags (e.g., ``Crash :collision:", ``io") that refer to issues presenting problems which are unique to the repositories in the development set.
+
+\input{tables/appx/dev-issue-tags}
+
+Following Table~\ref{table:dataset-stats}, we present the same set of repository-specific average statistics for the $6$ repositories in the development set in Table~\ref{table:dev-repo-dataset-stats}.
+Across the entire development set, each task instance has $19.9$ average / $2$ median F2P tests.
+There are $171.3$ average / $79.0$ median P2P tests, and $191.2$ average / $101.0$ median tests in total per task instance.
+
+\input{tables/appx/dev-repo-dataset-stats}
+
+\subsection{SWE-bench Lite Characterization}
+\label{appx:benchmark:lite}
+SWE-bench Lite is a canonical subset for more efficient evaluation of languag models on the SWE-bench task.
+SWE-bench is 

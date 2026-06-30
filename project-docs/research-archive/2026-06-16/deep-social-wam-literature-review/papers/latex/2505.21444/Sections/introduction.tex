@@ -1,0 +1,41 @@
+\section{Introduction}
+
+Pre-training on human-curated corpora has endowed language models with broad general-purpose capabilities \citep{brown2020language,rae2022scalinglanguagemodelsmethods}, but the supply of such data is becoming a bottleneck as compute scales rapidly \citep{hoffmann2022training,sevilla2022compute}. Reinforcement learning (RL)~\citep{sutton1998reinforcement} with verifiable rewards (RLVR) addresses this limitation by using automatic correctness checks, and has already shown success in reasoning and agentic tasks \citep{deepseekai2025deepseekr1incentivizingreasoningcapability,openai2024openaio1card}. Yet, achieving super-intelligence inevitably requires moving beyond domains where humans can provide ground-truth solutions. In these domains, an appealing approach is to have models \textbf{self-improve}— judging the correctness of their own outputs and using this signal to refine future generations \citep{zelikman2022star,song2025mind,huang2025selfimprovement}. If sustained iteratively, and \textbf{if teacher models can also self-improve}, this process could enable continual progress without human supervision — which is crucial step for AI based automatic scientific discovery.
+
+Prior work on self-improvement has mainly relied on supervised fine-tuning (SFT) \citep{zelikman2022star,huang-etal-2023-large} or direct preference optimization (DPO) \citep{rafailov2024directpreferenceoptimizationlanguage,prasad2024selfconsistencypreferenceoptimization}, where the self-labeling rule is updated only a handful of times (e.g., 1–10 rounds) and \emph{is generally kept fixed within a training round}. These studies show that self-improvement \emph{can} be effective, but leave open whether it can be sustained over longer horizons. Moreover, they are fundamentally bounded by the verification capabilities of the teacher model used to obtain training supervision, which is kept fixed for extended periods of training. In contrast, RL continuously updates the model on freshly generated (``on-policy'') data~\citep{xu2024dposuperiorppollm,tajwar2024preferencefinetuningllmsleverage,lanchantin2025bridgingofflineonlinereinforcement}, a property that has been critical to its success in training reasoning models with verifiable rewards. This success raises a natural question: can self-improvement leverage the same continuous-update paradigm? To study this question, we investigate the setting in which the feedback signal is \textbf{updated at every gradient step}—fundamentally altering the dynamics of self-improvement compared to earlier work.
+
+In this RL-based setup, the choice of feedback mechanism is critical. If feedback is always correct (e.g., perfectly verifying mathematical solutions), the procedure reduces to standard RL with ground-truth supervision. However, in practice, self-feedback is imperfect, and its design determines whether self-training is effective or not. As a first step, we study the simplest possible signal: \emph{majority vote}.~\citet{wang2023selfconsistency} has empirically demonstrated that majority vote tends to have higher accuracy compared to individual generations. Here, we cast the majority vote mechanism as a reward function --- granting positive reward to model outputs that match the most common answer.
+Previous works~\citep{huang-etal-2023-large,prasad2024selfconsistencypreferenceoptimization} have employed majority voting mainly as a mechanism to extract better quality generations from a \emph{fixed} teacher policy to then distill it into the student model. 
+\citet{zuo2025ttrl} concurrently  examined a similar RL procedure with majority voting, but in a different setting, as their focus is on training and testing on the same set of prompts. In contrast, our aim is to use this simple pseudo-label generation mechanism to investigate the validity of RL powered self-training frameworks. 
+
+Our key contributions are threefold:
+\begin{enumerate}[label=\textbf{(\arabic*)}]
+    \item Our comprehensive set of experiments demonstrate that this simple mechanism yields measurable gains over the base model on key reasoning metrics such as maj@k and avg@k success rates (Section~\ref{sec:question_1}). Remarkably, we observe clear improvement in the label generating policy after each gradient step, and this translates to gains over employing labels from a fixed teacher. Moreover, self-training achieves comparable performance to RLVR on 4 different base models.
+
+    \item In synthetic tasks where one can control the difficulty of the training dataset, we observe that a simple curriculum-based self-training approach can enable the model to keep climbing on progressively harder tasks without ground-truth labels (Section~\ref{sec:question_2}). Overall, this signals a promising path towards self-improvement of LLMs.
+
+    \item However, prolonged training with this framework consistently teaches models to ignore the prompt entirely and output the same template final answer, which maximizes training reward but leads to complete collapse on test datasets. To our knowledge, we are the first to demonstrate this failure mode of self-improving LLMs by employing self-consistency based training signal. In this work, we analyze the dynamics of model collapse in depth and trace them to the self-reinforcing nature of imperfect feedback.
+\end{enumerate}
+
+Overall, these findings identify feedback design as the key challenge that future research should address to sustain self-improvement.
+
+Our code is publicly available here: \url{https://github.com/tajwarfahim/srt}. For other project-related assets such as constructed datasets, please see our project website at \url{https://self-rewarding-llm-training.github.io/}.
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.98\linewidth]{Figures/section_1/srt_teaser_figure.pdf}
+    \caption{\footnotesize{\textbf{(Overview of \algo{})} In RLVR, one produces the reward for RL training using a ground truth verifier. Contrary to that, \algo{} does not assume access to a ground truth verifier; instead it uses majority voting from the model's own generations to estimate the ground truth, and use this proxy reward signal to train the model.}}
+    \label{fig:teaser_figure}
+    \vspace{-0.5cm}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+

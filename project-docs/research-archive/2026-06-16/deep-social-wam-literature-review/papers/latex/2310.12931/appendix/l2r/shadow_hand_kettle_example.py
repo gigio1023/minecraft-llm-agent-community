@@ -1,0 +1,6 @@
+set_min_l2_distance_reward("kettle_handle", "bucket_handle")
+set_min_l2_distance_reward("kettle_spout", "bucket_handle")
+set_min_l2_distance_reward("left_palm", "bucket_handle")
+set_min_l2_distance_reward("right_palm", "kettle_handle")
+set_min_l2_distance_reward("left_thumb", "bucket_handle")
+set_min_l2_distance_reward("right_thumb", "kettle_handle")

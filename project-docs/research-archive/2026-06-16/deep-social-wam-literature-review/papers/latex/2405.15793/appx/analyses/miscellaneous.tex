@@ -1,0 +1,32 @@
+\subsection{Miscellaneous}
+\label{appx:analyses:miscellaneous}
+In this section, we include additional minor analyses around agent behavior and their generations.
+
+\textbf{Agents are better at localizing files than BM25.}
+The interactive setting also enables agents to identify the correct file(s) to edit more often compared to the RAG baselines in \citet{jimenez2024swebench}.
+To measure this, we calculate the F1 score between the set of [edited, removed] files by the agent's prediction versus the gold patch.
+SWE-agent w/ GPT-4 Turbo achieves an F1 score of \num{59.05}\%, while BM25 w/ Claude 3 Opus produces an F1 score of just \num{45.47}\%.
+
+\textbf{Most resolved task instances are intentionally submitted.} There are four ways a task episode ends. 
+\begin{itemize}
+    \item ``Submit" refers to a task episode that ends when the agent generates the \texttt{submit} command.
+    \item ``Exit Cost (Submit)" refers to the scenario where the episode ends because the cost limit was hit, and the changes so far are gathered and submitted as an edit.
+    \item ``Exit Cost (No Submit)" refers to when the cost limit was hit and no \texttt{edit}'s were made, so there was nothing to submit. In this scenario, the instance is guaranteed to be unresolved.
+    \item ``Early Exit" refers to when the task episode terminates because an agent issued too many malformed responses in a row. Any changes are submitted as an edit.
+\end{itemize}
+
+Table~\ref{tab:appx:exit_conditions} shows the counts for the number of trajectories that ended on these four different outcomes, categorized across the agent, SWE-bench split, and whether or not that task instance was resolved.
+For SWE-agent with GPT-4 Turbo, the majority of ``All" task instances are \texttt{submit}.
+For the trajectories corresponding to``All" task instances by SWE-agent with Claude 3 Opus, slightly less than \num{50}\% of task instances are submitted, while the slight majority are auto-submitted when the cost limit is hit.
+
+\input{appx_tables/exit_conditions}
+
+However, these trends do not hold for ``Resolved" task instances.
+For SWE-agent with both models, the large majority of these task instances are \texttt{submit}.
+Reiterating the conclusion in Section~\ref{sec:analysis:agent-behavior} and prior visualizations in Section~\ref{appx:analyses:trajectory_analysis}, we see here again that resolved task instances often imply that the agent is able to produce and verify an edit within the allotted number of turns.
+The SWE-agent ACI is also effective at eliciting well-formed thoughts and actions from agents.
+Across all runs, there are only two ``Early Exit" occurrences, where the episode terminated because the agent generated too many malformed responses in a row.
+
+Finally, Table~\ref{tab:appx:exit_conditions} also upholds an expected trend.
+Task instances that finish with a \texttt{submit} action are more likely to be resolved than those that are cutoff by cost.
+For instance, for SWE-agent with GPT-4 Turbo on full SWE-bench, \num{14.3}\% of task instances that end with a \texttt{submit} are resolved, which is much higher than \num{3.1}\% for those finishing on \texttt{exit\_cost}.

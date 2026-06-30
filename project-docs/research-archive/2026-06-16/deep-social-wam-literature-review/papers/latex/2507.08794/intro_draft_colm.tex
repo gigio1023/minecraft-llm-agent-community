@@ -1,0 +1,80 @@
+
+\section{Introduction}
+\label{sec:intro}
+
+A widely recognized principle in many post-training methods~\citep{ouyang2022training} is that evaluating a response is often easier than generating one from scratch~\citep{leike2018scalable}. This idea has fueled the rise of large language models (LLMs) as automated judges~\citep{bai2022constitutional,kim2023prometheus, lee2023rlaif, zheng2023judging,zhang2024generative}, which leverage their strong generative and generalization capabilities to perform evaluation tasks such as ranking candidate answers or assigning quality scores, often achieving over 80\% agreement with human judgments and thus serving as a scalable alternative to manual evaluation.
+
+
+This trend has recently expanded to reinforcement learning with verifiable rewards (RLVR)~\citep{luong2024reft,lambert2024t,guo2025deepseek}, where LLMs act as generative reward models~\citep{su2025crossing,general-reasoner,seed2025seed1}. In this paradigm, an LLM compares a policy's output against a reference solution, generating a reward signal that guides the policy's training. This approach replaces inflexible, rule-based reward functions and unlocks the application of reinforcement learning for complex reasoning tasks with open-ended or unstructured answers.
+
+
+
+\begin{figure}[ht]
+   \begin{center}
+    \includegraphics[width=.9\linewidth]{Figures/Training_curves.pdf}
+   \end{center}
+
+   \vspace{-1em}
+ \caption{In a ``collapsed'' RLVR training, the response length drops sharply to fewer than 30 tokens while the KL divergence surges, a dynamic that differs significantly from a non-collapsed run.}
+ \label{fig:run}
+ % \vspace{-1em}
+\end{figure}
+
+\begin{wrapfigure}{r}{0.45\textwidth}
+  \centering
+  \includegraphics[width=.9\linewidth]{Figures/Copy_of_rlvr_magic-Page-4.drawio.pdf}
+  \vspace{-1em}
+  \caption{Reasoning openers such as ``Solution'' can trigger false positive rewards in many strong LLM judges. See Table~\ref{tab:appendix:examples} for more examples.}
+  \label{fig:magic_example}
+  \vspace{-2em}
+\end{wrapfigure}
+
+
+However, our investigation reveals a critical flaw in this paradigm: \textbf{generative reward models are surprisingly susceptible to reward hacking}. This issue first surfaced during an RLVR experiment where the policy model's training collapsed (cf. Figure~\ref{fig:run}). We found the model had degenerated into producing short, superficial \textbf{reasoning openers}, phrases like \emph{``Solution''}, \emph{``Thought process:''}, or \emph{``Let’s solve this problem step by step.''}, which the LLM judge (Qwen2.5-72B-Instruct~\citep{qwen2.5} in this experiment) consistently assigned a positive reward to despite the absence of any actual reasoning. An illustrative example is in Figure~\ref{fig:magic_example}.
+
+% \begin{figure}[ht]
+%    \begin{center}
+%   \includegraphics[width=.95\linewidth]{Figures/Copy_of_rlvr_magic-Page-4.drawio.pdf}
+%   \end{center}
+%   \vspace{-1em}
+%   \caption{Reasoning openers such as ``Solution'' can trigger false positive rewards in many state-of-the-art LLMs when used as generative reward models. See Table~\ref{tab:appendix:examples} for more examples.}
+%   \label{fig:magic_example}
+%   \vspace{-2em}
+% \end{figure}
+
+
+More alarmingly, this is not an isolated failure. We discovered that even minimal inputs, including single \textbf{non-word symbols} like a colon (``:''), can elicit false positive rewards. We term these superficial inputs, both \textbf{reasoning openers} and \textbf{non-word symbols}, as ``\textbf{master keys}'' for their consistent ability to unlock positive rewards without substantive content. This vulnerability is systemic, appearing across diverse datasets, prompt formats, and model families. Critically, it affects not only open-source models but also leading proprietary systems like GPT-4o, GPT-o1, and Claude-4, which are often treated as gold-standard evaluators. This finding challenges the foundational assumption of their robustness and calls into question the standard evaluation practices that rely on them.
+
+ 
+
+
+To mitigate this vulnerability, we propose a simple yet effective data augmentation strategy.  We construct adversarial-like negative examples by truncating model-generated solutions to their first segment (e.g., splitting on a line break). These segments often contain generic lead-ins that act as ``master keys''. By fine-tuning models (Qwen2.5-Instruct-7/32B) on this augmented data, we obtain more robust reward models, which we term \textbf{Master Reward Models (Master-RMs)}. Experiments show that this approach significantly mitigates susceptibility to these master key attacks across a range of benchmarks, including mathematical reasoning datasets (GSM8K~\citep{cobbe2021gsm8k}, MATH~\citep{math}, and AIME~\citep{aime_1983_2024}) and general-domain datasets (Multi-subject RLVR~\citep{yu-2021-self-teaching,su2025crossing} and NaturalReasoning~\citep{yuan2025naturalreasoning}). 
+
+
+
+To provide a comprehensive analysis, we conduct several ancillary studies (Section~\ref{sec:ana} and Appendices~\ref{app:hall_scal}-\ref{app:cot}). We investigate how susceptibility scales with model size, explore automated methods for discovering new ``master keys,'' test the impact of prompt modifications, and confirm the ineffectiveness of common inference-time techniques such as chain-of-thought and majority voting.
+
+Our main contributions are summarized below:
+\vspace{-1.5mm}
+
+\begin{itemize}
+    \item We identify \textbf{a critical vulnerability in LLM judges}: susceptibility to superficial ``master keys'' (e.g., reasoning openers or non-word symbols) that cause catastrophic reward hacking, even in reference-based paradigms. 
+
+    \vspace{-1.5mm}
+    \item We demonstrate through \textbf{systematic evaluation} that this vulnerability is pervasive, affecting a diverse range of open-source and leading proprietary models across multiple reasoning and general-domain benchmarks.
+    \vspace{-1.5mm}
+    
+    \item We propose an \textbf{effective mitigation strategy} using targeted data augmentation. The resulting Master-RMs achieve state-of-the-art robustness against ``master key'' attacks while maintaining high performance on standard evaluation tasks. To support open research and reproducibility, we will release the augmented $180k$-instance training dataset along with the Master RMs.
+    \vspace{-1.5mm}
+    
+    \item We provide a \textbf{comprehensive analysis} of the vulnerability, showing that larger judges are often more vulnerable, while mid-sized models best balance robustness and accuracy; chain-of-thought prompting and majority voting do not reliably defend and can even exacerbate the attack, whereas removing the question from the evaluation prompt substantially mitigates the vulnerability. Overall, we provide a clear picture for robustly employing generative reward models in RLVR by selecting mid-sized LLMs as judges, applying CoT-style prompting with caution, and removing questions from prompts when possible.
+    \vspace{-1.5mm}
+    
+\end{itemize}
+We discuss related works in Appendix~\ref{app:related}.
+
+
+
+
+
+

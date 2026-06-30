@@ -1,0 +1,141 @@
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[c]{0.48\textwidth} %
+        \centering
+        \begin{subfigure}[t]{\textwidth} %
+            \centering
+\begin{minted}[fontsize=\tiny, bgcolor=backcolour]{python}
+# EVOLVE-BLOCK START
+"""Image classification experiment in jaxline."""
+
+import jax
+...
+# EVOLVE-BLOCK-END
+
+...
+
+# EVOLVE-BLOCK-START
+class ConvNet(hk.Module):
+  def __init__(self, num_classes): ...
+  def __call__(self, inputs, is_training): ...
+
+
+def sweep():
+  return hyper.zipit([...])
+# EVOLVE-BLOCK-END
+
+...
+
+def evaluate(eval_inputs) -> dict[str, float]:
+  ...
+  return metrics
+\end{minted}
+            \captionsetup{justification=centering, singlelinecheck=false}
+            \caption{\raisebox{-0.3\baselineskip}{\includegraphics[height=1.8em]{assets/human-icon.png}}}
+            \label{fig:grounding-api}
+        \end{subfigure}
+        \vfill %
+        \begin{subfigure}[b]{\textwidth} %
+            \centering
+
+\begin{minted}[fontsize=\tiny, bgcolor=backcolour, escapeinside=||, breaksymbolleft={}]{python}
+|The current model uses a simple ResNet architecture with only three ResNet blocks. We can improve its performance by increasing the model capacity and adding regularization. This will allow the model to learn more complex features and generalize better to unseen data. We also add weight decay to the optimizer to further regularize the model and prevent overfitting. AdamW is generally a better choice than Adam, especially with weight decay.|
+
+
+<<<<<<< SEARCH
+    self._block1 = ResNetBlock(num_channels)
+    self._block2 = ResNetBlock(num_channels * 2, stride=2)
+    self._block3 = ResNetBlock(num_channels * 4, stride=2)
+=======
+    self._block1 = ResNetBlock(num_channels)
+    self._block2 = ResNetBlock(num_channels, stride=1)
+    self._block3 = ResNetBlock(num_channels * 2, stride=2)
+    self._block4 = ResNetBlock(num_channels * 2, stride=1)
+    self._block5 = ResNetBlock(num_channels * 4, stride=2)
+    self._block6 = ResNetBlock(num_channels * 4, stride=1)
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+  def optimizer(self, learning_rate):
+    return optax.adam(learning_rate)
+=======
+  def optimizer(self, learning_rate):
+    return optax.adamw(learning_rate, weight_decay=1e-4)
+>>>>>>> REPLACE
+\end{minted}
+            \addtocounter{subfigure}{+1}
+            \captionsetup{justification=centering, singlelinecheck=false}
+            \caption{\raisebox{-0.5\baselineskip}{\includegraphics[height=2.0em]{assets/llm-icon.png}}}
+            \label{fig:grounding-llm}
+        \end{subfigure}
+    \end{minipage}
+    \hfill %
+    \begin{minipage}[c]{0.48\textwidth} %
+        \centering
+        \begin{subfigure}{\textwidth} %
+            \centering
+
+\begin{minted}[fontsize=\tiny, bgcolor=backcolour, escapeinside=||, breaksymbolleft={}]{python}
+|Act as an expert software developer. Your task is to iteratively improve the provided codebase. [...]
+
+- Prior programs
+
+Previously we found that the following programs performed well on the task at hand:|
+
+top_1_acc: 0.796; neg_eval_log_loss: 0.230; average_score: 0.513
+
+"""Image classification experiment in jaxline."""
+[...]
+class ConvNet(hk.Module):
+  """Network."""
+
+  def __init__(self, num_channels=32, num_output_classess=10):
+    super().__init__()
+    self._conv1 = hk.Conv2D(num_channels, kernel_shape=3)
+    self._conv2 = hk.Conv2D(num_channels * 2, kernel_shape=3)
+    self._conv3 = hk.Conv2D(num_channels * 4, kernel_shape=3)
+    self._logits_module = hk.Linear(num_output_classes)
+[...]
+
+
+|- Current program
+
+Here is the current program we are trying to improve (you will need to propose a modification to it below).|
+
+top_1_acc: 0.862; neg_eval_log_loss: 0.387; average_score: 0.624
+
+"""Image classification experiment in jaxline."""
+[...]
+class ConvNet(hk.Module):
+  """Network."""
+
+  def __init__(self, num_channels=32, num_output_classes=10):
+    super().__init__()
+    self._conv1 = hk.Conv2D(num_channels, kernel_shape=3)
+    self._block1 = ResNetBlock(num_channels)
+    self._block2 = ResNetBlock(num_channels * 2, stride=2)
+    self._block3 = ResNetBlock(num_channels * 4, stride=2)
+    self._logits_module = hk.Linear(num_output_classes)
+|[...]
+
+SEARCH/REPLACE block rules:
+[...]
+
+Make sure that the changes you propose are consistent with each other. For example, if you refer to a new config variable somewhere, you should also propose a change to add that variable.
+
+Example:
+[...]
+
+Task
+Suggest a new idea to improve the code that is inspired by your expert knowledge of optimization and machine learning.  
+
+Describe each change with a SEARCH/REPLACE block.|
+\end{minted}
+            \addtocounter{subfigure}{-2}
+            \captionsetup{justification=centering, singlelinecheck=false}
+            \caption{\raisebox{-0.5\baselineskip}{\includegraphics[height=2.0em]{assets/prompt-icon.png}}}
+            \label{fig:grounding-prompt}
+        \end{subfigure}
+    \end{minipage}
+    \caption{Illustrative example of applying \method to evolving a supervised learning pipeline. All snippets are abbreviated, with ellipsis (...) indicating skipped lines. (a) The user-provided file with blocks marked for evolution, and the special \texttt{evaluate} function that can be invoked to score the current version of the code. (b) Example of an assembled prompt to be provided to the LLMs. (c) Example output generated by the LLM. The proposed diffs in (c) will be applied to the "current program" shown in the prompt (b), and the resulting modified program will then be sent to the evaluators. The evaluators will invoke the \texttt{evaluate} function from (a) in order to obtain the scores of the newly proposed program.}
+    \label{fig:grounding}
+\end{figure}

@@ -1,0 +1,233 @@
+\begin{figure}[p]
+\renewcommand{\thefigure}{\arabic{figure}a}\vspace{-0.03\textwidth}
+\begin{adjustbox}{width=0.9\textwidth}
+\begin{minipage}{0.9\textwidth}
+\begin{lstlisting}[style=pydiff, backgroundcolor=\color{backcolour}]
+@@ -45,9 +45,14 @@
+   # EVOLVE-BLOCK-START
+   def _get_optimizer(self) -> optax.GradientTransformation:
+     """Returns optimizer."""
+-    return optax.adam(self.hypers.learning_rate)
++    return optax.adamw(
++        self.hypers.learning_rate, weight_decay=self.hypers.weight_decay
++    )
+ 
+   def _get_init_fn(self) -> jax.nn.initializers.Initializer:
+     """Returns initializer function."""
+-    return initializers.normal(0.0, self.hypers.init_scale, jnp.complex64)
++    # Initialize with a smaller scale to encourage finding low-rank solutions.
++    # Increase scale slightly for better exploration.
++    scale = self.hypers.init_scale
++    return initializers.normal(0 + 1j * 0, scale * 0.2, jnp.complex64)
+
+@@ -80,6 +85,66 @@
+     # Gradient updates.
+     updates, opt_state = self.opt.update(grads, opt_state, decomposition)
+     decomposition = optax.apply_updates(decomposition, updates)
++    # Add a small amount of gradient noise to help with exploration
++    rng, g_noise_rng = jax.random.split(rng)
++    decomposition = jax.tree_util.tree_map(
++        lambda x: x
++        + self.hypers.grad_noise_std * jax.random.normal(g_noise_rng, x.shape),
++        decomposition,
++    )
++
++    # Add noise to the decomposition parameters (exploration).
++    _, noise_rng = jax.random.split(rng)
++    noise_std = self._linear_schedule(
++        global_step, start=self.hypers.noise_std, end=0.0
++    )
++    decomposition = jax.tree_util.tree_map(
++        lambda x: x + noise_std * jax.random.normal(noise_rng, x.shape),
++        decomposition,
++    )
++
++    # Cyclical annealing for clipping threshold.
++    cycle_length = 2000  # Number of steps per cycle
++    cycle_progress = (
++        global_step % cycle_length
++    ) / cycle_length  # Normalized progress within the current cycle [0, 1)
++
++    # Map cycle progress to a sinusoidal curve. Ranges from 0 to 1.
++    clip_threshold_multiplier = (1 + jnp.cos(2 * jnp.pi * cycle_progress)) / 2
++
++    clip_threshold = self.hypers.clip_min + clip_threshold_multiplier * (
++        self.hypers.clip_max - self.hypers.clip_min
++    )
++
++    def soft_clip(x, threshold):
++      # Clipping the real and imaginary parts separately.
++      x_re = jnp.real(x)
++      x_im = jnp.imag(x)
++
++      x_re_clipped = jnp.where(
++          x_re > threshold, threshold + (x_re - threshold) * 0.1, x_re
++      )
++      x_re_clipped = jnp.where(
++          x_re_clipped < -threshold,
++          -threshold + (x_re_clipped + threshold) * 0.1,
++          x_re_clipped,
++      )
+\end{lstlisting}
+\end{minipage}
+\end{adjustbox}
+\caption{
+Magnified version of~\Cref{fig:relaxed-opt-diff}(left), giving the program that discovers a faster algorithm to multiply $4\times4$ matrices (\emph{1/3}).}\label{fig:relaxed-opt-diff-appendix-1}
+\centering
+\end{figure}
+\addtocounter{figure}{-1}
+
+
+\begin{figure}[p]
+\renewcommand{\thefigure}{\arabic{figure}b}\vspace{-0.03\textwidth}
+\begin{adjustbox}{width=0.9\textwidth}
+\begin{minipage}{0.9\textwidth}
+\begin{lstlisting}[style=pydiff, backgroundcolor=\color{backcolour}, firstnumber=66]
++
++      x_im_clipped = jnp.where(
++          x_im > threshold, threshold + (x_im - threshold) * 0.1, x_im
++      )
++      x_im_clipped = jnp.where(
++          x_im_clipped < -threshold,
++          -threshold + (x_im_clipped + threshold) * 0.1,
++          x_im_clipped,
++      )
++
++      return x_re_clipped + 1j * x_im_clipped
++
++    decomposition = jax.tree_util.tree_map(
++        lambda x: soft_clip(x, clip_threshold), decomposition
++    )
++
+     return decomposition, opt_state, loss
+ 
+   def _loss_fn(
+@@ -91,13 +156,86 @@
+     """Computes (batched) loss on learned decomposition."""
+     # Compute reconstruction loss.
+     rec_tensor = self._decomposition_to_tensor(decomposition)  # (B, N, M, P)
++
++    # Add noise to the target tensor (robustness).
++    rng, noise_rng = jax.random.split(rng)
++    target_noise = self.hypers.target_noise_std * jax.random.normal(
++        noise_rng, self.target_tensor.shape
++    )
++    noisy_target_tensor = self.target_tensor + target_noise
++
++    # Hallucination loss (encourages exploration by randomly replacing values)
++    hallucination_prob = self.hypers.hallucination_prob
++    hallucination_scale = self.hypers.hallucination_scale
++
++    def hallucinate(x, hallucination_rng):
++      mask = jax.random.bernoulli(hallucination_rng, p=hallucination_prob)
++      noise = hallucination_scale * jax.random.normal(
++          hallucination_rng, x.shape
++      )
++      return jnp.where(mask, noise, x)
++
++    _, factor_rng = jax.random.split(rng)
++    decomposition = jax.tree_util.tree_map(
++        lambda x: hallucinate(x, jax.random.split(factor_rng)[0]),
++        decomposition,
++    )
++
+     # Add a batch dimension to `target_tensor` to ensure correct broadcasting.
+     # Define the loss as the L2 reconstruction error.
+-    rec_loss = l2_loss_complex(self.target_tensor[None, ...], rec_tensor)
++    rec_loss = l2_loss_complex(noisy_target_tensor[None, ...], rec_tensor)
+ 
+     # We must return a real-valued loss.
+-    return jnp.real(rec_loss)
+ 
++    # Discretization loss (encourage entries to be multiples of 1/2 or integer).
++    def dist_to_half_ints(x):
++      x_re = jnp.real(x)
++      x_im = jnp.imag(x)
++      return jnp.minimum(
++          jnp.abs(x_re - jnp.round(x_re * 2) / 2),
++          jnp.abs(x_im - jnp.round(x_im * 2) / 2),
++      )
++
+\end{lstlisting}
+\end{minipage}
+\end{adjustbox}
+\caption{Magnified version of~\Cref{fig:relaxed-opt-diff}(left), giving the program that discovers a faster algorithm to multiply $4\times4$ matrices  (\emph{2/3}).}\label{fig:relaxed-opt-diff-appendix-2}
+\centering
+\end{figure}
+\addtocounter{figure}{-1}
+
+
+\begin{figure}[p]
+\renewcommand{\thefigure}{\arabic{figure}c}\vspace{-0.03\textwidth}
+\begin{adjustbox}{width=0.9\textwidth}
+\begin{minipage}{0.9\textwidth}
+\begin{lstlisting}[style=pydiff, backgroundcolor=\color{backcolour}, firstnumber=131]
++    def dist_to_ints(x):
++      return jnp.abs(x - jnp.round(x))
++
++    discretization_loss = 0.0
++    for factor in decomposition:
++      discretization_loss += jnp.mean(dist_to_half_ints(factor))
++      discretization_loss += jnp.mean(dist_to_ints(factor))
++
++    discretization_loss /= (
++        len(decomposition) * 2
++    )  # average across all factors and loss components
++
++    discretization_weight = self._linear_schedule(
++        global_step, start=0.0, end=self.hypers.discretization_weight
++    )
++
++    # Cosine annealing for half-integer loss.
++    cycle_length = self.config.training_steps // 4  # Number of steps per cycle
++    cycle_progress = (
++        global_step % cycle_length
++    ) / cycle_length  # Normalized progress within the current cycle [0, 1)
++    half_int_multiplier = (1 + jnp.cos(jnp.pi * cycle_progress)) / 2
++    half_int_multiplier = (
++        1 - self.hypers.half_int_start
++    ) * half_int_multiplier + self.hypers.half_int_start
++
++    total_loss = (
++        rec_loss
++        + discretization_weight * discretization_loss * half_int_multiplier
++    )
++
++    # Add penalty for large values (stability).
++    large_value_penalty = 0.0
++    for factor in decomposition:
++      large_value_penalty += jnp.mean(jnp.abs(factor) ** 2)
++    large_value_penalty /= len(decomposition)
++    total_loss += self.hypers.large_value_penalty_weight * large_value_penalty
++
++    return jnp.real(total_loss)
++
+ 
+ def l2_loss_complex(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+   """Elementwise L2 loss for complex numbers."""
+@@ -117,6 +255,18 @@
+   return hyper.zipit([
+-      hyper.uniform('init_scale', hyper.interval(0.2, 1.5)),
+-      hyper.uniform('learning_rate', hyper.interval(0.05, 0.3)),
++      hyper.uniform('init_scale', hyper.interval(0.1, 1.0)),
++      hyper.uniform('learning_rate', hyper.interval(0.01, 0.2)),
++      hyper.uniform('discretization_weight', hyper.interval(0.0, 0.1)),
++      hyper.uniform('hallucination_prob', hyper.interval(0.0, 0.2)),
++      hyper.uniform('hallucination_scale', hyper.interval(0.0, 0.2)),
++      hyper.uniform('noise_std', hyper.interval(0.0, 0.01)),
++      hyper.uniform('target_noise_std', hyper.interval(0.0, 0.01)),
++      hyper.uniform('weight_decay', hyper.interval(0.00001, 0.001)),
++      hyper.uniform('clip_min', hyper.interval(0.0, 0.5)),
++      hyper.uniform('clip_max', hyper.interval(1.0, 3.0)),
++      hyper.uniform('large_value_penalty_weight', hyper.interval(0.0, 0.01)),
++      # Add noise to the gradient to aid in exploration.
++      hyper.uniform('grad_noise_std', hyper.interval(0.0, 0.001)),
++      hyper.uniform('half_int_start', hyper.interval(0.0, 1.0)),
+   ])
+ # EVOLVE-BLOCK-END
+\end{lstlisting}
+\end{minipage}
+\end{adjustbox}
+\caption{Magnified version of~\Cref{fig:relaxed-opt-diff}(left), giving the program that discovers a faster algorithm to multiply $4\times4$ matrices  (\emph{3/3}). Here \texttt{hyper} is a user-provided library for generating hyperparameter sweeps.}\label{fig:relaxed-opt-diff-appendix-3}
+\centering
+\end{figure}

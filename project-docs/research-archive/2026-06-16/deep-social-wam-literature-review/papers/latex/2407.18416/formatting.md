@@ -209,11 +209,11 @@ Within-document and external hyperlinks should be dark blue (hex #000099), not u
 
 Text in languages other than English should be accompanied by translations into English, and text in scripts other than Latin should \emph{also} be accompanied by transliterations into Latin script, since not all readers can recognize non-Latin characters easily.
 
-For example, παράδειγμα *paradeigma* ‘example’ is a Greek word, and this is a Greek sentence:
+For example, παράδειγμα *paradeigma* 'example' is a Greek word, and this is a Greek sentence:
 
 > Αυτό είναι ένα παράδειγμα.  
 > auto einai ena paradeigma.  
-> ‘This is an example.’
+> 'This is an example.'
 
 ### Citations
 
@@ -260,19 +260,19 @@ Appropriate records should be found for most materials in the current [ACL Antho
 
 Example article in a journal:
 
-> Rie Kubota Ando and Tong Zhang. 2005. [A framework for learning predictive structures from multiple tasks and unlabeled data](https://www.jmlr.org/papers/v6/ando05a.html). *Journal of Machine Learning Research*, 6:1817–1853.
+> Rie Kubota Ando and Tong Zhang. 2005. [A framework for learning predictive structures from multiple tasks and unlabeled data](https://www.jmlr.org/papers/v6/ando05a.html). *Journal of Machine Learning Research*, 6:1817-1853.
 
 Example paper in non-ACL proceedings, with DOI:
 
-> Galen Andrew and Jianfeng Gao. 2007. [Scalable training of L1-regularized log-linear models](https://doi.org/10.1145/1273496.1273501). In *Proceedings of the 24th International Conference on Machine Learning*, pages 33–40.
+> Galen Andrew and Jianfeng Gao. 2007. [Scalable training of L1-regularized log-linear models](https://doi.org/10.1145/1273496.1273501). In *Proceedings of the 24th International Conference on Machine Learning*, pages 33-40.
 
 Example ACL Anthology paper with DOI:
 
-> James Goodman, Andreas Vlachos, and Jason Naradowsky. 2016. [Noise reduction and targeted exploration in imitation learning for Abstract Meaning Representation parsing](http://dx.doi.org/10.18653/v1/P16-1001). In *Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)*, pages 1–45711, Berlin, Germany. Association for Computational Linguistics.
+> James Goodman, Andreas Vlachos, and Jason Naradowsky. 2016. [Noise reduction and targeted exploration in imitation learning for Abstract Meaning Representation parsing](http://dx.doi.org/10.18653/v1/P16-1001). In *Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)*, pages 1-45711, Berlin, Germany. Association for Computational Linguistics.
 
 Example ACL Anthology paper without DOI:
 
-> Benjamin Börschinger and Mark Johnson. 2011. [A particle filter algorithm for Bayesian word segmentation](https://www.aclweb.org/anthology/U11-1004/). In *Proceedings of the Australasian Language Technology Association Workshop 2011*, pages 10–44718, Canberra, Australia.
+> Benjamin Börschinger and Mark Johnson. 2011. [A particle filter algorithm for Bayesian word segmentation](https://www.aclweb.org/anthology/U11-1004/). In *Proceedings of the Australasian Language Technology Association Workshop 2011*, pages 10-44718, Canberra, Australia.
 
 Example arXiv paper:
 

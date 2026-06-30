@@ -1,0 +1,188 @@
+
+The following theorem is a generalization of \cref{thm:bestofn} which allows for approximate maximizers in the sense of \cref{def:sharpening_general}.
+  \begin{thmmod}{thm:bestofn}{$'$}
+  \label{thm:bestofn_general}
+  Let $\delfail,\delta\in(0,1)$ be given, and suppose we set
+  $N=\Nstar\log(2\delta^{-1})$ for a parameter $\Nstar\in\bbN$. Then
+  for any $n\in\bbN$, \bestofnalg ensures that with probability at least $1-\delfail$, for any $\gamma\in(0,1)$, the output model $\pihat$ satisfies
+  \begin{align}
+    \bbP_{x\sim\cdist}\brk*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-2\delta}
+    \approxleq{} \frac{1}{\delta}\cdot{}\frac{\log(\abs{\Pi}\delfail^{-1})}{n} + \frac{\Cstarg}{\Nstar}.
+  \end{align}
+In particular, given $(\eps,\delta,\gamma)$, by setting
+$n=C_{\ref{thm:bestofn}}\frac{\log\abs{\Pi}}{\delta\eps}$ and
+$\Nstar=C_{\ref{thm:bestofn}}\frac{\Cstarg}{\eps}$ for a sufficiently
+large absolute constant $C_{\ref{thm:bestofn}}>0$,
+we are guaranteed that
+\begin{align}
+  \bbP_{x\sim\cdist}\brk*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta}
+  \leq \eps. \label{eq:top_k_ub}
+\end{align}
+The total sample complexity is
+\begin{align}
+  m = O\left(\frac{\Cstarg\log(\abs{\Pi}\delfail^{-1})\log(\delta^{-1})}{\delta\eps^2}\right).
+\end{align}
+\end{thmmod}
+
+
+\begin{proof}[\pfref{thm:bestofn_general}]%
+  \newcommand{\cXgood}{\cX_{\texttt{good}}}%
+  \newcommand{\pik}{\pi_k}%
+  \newcommand{\kstar}{k_{\star}}%
+Under realizability of $\pin$ (\cref{assumption:bon-realizability}),
+\cref{lem:mle} implies that the output of \bestofnalg satisfies, with probability at least $1-\delfail$,
+\begin{align}
+  \label{eq:sft_stat}
+  \En_{x\sim\cdist}\brk*{\Dhels{\pihat(\cdot\mid{}x)}{\pin(\cdot\mid{}x)}}\leq\vepsstat^2\ldef{}\frac{2\log(\abs{\Pi}/\delfail)}{n}.
+\end{align}  
+Henceforth we condition on the event that \cref{eq:sft_stat} holds. Let
+\[
+  \cXgood\ldef{}\left\{
+    x\in\cX\mid\Nstar\geq\frac{1}{\piref(\Ygamma(x)\mid{}x)}
+    \right\}
+  \]
+  denote the set of prompts for which $\piref$ places sufficiently
+  high mass on $\Ygamma(x)$.
+  We can bound
+  \begin{align}
+    &\bbP_{x\sim\cdist}\brk*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta}
+    \\ 
+    &\qquad\leq{}
+    \bbP_{x\sim\cdist}\brk*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta,
+    x\in\cXgood}
+    +     \bbP_{x\sim\cdist}\brk*{x\notin\cXgood}.\label{eq:pihat-error-decomp}
+  \end{align}
+  To bound the first term in \cref{eq:pihat-error-decomp}, note that if $x\in\cXgood$, then
+  $\pin(\Ygamma(x)\mid{}x)\geq{}1-\delta/2$. Indeed, observe that
+  $y\sim\pin(\cdot\mid{}x)\notin\Ygamma(x)$ if and only if
+  $y_1,\ldots,y_N\sim\piref(x)$ have $y_i\notin\Ygamma(x)$ for all
+  $i$, which happens with probability
+  $(1-\piref(\Ygamma(x)\mid{}x))^N \leq (1-1/\Nstar)^N \leq \delta/2$ since $x \in \cXgood$. It follows that for any such $x$, we can lower bound (using the data processing inequality)
+  \begin{align}
+    \Dhels{\pihat(\cdot\mid{}x)}{\pin(\cdot\mid{}x)}
+    &\geq \left(\sqrt{1-\pihat(\Ygamma(x)\mid{}x)} - \sqrt{1-\pin(\Ygamma(x)\mid{}x)}\right)^2 \\
+    &\approxgeq{} \delta\cdot\indic\crl*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta}. \label{eq:topk_key_ineq}
+  \end{align}
+  By \cref{eq:sft_stat,eq:topk_key_ineq}, it follows that
+  \[
+    \bbP_{x\sim\cdist}\brk*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta,
+      x\in\cXgood}\approxleq \frac{\vepsstat^2}{\delta}.
+  \]
+
+  For the second term in \cref{eq:pihat-error-decomp}, we bound
+  \begin{align}
+    \bbP_{x\sim\cdist}\brk*{x\notin\cXgood}
+    &=
+    \bbP_{x\sim\cdist}\brk*{\Nstar < \frac{1}{\piref(\Ygamma(x)\mid{}x)}} \\
+    &=
+    \bbP_{x\sim\cdist}\brk*{\frac{1}{\Nstar\piref(\Ygamma(x)\mid{}x)}> 1} \\
+    &\leq{}
+    \frac{1}{\Nstar}\En_{x\sim\cdist}\brk*{\frac{1}{\piref(\Ygamma(x)\mid{}x)}} \\
+    &\leq{}  \frac{\Cstarg}{\Nstar}
+  \end{align}
+  via Markov's inequality and the definition of $\Cstarg$. Substituting both bounds into \cref{eq:pihat-error-decomp} completes the proof.
+\end{proof}
+
+
+
+\begin{proof}[\pfref{thm:bestofn_adaptive}]
+  The proof begins similarly to \cref{thm:bestofn}. By realizability of $\pi_{\taumu}$,
+\cref{lem:mle} implies that the output of \bestofnalg satisfies, with probability at least $1-\delfail$,
+\begin{align}
+\En_{x\sim\cdist}\brk*{\Dhels{\pihat(\cdot\mid{}x)}{\pi_{\taumu}(\cdot\mid{}x)}}\leq\vepsstat^2\ldef{}\frac{2\log(\abs{\Pi}/\delfail)}{n}.
+\end{align}  
+Condition on the event that this guarantee holds. We invoke
+the following lemma, proven in the sequel.
+\begin{lemma}\label{lem:fdr}  Let $P$ be a distribution on a discrete
+  space $\cY$. Let
+  $\Ystar = \argmax_{y\in\cY}P(y)$
+  and let $\Pstar := \max_{y\in\cY}P(y)$. Let
+  $y_1,y_2,\ldots\sim{}P$, and for any stopping time $\tau$, define
+  \begin{align}
+  \hatytau \in \argmax \left\{ P(y) : y \in
+    \left\{y_1,\dots,y_\tau\right\}\right\}.
+  \end{align}
+  Next, for a parameter $\mu>0$, define the stopping time
+\begin{align}
+  \taumu := \inf \left\{k : \frac{1}{\max_{1 \le i \le k} P(y_i)} \le k/\mu \right\}.
+\end{align}
+Then
+\begin{align}
+  \En[\taumu] \le \frac{\mu+(1/|\Ystar|)}{\Pstar}.
+\end{align}
+In addition, for any stopping time $\tau \ge \taumu$ (including $\tau =
+\taumu$ itself), we have $\Pr[\hatytau \notin \Ystar] \le e^{-\abs{\Ystar}\mu}$.
+\end{lemma}
+This lemma, with our choice of $\mu$, ensures that \emph{for all
+  $x\in\cX$}, 
+\begin{align}
+  \pi_{\taumu}(\Ystar(x)\mid x) \ge 1 - e^{-\mu} = 1 - \delta/2.
+\end{align}
+Following the reasoning in \cref{eq:topk_key_ineq}, this implies that
+\begin{align}
+    \Dhels{\pihat(\cdot\mid{}x)}{\pi_{\taumu}(\cdot\mid{}x)}
+    \approxgeq{} \delta\cdot\indic\crl*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}, 
+\end{align}
+so that
+\begin{align}
+      \bbP_{x\sim\cdist}\brk*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}\approxleq \frac{\vepsstat^2}{\delta}
+\end{align}
+as desired.
+
+To bound the expected sample complexity, we observe that
+\begin{align}
+  \En[m] = n \cdot \En[\taumu(x)] \overset{(i)}{\le} \En\left[\frac{1 + \mu}{\piref(\Ystar(x)\mid x)}\right] = (1+\mu)\Cstarb,
+\end{align}
+where inequality $(i)$ invokes \cref{lem:fdr} once more.
+\end{proof}
+\dfc{Remark: If we know $\abs{\Ystar}$, we can set
+  $\mu=\log(1/\delta)/\abs{\Ystar}$ to get
+  \[
+    \En\brk{\taumu} \leq \frac{1}{\abs{\Ystar}\Pstar} = \frac{1}{P(\Ystar)},
+  \]
+  which improves the result. Something similar probably works for
+  $\Ygamma$. Without this form of prior knowledge, the current result
+  is most likely tight.
+  }
+
+\begin{proof}[\pfref{lem:fdr}] Define $\Nstar := \mu/\Pstar $.
+To bound the tails of $\taumu$, define
+\begin{align}
+\tau = \inf \{k\mid{}k \ge \Nstar \text{ and } \Ystar \cap
+  \{y_1,\dots,y_k\} \ne \emptyset\}.
+  \end{align}
+  It follows from the definition that $\taumu \le \tau$, since
+  for any $k\geq{}\Nstar$, if there exists $i\leq{}k$ such that
+  $y_i\in\Ystar$, then
+  \begin{align}
+    \frac{1}{P(y_i)}
+    = \frac{1}{\Pstar} = \frac{\Nstar}{\mu} \leq \frac{k}{\mu}.
+  \end{align}
+
+  Thus, for $k \ge \Nstar$, we can bound
+\begin{align}
+    \Pr[\taumu >k] \le \Pr[\tau > k] = \Pr[\cY^{\star} \cap \{y_1,\dots,y_k\} = \emptyset]  \le (1 - |\Ystar|\Pstar)^k,
+\end{align}
+and consequently 
+\begin{align}
+    \En[\taumu] \le \En[\tau] &\le  \En[\tau \indic\{\tau \le
+                               \Nstar\}] +  \En[\tau \indic\{\tau >
+                               \Nstar\}]\\
+                               &\le \Nstar + \sum_{k > \Nstar}  (1 -
+                                 |\Ystar|\Pstar)^k \\
+                             &\le \Nstar +
+                                 \frac{1}{|\Ystar|P(\ystar)}
+                                 = \frac{\mu+1/|\Ystar|}{P(\ystar)}.
+\end{align}
+To prove correctness, observe that  $\taumu \ge \Nstar$,  
+because for all $y \in \cY$, $\frac{1}{P(y)} \ge \Nstar/\mu$. Hence,
+any stopping time $\tau \ge \taumu$ also satisfies $\tau \ge \Nstar$,
+and moreover has $\hatytau \in \Ystar$ whenever $\Ystar \cap
+\{y_1,y_2,\dots,y_{\tau}\} \ne \emptyset$. This fails to occur with
+probability no more than
+\begin{align}
+    \left(1 - \frac{|\Ystar|}{\Pstar}\right)^{\Nstar} = \left(1 - \frac{|\Ystar|}{\Pstar}\right)^{\mu/\Pstar} \le e^{-|\Ystar|\mu}.
+\end{align}
+
+\end{proof}
+

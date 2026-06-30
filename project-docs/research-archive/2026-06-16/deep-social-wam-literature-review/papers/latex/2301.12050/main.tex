@@ -1,0 +1,757 @@
+\documentclass[nohyperref]{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2023} with \usepackage[nohyperref]{icml2023} above.
+\usepackage{hyperref}
+
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+% \usepackage{icml2023}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2023}
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\usepackage[textsize=tiny]{todonotes}
+
+% Custom Packages & Commands
+
+\usepackage[symbol]{footmisc}
+\usepackage{pifont}
+\renewcommand{\algorithmiccomment}[1]{// #1}
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+\newcommand{\kolby}[1]{\color{red}[Kolby: #1]\color{black}}
+\newcommand{\raj}[1]{\color{blue}[Raj: #1]\color{black}}
+\newcommand{\yejin}[1]{\textcolor{magenta}{[yejin: #1]}}
+\newcommand{\hanna}[1]{\textcolor{orange}{[hanna: #1]}}
+\newcommand{\alane}[1]{\textcolor{green}{[alane: #1]}}
+\newcommand{\sameer}[1]{\textcolor{violet}{[sameer: #1]}}
+\newcommand{\roy}[1]{\textcolor{olive}{[roy: #1]}}
+
+
+\newcommand{\agentshort}{\textsc{DECKARD}}
+\newcommand{\agentlong}{\textbf{DEC}ision-making for \textbf{K}nowledgable \textbf{A}utonomous \textbf{R}einforcement-learning \textbf{D}reamers}
+\icmltitlerunning{Embodied Decision Making using Language Guided World Modelling}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Do Embodied Agents Dream of Pixelated Sheep?: \\ Embodied Decision Making using Language Guided World Modelling}
+
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Kolby Nottingham}{uci}
+\icmlauthor{Prithviraj Ammanabrolu}{ai2}
+\icmlauthor{Alane Suhr}{ai2} \\
+\icmlauthor{Yejin Choi}{uw,ai2}
+\icmlauthor{Hannaneh Hajishirzi}{uw,ai2}
+\icmlauthor{Sameer Singh}{uci,ai2}
+\icmlauthor{Roy Fox}{uci}
+\end{icmlauthorlist}
+
+\icmlaffiliation{uci}{Department of Computer Science, University of California Irvine, Irvine, CA, United States}
+\icmlaffiliation{ai2}{Allen Institute for Artificial Intelligence, Seattle, WA, United States}
+\icmlaffiliation{uw}{Paul G. Allen School of Computer Science, Seattle, WA, United States}
+
+\icmlcorrespondingauthor{Kolby Nottingham}{knotting@uci.edu}
+
+\icmlkeywords{Reinforcement Learning, Natural Language Processing, Embodied Agents, World Models}
+
+\vskip 0.3in
+]
+
+\printAffiliationsAndNotice{}
+
+\begin{abstract}
+    Reinforcement learning (RL) agents typically learn tabula rasa, without prior knowledge of the world.
+    However, if initialized with knowledge of high-level subgoals and transitions between subgoals, RL agents could utilize this \emph{Abstract World Model} (AWM) for planning and exploration.
+    We propose using few-shot large language models (LLMs) to hypothesize an AWM, that will be verified through world experience, to improve sample efficiency of RL agents.
+    Our \agentshort{} agent applies LLM-guided exploration to item crafting in Minecraft in two phases: (1) the \emph{Dream} phase where the agent uses an LLM to decompose a task into a sequence of subgoals, the hypothesized AWM; and (2) the \emph{Wake} phase where the agent learns a modular policy for each subgoal and verifies or corrects the hypothesized AWM.
+    Our method of hypothesizing an AWM with LLMs and then verifying the AWM based on agent experience not only increases sample efficiency over contemporary methods by an order of magnitude but is also robust to and corrects errors in the LLM---successfully blending noisy internet-scale information from LLMs with knowledge grounded in environment dynamics.
+\end{abstract}
+
+\section{Introduction}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\linewidth]{figures/DECKARD}
+    \caption{
+    During the \emph{Dream} phase, \agentshort{} uses the LLM-predicted DAG of subgoals, the \color{Mulberry}\textbf{hypothesized}\color{black}~Abstract World Model (AWM), to sample a node on the path to the current task.
+    Then, during the \emph{Wake} phase, the agent executes subgoals and explores until reaching the sampled node. 
+    The AWM is corrected and discovered nodes marked as \color{BurntOrange}\textbf{verified}\color{black}.
+    }
+    \label{fig:deckard}
+\end{figure*}
+
+Despite evidence that practical sequential decision making systems require efficient exploitation of prior knowledge regarding a task, the current prevailing paradigm in reinforcement learning (RL) is to train \emph{tabula rasa}, without any pretraining or external knowledge \citep{agarwal2022reincarnating}.
+In an effort to shift away from this paradigm, we focus on the task of creating embodied RL agents that can effectively exploit large-scale external knowledge sources presented in the form of pretrained large language models (LLMs).
+
+LLMs contain potentially useful knowledge for completing tasks and compiling knowledge sources \cite{petroni2019language}. 
+Previous work has attempted to apply knowledge from LLMs to decision-making by generating action plans for executing in an embodied environment \cite{ichter2022do,huanginner,song2022llm,singhprogprompt,liang2022code,huang2022language}.
+However, LLMs still often fail when generating plans due to a lack of grounding \cite{valmeekam2022large}.
+Additionally, many of these agents that rely on LLM knowledge at execution time are limited in performance by the accuracy of LLM output.
+We hypothesize that if LLMs are instead applied to improving exploration during training, resulting policies will not be constrained by the accuracy of an LLM.
+
+Exploration in environments with sparse rewards becomes increasingly difficult as the size of the explorable state space increases. 
+For example, the popular 3D embodied environment Minecraft has a large technology tree of craftable items with complex dependencies and a high branching factor.
+Before crafting a stone pickaxe in Minecraft an agent must: collect logs, craft logs into planks and then sticks, craft a crafting table from planks, use the crafting table to craft a wooden pickaxe from sticks and planks, use the wooden pickaxe to collect cobblestone, and finally use the crafting table to craft a stone pickaxe from sticks and cobblestone.
+Reaching a goal item is difficult without expert knowledge of Minecraft via dense rewards \cite{bakervideo,danijardreamer} or expert demonstrations \cite{SkrynnikForgetful,Patil2020AlignRUDDERLF}, making item crafting in Minecraft a long-standing AI challenge \cite{GussMineRL,fanminedojo}.
+
+We propose \agentshort{}\footnote[1]{\href{https://deckardagent.github.io/}{https://deckardagent.github.io/}} (\agentlong), an agent that hypothesizes an \emph{Abstract World Model} (AWM) over subgoals by few-shot prompting an LLM, then exploits the AWM for exploration and verifies the AWM with grounded experience.
+As seen in Figure \ref{fig:deckard}, \agentshort{} operates in two phases: (1) the \emph{Dream} phase where it uses the hypothesized AWM to suggest the next node to explore from the directed acyclic graph (DAG) of subgoals; and (2) the \emph{Wake} phase where it learns a modular policy of subgoals, each trained on RL objectives, and verifies the hypothesized AWM with grounded environment dynamics.
+Figure \ref{fig:deckard} shows two iterations of the \agentshort{} agent learning the ``craft a stone pickaxe'' task in Minecraft.
+During the first \emph{Dream} phase, the agent has already verified the nodes \emph{log} and \emph{plank}, and \agentshort{} suggests exploring towards the \emph{stick} subgoal, ignoring nodes such as \emph{door} that are not predicted to complete the task.
+Then, during the following \emph{Wake} phase, \agentshort{} executes each subgoal in the branch ending in the \emph{stick} node and then explores until it successfully crafts a stick.
+If successful, the agent marks the newly discovered node as verified in its AWM before proceeding to the next iteration.
+
+We evaluate \agentshort{} on learning to craft items in the Minecraft technology tree.
+We show that LLM-guidance is essential to exploration in \agentshort{}, with a version of our agent without LLM-guidance taking over twice as long to craft most items during open-ended exploration.
+Whereas, when exploring towards a specific task, \agentshort{} improves sample-efficiency by an order of magnitude versus comparable agents, (12x the ablated \agentshort{} without LLM-guidance).
+Our method is also robust to task decomposition errors in the LLM, consistently outperforming baselines as we introduce errors in the LLM output. 
+\agentshort{} demonstrates the potential for robustly applying LLMs to RL, thus enabling RL agents to effectively use large-scale, noisy prior knowledge sources for exploration. 
+
+\section{Related Work}
+
+\subsection{Language-Assisted Decision Making}
+
+Textual knowledge can be used to improve generalization in reinforcement learning through environment descriptions \cite{branavan2011learning,Zhong2020RTFM,hanjie2021grounding} or language instructions \cite{chevalier-boisvert2018babyai,Anderson_2018_CVPR,ku2020room,Shridhar_2020_CVPR}.
+However, task specific textual knowledge is expensive to obtain, prompting the use of web queries \cite{nottingham2022learning} or models pretrained on general world knowledge \cite{dambekodi2020playing,SugliaEmbodied,ichter2022do,huanginner,song2022llm}.
+
+LLMs can also be used as an external knowledge source by prompting or finetuning them to generate action plans.
+However, by default, the generated plans are not grounded in environment dynamics and constraining output can harm model performance, both of which lead to subpar performance of out-of-the-box LLMs on decision-making tasks \cite{valmeekam2022large}. 
+Existing work that uses LLMs for generating action plans focuses on methods for grounding language in environment states \cite{ichter2022do,huanginner,song2022llm}, or improving LLM plans through more structured output \cite{singhprogprompt,liang2022code}.
+In this work, we focus on using LLMs for exploration rather than directly generating action plans.
+
+\citet{tam2022semantic} and \citet{mu2022improving} recently demonstrated that language is a meaningful state abstraction when used for exploration.
+Additionally, \citet{tam2022semantic} experiment with using LLM latent representations of state descriptions for novelty exploration, relying on pretrained LLM encodings to detect novel textual states.
+To the best of our knowledge, we are the first to apply language-assisted decision-making to exploration by using LLMs to predict and verify environment dynamics through experience.
+
+\subsection{Language Grounded in Interaction}
+
+Without grounding, LLMs often fail to reason about real world dynamics \cite{bisk2020experience}.
+Instruction following tasks have been a popular testbed for language grounding \cite{chevalier-boisvert2018babyai,Anderson_2018_CVPR,ku2020room,Shridhar_2020_CVPR} prompting many improvements to decision making conditioned on language instructions \cite{yu2018interactive,Lynch2020LanguageCI,nottingham2021modular,SugliaEmbodied,kuo2021compositional,zellers2021piglet,Song_2022_CVPR,pmlr-v164-blukis22a}.
+Other prior work used environment interactions to ground responses from question answering models in environment state \cite{gordon2018iqa,Das_2018_CVPR} or physics \cite{liu2022mind}.
+Finally, \citet{ammanabrolu2021learning} learn a grounded textual world model from environment interactions to assist an RL agent in planning and action selection.
+In this work, our \agentshort{} agent also uses a type of textual world model but it is obtained few-shot from an LLM and then grounded in environment dynamics by verifying hypotheses through interaction.
+
+\subsection{Modularity in RL}
+
+Modular RL proposes to learn several independent policies in a composable way to facilitate training and generalization \cite{Simpkins_Isbell_2019}.
+\citet{ammanabrolu2020avoid} and \citet{Patil2020AlignRUDDERLF} demonstrate how modular policies can improve exploration by reducing policy horizons, the former using the text-based game Zork and the latter using Minecraft.
+We implement modularity for Minecraft by finetuning a pretrained transformer policy with adapters, a technique recently implemented for RL by \citet{liang2022transformer} for multi-task robotic policies.
+
+\subsection{Minecraft}
+\label{sec:mine}
+
+Minecraft is a vast open-ended world with complex dynamics and sparse rewards.
+Crafting items in the Minecraft technology tree has long been considered a challenging task for reinforcement learning, requiring agents to overcome extremely delayed rewards and difficult exploration \cite{SkrynnikForgetful,Patil2020AlignRUDDERLF,danijardreamer}.
+This is partially due to the scarcity of items in the environment, but also due to the depth of some items in the game's technology tree.
+The purpose of our work is to overcome the latter of these two difficulties by better learning and navigating Minecraft's technology tree.
+
+Several existing agents overcome the problem of item scarcity in Minecraft by simplifying environment parameters such as action duration \cite{Patil2020AlignRUDDERLF} or block break time \cite{danijardreamer}, making comparison between methods difficult.
+For this reason we compare minimally to other Minecraft agents (see Table \ref{tab:agents}), focusing our evaluation on the benefits of LLM-guided exploration with \agentshort{}.
+We use the video pretrained (VPT) Minecraft agent \cite{bakervideo} as a starting point for exploration and finetuning, and we use the Minedojo implementation of the Minecraft Environment \cite{fanminedojo}.
+
+\section{Background}
+
+\subsection{Modular Reinforcement Learning}
+
+Rather than train a single policy with sparse rewards, modular RL advocates learning compositional policy modules \cite{Simpkins_Isbell_2019}. 
+\agentshort{} automatically discovers subgoals in Minecraft---each of which maps to an independently trained policy module---and learns a DAG of dependencies (the AWM) to transition between subgoals.
+Policy modules are trained in an environment modeled by a POMDP with states $s \in \mathcal{S}$, obseravtions $o \in O$, actions $a \in \mathcal{A}$, and environment dynamics $\mathcal{T}: \mathcal{S}, \mathcal{A} \to \mathcal{S}'$.
+These elements are common between modules, but each subgoal defines different initial states $\mathcal{S}_0$ and observations $O_0$, terminal states $\mathcal{S}_t$, and reward functions $\mathcal{R}: \mathcal{S}, \mathcal{A} \to \mathbb{R}$, according to the particular subgoal. 
+$\mathcal{S}_0$ and $O_0$ are defined by the current subgoal's parents in the DAG, and $\mathcal{S}_t$ and $\mathcal{R}$ are defined by the current subgoal.
+For example, the \emph{craft wooden pickaxe} subgoal has parents \emph{craft planks} and \emph{craft stick}, so $\mathcal{S}_0$ includes these items in the agent's starting inventory.
+This subgoal recieves a reward and terminates when a wooden pickaxe is added to the agent's inventory.
+Section \ref{sec:agent} and Appendix \ref{app:finetuning} provide more details.
+
+Due to the compositionality of modular RL, individual modules can be chained together to achieve complex tasks.
+In our case, given a goal state $s_g$, we use the subgoal DAG to create a path from our current state to $s_g$, $[s_0, s_1, ..., s_g]$, where each $s$ represents the terminal state for a subgoal.
+By chaining together sequences of subgoal modules, we can successfully navigate to connected portions of the currently discovered DAG and reach arbitrary goal states.
+
+\subsection{Large Language Models}
+\label{sec:llm}
+
+Large language models (LLM) are trained with a language modeling objective to maximize the likelihood of training data from large text corpora. 
+As LLMs have grown in size and representational power, they have seen success on various downstream tasks by simply modifying their input, referred to as prompt engineering \cite{brown2020language}. 
+Recent applications of LLMs to decision-making have relied partially or entirely on prompt engineering for their action planning \cite{ichter2022do,song2022llm,huanginner,singhprogprompt,liang2022code}.
+We follow this pattern to extract knowledge from LLMs and construct our AWM.
+We prompt OpenAI's Codex model \cite{OpenAICodex} to generate \agentshort{}'s hypothesized AWM.
+Codex is trained to generate code samples from natural language.
+As with previous work \cite{singhprogprompt,liang2022code}, we find that structured code output works well for extracting knowledge from LLMs.
+We structure LLM output by prompting Codex to generate a python dictionary of Minecraft item dependencies, which we then map to a graph of items and their dependencies (see Section \ref{sec:subllm} and Appendix \ref{app:llm}).
+
+\section{DECKARD}
+\label{sec:deckard}
+
+\begin{algorithm}[t]
+\caption{\agentshort}\label{alg:deckard}
+\begin{algorithmic}
+    \STATE $G \gets LLM()$ \hfill\COMMENT{hypothesize AWM with LLM}
+    \STATE $C \gets X: 0$ \hfill\COMMENT{dict of visit counts}
+    \STATE $V \gets \emptyset$ \hfill\COMMENT{set of verified nodes}
+    \WHILE{$training$}
+        \STATE\COMMENT{Dream Phase}
+        \STATE $F \gets Frontier(G, V)$
+        \IF{$any(C(F)\le c_0)$}
+            \STATE $\bar{x} \gets SampleBranch(F\;|\;C(F)\le c_0)$
+        \ELSE
+            \STATE $\bar{x} \gets SampleBranch(F\cup V)$
+        \ENDIF
+        \STATE\COMMENT{Wake Phase}
+        \STATE $x \gets x_0$
+        \FOR{$t = 1 ... |\bar{x}|$}
+            \STATE $x' \gets ExecuteSubgoal(\bar{x}_t)$
+            \STATE $C(x') \gets C(x')+1$
+            \IF{$x' \notin V$}
+                \STATE $G \gets AddEdge(G, x, x')$
+                \STATE $V \gets V \cup \{x'\}$
+            \ENDIF
+            \STATE $x \gets x'$
+        \ENDFOR
+    \ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Abstract World Model}
+
+Our method, \agentlong{} (\agentshort), builds an Abstract World Model (AWM) of subgoal dependencies from state abstractions.
+We begin by assuming a textual state representation function $\phi: O \to X$. 
+Textual state representations $x \in X$ make up the nodes for our AWM $G: X, E$ with directed edges $E$ defining the dependencies between $X$. 
+We further constrain $G$ to a directed acyclic graph (DAG) so that the nodes of the DAG represent subgoals useful in navigating towards a target goal. 
+In our experiments, we use the agent's current inventory as $X$, a common component of the Minecraft observation space \cite{fanminedojo,danijardreamer}.
+
+We update $G$ from agent experience through environment exploration. 
+When the agent experiences node $x_t$ for the first time, $G$ is updated by adding edges between the previous node $x_{t-1}$ and the new node $x_t$.
+When trying to reach a previously experienced node, \agentshort{} recovers the path from current node $x_0$ to the target node $x_t$ from the AWM.
+\agentshort{} then executes policies for each recovered node until it reaches the target goal.
+
+\subsection{LLM Guidance}
+
+The setup so far (referred to in our experiments as ``\agentshort{} (No LLM)'') allows the construction of a modular RL policy for navigating subgoals.
+However, the agent is still learning the AWM tabula-rasa.
+The key insight of \agentshort{} is that we can hypothesize the AWM with knowledge from an LLM.
+We use in-context learning, as described in Section \ref{sec:subllm}, to predict $G$ from an LLM with predicted edges, $\hat{E}$.
+While acting in the environment, we verify or correct edges of $G$ and track the set of nodes that have been verified $V$ thus grounding the AWM hypothesized by the LLM in environment dynamics. 
+
+\subsubsection{Dream Phase}
+\label{sec:dream}
+
+Equipped with a hypothesized AWM, we iterate between \emph{Dream} and \emph{Wake} phases for guided exploration toward a goal (see Algorithm \ref{alg:deckard}).
+During the \emph{Dream} phase, we compute the verified frontier $F$ of $G$, composed of verified nodes $V$, with predicted edges to unverified nodes $G-V$.
+In addition, if a path between $V$ and the current task's goal exists, $F$ is pruned to only include nodes along the predicted path to the goal.
+For example, after learning to craft \emph{planks}, subgoals \emph{door} and \emph{stick} are potential frontier nodes.
+However, if the target item is \emph{wooden pickaxe}, \agentshort{} will eliminate \emph{door} as a candidate node for exploration since \emph{stick} is part of the LLM-predicted recipe for the target item and \emph{door} is not.
+Finally, we sample a branch $\bar{x}$ terminating with an element from $F$ to explore during the \emph{Wake} phase.
+If all nodes in $F$ have been sampled at least $c_0$ times (where $c_0$ is an exploration hyperparameter) without success, we the sample from all $V$ rather than $F$ only.
+
+\subsubsection{Wake Phase}
+\label{sec:wake}
+
+Next, during the \emph{Wake} phase, the agent executes the sequence of subgoals $\bar{x}$ updating $G$ with learned experience and adding verified nodes to $V$.
+If sampled from $F$, the final node in $\bar{x}$ will be unlearned, allowing the agent to explore in an attempt to reach the unverified node.
+If successful, the AWM is updated and the new node is also added to $V$.
+When adding a newly verified node $x$ we begin finetuning a new subgoal policy for $x$ (see Section \ref{sec:agent}).
+Beyond reducing the number of iterations it takes to construct $G$, one benefit of initializing $G$ with an LLM is that we do not finetune subgoals for nodes outside of the predicted path to our target goal.
+If the predicted recipes fail, then \agentshort{} begins training additional subgoal policies to assist in exploration.
+This drastically reduces the number of environment steps required to train \agentshort{}.
+
+\section{Experiment Setup}
+\label{sec:agent}
+
+We apply \agentshort{} to crafting items in Minecraft, an embodied learning environment that requires agents to perform sequences of subgoals with sparse rewards.
+Our agent maps inventory items to AWM subgoals and learns a modular policy that can be composed to achieve complex tasks.
+By learning modular policies, our agent is able to collect and craft arbitrary items in the Minecraft technology tree.
+
+\subsection{Predicting the Abstract World Model}
+\label{sec:subllm}
+
+In our experiments,  we predict the AWM using OpenAI's Codex model \cite{OpenAICodex} by prompting the LLM to generate recipes for Minecraft items. 
+We prompt Codex to ``Create a nested python dictionary containing crafting recipes and requirements for minecraft items'' along with additional instructions about the dictionary contents and two examples: \emph{diamond pickaxe} and \emph{diamond} (see Appendix \ref{app:llm}).
+We iterate over 391 Minecraft items, generating recipes as well as tool requirements (mining stone requires a pickaxe) and workbench requirements (crafting a pickaxe requires a crafting table).
+The hypothesized AWM is generated at the start of training, so no forward passes of the LLM are necessary during training or inference.
+Table \ref{tab:llm} shows the accuracy of the hypothesized un-grounded AWM.
+
+\begin{table}[h]
+    \small
+    \setlength{\tabcolsep}{2.75pt}
+    \center
+    \begin{tabular}{lcc}
+        Metric                   & All Items & Tools Only \\
+        \midrule
+        Collectable vs. Craftable& 57      & 100   \\
+        Crafting Table / Furnace & 84      & 96  \\
+        Recipe Correct Items     & 66      & 81  \\
+        Recipe Exact Match       & 55      & 69 
+    \end{tabular}
+    \caption{
+    LLM accuracy when predicting various node features: whether an item is collectable (no parents) or craftable (has a recipe), whether it requires a crafting table or furnace to craft, whether recipe ingredients are correct, and whether the recipe is an exact match (including ingredient quantities). The first results column includes all 391 Minecraft items, whereas the second column only includes the 37 items in the tool technology tree.}
+    \label{tab:llm}
+\end{table}
+
+\subsection{Subgoal Finetuning}
+\label{sec:finetuning}
+
+Rather than train each module from scratch, we finetune transformer adapters for each module with an RL objective following the adapter architecture from \citet{houlsby2019parameter}. 
+We use the Video-Pretrained (VPT) Minecraft model as our starting policy \cite{bakervideo}.
+We chose to finetune VPT as it proved to be more sample efficient and more stable than training policies from scratch.
+Moreover, since VPT is pretrained on a variety of Minecraft skills, the non-finetuned VPT model explores the environment more thoroughly than a random agent.
+Our implementation of VPT finetuned with adapters is referred to as VPT-a.
+
+Adapters are especially well suited for modular finetuning due to their lightweight architecture \cite{liang2022transformer}. 
+In our agent, each subgoal module corresponds to one set of adapters and only contains 9.5 million trainable parameters, approximately 2\% of the 0.5 billion parameter VPT model. 
+This allows us to train a separate set of adapters for each subgoal and still keep all parameters in memory concurrently, a practical benefit of using adapters for modular, compositional RL policies.
+
+\subsection{Environment Details}
+\label{sec:env}
+
+We use Minedojo's Minecraft implementation for our experiments \cite{fanminedojo}. 
+As with VPT \cite{bakervideo}, our subgoal policies use a pixel only observation space and a large multi-discrete action space, while our overall policy transitions between subgoals based on the agent's current inventory.
+Unlike VPT, we use standard high-level crafting actions that instantly crafts target items from inventory items.
+At the time of this writing, Minedojo does not support the VPT style of human-like crafting in a GUI, so we instead remove the VPT action for opening the crafting GUI and replace it with 254 crafting actions (one for each item). 
+This brings our multi-discrete action space to 121 camera actions and 8714 keyboard/crafting actions, and our observation space to 128x128x3 pixels plus 391 inventory item quantities (only used to transition between subgoals).
+
+Because our subgoals map to individual items, there is an intrinsic separation between items that are collected from the environment versus those that require crafting.
+While we must finetune a set of adapters for subgoals that require navigating or collecting items from the environment, crafting subgoal policies map to a single craft action---making them much more space and sample efficient compared to collectable item subgoals.
+
+\subsection{Experiments}
+
+We evaluate \agentshort{} on both crafting tasks---in which the agent learns to collect ingredients and craft a target item---and open-ended exploration.
+In open-ended exploration, although there is no extrinsic learning signal, \agentshort{} is intrinsically motivated to explore new AWM nodes.
+We compare the growth of the agent's verified AWM during open-ended exploration for \agentshort{} with and without LLM guidance along with a VPT baseline. 
+Next, we compare LLM-guided \agentshort{} to RL baselines and \agentshort{} without LLM guidance on goal-driven tasks for collecting/crafting: logs, wooden pickaxes, cobblestone, stone pickaxes, furnaces, sand, and glass.
+We also compare to several popular Mincraft agents on the ``craft a stone pickaxe task'' (see Table \ref{tab:agents}).
+Finally, we evaluate the effect of artificial errors in the hypothesized AWM to simulate errors in LLM output and demonstrate \agentshort{}'s robustness to LLM accuracy.
+
+\section{Experiment Results}
+
+\subsection{Open-Ended Exploration}
+
+\begin{figure}
+    \centering
+    \includegraphics[trim={0 1cm 0 0},width=\linewidth]{figures/size}
+    \caption{
+    Rate of exploration for during open-ended exploration, measured by the size of the verified AWM per iteration. Each iteration  includes one \emph{Dream} and one \emph{Wake} phase. 
+    \emph{VPT} measures the number of items discovered by a non-finetuned VPT policy and \emph{No LLM} ablates LLM guidance. 
+    LLM guidance more than halves the time it takes to discover difficult items such as stone tools and glass.
+    }
+    \label{fig:size}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[trim={0 1cm 0 0},width=\linewidth]{figures/pruned}
+    \caption{
+    \agentshort{} prunes the AWM by only sampling from the frontier of verified and hypothesized AWM nodes.
+    Without LLM guidance, our agent would sample from the entire AWM during exploration. 
+    However, the AWM grows in size throughout training and many nodes become dead ends, slowing exploration. 
+    }
+    \label{fig:pruned}
+\end{figure}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=.9\linewidth]{figures/success}
+    \caption{
+    Success rates for item tasks on random world seeds. 
+    The VPT agent shows success rates of the pretrained VPT policy without any additional finetuning. 
+    VPT-a finetunes VPT using the same training setup as \agentshort{} without modularity or LLM guidance.
+    As indicated by the results for \emph{log} and \emph{sand} (item tasks composed of a single subgoal), VPT-a is equivalent to a single subgoal policy.
+    \agentshort{} without LLM-guidance has the same success rate as the full \agentshort{} agent.
+    }
+    \label{fig:success}
+\end{figure*}
+
+\agentshort is intrinsically motivated to explore new nodes, always sampling and attempting to craft new items, and thus does not require a target task to improve exploration.
+We can measure the effect of \agentshort{} on exploration by tracking the growth of the agent's verified AWM nodes.
+Figure \ref{fig:size} shows the speed of exploration when using \agentshort{} with and without LLM guidance.
+We also compare \agentshort{} to a VPT baseline that explores the environment without an AWM with a non-finetuned VPT policy.
+Although VPT does not construct an AWM, it gathers Minecraft items and randomly attempts to craft new items from the gathered ingredients.
+We track how many items it has discovered and plot that quantity in Figure \ref{fig:size}.
+\agentshort{} without LLM guidance constructs an AWM from scratch, but only the  LLM-guided \agentshort{} agent uses LLM guidance to decide which items to collect and which recipes to attempt next. 
+Note that \agentshort{} subgoal policies are initialized with VPT, so VPT starts out exploring at a similar rate to \agentshort{}.
+
+The \agentshort{} and VPT agents quickly learn to mine logs and craft wooden items.
+However, one exploration hurdle is discovering that wooden pickaxes are a prerequisite for mining cobblestone.
+As seen in Figure \ref{fig:size}, it takes \agentshort{} without LLM guidance and the VPT baseline 2x and 3x longer respectively to learn to use a wooden pickaxe to mine cobblestone.
+Once the agents learn how to mine cobblestone, they can begin adding stone items to their AWM.
+However, only \agentshort{} avoids oversampling dead ends in the crafting tree allowing it to quickly explore new states.
+Also, the LLM incorrectly predicts that glass can be collected without crafting or tools of any kind, but \agentshort{} overcomes and corrects this error, successfully crafting glass and adding the correct recipe to the AWM.
+
+In general, the frontier $F$ of the verified AWM nodes is much smaller than $G$.
+This difference increases as the agent continues to explore and add verified nodes to $G$.
+Figure \ref{fig:pruned} shows the sizes of $G$ and $F$ throughout open-ended exploration for \agentshort{}.
+The smaller size of $F$ means that each iteration \agentshort{} is more likely to sample items that are useful for crafting something new.
+Eventually, difficult to reach or erroneous nodes in $F$ could limit exploration, so we stop prioritizing sampling from the frontier after $c_0$ failed attempts to reach nodes from $F$.
+
+\subsection{Crafting Tasks}
+
+\begin{figure}
+    \centering
+    \includegraphics[trim={0 1cm 0 0},width=1\linewidth]{figures/steps}
+    \caption{
+    LLM guidance improves environment timestep efficiency by an order of magnitude by only learning policies for predicted prerequisites of target items.
+    }
+    \label{fig:steps}
+\end{figure}
+
+We also evaluate \agentshort{} on tasks that challenge the agent to collect or crafting a specific item.
+The training procedure for items tasks is the same, but rather than sample from the entire frontier $F$ as with open-ended exploration, we only sample nodes from $F$ predicted to lead to the target item.
+We conclude training when the target item is obtained.
+
+Figure \ref{fig:success} compares \agentshort{} success rates to baselines across item tasks: logs, wooden and stone pickaxes, cobblestone, furnace, sand, and glass.
+The VPT baseline is the non-finetuned VPT policy acting in the environment, and VPT-a follows the same training setup as our subgoal policies (see Section \ref{sec:finetuning}).
+Agents are allowed a maximum of 1,000 environment steps to obtain collectable items (log and sand), and 5,000 steps for all other craftable items.
+Training for each agent is limited to 6 million steps, although \agentshort{} only takes that many for the ``craft glass'' task.
+\agentshort{} outperforms directly training on item tasks with a traditional reinforcement learning signal and learns to craft items further up the technology tree where the baseline completely fails.
+
+\begin{table*}
+    \small
+    \setlength{\tabcolsep}{2.75pt}
+    \center
+    \begin{tabular}{lccccccc}
+        Method & Demos & Dense Rewards & Auto-crafting & Observations & Actions & Params & Steps \\
+        \midrule
+        Align-RUDDER \cite{Patil2020AlignRUDDERLF} & Expert & \xmark & \cmark & Pixels \& Meta & 61 & 2.5M/subgoal & 2M \\
+        VPT+RL \cite{bakervideo} & Videos & \cmark & \xmark & Pixels Only & 121, 8461 & 248M & 2.4B \\
+        DreamerV3 \cite{danijardreamer} & None & \cmark & \cmark & Pixels \& Meta & 25 & 200M & 6M \\
+        \agentshort{} (No LLM)    & Videos & \xmark & \cmark & Pixels \& Inventory & 121, 8714 & 9.5M/subgoal & 32M \\
+        \agentshort{}             & Videos & \xmark & \cmark & Pixels \& Inventory & 121, 8714 & 9.5M/subgoal & 2.6M
+    \end{tabular}
+    \caption{
+    We limit comparison between minecraft agents because of the various shortcuts used to solve the difficult exploration task. 
+    Align-RUDDER, relies on expert demonstrations. 
+    DreamerV3 and Align-RUDDER, simplify the action space. 
+    VPT+RL and DreamerV3 provide intermediate crafting rewards. 
+    The final column above compares how long each method takes to learn the ``craft stone pickaxe'' task.
+    Despite its challenging learning setup, \agentshort{} achieves sample efficiency equal to or better than existing agents.
+    }
+    \label{tab:agents}
+\end{table*}
+
+Note that we use random world seeds for all evaluation making scarce items more difficult to reliably collect.
+For example, the fact that sand is more rare than logs is reflected in their respective success rates in Figure \ref{fig:success}.
+Also, items that depend on logs (pickaxes, cobblestone, furnace) and sand (glass) will have success rates bounded by that of their parent nodes in the AWM.
+
+The sample efficiency of \agentshort{} with LLM guidance is especially notable when applied to item crafting and collecting tasks.
+With LLM guidance, \agentshort{} can avoid learning subgoal policies for items it predicts are unnecessary for the current goal (see Section \ref{sec:wake}).
+Figure \ref{fig:steps} demonstrates the large difference in sample efficiency when only training policies for predicted subgoals. 
+Without LLM guidance, \agentshort{} finetunes subgoal policies for an average of fifteen different collectable items when learning to craft a stone pickaxe.
+With guidance, \agentshort{} only finetunes subgoal policies for collecting needed items (such as logs and cobblestone)---resulting in an order of magnitude improvement in sample efficiency.
+
+Although not the primary goal of this work, we compare \agentshort{} to several agents from previous work trained to craft items along the Minecraft technology tree.
+Table \ref{tab:agents} includes a high level overview of these agents and shows the number of environment samples for each to learn the ``craft stone pickaxe'' task.
+Note that each of these agents uses different action and observation spaces as well as pretraining data.
+For example, \agentshort{} does not require any reward shaping from domain expertise, expert demonstrations, or simplifications of the observation and action spaces.
+As mentioned in Section \ref{sec:env}, we do follow previous work and use discrete actions for item crafting.
+At the time of writing, VPT is the only agent that learns low-level item crafting using the graphical crafting interface.
+Table \ref{tab:agents} shows that \agentshort{}'s sample efficiency is equal to or better than that of previous work.
+
+\subsection{Robustness}
+
+\begin{figure}
+    \centering
+    \includegraphics[trim={0 1cm 0 0},width=\linewidth]{figures/noise}
+    \caption{
+    Effect of errors in the initial AWM, measured by time to craft a stone pickaxe. 
+    Starting from a ground truth AWM, the error rate indicates the percentage of artificially inserted/deleted edges to simulate errors in LLM output.
+    }
+    \label{fig:noise}
+\end{figure}
+
+Finally, we evaluate our claim that \agentshort{} is robust to errors in LLM output. 
+While LLMs are becoming surprisingly knowledgeable, they are not grounded in environment knowledge and sometimes output erroneous facts \cite{valmeekam2022large}.
+Figure \ref{fig:noise} shows training time for \agentshort{} on the target task ``craft stone pickaxe'' for various error types and rates in the hypothesized AWM.
+For each run, we start with a ground truth AWM and artificially introduce errors over at least three different random seeds for each error type and rate.
+
+The most common error in our LLM-hypothesized AWM was ingredient quantity (see Table \ref{tab:llm}), but we found that \agentshort{} was robust to this error and often ended up with a surplus of ingredients.
+Figure \ref{fig:noise} shows the effect of inserting and deleting edges from the ground truth AWM.
+Inserted edges always add sand as an ingredient for the current item, and deleted edges may remove recipe ingredients or a required tool/crafting table.
+\agentshort{} with LLM guidance successfully outperforms \agentshort{} without LLM guidance even when faced with large errors in LLM output, demonstrating \agentshort's robustness to LLM output as an exploration method.
+
+\section{Discussion \& Conclusion}
+
+In line with proposals to utilize pretrained models in RL \cite{agarwal2022reincarnating}, we extract knowledge from LLMs in the form of an Abstract World Model (AWM) that defines transitions between subgoals in a directed acyclic graph.
+Our agent, \agentshort{} (\agentlong{}), successfully uses the AWM to intelligently explore Minecraft item crafting, learning to craft arbitrary items through a modular RL policy.
+Initializing \agentshort{} with an LLM-predicted AWM improves sample efficiency by an order of magnitude.
+Additionally, we use environment dynamics to ground the hypothesized AWM by verifying and correcting it with agent experience, robustly applying large-scale, noisy knowledge sources to aid in sequential decision-making.
+
+We, along with many others, hope to utilize the potential of LLMs for unlocking internet-scale knowledge for decision-making.
+Throughout this effort, we encourage the pursuit of robust and generalizable methods, like \agentshort{}.
+One drawback of \agentshort{}, along with many other LLM-assisted RL methods, is that it requires an environment already be grounded in language.
+Some preliminary methods for generating state descriptions from images are used by \citet{tam2022semantic}, but this remains an open area of research.
+Additionally, we assume an abstraction over environment states to make predicting dependencies scalable.
+We leave the problem of of automatically identifying state abstractions to future work.
+Finally, \agentshort{} considers only deterministic transitions in the AWM.
+While a similar approach to ours could be applied to stochastic AWMs, that is out of the scope of this work. 
+
+\agentshort{} introduces a general approach for utilizing pretrained LLMs for guiding agent exploration.
+By alternating between sampling predicted next subgoals on the frontier of agent experience (The \textit{Dream} phase) and executing subgoal policies to expand the frontier (The \textit{Wake} phase), we successfully ground noisy LLM world knowledge with environment dynamics and learn a modular policy over compositional subgoals.
+
+\section*{Acknowledgements}
+
+We would like to thank Dheeru Dua, Dylan Slack, Anthony Chen, Catarina
+Belem, Shivanshu Gupta, Tamanna Hossain, Yasaman Razeghi, Preethi Seshardi, and the anonymous reviewers for their discussions and feedback.
+Roy Fox is partly funded by the Hasso Plattner Foundation.
+
+\bibliography{main}
+\bibliographystyle{icml2023}
+
+\newpage
+\appendix
+\onecolumn
+\section{Codex In-Context Learning}
+\label{app:llm}
+
+\subsection{Prompting Details}
+
+We use OpenAI's Codex model (code-davinci-002) \cite{OpenAICodex} to predict an Abstract World Model (AWM) for \agentshort{}. 
+We prompt the model with instructions in code comments that instruct the model to generate a python dictionary with information for Minecraft item requirements.
+We also provide example entries for ``diamond pickaxe'' and ``diamond''.
+We then iterate over all 391 Minecraft items to generate the next entry in the python dictionary.
+We organize the data in the dictionary entries into the following item attributes:
+
+\begin{itemize}
+    \item requires\_crafting\_table: whether an item requires the agent to have a crafting table prior to crafting
+    \item requires\_furnace: whether the item is smelted with a furnace
+    \item required\_tool: what tool is required to collect the item from the environment
+    \item recipe: list of ingredients and ingredient quantities to craft the item
+\end{itemize}
+
+The full prompt we use can be found below:
+
+\begin{verbatim}
+# Create a nested python dictionary containing crafting recipes and requirements 
+for minecraft items.
+# Each crafting item should have a recipe and booleans indicating whether a 
+furnace or crafting table is required.
+# Non craftable blocks should have their recipe set to an empty list and 
+indicate which tool is required to mine.
+
+minecraft_info = {
+    "diamond_pickaxe": {
+        "requires_crafting_table": True,
+        "requires_furnace": False,
+        "required_tool": None,
+        "recipe": [
+            {
+                "item": "stick",
+                "quantity": "2"
+            },
+            {
+                "item": "diamond",
+                "quantity": "3"
+            }
+        ]
+    },
+    "diamond": {
+        "requires_crafting_table": False,
+        "requires_furnace": False,
+        "required_tool": "iron_pickaxe",
+        "recipe": []
+    },
+    "[insert item name]": {
+\end{verbatim}
+
+\subsection{Parsing Details}
+
+When parsing output, we consider any item with a recipe of length zero to be a collectable item (it will have no parents in the AWM).
+In our experiments, Codex generated parsable entries for all but one Minecraft item (brown mushroom block).
+
+In general, Codex predicts the same item identifier that Minedojo \cite{fanminedojo} uses.
+One major exception is that of \emph{planks}, a common item essential for many recipes.
+We parse \emph{plank} and \emph{wood} as well as any variant of these two (\emph{oak plank}) as \emph{planks}.
+We also parse \emph{cane} as \emph{reeds}.
+Note that in all these cases the predicted names are also common identifiers for these items in minecraft, but they do not match the Minedojo identifiers.
+
+Finally, we remove circular dependencies from the predicted AWM.
+First we remove edges from crafting table, furnace, and tool nodes to items that are found in the recipes for those nodes.
+Then we remove edges both to and from items found in eachother's recipes.
+There were four cases of circular dependencies in our hypothesized AWM, between planks and crafting table, log and wooden axe, fermented spider eye and spider eye, and purpur block and purpur pillar.
+
+\subsection{Additional Results}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{cccc}
+        \multicolumn{4}{c}{``Tool Only'' Items} \\
+        \hline
+        coal & furnace & crafting\_table & log \\
+        planks & stick & cobblestone & iron\_ore \\
+        iron\_ingot & gold\_ore & gold\_ingot & diamond \\
+        wooden\_hoe & wooden\_sword & wooden\_axe & wooden\_pickaxe \\
+        wooden\_shovel & stone\_hoe & stone\_sword & stone\_axe \\
+        stone\_pickaxe & stone\_shovel & iron\_hoe & iron\_sword \\
+        iron\_axe & iron\_pickaxe & iron\_shovel & golden\_hoe \\
+        golden\_sword & golden\_axe & golden\_pickaxe & golden\_shovel \\
+        diamond\_hoe & diamond\_sword & diamond\_axe & diamond\_pickaxe \\
+        diamond\_shovel &  &  &  
+    \end{tabular}
+    \caption{The 37 Minecraft items from the tool technology tree.}
+\end{table}
+
+\begin{table}[h]
+    \small
+    \setlength{\tabcolsep}{2.75pt}
+    \center
+    \begin{tabular}{lcc}
+        Metric & All Items & Tools Only \\
+        \midrule
+        Accuracy: Collectable vs. Craftable Label           & 57  & 100   \\
+        Accuracy: Workbench (Crafting Table/Furnace)        & 84  & 96  \\
+        Accuracy: Recipe Ingredients                        & 66  & 81  \\
+        Accuracy: Recipe Ingredients \& Quantities          & 55  & 69 \\
+        \% Items w/ Incorrectly Inserted Dependencies       & 42  & 8 \\
+        \% Items w/ Missing Dependencies                    & 35  & 26 \\
+        Standard Deviation In Predicted Ingredient Quantity & 0.98  & 0.34 \\
+        Absolute Error In Predicted Ingredient Quantity     & 2.77  & 1.50 \\
+        Average Error In Predicted Ingredient Quantity      & -1.07 & 0.50
+    \end{tabular}
+    \caption{
+    Additional Codex metrics for predicting the Minecraft AWM.
+    }
+\end{table}
+
+Our experiments with few-shot prompting Codex to generate the AWM for Minecraft show that LLMs can generate structured knowledge for decision making.
+However, predictions are not perfect, so we treat them as hypotheses that are verified by environment interactions.
+Codex does perform better on the tool technology tree, items that are both more common and more relevant for crafting agents.
+A large percentage of errors also appears to be from incorrectly predicted ingredient quantities.
+
+\newpage
+\section{Subgoal Finetuning}
+\label{app:finetuning}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=.8\linewidth]{figures/fintune}
+    \caption{
+    Results for finetuning subgoal policies. \agentshort{}'s VPT-based subgoal policies are trained on seeds where the target item is nearby and evaluated on random world seeds. 
+    Of these results, cobblestone is the most ubiquitous and sand the least, as indicated by how well the policy generalizes to random Minecraft world seeds.
+    }
+    \label{fig:finetune}
+\end{figure}
+
+\begin{table}[h]
+    \small
+    \setlength{\tabcolsep}{2.75pt}
+    \center
+    \begin{tabular}{lcc}
+        Hyperparameter & Value \\
+        \midrule
+        VPT Checkpoint & bc-house-3x \\
+        Environment Steps per Actor per Iteration & 500  \\
+        Number of Actors & 4  \\
+        Batch Size & 40 \\
+        Iteration Epochs & 5 \\
+        Learning Rate & 0.0001 \\
+        $\gamma$ & 0.999 \\
+        Value Loss Coefficient & 1 \\
+        Initial KL Loss Coefficient & .1 \\
+        KL Coefficient Decay per Iteration & .999 \\
+        Adapter Downsize Factor & 16
+    \end{tabular}
+    \caption{
+    \agentshort{} subgoal finetuning hyperparameters.
+    }
+    \label{tab:hyper}
+\end{table}
+
+\subsection{VPT Finetuning}
+
+We finetune VPT (3x w/ behavior cloning on house contractor data) \cite{bakervideo} with reinforcement learning (RL) using transformer adapters as described by \citet{houlsby2019parameter}.
+That is, we insert two adapter modules with residual connections in each transformer layer, with a 16x reduction in hidden state size.
+We updated the adapters and agent value head using proximal policy optimization (PPO) \cite{schulman2017proximal}, but we leave the rest of the agent unchanged (including the policy head).
+
+Following \citet{bakervideo}, we replace the traditional entropy loss in the PPO algorithm with a KL loss between the current policy and the non-finetuned VPT policy.
+The purpose of this loss is to prevent catastrophic forgetting early in training.
+Our experiments reaffirmed the importance of this term, even when leaving the majority of the VPT weights unchanged.
+The KL loss coefficient decays throughout training to allow the agent to reach an optimal policy.
+
+\subsection{MineClip Reward}
+
+Along with their Minedojo Minecraft implementation, \citet{fanminedojo} introduced a text and video alignment model for Minecraft called MineClip and showed how the model could be used for automatic reward shaping given a text goal.
+We use MineClip to provide reward shaping for finetuning \agentshort{} subgoal and VPT-a policies.
+Unlike \citet{fanminedojo}, we implement MineClip reward shaping by subtracting $clip_{low}=21$ from the MineClip alignment score and scaling by $clip_\alpha=0.005$, smoothed over $smooth=50$ steps:
+
+$$reward_{clip} = clip_\alpha \times max(0, mean(score\_buffer_{-smooth:}) - clip_{low})$$
+
+Additionally, we only provide the agent with non-zero reward when the MineClip alignment score reaches a new maximum for the episode.
+Finally we provide a reward of $+1$ when the agent successfully adds the target item to its inventory.
+
+\subsection{Minecraft Settings}
+\label{app:minecraft}
+
+Use use the Minedojo simulator \cite{fanminedojo} with the ``creative'' metatask for our experiments.
+We found Minedojo preferable to MineRL \cite{GussMineRL}, due to a reduced tendency to crash when running many parallel environment instances.
+We followed the VPT \cite{bakervideo} observation and action spaces---128x128x3 pixel observation space and 121x8461 multi-discrete action space---with the modification of replacing the ``open inventory'' action with 254 discrete crafting actions.
+
+When training subgoal policies, we initialize the agent with items from the current node's parents.
+For example, when training the \emph{collect cobblestone} subgoal, we initialize the agent with a wooden pickaxe, the required tool for cobblestone in the AWM.
+We terminate each episode after 1,000 environment steps, generating a new world.
+
+We also found that finetuning was sensitive to world seed when training.
+For example, many world seeds spawned the agent far from target items, stranded on islands, or underwater.
+To mitigate the effect of poor world initialization on training, we use a single world seed for training each subgoal policy and then evaluate on random world seeds.
+We find that VPT is able to generalize to random seeds after training on a training seed.
+
+\section{Abstract World Model}
+
+\subsection{Disambiguating the World Model}
+
+In many environments, multiple possible transitions between subgoals may exist.
+For example, in Minecraft, an agent can obtain coal through mining or by burning wood in a furnace.
+Ideally, edges of the AWM would provide paths with high success rate to each node.
+In our implementation we keep the first experienced edge between nodes, assuming it to be the simplest path.
+
+\subsection{Additional Results}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=.6\linewidth]{figures/size_4}
+    \caption{
+    AWM growth over the course of open-ended exploration.
+    The first three quadrants are identical to Figure \ref{fig:size}.
+    The last quadrant adds results for a ground truth AWM.
+    The agent learns to craft glass much sooner and also learns to craft glass bottles, and item none of the other methods reached.
+    }
+    \label{fig:size_4}
+\end{figure}
+
+
+
+\end{document}

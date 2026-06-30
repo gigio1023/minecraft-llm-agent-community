@@ -1,0 +1,96 @@
+\newcommand{\givebase}{}
+
+
+    
+This section introduces the two families of self-improvement algorithms
+for sharpening
+that we study. {Going forward, we omit the dependence of
+  $\rself$ on $\pibase$ when it is clear from context. We use the notation $\argmax_{\pi \in \Pi}$ or $\argmin_{\pi \in \Pi}$
+  to denote exact optimization over a user-specified model class
+  $\Pi$ for theoretical results
+  \citep{agarwal2019reinforcement,foster2023foundations}; empirically,
+  these operations can be implemented by training a neural network to low loss.}
+
+
+
+
+\subsection{Self-Improvement through SFT: \bestofnalg}
+
+\label{sec:bestofn}
+\bestofnalg filters responses for which the self-reward
+$\rself(y\mid{}x)$ 
+is large, and applies standard supervised fine-tuning on the resulting dataset
+\citep{amini2024variational,sessa2024bond,gui2024bonbon,pace2024west}. This can be viewed as 
+amortizing inference-time sharpening via the  effective-but-costly  \bestofn sampling approach
+\citep{brown2024large,snell2024scaling,wu2024empirical}. 
+Concretely, suppose we have a collection of prompts
+$x_1,\ldots,x_n$. For each prompt, we sample $N$ responses
+$y_{i,1},\ldots,y_{i,N}\sim\piref(\cdot\mid{}x_i)$, then compute the
+\bestofn response
+$\ybon_i=\argmax_{j\in\brk{N}}\crl*{\rself(y_{i,j}\mid{}x_i\givebase)}$,
+scoring via the model's self-reward function. We
+ compute the sharpened model via supervised fine-tuning on the \bestofn responses:
+\begin{align}
+  \pihatbon = \argmax_{\pi \in \Pi}\sum_{i=1}^{n}\log \pi(\ybon_i\mid{}x_i\givebase).
+\end{align}
+\arxiv{\bestofnalg}\iclr{This} is a simple, flexible self-training scheme, and
+converges to a sharpened model as $n, N\to \infty$.\arxiv{ In
+\cref{sec:adaptive}, we consider a variant of
+  \bestofnalg based on \emph{adaptive sampling}, which adjusts the
+  number of sampled responses adaptively for better performance.}\loose
+
+
+
+
+
+\subsection{Self-Improvement through RLHF: \rlhfalg}
+\label{sec:rlhf}
+A drawback of the \bestofnalg algorithm is that it may ignore useful information contained in the self-reward function $\rself(y\mid{}x\givebase)$. Fixing a regularization parameter $\beta > 0$ throughout, 
+ our second class of algorithms solve a KL-regularized reinforcement
+ learning problem in the spirit of RLHF and other alignment methods
+\citep{christiano2017deep,\arxiv{bai2022training,ouyang2022training,}rafailov2024direct}.   Defining
+$\En_{\pi}\brk{\cdot}=\En_{x\sim\cdist,y\sim\pi(\cdot\mid{}x)}\brk{\cdot}$
+  and 
+  $\Dkl{\pi}{\piref}=\En_{\pi}\brk[\big]{\log\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}}$,
+  we choose
+\begin{align}
+  \label{eq:rlhf}
+  \pihat \approx \argmax_{\pi\in\Pi}\crl*{
+  \En_{\pi}\brk*{\rself(y\mid{}x\givebase)}
+  -\beta\Dkl{\pi}{\piref}
+  }.
+\end{align}
+  The exact optimizer $\pistarb = \argmax_{\pi\in\Pi}\crl*{
+  \En_{\pi}\brk*{\rself(y\mid{}x\givebase)}
+  -\beta\Dkl{\pi}{\piref}
+}$ for this objective has the form \iclr{$
+  \pistarb(y\mid{}x)\propto\piref(y\mid{}x)\cdot\exp\prn*{\beta^{-1}\rself(y\mid{}x\givebase)}$,}
+\arxiv{\begin{align}
+  \pistarb(y\mid{}x)\propto\piref(y\mid{}x)\cdot\exp\prn*{\beta^{-1}\rself(y\mid{}x\givebase)},
+\end{align}}
+which converges to the solution to the sharpening objective in
+\cref{eq:sharpening} as $\beta\to{}0$. Thus, \cref{eq:rlhf} can be seen to
+encourage sharpening.\loose
+
+There are many choices for what RLHF/alignment algorithm one might use to solve \eqref{eq:rlhf}. 
+For our theoretical results, we implement \cref{eq:rlhf} using an
+approach inspired by DPO and its reward-based variants \citep{rafailov2024direct,gao2024rebel}. Given a dataset  $\cD=\crl*{(x,y,y')}$ of $n$ examples sampled via
+$x\sim\cdist$ and $y,y'\sim\piref(y\mid{}x)$, we consider the algorithm
+that solves
+\begin{small}
+  \begin{align}
+    \label{eq:dpo}
+    \pihat\in \argmin_{\pi\in\Pi}\sum_{(x,y,y')\in\cD}\prn*{
+    \beta\log\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}-\beta\log\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}
+    - \prn*{\rself(y\mid{}x\givebase)-\rself(y'\mid{}x\givebase)}
+    }^2.
+  \end{align}%
+\end{small}%
+In the sequel (\cref{sec:theoretical_analysis}), we show that this approach leads to comparable
+guarantees to \bestofnalg, but that a more sophisticated DPO variant
+that incorporates \emph{online exploration} \citep{xie2024exploratory} can offer provable
+benefits.
+
+
+
+

@@ -1,0 +1,69 @@
+% Auto-generated PGFPlots template — single-series vertical bars (ggplot-like)
+% Ensure required packages when included standalone in lint/preview
+\makeatletter
+\@ifundefined{pgfplotsversion}{\RequirePackage{pgfplots}}{}
+\@ifundefined{pgfplotstableread}{\RequirePackage{pgfplotstable}}{}
+\makeatother
+% Data: new_plots/data/coverage_by_source.csv
+
+\begingroup
+
+% ------- configurable knobs -------
+% overall size (avoid digits in macro names)
+\newcommand{\CoveragePlotWidth}{0.5\linewidth}
+\newcommand{\CoveragePlotHeight}{16em}
+% typography
+\newcommand{\CoverageFont}{\scriptsize}
+\newcommand{\CoverageXFont}{\tiny}
+% bar geometry
+\newlength{\CoverageBarWidth} \setlength{\CoverageBarWidth}{9pt}
+% margins
+\newcommand{\CoverageEnlargeX}{0.25}
+\newcommand{\CoverageEnlargeY}{0.04}
+% ---------------------------------
+
+% load table
+\pgfplotstableread[col sep=comma]{new_plots/data/coverage_by_source.csv}\coveragetable
+\tikzsetnextfilename{coverage_by_source}
+\begin{tikzpicture}[]
+  \begin{axis}[
+      % title={Coverage Ratio by Agent},
+      % ylabel={Coverage Ratio},
+      tick label style={font=\CoverageFont},
+      xticklabel style={font=\CoverageXFont, rotate=20, anchor=east},
+      xtick=data,
+      % modern, ggplot-like styling
+      grid=none,
+      axis background/.style={fill={rgb,255:red,243; green,246; blue,255}},
+      axis lines=left,
+      axis line style={draw=none},
+      x axis line style={draw=none},
+      y axis line style={draw=none},
+      tick style={draw=none},
+      label style={font=\CoverageFont},
+      title style={font=\CoverageFont},
+      width=\CoveragePlotWidth,
+      height=\CoveragePlotHeight,
+      ymin=0,
+      ytick distance=1,
+      restrict y to domain*=0:1.05,
+      unbounded coords=discard,
+      symbolic x coords={o3, claude-4-sonnet, gemini-2.5-pro, human},
+      bar width=\CoverageBarWidth,
+      enlarge x limits=\CoverageEnlargeX,
+      enlarge y limits={upper, value=\CoverageEnlargeY},
+    ]
+    % standard single-series bar plot with SEM error bars
+    \addplot+[ybar, draw=none, fill={rgb,255:red,86; green,180; blue,233}, mark=none,
+      error bars/.cd, y dir=both, y explicit,
+      error bar style={draw=black!40, line width=0.5pt},
+      error mark=|,
+      error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt}
+    ] table [
+        x=source, y=mean, y error=sem,
+        row predicate/.code={\edef\tempa{\thisrow{source}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}
+      ] {\coveragetable};
+  \end{axis}
+\end{tikzpicture}
+
+\endgroup

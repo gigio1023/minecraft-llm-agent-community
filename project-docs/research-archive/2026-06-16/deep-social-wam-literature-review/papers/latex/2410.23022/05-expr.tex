@@ -1,0 +1,158 @@
+\section{Experiments}
+\label{sec:expr}
+\textbf{Environment} We use the NetHack Learning Environment (NLE) \citep{kuettler2020nethack} as our experimental testbed, since it is one of the most challenging open-ended, long horizon and sparse reward environments available, and was also used as the main environment in the prior work we compare to. NetHack is a classic dungeon crawling game which presents a number of interesting challenges for RL agents: it is procedurally generated, requiring generalization; rewards are sparse for most tasks, requiring exploration; the environment is partially rather than fully observable; transitions are naturally stochastic; episodes are very long, requiring tens to hundreds of thousands of steps to win the game; the dynamics are highly complex, involving large numbers monsters, objects, non-player characters and other entities. Succeeding in the game requires mastering and balancing diverse behaviors including exploration, resource management, object use, combat, puzzle solving and skill progression. We used the environment settings from \citep{klissarov2024maestromotif}, which include macros for eating, quaffing potions, enhancing skills and casting spells. \looseness=-1
+
+\textbf{Tasks and Metrics} 
+We evaluate our agents in two ways: how well they are able to succeed in tasks which have a (typically sparse) extrinsic reward, and how well they are able to progress in the game using the intrinsic reward only. For the former, we use one dense reward task and three sparse reward tasks used in prior work \citep{kuettler2020nethack, klissarovdoro2023motif}, listed below.
+\begin{enumerate}[topsep=0pt, itemsep=0pt]
+    \item The \texttt{Score} task treats the in-game score\footnote{\url{https://nethackwiki.com/wiki/Score}} as a dense extrinsic reward.
+    \item The \texttt{Oracle} task requires finding the in-game Oracle character, which resides deep in the dungeon. The agent receives a reward of 50 if it manages to reach the Oracle, zero otherwise. 
+    \item The \texttt{StaircaseLvl3} and \texttt{StaircaseLvl4} tasks require reaching the third or fourth level staircase and zero otherwise---this requires exploring multiple levels in order to find staircases which lead deeper into the dungeon, while fighting or escaping monsters to survive. 
+\end{enumerate}
+%
+Previous work found that the \texttt{Oracle} task can be solved in unexpected ways via reward hacking; however, this is still a challenging sparse reward problem and we include it for completeness. 
+We also train agents with the intrinsic reward only and measure the game progress via four metrics: 
+
+{
+\hspace*{15pt} \emph{experience level, \; dungeon level, \; gold, \; and \, scout (number of unique locations explored)}. 
+}
+
+Removing the extrinsic reward gives us a clearer picture of what the intrinsic rewards are prioritizing. 
+
+
+%
+
+
+%
+
+\textbf{Methods and Hyperparameters} 
+We instantiate \oni with the three reward functions described in \Cref{sec:methods}. We name the three approaches \oniretrieval, \onicls and \oniranking, respectively.
+For policy learning, we use the Chaotic Dwarven GPT5 (CDGPT5) architecture \citep{CDGPT5} used in prior work \citep{piterbarg2023nethack, kurenkov2023katakomba, klissarovdoro2023motif}. Architecture details can be found in \Cref{sec:architecture-details}.  
+All the methods are trained with two billion $(2 \times 10^9)$ environment steps.  We train \onicls with 
+with classification threshold $\eta=0.5$, where the intrinsic reward coefficient is $\beta = 0.1$ for the \texttt{Score} task and $\beta=0.4$ for all the other sparse-reward tasks and the reward-free agent. Similarly, \oniretrieval uses $\beta = 0.1$ for \texttt{Score} and $\beta=0.5$ for the others. 
+\oniranking is trained with $\beta=0.05$ and $\nu_\N = 0$. Full details of the training process can be found in \Cref{sec:rl-details}. 
+ 
+
+\textbf{LLMs} We use the LLaMA-3 herd of models \citep{dubey2024llama3herdmodels} as our LLMs. All prompts are listed in \Cref{app:prompts}. We initially reran the Motif baseline using the official code\footnote{\url{https://github.com/facebookresearch/motif}} and compared the performance of LLaMA-3.1-70B-Instruct and LLaMA-3.1-8B-Instruct (see \Cref{app:llm_model_size}). We did not observe a significant difference in their performance on the \texttt{Oracle} or \texttt{Score} tasks.
+%
+Therefore, we use LLaMA-3.1-8B-Instruct in our subsequent experiments to reduce computation. \looseness=-1
+
+\textbf{Baselines} We compare to 3 baselines: i) agents trained with extrinsic reward alone, ii) Motif~\citep{klissarovdoro2023motif},
+ and iii) a variant of the \ellm algorithm \cite{du2023guiding}. It is not feasible to directly apply \ellm to our setting, since it requires an LLM call for each observation, where the total number of calls scales to the billions in our case. Therefore, we designed a more scalable variant which i) replaces the LLM embedding with a lightweight bag-of-words embedding \footnote{We also tried using Sentence Transformers (SBERT) for generating sentence embeddings, which led to an approximately 20x throughput drop: 28k vs 1.4k FPS on a Tesla V100-32GB GPU, when the sentence embeddings can be cached. If we recompute the sentence embedding in the forward pass every time, the throughput drop is approximately 100x.} using FastText \citep{bojanowski2016enriching}, and ii) includes an episodic term in the intrinsic reward, as with Motif and \oni (see \Cref{sec:rl-details}). We call it \ellmbow and include more details in Appendix \ref{app:ellm-details}.
+%
+%
+We note that \citet{klissarovdoro2023motif} found that other exploration methods based on novelty bonuses such as RND \citep{RND}, NovelD \citep{NovelD} and E3B \citep{E3B} did not improve over the extrinsic reward baseline on these tasks, hence we do not include them. 
+\looseness=-1
+
+
+\subsection{Main Results}
+\label{sec:expr_main}
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}[b]{\linewidth}
+        \includegraphics[width=\linewidth]{plot/main_results_return.pdf}
+        \caption{Performance on four different NetHack tasks.}
+        \label{fig:main}
+    \end{subfigure}
+     \begin{subfigure}[b]{\linewidth}
+        \includegraphics[width=\linewidth]{plot/main_reward_free.pdf}
+        \caption{Game progress of intrinsic rewards only agents. }
+         \label{fig:main_reward_free}
+    \end{subfigure}
+    \caption{\oni-based methods are able to match or closely track the performance of Motif without using an pre-collected dataset. This includes (a) reward-based and (b) reward-free settings. Motif's pre-collected dataset uses privileged information about dense reward functions to solve sparse-reward or reward-free environments while \oni-methods do not. \ellmbow demonstrated to be a competitive baseline here too.}
+\end{figure*}
+
+\textbf{Task Performance}  We report the average performance
+and $95\%$ confidence intervals computed via standard errors over $5$ seeds in \Cref{fig:main}.
+%
+The extrinsic reward agent performs reasonably well on the dense \texttt{Score} task, but completely fails on the others due to reward sparsity. We find that, despite not requiring any external data, our \onicls agent is able to match Motif on all tasks except \texttt{Oracle}, where it still performs well. 
+We note that Motif requires pre-collecting data from the \texttt{Score} task even for sparse reward tasks---this assumes access to an additional dense reward function, which is an often unrealistic assumption. It also incurs an additional one billion ($10^9$) environment samples prior to policy training.
+All of our agents significantly outperform the extrinsic only baseline on the sparse reward tasks, demonstrating they are able to explore effectively while synthesizing their intrinsic rewards from online data alone. \looseness=-1
+
+%
+
+Despite its simplicity, \oniretrieval performs surprisingly well, and its performance is often close to that of \onicls. This is likely a consequence of many messages with positive valence being repeated in the early game of NetHack, such as ``\emph{You find a hidden passage}'' that allows exploring the rest of the level, or ``\emph{You kill the} \{monster\}!'' which leads to experience gain. \onicls, which also predicts binary rewards but is able to generalize to unseen messages, provides a modest but consistent improvement over \oniretrieval across all environments. This suggests that learning a reward model is indeed helpful. We would expect this gap to increase in settings with added noise or caption diversity, since they increase the likelihood of observed captions being unique. \looseness=-1
+
+We do not observe any significant gains from using \oniranking over \onicls, despite it being more conceptually general and able to represent a continuous range of intrinsic rewards rather than binary values. This may be because our tasks take place at the very earliest part of the game of NetHack, where only a small fraction of all possible messages are observed, which would also explain the relatively strong performance of \oniretrieval. We hypothesize that more benefits will appear in settings with higher observation diversity.%
+%
+%
+%
+
+%
+\ellmbow performs quite well on these tasks, closely tracking or matching Motif and \oni methods. However, in \Cref{sec:comp_cosine_bow} we highlight a fundamental limitation of \ellmbow, namely its inability to capture complex semantic meaning, whereas \oni is capable thanks to its use of an LLM. It is worth noting that directly using \ellmbow as in \citet{du2023guiding} without our episodic bonus completely fails, see \Cref{app:episodic_bonus_cosine_bow}. 
+%
+
+
+\textbf{Game Progress of Intrinsic-Reward-Only Agents} Results for all methods trained in the reward-free setting are shown in \Cref{fig:main_reward_free}. All of our \oni methods are able to make meaningful progress across all metrics. 
+In particular, \onicls outperforms Motif on 3 out of 4 metrics. 
+%
+We include the results of Motif for reference, yet emphasize it is actually inapplicable in a truly reward-free setup since it assumes access to dense rewards. %
+
+%
+\subsection{Comparisons for More Complex Goals}
+%
+\label{sec:comp_cosine_bow}
+%
+Even though \ellmbow performs well in \Cref{sec:expr_main}, we have found that it does not capture the semantic meanings of more complex goal strings due to the simple bag-of-word representation. To demonstrate this,
+we train \ellmbow and \oniretrieval for two opposite goals in the extrinsic-reward-free environment: \textbf{(Gold)} ``collect gold but do not kill monsters'' vs \textbf{(Combat)} ``kill monsters but do not collect gold''.  \Cref{fig:comp_with_cosine_bow_2_goals} shows that \ellmbow produces two agents of nearly identical behavior in terms of collected gold and killed monsters. In contrast, \oniretrieval is able to distinguish the two goals and produces agents that emphasize either combat engagement or gold collection, depending on the goal string. See \Cref{app:goal_strings} for the goal strings for \ellmbow and prompts for \oniretrieval.
+%
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.49\linewidth}
+        \includegraphics[width=0.9\linewidth]{plot/ablation_change_goal_cosine_bow.pdf}
+        \caption{\ellmbow  under 2 different goals}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\linewidth}
+        \includegraphics[width=0.9\linewidth]{plot/ablation_change_goal_oni_cls.pdf} 
+        \caption{\onicls  under 2 different goals}
+    \end{subfigure}
+    \caption{\textbf{(a)} \ellmbow is not able to understand the semantic meaning of complex goals, resulting in agents with similar behavior under the combat and the gold goal. \textbf{(b)} \oniretrieval can distinguish the goals and the resulting agents focus on different aspects of game progress. \looseness=-1 }
+    \label{fig:comp_with_cosine_bow_2_goals}
+\end{figure}
+
+
+\subsection{Ablation Studies}
+\label{sec:ablations}
+
+%
+
+\textbf{Performance vs. LLM Annotation Throughput}
+%
+We compared agents trained on the \texttt{Score} and \texttt{Oracle} tasks using either $1$ or $4$ V100 GPUs in the LLM server node. 
+As shown in \Cref{fig:4gpu}, using 4 GPUs rather than 1 significantly increases the number of annotated observations, but does not significantly change the performance.
+%
+%
+This suggests that many of the labelled examples may contain redundant information, which is not useful for updating the reward model. Designing more sophisticated prioritization schemes, which can select maximally informative examples to send to the LLM, constitutes an interesting direction for future work. 
+\begin{figure}[th]
+    \centering
+    \includegraphics[width=0.9\linewidth]{plot/ablation_gpu_score.pdf}
+    \includegraphics[width=0.9\linewidth]{plot/ablation_gpu_oracle.pdf}
+    \caption{
+        Performance remains comparable despite doubling LLM annotation throughput.
+        %
+        \oniranking's throughput is lower than the others due to annotating pairs of captions.
+        %
+    }
+    \label{fig:4gpu}
+\end{figure}
+
+\textbf{Performance when Reducing LLM Annotations} Thus far we have been using all LLM annotations available. It is also intriguing to check the performance when we limit the volume of annotations, to simulate more resource-constrained settings. Here we subsample the LLM-annotated messages with rate 0.1 and 0.01 before sending them back to the hash table. \Cref{fig:ablation_llm_annotation_subsample} shows that the performance of \oniretrieval significantly drops with rate 0.01, whereas \onicls remains comparable. This suggests that using a parametric reward model can help reduce the number of annotations required thanks to its generalization ability.
+\begin{figure}[th]
+    \centering
+    \includegraphics[width=0.43\linewidth]{plot/ablation_llm_annotation_subsample_retrieval.pdf}
+    \hspace{15pt}
+    \includegraphics[width=0.48\linewidth]{plot/ablation_llm_annotation_subsample_online_cls_reward_model.pdf}
+    \caption{
+        Performance of \oniretrieval plunges when the subsampling rate reduces to 0.01, while performance of \onicls is still comparable with the original one. 
+    }
+    \label{fig:ablation_llm_annotation_subsample}
+\end{figure}
+
+See Appendix \ref{app:additional-ablations} for additional ablations studying hyperparameters and sampling mechanisms.
+
+
+%
+%
+%
+%

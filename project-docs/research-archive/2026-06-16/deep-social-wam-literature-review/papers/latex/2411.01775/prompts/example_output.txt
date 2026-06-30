@@ -1,0 +1,68 @@
+Here's an alternative terrain generation function that focuses on creating a series of ramps for the quadruped robot to navigate through. This course will test the robot's ability to handle inclined surfaces and maintain balance.
+
+```python
+import numpy as np
+import random
+
+def set_terrain(length, width, field_resolution, difficulty):
+    """Ramps of varying angles for the robot to climb and descend."""
+
+    def m_to_idx(m):
+        """Converts meters to quantized indices."""
+        return np.round(m / field_resolution).astype(np.int16) if not (isinstance(m, list) or isinstance(m, tuple)) else [round(i / field_resolution) for i in m]
+    
+    height_field = np.zeros((m_to_idx(length), m_to_idx(width)))
+    goals = np.zeros((8, 2))
+
+    # Initialize parameters
+    ramp_length = 1.0 + difficulty * 2.0  # Make ramps longer and steeper with higher difficulty
+    ramp_length = m_to_idx(ramp_length)
+    ramp_height = 0.1 + difficulty * 0.4  # Ramp height varies with difficulty
+    ramp_height_change = ramp_height / ramp_length  # Height change per quantized step
+    ramp_width = 1.0  # Set ramp width to 1 meter
+    ramp_width = m_to_idx(ramp_width)
+
+    mid_y = m_to_idx(width) // 2
+
+    def add_ramp(start_x, end_x, mid_y, upward=True):
+        """Add a ramp either upward or downward starting from start_x."""
+        for i in range(start_x, end_x):
+            height = (i - start_x) * ramp_height_change if upward else (end_x - 1 - i) * ramp_height_change
+            height_field[i, mid_y - ramp_width // 2: mid_y + ramp_width // 2] = height
+            if not upward:
+                height_field[i, mid_y - ramp_width // 2: mid_y + ramp_width // 2] -= ramp_height  # Adjust for downward ramp
+
+    dx_min, dx_max = -0.1, 0.1
+    dx_min, dx_max = m_to_idx(dx_min), m_to_idx(dx_max)
+    dy_min, dy_max = -0.4, 0.4
+    dy_min, dy_max = m_to_idx(dy_min), m_to_idx(dy_max)
+
+    # Set flat ground at the start
+    spawn_length = m_to_idx(2)
+    height_field[0:spawn_length, :] = 0
+    goals[0] = [spawn_length - m_to_idx(0.5), mid_y]  # First goal at spawn
+
+    # Initial height is 0
+    cur_x = spawn_length
+    cur_upward = True  # Start with an upward ramp
+
+    for i in range(7):  # Set up 7 ramps
+        dx = np.random.randint(dx_min, dx_max)
+        dy = np.random.randint(dy_min, dy_max)
+        end_x = cur_x + ramp_length + dx
+
+        add_ramp(cur_x, end_x, mid_y + dy, upward=cur_upward)
+        
+        # Place goal in the center of the ramp
+        goals[i+1] = [(cur_x + end_x) / 2, mid_y + dy]
+
+        # Switch direction (up or down)
+        cur_upward = not cur_upward
+        cur_x = end_x
+
+    # Final goal at the end of the last ramp
+    goals[-1] = [cur_x + m_to_idx(0.5), mid_y]
+    height_field[cur_x:, :] = 0
+
+    return height_field, goals
+```

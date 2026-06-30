@@ -1,4 +1,4 @@
-# Action-Space Comparison — Minecraft Agents vs This Repo
+# Action-Space Comparison - Minecraft Agents vs This Repo
 
 Lane 2. Compares the *action interface* (the altitude at which a controller emits
 decisions) across the Minecraft agent literature, then contrasts with this repo's
@@ -26,17 +26,17 @@ relies on a library of primitives.
 | Voyager (2305.16291) | **code-skill** (Mineflayer JS) | LLM writes/stores JavaScript skills calling Mineflayer (`mineBlock`, `craftItem`, ...) | per-skill (many ticks) | LLM code-gen | via the JS it writes (not schema-checked) | none (single agent) |
 | GITM (2305.17144) | **structured actions** (text) | LLM emits structured action plans over a fixed action set; rule-based controller executes | per-action | LLM planner | partial (structured but text) | none |
 | Plancraft (2412.21033) | symbolic GUI ops | crafting-GUI `move`/`smelt` inventory operations; also a `stop`/impossible action | per-step | LLM/VLM | yes (discrete GUI ops) | none |
-| MINDcraft / MineCollab (2504.17950) | **Mineflayer high-level tools** | **47 parameterized tools**, e.g. `!collectBlocks`, `!craftRecipe`, **`!givePlayer("randy","oak log",4)`**; custom JS fallback | per-tool (>20 steps/task) | LLM tool-call | yes (named tool + typed params) | **yes — `givePlayer` item handoff; chat messages** |
+| MINDcraft / MineCollab (2504.17950) | **Mineflayer high-level tools** | **47 parameterized tools**, e.g. `!collectBlocks`, `!craftRecipe`, **`!givePlayer("randy","oak log",4)`**; custom JS fallback | per-tool (>20 steps/task) | LLM tool-call | yes (named tool + typed params) | **yes - `givePlayer` item handoff; chat messages** |
 | VillagerAgent (2406.05720) | Mineflayer high-level (Voyager-style) | high-level skills under a DAG task scheduler | per-skill | multi-agent LLM | partial | implicit (task delegation, not item-transfer primitives) |
-| MineLand (2403.19267) | Mineflayer high-level + **communication + low-resolution senses** | high-level actions; agents must **speak** to share info; bounded vision/audio | per-action | multi-agent LLM (Alex framework) | partial | **yes — communication is a first-class action; physical needs (food)** |
+| MineLand (2403.19267) | Mineflayer high-level + **communication + low-resolution senses** | high-level actions; agents must **speak** to share info; bounded vision/audio | per-action | multi-agent LLM (Alex framework) | partial | **yes - communication is a first-class action; physical needs (food)** |
 | Odyssey (2407.15325) | symbolic skill library | **40 primitive + 183 compositional skills** invoked by LLM | per-skill | LLM | yes (skill names + params) | none (single agent) |
-| Narayan-Chen MDC (P19-1537) | block place/remove + **natural-language dialogue** | builder places/removes colored blocks; architect speaks | per-action | human (corpus) | n/a (human study) | **yes — grounded dialogue is the action** |
-| **THIS REPO** | **Action Cards (typed high-level) + `author_mineflayer_action` (code-skill, gated) + social actions** | named Action Cards with **schema-bound logical params**; `author_mineflayer_action` triggers full-context Mineflayer codegen + trial; social actions (request/promise/handoff/...) | one tool selection per **Actor Turn** | LLM proposes ONE function-tool; runtime owns execution | **yes — explicit logical params, schema/permission/retry/verifier gates** | **yes — request, promise, refusal, borrow/lend/return, etc. as typed acts** |
+| Narayan-Chen MDC (P19-1537) | block place/remove + **natural-language dialogue** | builder places/removes colored blocks; architect speaks | per-action | human (corpus) | n/a (human study) | **yes - grounded dialogue is the action** |
+| **THIS REPO** | **Action Cards (typed high-level) + `author_mineflayer_action` (code-skill, gated) + social actions** | named Action Cards with **schema-bound logical params**; `author_mineflayer_action` triggers full-context Mineflayer codegen + trial; social actions (request/promise/handoff/...) | one tool selection per **Actor Turn** | LLM proposes ONE function-tool; runtime owns execution | **yes - explicit logical params, schema/permission/retry/verifier gates** | **yes - request, promise, refusal, borrow/lend/return, etc. as typed acts** |
 
 ## Reading the matrix (interpretation)
 
 1. **Two clusters, a known gap between them.** The *learned-policy* cluster (VPT,
-   STEVE-1, GROOT, ROCKET-1, JARVIS-VLA, Optimus) lives at **camera/buttons** —
+   STEVE-1, GROOT, ROCKET-1, JARVIS-VLA, Optimus) lives at **camera/buttons** -
    maximally general, but the runtime gets **no typed handle** on what was
    attempted (it sees button presses, not "place oak_log at (x,y,z)"). The
    *LLM-agent* cluster (Voyager, GITM, MINDcraft, VillagerAgent, Odyssey) lives at
@@ -51,7 +51,7 @@ relies on a library of primitives.
    MINDcraft (`givePlayer` + chat), MineLand (communication + physical needs), and
    the Narayan-Chen corpus (grounded dialogue). Everything else is single-agent
    physical competence. This repo's *typed social actions* (request/promise/
-   refusal/borrow/lend/return) are net-new relative to even these three — they
+   refusal/borrow/lend/return) are net-new relative to even these three - they
    carry obligation/credit, not just message-passing.
 4. **Mechanically reusable for this repo**: MINDcraft's tool list (esp.
    `givePlayer`), Odyssey's primitive/compositional split (40+183), Plancraft's
@@ -64,5 +64,5 @@ Every "yes" in the social/transfer column except this repo's is **message-passin
 or item-transfer in service of task completion**. Item handoff that finishes a
 recipe (MineCollab) is a *competence* act; the same handoff creating a tracked
 obligation/credit between actors is the *social* act this repo targets. The
-action interface alone does not close that gap — the **bookkeeping of consequence**
+action interface alone does not close that gap - the **bookkeeping of consequence**
 does (see `minecraft-multi-agent-social.md`).

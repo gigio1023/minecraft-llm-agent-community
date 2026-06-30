@@ -1,0 +1,557 @@
+\section{Experimental Details}
+\label{sec:exp-details}
+
+\subsection{Architectures}
+\label{sec:architecture-details}
+
+Our architectures largely follow those used in \citet{klissarovdoro2023motif}. 
+\paragraph{Our policy network} uses the Chaotic Dwarven GPT5 architecture originally introduced in \citet{CDGPT5}. This architecture combines convolutional layers processing the top-down visible map centered at the agent with fully-connected layers processing messages and bottom-line statistics including hit points, experience, hunger level and the like. The convolutional encoder has $3$ convolutional layers with $32, 64, 128$ feature maps respectively, interleaved with exponential linear unit (ELU) non-linearities \citep{ELU}.  Messages and bottom-line statistics are each processed with 2-layer MLPs with $128$ hidden units each. All embeddings are combined, passed through a single-layer MLP with $512$ hidden units, and then passed to a recurrent GRU module \citep{GRU} with $512$ hidden units. Finally, this hidden representation feeds into linear critic and actor heads. 
+
+\paragraph{Our reward model} The reward model of \oni-ranking is based on the encoder from \citet{kuettler2020nethack} that processes both state representation and messages. Messages are processed by a $5$-layer character-level CNN \citep{DBLP:journals/corr/ZhangZL15} with $64$ feature maps at each layer. The first, second and last layers are interleaved with max-pooling layers with kernel size and stride $3$. The output is then passed through a $3$-layer MLP with $128, 256, 512$ hidden units at each layer respectively, and ReLU non-linearities, followed by a scalar output. The reward model of \oni-classification only process messages, using the same architecture described above.
+
+\subsection{Hyperparameters}
+\label{sec:rl-details}
+Following \citet{klissarovdoro2023motif}, we scale the environment reward by 0.1 for the \texttt{Score} task and by 10 for the other sparse reward tasks, and use normalized intrinsic reward
+\begin{equation}
+    \label{eq:episodic_normalization}
+    \rint_{\text{normalized}}(o_t) = \rint(o_t) / N(c_t)^z,
+\end{equation}
+where $N(c_t)$ is the number of times the caption $c_t$ has been found in one episode. For all our experiments, we use $z=3.0$. This is also called the \emph{episodic bonus}~\cite{henaff2022exploration}.
+
+For \onicls and \oniranking, we train the reward model using the Adam optimizer~\cite{kingma2014adam} with batch size $256$.
+\onicls is trained with learning rate $0.0001$, classification threshold $\eta=0.5$, $\beta=0.1$ for the \texttt{Score} task and $\beta=0.4$ for the others.
+\oniranking is trained with $0.00001$, $\beta=0.05$ and $\nu_\N = 0$ (mean of the standard normal distribution).
+\oniretrieval does not train a reward model, and we use $\beta=0.1$ for the \texttt{Score} task and $\beta=0.5$ for the others.
+
+
+\Cref{tab:common-appo-hps} shows the APPO hyperparameters which are common to all experiments and \Cref{tab:llm-hps} includes the hyperparameters for the online LLM annotation.
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ll}
+    Hyperparameter & Value \\
+    \midrule
+    Number of Parallel Environment Instances & $480$ \\
+    Batch Size & $4096$ \\
+    PPO Clip Ratio & $0.1$ \\
+    PPO Clip Value & $1.0$ \\
+    PPO Epochs & $1$ \\
+    Max Gradient Norm & $4.0$ \\
+    Value Loss Coefficient & $0.5$ \\
+    Exploration Loss & entropy \\
+%
+%
+%
+    \end{tabular}
+    \caption{Common APPO hyperparameters across all experiments.}
+    \label{tab:common-appo-hps}
+\end{table}
+
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ll}
+    Hyperparameter & Value \\
+    \midrule
+    LLM Model & LLaMA-3.1-8B-Instruct \\
+    %
+    Temperature & $0.1$ \\
+    Max tokens to generate & $4096$ \\
+    Annotation Batch Size  & $100$ \\
+    \end{tabular}
+    \caption{LLM annotation hyperparameters.}
+    \label{tab:llm-hps}
+\end{table}
+
+
+
+\subsection{Implementation Details for \ellmbow}
+\label{app:ellm-details}
+
+For any piece of text $c$, we construct an embedding vector by first applying the FastText tokenizer \cite{bojanowski2016enriching} to the text, separating it into words $c = (w_1, ..., w_m)$. We then retrieve the FastText word embeddings $x_1,...,x_m$ for each word, and compute their sum $\texttt{embed}(c) = \sum_{i=1}^m x_i$. The intrinsic reward is then defined by the cosine distance between the embeddings of the caption of the current observation and the goal, weighted by an episodic count-based term::
+
+\begin{equation*}
+    r(o_t) = \frac{1}{N_e(c_t)^z} \cdot \frac{\texttt{embed}(c_t) \cdot \texttt{embed}(g)}{\|\texttt{embed}(c_t)\| \cdot \|\texttt{embed}(g)\|}
+\end{equation*}
+
+We include the episodic term for consistency with Motif and \oni. In Section \ref{app:episodic_bonus_cosine_bow}, we ablate this choice and show that it is essential for good performance. 
+
+\newpage
+\section{Prompts}
+\label{app:prompts}
+Here we include all the LLM prompts we use. The system prompt and the prompt for \oni-ranking are identical to the ones used in \citet{klissarovdoro2023motif}. We adapted these to produce labels for single observations for \oni-retrieval and \oni-classification.   
+
+\textbf{System Prompt (used by all methods)}
+
+\begin{lstlisting}
+You are a helpful and honest judge of good gameplaying and progress in the NetHack game. Always answer as helpfully as possible, while being truthful.
+
+If you don't know the answer to a question, please don't share false information.
+\end{lstlisting}
+
+
+\textbf{Prompt for \oni-retrieval and \oni-classification}
+
+%
+
+\begin{lstlisting}
+Context: I am playing NetHack and I will present you a message from the gameplay.
+
+Instruction: First, tell me about your knowledge of NetHack. Mention the goal of NetHack.
+Then, write an analysis describing the semantics of each message using your knowledge of NetHack. Finally, respond by assigning a score to the message, which measures whether the status represented by the message is helpful or unhelpful to make some progress towards the goal.
+Helpful here does not mean whether it is informative to the player to make decisions or not, but whether it is helpful for the agent to solve the game.
+I prefer agents that maximize the score in the game, for instance by killing monsters, collecting gold or going down the stairs in the dungeon.
+For extremely helpful messages, assign a label FOO. For unhelpful, neutral, and lukewarm messages, assign a label BAR.
+
+Example 1: "You kill the goblin!  Welcome to experience level 4" indicates that the player
+has killed a goblin and gained experience. This led to a level up and increased abilities.
+Gaining experience and leveling up are both extremely helpful and this message should be labelled as FOO.
+
+Example 2: "You hear someone counting money." indicates that the player is close to a source of gold, as the sound of counting money suggests a nearby NPC or monster with treasure.
+This is also extremely helpful and should be labelled as FOO.
+
+Example 3: "5 gold pieces." indicates you collected 5 gold coins. This is extremely helpful should be labelled as FOO.
+
+Example 4: "That door is closed." is neutral and should be labelled as BAR.
+
+Please rate this message: {{"{}"}}
+
+Constraint: Please format your response strictly in this format without additional explanation:
+<knowledge> [your knowledge of NetHack] </knowledge>
+<analysis> [your one-sentence analysis of the message] </analysis>
+<label> [FOO/BAR] </label>
+\end{lstlisting}
+
+
+\clearpage
+\textbf{Prompt for \oni-ranking}
+
+\begin{lstlisting}
+I will present you with two short gameplay descriptions.
+First, tell me about your knowledge of NetHack. Mention the goal of NetHack. Prefer agents that maximize the score in the game, for instance by killing monsters, collecting gold or going down the stairs in the dungeon.
+Then, write an analysis describing the semantics of each description strictly using information from the descriptions (which may be empty) and your knowledge of NetHack.
+Provide a comparative analysis based on first principles.
+Finally, respond by explicitly declaring which one is the most likely to make some progress towards the goal, writing either ("best_description": 1), ("best_description": 2). You could also say ("best_description": None).
+
+{{
+"description_1":
+"{}"
+}}
+
+{{
+"description_2":
+"{}"
+}}
+\end{lstlisting}
+
+
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+
+
+\subsection{Goal String and Prompts used in \Cref{sec:comp_cosine_bow}}
+
+For the experiments in Section \ref{sec:comp_cosine_bow}, we use the goal strings from \cite{klissarovdoro2023motif} used to induce different behaviors in agents, such as the Gold Collector, Monster Slayer or Descender. These goal string explicitly aim to maximize one metric while minimize the others. The default goal string is the same used in \oni prompts. 
+\label{app:goal_strings}
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+\subsubsection{Prompt used for \texttt{ELLM-BoW}}
+\label{app:goal_string_cosine_bow}
+
+\textbf{Default Goal} \begin{lstlisting}
+Prefer agents that maximize the score in the game, for instance by killing monsters, collecting gold or going down the stairs in the dungeon.
+\end{lstlisting}
+
+\textbf{Combat Goal} \begin{lstlisting}
+Prefer agents that engage in combat, for instance by killing monsters. But never prefer agents that collect ANY gold or that go down the dungeon.
+\end{lstlisting}
+
+\textbf{Gold Goal} \begin{lstlisting}
+Prefer agents that maximize their gold. But never prefer agents that maximize the score in other ways (e.g., by engaging in combat or killing monsters) or that go down the dungeon.
+\end{lstlisting}
+
+
+
+\subsubsection{Prompt used for \oniretrieval}
+\label{app:prompt_goal_string_oni}
+
+The prompt used for \oni methods have been modified to reflect the change of goals, which we list in the next subsection. In addition to the changes of goal description, we use the same examples as in \Cref{app:prompts} but changed its label.
+
+\textbf{Combat Goal}
+
+\begin{lstlisting}
+Context: I am playing NetHack and I will present you a message from the gameplay.
+
+Instruction: First, tell me about your knowledge of NetHack. Mention the goal of NetHack.
+Then, write an analysis describing the semantics of each message using your knowledge of NetHack. Finally, respond by assigning a score to the message, which measures whether the status represented by the message is helpful or unhelpful to make some progress towards the goal.
+Helpful here does not mean whether it is informative to the player to make decisions or not, but whether it is helpful for the agent to solve the game.
+I prefer agents engage in combat, for instance by killing monsters. But never prefer agents that collect ANY gold or that go down the dungeon.
+For extremely helpful messages, assign a label FOO. For unhelpful, neutral, and lukewarm messages, assign a label BAR.
+
+Example 1: "You kill the goblin!  Welcome to experience level 4" indicates that the player
+has killed a goblin and gained experience. This led to a level up and increased abilities.
+Gaining experience and leveling up are both extremely helpful and this message should be labelled as FOO.
+
+Example 2: "You hear someone counting money." indicates that the player is close to a source of gold, as the sound of counting money suggests a nearby NPC or monster with treasure.
+This is not helpful and should be labelled as BAR.
+
+Example 3: "5 gold pieces." indicates you collected 5 gold coins. This is not aligned with our goal and should be labelled as BAR.
+
+Example 4: "That door is closed." is neutral and should be labelled as BAR.
+
+Please rate this message: {{"{}"}}
+
+Constraint: Please format your response strictly in this format without additional explanation:
+<knowledge> [your knowledge of NetHack] </knowledge>
+<analysis> [your one-sentence analysis of the message] </analysis>
+<label> [FOO/BAR] </label>
+\end{lstlisting}
+
+\textbf{Gold Goal}
+
+\begin{lstlisting}[escapechar=@]
+Context: I am playing NetHack and I will present you a message from the gameplay.
+
+Instruction: First, tell me about your knowledge of NetHack. Mention the goal of NetHack.
+Then, write an analysis describing the semantics of each message using your knowledge of NetHack. Finally, respond by assigning a score to the message, which measures whether the status represented by the message is helpful or unhelpful to make some progress towards the goal.
+Helpful here does not mean whether it is informative to the player to make decisions or not, but whether it is helpful for the agent to solve the game.
+I prefer agents that maximize their gold. But never prefer agents that maximize the score in other ways (e.g., by engaging in combat or killing monsters) or that go down the dungeon.
+For extremely helpful messages, assign a label FOO. For unhelpful, neutral, and lukewarm messages, assign a label BAR.
+
+Example 1: "You kill the goblin!  Welcome to experience level 4" indicates that the player
+has killed a goblin and gained experience.  This is not aligned with our goal and should be labelled as BAR.
+
+Example 2: "You hear someone counting money." indicates that the player is close to a source of gold, as the sound of counting money suggests a nearby NPC or monster with treasure. This is extremely helpful and should be labelled as FOO.
+
+Example 3: "5 gold pieces." indicates you collected 5 gold coins. This is extremely helpful and should be labelled as FOO.
+
+Example 4: "That door is closed." is neutral and should be labelled as BAR.
+
+Please rate this message: {{"{}"}}
+
+Constraint: Please format your response strictly in this format without additional explanation:
+<knowledge> [your knowledge of NetHack] </knowledge>
+<analysis> [your one-sentence analysis of the message] </analysis>
+<label> [FOO/BAR] </label>
+\end{lstlisting}
+
+
+
+\clearpage
+\section{Additional Results}
+\label{sec:additional-results}
+
+\subsection{LLaMA-3.1-70B-Instruct vs. LLaMA-3.1-8B-Instruct}
+\label{app:llm_model_size}
+
+In \Cref{fig:motif_model_size}, we compare the performance of Motif using two different sized LLMs on \texttt{Score} and \texttt{Oracle} (LLaMA-3.1-8B-Instruct and LLaMA-3.1-70B-Instruct). Interestingly, we do not observe a significant difference between the two. This is in contrast to the previous work of \citep{klissarovdoro2023motif}, who found a significant difference between using LLaMA-2-70B-chat and LLaMA-2-7B-chat. This suggest that the smaller 8B model is sufficient for evaluating messages on these tasks, hence we use it in our experiments. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{plot/ablation_model_size.pdf}
+    \caption{Performance of Motif using two different LLMs. Curves represent means and shaded regions represent standard errors over $5$ seeds. }
+    \label{fig:motif_model_size}
+\end{figure}
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+%
+%
+%
+%
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+
+
+
+\subsection{Effect of the Episodic Term for ELLM-BoW}
+\label{app:episodic_bonus_cosine_bow}
+
+Our implementation of \texttt{ELLM-BoW} has included the episodic-count based normalization~\eqref{eq:episodic_normalization}, which is key to the performance of  \texttt{ELLM-BoW}.
+\Cref{fig:cosine_bow_episodic} shows that directly using ELLM-BoW as in \citet{du2023guiding} \texttt{ELLM-BoW}, without the episodic term, failed to make progress in all three tasks.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{plot/ablation_cosine_bow_episodic_bonus.pdf}
+    \caption{\texttt{ELLM-BoW} performs well when the intrinsic reward is normalized by an episodic-count based term as in~\eqref{eq:episodic_normalization}. Without it, the success rate is zero for all the three tasks.}
+    \label{fig:cosine_bow_episodic}
+\end{figure}
+
+
+\subsection{Additional Ablations}
+\label{app:additional-ablations}
+
+%
+\label{app:a100_vs_v100}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\linewidth]{plot/ablation_gpu_a100_score.pdf}\\
+    \includegraphics[width=0.55\linewidth]{plot/ablation_gpu_a100.pdf}\\
+    \caption{
+        Performance of \onicls is comparable when the LLM server uses a Tesla A100-80GB or V100-32GB GPU.
+    }
+    \label{fig:a100_vs_v100}
+\end{figure}
+
+%
+%
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{plot/ablation_lrc_oni_retrieval.pdf}\\
+    \includegraphics[width=\linewidth]{plot/ablation_lrc_oni_classification.pdf}\\
+    \includegraphics[width=\linewidth]{plot/ablation_ranking_lrc.pdf}\\
+    \caption{
+        For \oniretrieval and \onicls, sparse reward tasks favor larger intrinsic reward coefficient $\beta$ while smaller values of $\beta$ lead to better results for
+        the dense reward \texttt{Score} task. 
+        For \oniranking, we do not observe much difference for the \texttt{Score} task, but the sparse reward tasks still slightly favors larger $\beta$. \
+        %
+    }
+    \label{fig:ablation_lrc}
+\end{figure}
+
+
+
+\textbf{Impact of Intrinsic Reward Coefficient $\beta$}
+For \onicls and \oniretrieval, we have used different values of $\beta$ for the \texttt{Score} task and other sparse reward tasks in \Cref{sec:expr_main}.
+Throughout our experiments, we have found that
+for these two methods, 
+larger values of $\beta$ lead to better performance for the sparse reward tasks, while smaller values of $\beta$ better balance between intrinsic and extrinsic rewards for the dense reward \texttt{Score} task. In comparison, \oniranking is relatively robust to this choice, where larger values of $\beta$ are still slightly favored for the sparse reward tasks.
+%
+
+
+
+%
+%
+%
+%
+%
+%
+%
+
+
+
+
+
+
+
+
+
+%
+\textbf{\onicls: the impact of the classification threshold} 
+As described in \Cref{sec:methods}, \onicls predicts binary rewards by modeling $P(y_t=1|o_t)$ and then thresholding with $\eta$.
+Instead of using binary reward, an alternative design choice is to use real valued reward
+\begin{equation}
+\label{eq:oni_classification_no_eta}
+    \rint(o_t) = P(y_t=1|o_t),
+\end{equation}
+where $\rint(o_t) \in [0, 1]$ is the output of the reward classifier before thresholding. 
+\Cref{fig:ablation_eta} shows that the performance of \onicls on the four NetHack tasks
+is relatively robust to this hyperparameter $\eta$, and using $P(y_t=1|o_t)$ as the reward leads to similar performance.
+As the training progresses, our reward model outputs values close to 0 or 1\footnote{To increase the diversity of the captions in the training dataset, we do not requery the LLM server if a caption is already annotated before. 
+Therefore, every caption in our dataset only has a single label, resulting in this phenomenon.},
+and we hypothesize this is the reason why the final performance remains comparable.
+Moreover, the natural classification threshold $\eta=0.5$ %
+marginally outperforms the other values in the reward-free setting. 
+\begin{figure}[ht]
+    \centering
+        \includegraphics[width=0.9\linewidth]{plot/ablation_db_returns.pdf}
+        \includegraphics[width=0.9\linewidth]{plot/ablation_db_reward_free_no_fraction.pdf}
+    \caption{\textbf{(Top)} Performance of \onicls is robust to different choices of the classification threshold $\eta$ on the four NetHack tasks. 
+    \textbf{(Bottom)} $\eta = 0.5$ marginally outperform the other values for training intrinsic-reward-only agents. The result when using $P(y_t=1|o_t)$ as reward \eqref{eq:oni_classification_no_eta} is 
+    marked with legend \texttt{oni-classification (no eta)}.
+    }
+    \label{fig:ablation_eta}
+\end{figure}
+
+
+\paragraph{\oniranking: the impact of sampling strategy for LLM annotation and reward training}
+Unlike \onicls that uses a LIFO queue to rank captions for LLM annotation, it is more subtle to design the most effective sampling strategy for \oniranking, where we need to construct pairs of captions to annotate and use for reward model training.
+Here we study the effect of deduplicating captions before passing them to our pipeline. In either case, we maintain a message list $\mathcal{L}$, and sample pairs of captions $c_1, c_2 \sim \text{Uniform}(\mathcal{L} \times \mathcal{L})$ for annotation. The annotated message pairs are stored in another list, which is sampled from uniformly when training the reward model.
+%
+In the first option, each time the agent encounters a message, we check if it is already stored in $\mathcal{L}$ and only add it if not. This is similar to the approach used in \onicls. 
+%
+In the second option, we simply add all captions encountered by the agent into $\mathcal{L}$, regardless of whether they have already been seen before. This approach is similar to that taken by the original Motif work, which does not perform any deduplication of the offline dataset. 
+%
+
+\Cref{fig:ablation_ranking_offset_vs_thresholding} shows the performance and the number of captions stored in the replay buffer for both schemes. We see that for the deduplicated variant, the number of captions does not grow past a certain point (approximately $70k$ unique captions). For the non-deduplicated variant, the number of captions keeps growing linearly over time. The deduplicated variant fails to learn, which highlights the important effect which the annotation dataset can have. We hypothesize that the deduplicated variant may undersample captions that occur frequently in the agent's experience, for which it is important to reliably estimate reward. For example, the blank message occurs very frequently during policy learning, but is only included in a small fraction of the pairs sent to the LLM for annotation, since it is sampled with the same probability as the other $\sim 70k$ other captions. In contrast, the duplicated variant samples the blank message and other frequent captions with much higher probability. Still, this remains a simple strategy, and designing more sophisticated sampling mechanisms (for example, that account for the epistemic uncertainty of the reward model) would be an interesting direction for future work.
+
+%
+%
+%
+%
+%
+%
+%
+%
+  %
+  
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{plot/ablation_ranking_dedup_returns.pdf}
+        %
+        %
+    \caption{ 
+    Performance and number of captions in the replay buffer for agents trained with and without message deduplication. Keeping the natural distribution of captions, and not deduplicating, is important to enable our ranking-based method to learn. 
+        %
+        %
+    }
+    \label{fig:ablation_ranking_offset_vs_thresholding}
+\end{figure}
+
+
+
+
+
+
+
+\section{Additional Related Work}
+\label{app:additional_related_work}
+
+%
+
+\paragraph{LLM for RL Broadly}
+Another way of leveraging the prior knowledge encoded in LLMs for decision making is to use the LLM directly as a policy. This approach has been successfully used in robotics \citep{ahn2022icanisay, driess2023palme},
+as well as open-ended exploration in MineCraft \citep{wang2024voyager}. Both settings require the LLM to operate at a higher level of abstraction, by having it call upon a set of semantically grounded skills which handle the low-level sensorimotor activity. These are in turn produced by imitation learning on expert trajectories or hardcoded APIs.
+%
+%
+\citet{jeurissen2024playing} prompt the LLM to choose a predefined skill to play NetHack.
+The prompts are constructed to represent past events, current observation, and the task description and hardcoded available skills are also included.
+More references on LLMs for decision making can be found in the survey paper of \citet{cao2024survey}.
+
+
+
+
+%
+%
+%
+%
+
+

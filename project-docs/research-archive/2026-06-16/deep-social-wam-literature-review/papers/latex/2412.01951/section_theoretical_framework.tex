@@ -1,0 +1,157 @@
+
+This section introduces the theoretical framework within which we will
+analyze the \bestofnalg and \rlhfalg algorithms. We first introduce
+the \mlsharp objective as a stylized self-reward function, then
+introduce our statistical framework for sharpening.
+\iclr{We write $f=\bigoht(g)$ to denote 
+    $f = \bigoh(g\cdot{}\max\crl*{1,\mathrm{polylog}(g)})$ and
+    $a\approxleq{}b$ as shorthand for $a=\bigoh(b)$.\loose}
+\subsection{Maximum-Likelihood Sharpening}\label{sec:autoreg_sharpening}
+
+Our theoretical results focus on the \mlsharp objective given
+by
+\begin{align}
+  \label{eq:ml_sharpening2}
+    \rself(y \mid x) := \log \piref(y \mid x),
+\end{align}
+which we aim to maximize using conditional samples
+$y\sim\piref(\cdot\mid{}x)$ from the base model. This is a simple and stylized self-reward function, but we will show
+that it enjoys a rich theory. In
+particular, we can restate the problem of sharpening with this self-reward through the lens of \emph{amortization}.
+\loose
+\begin{mainbox}
+  \emph{Can we efficiently \textbf{amortize maximum likelihood
+      inference (optimization)}
+  for a conditional distribution $\piref(y\mid{}x)$ given access to a
+  \textbf{sampling oracle} that can sample $y\sim\piref(\cdot \mid{}x)$?\loose}
+\end{mainbox}
+\dfedit{The tacit assumption in this framing is that the
+  maximum-likelihood response constitutes a useful form of hidden
+  knowledge.} \Mlsharp connects
+the study of self-improvement to a large body of research in
+theoretical computer science demonstrating computational reductions between
+optimization (inference) and sampling (generation)
+\citep{kirkpatrick1983optimization,lovasz2006fast,singh2014entropy,ma2019sampling,talwar2019computational}. %
+Our sharpening framework offers a new learning-theoretic perspective by focusing on the problem of amortizing this
+type of reduction\akdelete{ \abedit{and is inspired by the classical query complexity framework\citep{nemirovski1983problem,traub1988information,raginsky2011information,agarwal2012information}}}. \msdelete{}
+
+We evaluate the quality of an
+approximately sharpened model as follows. Let
+\[\Ystar(x)\ldef{}\argmax_{y\in\cY}\log \piref(y\mid{}x);\] we interpret
+$\Ystar(x)\subset\cY$ as a set  to accommodate non-unique
+maximizers, and will write $\ystar(x)$ to indicate a
+unique maximizer when it exists (i.e., when
+$\Ystar(x)=\crl{\ystar(x)}$). 
+
+
+                                                     \begin{definition}[Sharpened model]
+                                                       \label{def:sharpening}
+    We say that a model $\pihat$ is $(\eps,\delta)$-sharpened
+    relative to $\piref$ if
+    \begin{align}
+      \bbP_{x\sim\cdist}\brk*{\pihat\prn*{\Ystar(x)\mid{}x}\geq{}1-\delta} \geq{} 1-\eps.
+    \end{align}
+  \end{definition}
+That is, an $(\eps,\delta)$-sharpened model places at least
+$1-\delta$ mass on arg-max responses on all but an $\eps$-fraction
+of prompts under $\mu$. For small $\delta$ and $\eps$, we are
+guaranteed that $\pihat$ is a high-quality generator: sampling from the model will produce an arg-max
+response with high probability for most prompts.
+
+
+
+
+
+
+
+  \paragraph{\Mlsharp for autoregressive models}
+  Though our most general results are
+  agnostic to the structure of $\cX$, $\cY$, and $\piref$, our primary
+  motivation is
+the autoregressive setting in which
+$\cY=\cV^{H}$ for a \emph{vocabulary space} $\cV$ and sequence
+  length $H$, and where $\piref$ has the autoregressive structure
+$\piref(y_{1:H}\mid{}x)=\prod_{h=1}^{H}\pirefh(y_h\mid{}y_{1:h-1},x)$
+for $y=y_{1:H}\in\cY$.
+We observe
+that when the response
+$y=(y_1,\ldots,y_H)\in\cY=\cV^{H}$ is a sequence of tokens, the
+\mlsharp objective \eqref{eq:ml_sharpening} sharpens
+toward the \emph{sequence-level} arg-max response:
+\begin{align}
+  \label{eq:inference_time}
+\argmax_{y_{1:H}}\log\piref(y_{1:H}\mid{}x).
+\end{align}
+\dfedit{Although somewhat stylized, \cref{eq:inference_time}
+ is a non-trivial (in general, computationally intractable; see \Cref{sec:hardness})
+ solution concept. We view the sequence-level arg-max as a form of hidden
+ knowledge that cannot necessarily be uncovered through naive
+ sampling or greedy decoding.
+  \loose}
+
+
+  
+
+
+  \loose
+
+  \paragraph{Role of $\delta$ for autoregressive models}
+
+
+  As can be verified through simple examples, beam-search and greedy
+  tokenwise decoding do not return an exact (or even approximate)
+  solution to \eqref{eq:inference_time} in general. There is one
+  notable exception: If the model has already been sharpened to
+  $\delta<1/2$ and the arg-max sequence is unique, then greedy
+  decoding will succeed.
+  \loose
+  \begin{proposition}[Greedy decoding succeeds for sharpened policies]
+    \label{prop:greedy}
+    Let $\pi=\pi_{1:H}$ be an autoregressive model defined over
+    response space $\cY=\cV^{H}$. For a given prompt $x\in\cX$, if
+    $\Ystar(x)=\crl*{\ystar(x)}$ is a singleton and
+    $\pi(\ystar(x)\mid{}x)>1/2$, then the greedy decoding strategy
+    that selects
+    \iclr{$\yhat_h=\argmax_{y_h\in\cV}\pi_h(y_h\mid{}\yhat_1,\ldots,\yhat_{h-1},x)$}
+    \arxiv{\begin{align}
+      \yhat_h=\argmax_{y_h\in\cV}\pi_h(y_h\mid{}\yhat_1,\ldots,\yhat_{h-1},x)
+    \end{align}}
+    guarantees that $\yhat=\ystar(x)$. This result is tight, in the
+    sense that there exist $\pi$ with $\pi(\ystar(x)\mid{}x)\leq{}1/2$
+    for which greedy decoding fails to recover $\ystar(x)$. \loose
+  \end{proposition}
+  This means that if we start from an un-sharpened model, it can suffice
+  to focus on sharpening to $\delta<1/2$.
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

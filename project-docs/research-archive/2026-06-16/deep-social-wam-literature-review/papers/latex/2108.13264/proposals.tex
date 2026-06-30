@@ -1,0 +1,159 @@
+
+% Point estimates based on a few runs misrepresent the true performance as such estimates are highly dependent on the randomness associated with those specific runs~(\Secref{sec:case_study}).  Unfortunately, such misrepresentations are widespread as deep RL publications typically use a handful of runs but disregard the substantial statistical uncertainty in reported results~(\Secref{sec:reevaluating_eval}).
+
+
+
+
+
+
+% \begin{wrapfigure}{r}{0.4\linewidth}
+%     \centering
+%     \vspace{-0.5cm}
+%     \includegraphics[width=\linewidth]{figures/bootstrapping_cis.pdf}
+%      \caption{\textbf{Validating Bootstrap 95\% CIs} for a varying number of runs for median and IQM scores for DER~\citep{van2019use}. The true coverage \% is computed by sampling 20,000 sets of K runs sampled without replacement from 200 runs and checking the fraction of 95\% CIs that contains the true estimate approximation based on 200 runs. %  This process is repeated for 20,000 different sets of K runs and we present the average results. 
+%      Percentile CIs has the best coverage while achieving a small interval width to other methods. Also, CI widths for IQM are smaller than that of median.}\label{fig:bootstrap_metrics}
+%     \vspace{-0.6cm}
+% \end{wrapfigure}
+
+% Reasons why we need to account for uncertainty.
+% Our case study shows how the number of runs alone cannot address the issues posed by statistical uncertainty, at least not when applied to computationally demanding deep RL benchmarks. 
+Our case study shows that the increase in the number of runs required to address the statistical uncertainty issues is typically infeasible for computationally demanding deep RL benchmarks.
+% how the number of runs alone cannot address the issues posed by statistical uncertainty, at least not when applied to computationally demanding deep RL benchmarks. 
+In this section, we identify three tools for improving the quality of experimental reporting in the few-run regime, all aligned with the principle of accounting for statistical uncertainty in results.
+
+% Although statistical uncertainty in point estimates can be reduced by evaluating a large number of runs, it is often computationally prohibitive to do so on deep RL benchmarks. Moreover, while controlling all sources of randomness might make such estimates reproducible under the \emph{exact} same experimental setup, there is no justification for preferring specific random conditions, for example, by choosing one random seed over another, as such conditions might be more preferable for certain algorithms than others.
+% Thus, reliable results with a handful of runs require accounting for uncertainty, for which we call for the use of interval estimates and score distributions.
+
+% How to do interval estimation?
+% Previous work has used it.
+% Building block for reporting uncertainty.
+% Random things must have uncertainty.
+% Bootstrap intervals often underestimate, but better than none.
+% Explain why there are confidence intervals in performance profiles.
+% Any function of finite data is random. Uncertainty is greater with fewer runs.
+% All of these methods will help mitigate uncertainty.
+\vspace{-0.2cm}
+\subsection{Stratified Bootstrap Confidence Intervals}
+\label{sec:stratified_bootstrap_ci}
+\vspace{-0.1cm}
+We first reaffirm the importance of reporting interval estimates to indicate the range within which an algorithm's aggregate performance is believed to lie. Concretely, we propose using bootstrap CIs~\citep{eforn1979bootstrap} with stratified sampling for aggregate performance, a method that can be applied to small sample sizes and is better justified than reporting sample standard deviations in this context.
+% The key assumption behind \emph{bootstrapping} is that re-sampling from the data approximates sampling from the true distribution.
+While prior work has recommended using bootstrap CIs for reporting uncertainty in single task mean scores with $N$ runs~\citep{henderson2018deep,chan2019measuring, colas2018many}, this is less useful when $N$ is small~(\figref{fig:dist_der_ci}), as \emph{bootstrapping} assumes that re-sampling from the data approximates sampling from the true distribution. We can do better by aggregating samples across tasks, for a total of $MN$ random samples.
+%, and by using more sophisticated interval estimation techniques. 
+
+
+
+To compute the stratified bootstrap CIs, we re-sample runs with replacement independently for each task to construct an empirical bootstrap sample with $N$ runs each for $M$ tasks from which we calculate a statistic and repeat this process many times to approximate the sampling distribution of the statistic. %Since, in practice, we often only have a handful of runs, how well do stratified bootstrap CIs estimate uncertainty in this setting?
+We measure the reliability of this technique in Atari 100k for variable $N$, by comparing the nominal coverage of 95\% to the ``true'' coverage from the estimated CIs~(\figref{fig:bootstrap_metrics}) for different bootstrap methods~(%percentile, basic, bias-corrected~(BC) and bias-corrected and accelerated~(BCa); 
+see \citep{efron1987better} and Appendix~\ref{sec:bootstrap_ci_app}). We find that percentile CIs provide good interval estimates for as few as $N=10$ runs for both median and IQM scores~(\Secref{sec:aggregate_metrics_robust}).
+
+
+
+
+
+% Since, in practice, we often only have a handful of runs, how well do stratified bootstrap CIs estimate uncertainty in this setting? To answer this question, we evaluate four common methods for constructing bootstrap CIs, namely . We compare these methods based on how correctly they estimate the uncertainty in median and IQM scores~(\Secref{sec:better_aggregate}) for DER on Atari 100K. We find that percentile intervals work very well in terms of achieving true coverage closest to the nominal coverage of 95\%, which they achieve with as few as 10 runs~().
+
+\vspace{-0.25cm}
+\subsection{Performance Profiles}
+\label{subsec:perf_profiles}
+\vspace{-0.1cm}
+Most deep RL benchmarks yield scores that vary widely between tasks and may be heavy-tailed, multimodal, or possess outliers~(\eg \figref{fig:dist_der}). In this regime, both point estimates, such as mean and median scores, and interval estimates of these quantities paint an incomplete picture of an algorithm's performance~\citep[][Section 3]{dehghani2021benchmark}. Instead, we recommend the use of \emph{performance profiles}~\citep{dolan2002benchmarking}, commonly used in benchmarking optimization software. While performance profiles from \citet{dolan2002benchmarking} correspond to empirical cumulative distribution functions without any uncertainty estimates, profiles proposed herein visualize the empirical tail distribution function~(Section \ref{sec:formalism}) of a random score~(higher curve is better),  with pointwise confidence bands based on stratified bootstrap. 
+
+
+By representing the entire set of normalized scores $x_{1:M, 1:N}$ visually, performance profiles reveal performance variability across tasks much better than interval estimates of aggregate metrics. Although tables containing per-task mean scores and standard deviations can reveal this variability, such tables tend to be overwhelming for more than a few tasks.\footnote{In addition, standard deviations are sometimes omitted from tables due to space constraints.}
+In addition, performance profiles are robust to outlier runs and insensitive to small changes in performance across all tasks~\citep{dolan2002benchmarking}.
+
+% Marc here... need to navigate carefully between tables and old proposals. What are we doing better?
+
+% Performance profiles present an appealing alternative for reporting performance variability across tasks concealed by the scalar aggregate metrics. Although tables containing mean scores per task with standard deviation can reveal this variability, such tables tend to be overwhelming for more than a few tasks. Also, task mean scores can be misleading when the score distribution for a task is heavy-tailed,  multimodal, or has outliers~(\figref{fig:dist_der}).
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{new_figures/atari_100k_profiles.pdf}
+    \caption{\textbf{Performance profiles on Atari 100k} based on  score distributions~\textbf{(left)}, which we recommend, and average score distributions~\textbf{(right)}.
+    Shaded regions show pointwise 95\% confidence bands based on percentile bootstrap with stratified sampling. The profiles on the left are more robust to outliers and have smaller confidence bands. We use 10 runs to show the robustness of profiles with a few runs. For SimPLe~\citep{kaiser2019model}, we use the 5 runs from their reported results. The $\tau$ value where the profiles intersect $y=0.5$ shows the median while for a non-negative random variable, area under the performance profile corresponds to the mean. }
+    \label{fig:atari_100k_perf_prof}
+    \vspace{-0.45cm}
+\end{figure}
+
+In this paper, we propose the use of a performance profile we call run-score distributions or simply \emph{score distributions} (\figref{fig:atari_100k_perf_prof}, right), particularly well-suited to the few-run regime.
+A score distribution shows the fraction of runs above a certain normalized score and is given by 
+\vspace{-0.16cm}
+\begin{equation}
+    \hat{F}_X(\tau) = \hat{F}(\tau; x_{1:M, 1:N}) = \frac{1}{M} \sum_{m=1}^{M} \ecdfi(\tau) = \frac{1}{M} \sum_{m=1}^{M}  \frac{1}{N} \sum_{n=1}^{N} \mathbbm{1}[x_{m,n} > \tau] .
+\end{equation}
+\vspace{-0.1cm}
+One advantage of the score distribution is that it is an unbiased estimator of the underlying distribution $F(\tau) =  \tfrac{1}{N} \sum_{m=1}^{M} F_{m}(\tau)$. Another advantage is that an outlier run with extremely high score can change the output of score distribution for any $\tau$ by at most a value of $\tfrac{1}{MN}$. 
+
+It is useful to contrast score distributions to average-score distributions, originally proposed in the context of the ALE~\citep{bellemare2013arcade} as a generalization of the median score. Average-score distributions correspond to the performance profile of a random variable $\mixX$,  $\hat{F}_{\mixKX}(\tau) = \hat{F}(\tau; {\bar x}_{1:M})$, which shows the fraction of tasks on which an algorithm performs better than a certain score. However, such  distributions are a biased estimate of the thing they seek to represent. Run-score distributions are more robust than average-score distributions, as they are a step function in $1/MN$ versus $1/M$ intervals, and typically has less variance: $\sigma_X^2 = \tfrac{1}{M^2N} \sum_{m=1}^{M} \cdfi(\tau)(1 - \cdfi(\tau))$ versus $\sigma_{\bar X}^2 = \tfrac{1}{M^2}\sum_{m=1}^{M} F_{\avgXi}(\tau)(1 - F_{\avgXi}(\tau))$. \figref{fig:atari_100k_perf_prof} illustrates these differences.
+
+% A score distribution is step function that jumps up by $1/MN$ at each of the $N$ scores for $M$ tasks, and is an unbiased estimator to the underlying distribution $F(\tau) =  \tfrac{1}{N} \sum_{m=1}^{M} F_{m}(\tau)$ with variance $\sigma_X^2 = \tfrac{1}{M^2N} \smash{\sum_{i=m}^{M} \cdfi(\tau)(1 - \cdfi(\tau))}$. Finally, $\smash{\sqrt{MN}(\hat{F}_X(\tau) - F(\tau)}$ asymptotically converges to a normal distribution $\mathcal{N}(0, \sigma_X^2)$ pointwise.
+
+% Interestingly, quantile plots of average scores~\citep{bellemare2013arcade} can also be interpreted as the performance profile of a random variable $\mixX$,  $\smash{\hat{F}_{\mixKX}(\tau)} = \smash{\hat{F}(\tau; {\bar x}_{1:M})}$, which shows the fraction of tasks on which an algorithm performs better than a certain score. Such profiles are less robust to outliers than score distributions, that is, a run with extremely high score would increase  $\hat{F}_{\mixKX}(\tau)$ by $1/ M$, as opposed to only $1/MN$ for $\hat{F}_X(\tau)$.
+% %\smash{\tfrac{1}{N} \sum_{i=1}^{M} \mathbbm{1}[\avgxi > \tau]}$, 
+% Also, akin to median scores, $\hat{F}_\mixX(\tau)$ is a biased estimate of the true average score distribution  $\smash{\hat{F}(\tau; \expected[X_m]_{1:M})}$.
+% %\smash{\tfrac{1}{N} \sum_{i=1}^{N} P(\expected[X_i] > \tau)}$.
+% % , that is,  $\expected[\hat{F}_\mixKX(\tau)] = F_\mixKX(\tau) \neq F_{\mixX}(\tau)$. 
+% % Since we only have access to $K$ runs per task,, which is a step function that jumps up by $1/N$ at the $N$ task scores. 
+% Additionally, the variance of $\smash{\hat{F}_{\mixKX}(\tau)}$, $\sigma_{\bar X}^2 = \tfrac{1}{M^2}\sum_{m=1}^{M} F_{\avgXi}(\tau)(1 - F_{\avgXi}(\tau))$, is typically higher than that of the score distributions~(\figref{fig:atari_100k_perf_prof}). 
+
+% Another alternative~\citep{recht-2018} is to replace scores in a performance profile by the probability that average task scores of a given method outperforms the best method~(among a given set of methods), computed using the Welsh's t-test~\citep{welch1947generalization}. However, this profile is (1) also a biased estimate, (2) less robust to outlier runs, (3) is insensitive to the size of performance differences, \ie two methods that are uniformly 1\% and 100\% worse than the best method are assigned the same probability, (4) is only sensible when task score distributions are Gaussian, as required by Welsh's t-test, and finally, (5) the ranking of methods depends on the specific set of methods being compared in such profiles. 
+
+% Performance profiles from \citet{recht-2018} show the distribution of the probability that average task scores of a given method outperforms the best method~(among a given set of methods), computed using the Welsh's t-test~\citep{welch1947generalization}. Score distributions provide several benefits over such profiles: (1) akin to distribution of average scores~\citep{bellemare2013arcade}, such profiles are less robust to outlier runs;
+% (2) they are biased estimates of the distribution of the probability based on true task mean scores;
+% (3) the probability of improvement does not consider the size of performance differences, \ie two methods that are uniformly 1\% and 100\% worse than the best method are assigned the same probability;
+% (4) Welsh t-test assumes task score distributions are Gaussian, which is far from reality~(\figref{fig:dist_der}); 
+% and (5) the ranking of methods 
+% depends on the specific set of methods being compared in such profiles. 
+% The median normalized scores is a summary statistic for the random variable $\mixX$ that encapsulates how well the algorithm performs, in terms of average score with $K$ runs, on a randomly selected task. 
+% This variable follows a mixture distribution with complementary CDF $ F_\mixX(\tau) = \frac{1}{N} \sum_{i=1}^{N} P(\barXi > \tau)$, where $\barXi = \frac{1}{K} \sum_{k=1}^{K} {X_i}^s$ is the random variable corresponding to the average score for task $i$ with $K$ runs. Furthermore, the central limit theorem implies that $\hat{F}_\mixX(\tau) - F_\mixX(\tau)$ asymptotically converges pointwise to a normal distribution $\frac{1}{\sqrt{N}}\mathcal{N}(0, F_\mixX(\tau)(1 - F_\mixX(\tau))$.
+
+
+
+\vspace{-0.1cm}
+\subsection{Robust and Efficient Aggregate Metrics}
+\label{sec:aggregate_metrics_robust}
+\vspace{-0.1cm}
+
+\begin{wrapfigure}{r}{0.35\linewidth}
+    \centering
+    \vspace{-0.55cm}
+    \includegraphics[width=\linewidth]{new_figures/aggregate_metric.pdf}
+     \caption{\textbf{Aggregate metrics}. For a non-negative random variable $X$, IQM corresponds to the red shaded region while optimality gap corresponds to the orange shaded region in the performance profile of $X$. }\label{fig:aggregate_metrics}
+    \vspace{-0.45cm}
+\end{wrapfigure}
+
+Performance profiles allow us to compare different methods at a glance. If one curve is strictly above another, the better method is said to \emph{stochastically dominate}\footnote{A random variable $X$ has stochastic dominance over random variable $Y$ if  $P(X > \tau) \geq P(Y > \tau)$ for all $\tau$, and for some $\tau$, $P(X>\tau) > P(Y>\tau)$.} the other~\citep{levy1992stochastic, dror2019deep}. In RL benchmarks with a large number of tasks, however, stochastic dominance is rarely observed: performance profiles often intersect at multiple points. Finer quantitative comparisons must therefore entail aggregate metrics. 
+
+
+
+We can extract a number of aggregate metrics from score distributions, including median (mixing runs and tasks) and mean normalized scores~(matching our usual definition).
+As we already argued that these metrics are deficient, 
+we now consider interesting alternatives also derived from score distributions. 
+% However, existing metrics such as median and mean normalized scores have limitations. Median scores have high variability, are biased and, consequently, require many runs to detect improvements in performance~(\secref{sec:case_study}). 
+% While median scores are considered robust measure of performance, they are independent of performance on all but the median tasks~(at most 2).  % -- even if almost half of the task scores are zero, the median is not affected. This wastes resources computing performance on non-median tasks.
+% Mean normalized scores, on the other hand, consider performance on all tasks but can easily be dominated by performance on a few outlier tasks. % without being indicative of overall performance.
+
+%  In addition to the already discussed deficiencies of these metrics, these metrics are also not robust measures of performance. While mean scores can easily be dominated by performance on a few outlier tasks, median scores are independent of performance on all but the median tasks~(at most 2). 
+
+
+As an alternative to median, we recommend using the \textbf{interquartile mean}~(IQM). Also called 25\% trimmed mean, IQM discards the bottom and top $25\%$ of the runs and calculates the mean score of the remaining 50\% runs~(=$\floor{NM/2}$ for $N$ runs each on $M$ tasks). IQM interpolates between mean and median across runs, which are 0\% and almost $50\%$ trimmed means respectively. Compared to sample median, IQM is a better indicator of overall performance as it is calculated using 50\% of the combined runs while 
+median only depends on the performance ordering across tasks and not on the magnitude except at most 2 tasks. For example, zero scores on nearly half of the tasks does not affect the median while IQM exhibits a severe degradation. Compared to mean, IQM is robust to outliers, yet has considerably less bias than median~(\figref{fig:iqm_bias}). While median is more robust to outliers than IQM, this robustness comes at the expense of statistical efficiency, which is crucial in the few-run regime: IQM results in much smaller CIs~(\figref{fig:variability_in_median}~(right) and \ref{fig:bootstrap_metrics}) and is able to detect a given improvement with far fewer runs~(\twoFigref{fig:lift_spr}{fig:diff_medians}).
+% IQM is robust to outliers, and yet has considerably less bias than median~(\figref{fig:iqm_bias}). 
+% It is also a better indicator of overall performance than the median as it is calculated using 50\% of the runs (versus at most two tasks). Our experiments show that IQM results in much smaller CIs~(\figref{fig:variability_in_median}~(right) and \ref{fig:bootstrap_metrics}) and is able to detect a given improvement with far fewer runs~(\twoFigref{fig:lift_spr}{fig:diff_medians}). 
+
+% Median of task means doesn’t change even if we set the normalized scores on nearly half of the tasks to be 0 – IQM would indicate a severe degradation instead.
+% Mean task performance is dominated by outlier tasks and does not typically indicate performance of most tasks: IQM would ignore these outlier tasks.
+% For example, JamesBond on Atari 200M gets a normalized score above 50 and results in extremely high mean for Dreamer/M-IQN.
+% Theoretically, trimmed means, are known to have higher statistical efficiency for mixed distributions and heavy-tailed distributions (Cauchy distribution), at the cost of lower efficiency for some other less heavily-tailed distributions (normal distribution) than mean, as shown by the seminal work of Tukey [1]. We validate this empirically in Figure A.16 (Appendix) which shows the statistical efficiency of various trimmed estimators for different algorithms.
+
+
+As a robust alternative to mean, we recommend using the \textbf{optimality gap}:
+the amount by which the algorithm fails to meet a minimum score of $\gamma = 1.0$ (orange region in \figref{fig:aggregate_metrics}). This assumes that a score of 1.0 is a desirable target beyond which improvements are not very important, for example when the aim is to obtain human-level performance~\citep[\eg][]{dabney2018distributional, badia2020agent57}. Naturally, the threshold $\gamma$ may be chosen differently, which we discuss further in Appendix~\ref{app:agg_metrics_and_score_dist}.
+
+% ; when measuring performance relative to humans, $\gamma=1$ is
+% sensible as it emphasizes tasks below human performance. 
+
+
+If one is interested in knowing how robust an improvement from an algorithm $X$ over an algorithm $Y$ is, another possible metric to consider is the average \textbf{probability of improvement} -- this metric shows how likely it is for $X$ to outperform $Y$ on a randomly selected task. Specifically, $P(X > Y) = \tfrac{1}{M} \sum_{m=1}^{M} P(X_m > Y_m)$, where $P(X_m > Y_m)$~(Equation~\ref{eq:prob_improve}) is the probability that $X$ is better than $Y$ on task $m$. Note that, unlike IQM and optimality gap, this metric does not account for the size of improvement. While finding the best aggregate metric is still an open question and is often dependent on underlying normalized score distribution, our proposed alternatives avoid the failure modes of prevalent metrics while being robust and requiring fewer runs to reduce uncertainty.
+

@@ -1,0 +1,76 @@
+\subsection{Experimental Implementation Details}
+\label{sec:appdix_setup}
+
+\subsubsection{Tasks and Datasets}
+To comprehensively evaluate the EvolveR paradigm, we assess its performance on seven question-answering benchmarks, encompassing both in-domain and out-of-domain datasets. Following prior work~\citep{jin2025searchr1trainingllmsreason, mei2025o2searchersearchingbasedagentmodel}, the in-domain datasets, whose training splits are used to build the experience base, include Natural Questions (NQ)~\citep{kwiatkowski2019natural} and the multi-hop benchmark HotpotQA~\citep{yang2018hotpotqa}. The out-of-domain datasets, used exclusively for evaluating generalization, encompass the general QA benchmarks TriviaQA~\citep{joshi2017triviaqa} and PopQA~\citep{mallen2022not}, as well as the more complex multi-hop challenges 2WikiMultiHopQA~\citep{ho2020constructing}, Musique~\citep{trivedi2022musique}, and Bamboogle~\citep{press2022measuring}.
+
+
+\subsubsection{Baseline Methods}
+Following prior works, we compare against a comprehensive suite of baselines built upon the Qwen2.5 foundational models. The baselines represent three primary paradigms. First, prompting-based methods, which require no parameter updates, include Direct Inference, Chain-of-Thought (CoT)~\citep{wei2022chain}, Retrieval-Augmented Generation (RAG)~\citep{lewis2020retrieval}, and advanced variants like IRCoT~\citep{trivedi2022interleaving} and Search-o1~\citep{li2025search}. Second, Supervised Fine-Tuning (SFT) methods represent approaches that learn from static expert data, including standard SFT~\citep{chung2024scaling} and Rejection Sampling~\citep{ahn2024large}. Finally, the most direct competitors are RL methods, against which we benchmark extensively. This category is primarily composed of Search-R1~\citep{jin2025searchr1trainingllmsreason}, DeepSeek-R1~\citep{guo2025deepseek}, which are also trained with trajectory-level feedback. Specifically, DeepSeek-R1 performs reasoning and answer steps without a search engine, whereas Search-R1 incorporates an external local or web search engine. Together, these baselines provide a challenging evaluation landscape for our proposed paradigm.
+% Specially, DeepSeek-R1 performs reasoning and answer steps without a search engine, whereas Search-R1 and O$^2$-Searcher incorporate external local or web search engine. Together, these baselines provide a challenging evaluation landscape for our proposed paradigm.
+
+
+\subsubsection{Evaluation Metrics}
+
+To ensure a direct and fair comparison with prior work in our main results, our primary evaluation metric is Exact Match (EM), a strict measure that requires the predicted answer to exactly match the ground truth after standard normalization. We also report the F$1$ Score in the analysis of model scales' generalizability, which provides a more comprehensive and robust measure of performance, particularly since ground truths may contain multiple valid answers or aliases.
+
+\subsubsection{Implementation Details}
+
+
+Our experiments are conducted on the Qwen2.5 model family. Inspired by DeepSeek-R1~\citep{guo2025deepseek}, we introduce a cold-start stage to stabilize early RL training by first fine-tuning the base model on a small, curated dataset of CoT interaction trajectories. Following the setup of Search-R1, we construct this dataset from approximately 700 samples from the NQ and HotpotQA training sets. 
+We utilize the LLama\_Factory~\citep{zheng2024llamafactory} to fine-tune the model with LoRA. For the agent evolution phase, we employ GRPO for optimization. At each RL step, we sample a batch of 128 prompts, generating $G=8$ trajectories for each. The agent is then updated, again using Adam, but with a reduced learning rate of $1 \times 10^{-6}$, a warm-up step of 20 and a mini-batch size of 128. All training is conducted on 8 A100 GPUs, leveraging the Verl framework~\footnote{https://github.com/volcengine/verl} for efficient implementation. We will show more details in Appendix~\ref{sec:appdix_setup}. 
+
+
+\subsection{Main Results}
+\label{sec:main_results}
+
+The main results of our evaluation are presented in Table~\ref{tab:main_results}. Our analysis focuses on the comprehensive evaluation conducted on the Qwen2.5-3B and 7B models (we will show more results of different model scales in the Section~\ref{sec:scaling_analysis}). EvolveR achieves superior average scores 0.382 for 3B and 0.417 for 7B, outperforming all baselines, including strong RL agents like Searcher-R1. This robust overall performance is not driven by a narrow specialty, but by consistent, top-tier results across a wide spectrum of tasks; it secures the best scores on diverse benchmarks, including the in-domain NQ, the out-of-domain PopQA, and the adversarial Bamboogle dataset, while remaining highly competitive on all others. 
+% This performance is particularly noteworthy as our results on the 3B model are demonstrably comparable to the strong 7B-scale benchmark set by Search-R1-instruct, highlighting the significant efficiency and effectiveness of our experience-driven learning paradigm. 
+This consistent, high-level performance across diverse benchmarks validates that by systematically distilling, managing and utilizing, agents can develop more generalizable and powerful problem-solving strategies.
+
+
+
+\begin{table*}[!t]
+    \small
+    \centering
+    \setlength{\tabcolsep}{5pt}
+    \caption{Main results on QA benchmarks. The best performance in each column is set in \textbf{bold}. Our proposed model, EvolveR, is highlighted in gray.}
+    \label{tab:main_results}
+    \begin{tabular}{l cc ccccc c} % Adjusted column alignment
+        \toprule
+        \multirow{2}{*}{\textbf{Methods}}& \multicolumn{2}{c}{\textbf{In domain}} & \multicolumn{5}{c}{\textbf{Out of domain}} & \multirow{2}{*}{\textbf{Avg.}} \\
+        \cmidrule(lr){2-3} \cmidrule(lr){4-8}
+        & NQ & HotpotQA & TriviaQA & PopQA & 2wiki & Musique & Bamboogle & \\
+        \midrule
+        \multicolumn{9}{l}{\textbf{Qwen2.5-3B}} \\
+        Direct Inference & 0.106 & 0.149 & 0.288 & 0.108 & 0.244 & 0.020 & 0.024 & 0.134 \\
+        CoT & 0.023 & 0.021 & 0.032 & 0.005 & 0.021 & 0.002 & 0.000 & 0.015 \\
+        IRCoT & 0.111 & 0.164 & 0.312 & 0.200 & 0.171 & 0.067 & 0.240 & 0.181 \\
+        Search-o1 & 0.238 & 0.221 & 0.472 & 0.262 & 0.218 & 0.054 & 0.320 & 0.255 \\
+        RAG & 0.348 & 0.255 & 0.544 & 0.387 & 0.226 & 0.047 & 0.080 & 0.270 \\
+        SFT & 0.249 & 0.186 & 0.292 & 0.104 & 0.248 & 0.044 & 0.112 & 0.176 \\
+        R1-base & 0.226 & 0.201 & 0.455 & 0.173 & 0.268 & 0.055 & 0.224 & 0.229 \\
+        R1-instruct & 0.210 & 0.208 & 0.449 & 0.171 & 0.275 & 0.060 & 0.192 & 0.224 \\
+        Rejection Sampling & 0.294 & 0.240 & 0.488 & 0.332 & 0.233 & 0.059 & 0.210 & 0.265 \\
+        Search-R1-base & 0.406 & 0.284 & \textbf{0.587} & 0.435 & 0.273 & 0.049 & 0.088 & 0.303 \\
+        Search-R1-instruct & 0.341 & 0.324 & 0.545 & 0.378 & 0.319 & 0.103 & 0.264 & 0.325 \\
+        \rowcolor{Gray}
+        EvolveR (ours) & \textbf{0.434} & \textbf{0.373} & 0.584 & 0.434 & \textbf{0.381} & \textbf{0.137} & \textbf{0.328} & \textbf{0.382} \\
+        \midrule
+        \multicolumn{9}{l}{\textbf{Qwen2.5-7B}} \\
+        Direct Inference & 0.134 & 0.183 & 0.408 & 0.140 & 0.250 & 0.031 & 0.120 & 0.181 \\
+        CoT & 0.048 & 0.092 & 0.185 & 0.054 & 0.111 & 0.022 & 0.232 & 0.106 \\
+        IRCoT & 0.224 & 0.133 & 0.478 & 0.301 & 0.149 & 0.072 & 0.224 & 0.239 \\
+        Search-o1 & 0.151 & 0.187 & 0.443 & 0.131 & 0.176 & 0.058 & 0.296 & 0.206 \\
+        RAG & 0.349 & 0.299 & 0.585 & 0.392 & 0.235 & 0.058 & 0.208 & 0.304 \\
+        SFT & 0.318 & 0.217 & 0.354 & 0.121 & 0.259 & 0.066 & 0.112 & 0.207 \\
+        R1-base & 0.297 & 0.242 & 0.539 & 0.202 & 0.273 & 0.083 & 0.296 & 0.276 \\
+        R1-instruct & 0.270 & 0.237 & 0.537 & 0.199 & 0.292 & 0.072 & 0.293 & 0.271 \\
+        Rejection Sampling & 0.360 & 0.331 & 0.592 & 0.380 & 0.296 & 0.123 & 0.355 & 0.348 \\
+        Search-R1-instruct & 0.393 & 0.370 & 0.610 & 0.397 & \textbf{0.414} & 0.146 & 0.368 & 0.385 \\
+        \rowcolor{Gray}
+        EvolveR (ours) & \textbf{0.462} & \textbf{0.411} & \textbf{0.620} & \textbf{0.473} & 0.395 & \textbf{0.168} & \textbf{0.392} & \textbf{0.417} \\
+        \bottomrule
+    \end{tabular}
+\end{table*}
+

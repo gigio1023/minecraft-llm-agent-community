@@ -1,0 +1,493 @@
+\subsection{\texttt{Try-Cover}}\label{sec:try_partition}
+In this section, we present key component of Algorithm~\ref{alg:final_algorithm}, which is
+the \texttt{Try-Cover} procedure (Algorithm~\ref{alg:try_partition}). 
+%
+It builds a cover $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D}}$ of $\mathcal{P}$ made of approximate best-response regions for the meta-actions in the current set $\mathcal{D}$.
+%
+The approximate best-response region $\mathcal{L}_d$ for a meta-action $d \in \mathcal{D}$ must be such that: (i) all the best-response regions $\preg_a$ of actions $a \in A(d)$ associated with $d$ are contained in $\mathcal{L}_d$; and (ii) for every contract in $\mathcal{L}_d$ there must be an action $a \in A(d)$ that is induced as an ``approximate best response'' by that contract.
+%
+Notice that working with approximate best-response regions is unavoidable since the algorithm has only access to estimates of the (true) distributions over outcomes induced by agent's actions.  
+
+
+
+\begin{wrapfigure}[31]{R}{0.42\textwidth}
+	\vspace{-.7cm}
+	\begin{minipage}{0.42\textwidth}
+		\begin{algorithm}[H]
+			\caption{\texttt{Try-Cover}}\label{alg:try_partition}
+			\small
+			\begin{algorithmic}[1]
+				\State $\mathcal{L}_d \gets \varnothing$, $\mathcal{U}_{d}\leftarrow\mathcal{P}$ for all $d \in \mathcal{D}$\label{line:init_start}
+				\State $\mathcal{D}_d\gets \{d\}$ for all $d \in \mathcal{D}$ 
+				\State $\widetilde{{H}}_{ij} \gets \varnothing$, $ \Delta \widetilde c_{ij}\gets 0$ for all $d_i,d_j \in \mathcal{D}$
+				%\State Randomly take a contract $p \in \mathcal{P}$
+				\State $d\leftarrow\texttt{Action-Oracle}(p)$ \Comment{\textcolor{gray}{For any $p$ %\in \mathcal{P}$
+				}}
+				\IfThen{$d = \bot$}%
+				{\textbf{return} $\varnothing$}\label{line:rollback_1}
+				\State $\mathcal{L}_{d}\leftarrow\{p\}$, $\mathcal{C} \gets \{ d \}$\label{line:init_end}
+				\While{$\mathcal{C} \ne \varnothing $ }\label{line:partition_loop1}
+				\State Take any $d_i \in \mathcal{C}$
+				\While{$\mathcal{L}_{d_i} \ne \mathcal{U}_{d_i}$}\label{line:partition_loop2}
+				\State $V_{d_i} \gets V(\mathcal{U}_{d_i})$ \Comment{\textcolor{gray}{Vertexes of $\mathcal{U}_{d_i}$}}\label{line:loop_vertex}
+				%\While {$V_{d_i} \neq \varnothing$}\label{line:partition_loop3}
+				\Do 
+				\State Take any $p \in V_{d_i}$
+				\State $d_j \leftarrow \texttt{Action-Oracle}(p)$\label{line:d_j}
+				\IfThen{$d_j = \bot$}%
+				{\textbf{return} $\varnothing$}\label{line:rollback_3}
+				\If {$\mathcal{L}_{d_j} = \varnothing$} \label{line:add_1}
+				\State $\mathcal{L}_{d_j} \gets \{ p \}$, $\mathcal{C} \gets \mathcal{C} \cup \{d_j\}$\label{line:add_2}
+				\EndIf
+				\If {$d_j \in \mathcal{D}_{d_i}$} 
+				\State $\mathcal{L}_{d_i} \gets \text{co}(\mathcal{L}_{d_i}, p)$
+				\Else
+				\State $\hspace{-3.5mm}(\widetilde H, d_k) \shortleftarrow \texttt{Find-HS} ({d_i},p)$\label{line:find_hp}\label{line:d_k}
+				% \State $\widetilde H_{ik} \gets \texttt{Find-HP} (\mathcal{L}_{d_i},p)$\label{line:find_hp}
+				\IfThen{$d_k = \bot$}%
+				{\textbf{return} $\varnothing$}\label{line:rollback_2}
+				%\IfThen{$\widetilde H_{ik} = \varnothing$}%
+				%{\textbf{return} $\varnothing$}\label{line:rollback_2}
+				\State $\widetilde H_{ik} \gets \widetilde H$\label{line:switch}
+				\State $\mathcal{U}_{d_i} \leftarrow \mathcal{U}_{d_i} \cap \widetilde H_{ik} $\label{line:upper_bounds}
+				\State $\dreg_{d_i} \gets \dreg_{d_i} \cup \{d_k\}$\label{line:add_di}
+				%\State $\widetilde H_{ki} \gets - \widetilde H_{ik}$ \label{line:switch}
+				% \State $\mathcal{H} \gets \mathcal{H} \cup \{ \widetilde H_{ik}, \widetilde H_{ki} \}$
+				\EndIf
+				\State $V_{d_i} \gets V_{d_i} \setminus \{p\}$
+				\doWhile{$V_{d_i} \neq \varnothing\wedge d_j \in \mathcal{D}_{d_i}$}\label{line:partition_loop3}
+				%\doWhile{$V_{d_i} \neq \varnothing \wedge  \left( d_i =  d_j \vee p  \in \widetilde H_{ij} \right)$}\label{line:partition_loop3}
+				%\EndWhile
+				\EndWhile
+				\State $\mathcal{C} \leftarrow \mathcal{C} \setminus \{d_i\}$
+				\EndWhile
+				\State \Return  $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } $
+			\end{algorithmic}
+		\end{algorithm}
+	\end{minipage}
+\end{wrapfigure}
+%
+% \bac{la condizione nel do while non mi torna non dovrebbe essere $V_{d_i} \neq \varnothing \wedge  \left( d_i =  d_j \vee p  \in \widetilde H_{ij} \right)$}
+The core idea of the algorithm is to progressively build two polytopes $\mathcal{U}_{d}$ and $\mathcal{L}_{d}$---called, respectively, \emph{upper bound} and \emph{lower bound}---for each meta-action $d \in \mathcal{D}$.
+%
+During the execution, the upper bound $\mathcal{U}_{d}$ is continuously shrunk in such a way that a suitable approximate best-response region for $d$ is guaranteed to be contained in $\mathcal{U}_{d}$, while the lower bound $\mathcal{L}_{d}$ is progressively expanded so that it is contained in such a region.
+%
+%Intuitively, the upper bound $\mathcal{U}_{d}$ is constructed so that it ``approximately contains''  the best-response region $\mathcal{P}_{a}$ of each action $a \in I(d)$.
+%
+% Instead, the lower bound $\mathcal{L}_{d}$ is built in such a way that it is ``approximately contained'' in the union of all such best-response regions $\mathcal{P}_{a}$.
+%
+% Notice that approximating such containment relations is unavoidable due to the fact that the algorithm has only access to estimates of the (true) distributions over outcomes induced by agent's actions.  
+%
+The algorithm may terminate in two different ways.
+%
+The first one is when $\mathcal{L}_{d} = \mathcal{U}_{d}$ for every $d \in \mathcal{D}$.
+%
+In such a case, the lower bounds $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D}}$ constitutes a cover of $\mathcal{P}$ made of suitable approximate best-response regions for the meta-actions in $\mathcal{D}$, and, thus, it is returned by the algorithm.
+%
+% it returns the collection $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D}}$ of the lower bounds, as this constitutes a cover of $\mathcal{P}$ made of suitable approximate best-response regions for the meta-actions in $\mathcal{D}$.
+%
+The second way of terminating occurs any time a call to the \texttt{Action-Oracle} procedure is \emph{not} able to safely map the agent's best response under the contract given as input to a meta-action (\emph{i.e.}, \texttt{Action-Oracle} returns $\bot$).
+%
+In such a case, the algorithm gives back control to Algorithm~\ref{alg:final_algorithm} by returning $\varnothing$, and the latter in turn re-starts the \texttt{Try-Cover} procedure from scratch since the last call to \texttt{Action-Oracle} has updated $\mathcal{D}$.
+%
+This happens in Lines~\ref{line:rollback_1},~\ref{line:rollback_3},~and~\ref{line:rollback_2}.
+%\mat{line 16 e 24}
+%(in the latter case, since a call to \texttt{Action-Oracle} made internally to \texttt{Find-HP} has returned $\bot$, see Appendix~\ref{sec:hyperplane}).
+%
+% The core idea behind this algorithm is to maintain an upper bound $\mathcal{U}_{d_i}$ that approximately contains each best-response region $\mathcal{P}_{a_i}$ for each action $a_i \in I(d_i)$ and for each discovered action $d_i \in \mathcal{D}$. Analogously, the algorithm maintains an lower bound $\mathcal{L}_{d_i}$ in wihch each feasibility region $\mathcal{P}_{a_i}$ is approximately contained for each action $a_i \in I(d_i)$ and for each discovered action $d_i \in \mathcal{D}$. 
+
+The ultimate goal of Algorithm~\ref{alg:try_partition} is to reach termination with $\mathcal{L}_{d} = \mathcal{U}_{d}$ for every $d \in \mathcal{D}$.
+%
+Intuitively, the algorithm tries to ``close the gap'' between the lower bound $\mathcal{L}_{d} $ and the upper bound $ \mathcal{U}_{d}$ for each $d \in \mathcal{D}$ by discovering suitable \emph{approximate halfspaces} whose intersections define the desired approximate best-response regions.  
+%
+% suitable \emph{approximate separating hyperplanes} that define the boundaries of the desired approximate best-response regions.
+%
+Such halfspaces are found in Line~\ref{line:find_hp} by means of the \texttt{Find-HS} procedure (Algorithm~\ref{alg:find_hyperplane}), whose description and analysis is deferred to Appendix~\ref{sec:hyperplane}.
+%
+Intuitively, such a procedure searches for an hyperplane that defines a suitable approximate halfspace by performing a binary search (with parameter $\eta$) on the line connecting two given contracts, by calling \texttt{Action-Oracle} on the contract representing the middle point of the line at each iteration.
+%\bac{Dire che i parametro della binary serach è $\eta$ se non non si capisce a cosa serva..}
+%
+%The procedure may either find a suitable approximate halfspace $\widetilde{H}$ or terminate prematurely.
+%
+%The latter case occurs whenever a call to \texttt{Action-Oracle} internal to \texttt{Find-HS} returned the special value $\bot$.
+%
+%When this happens, Algorithm~\ref{alg:try_partition} immediately returns $\varnothing$ (see Line~\ref{line:rollback_2}).
+
+
+
+The halfspaces that define the approximate best-response regions computed by Algorithm~\ref{alg:try_partition} intuitively identify areas of $\mathcal{P}$ in which one meta-action is ``supposedly better'' than another one.
+%
+In particular, Algorithm~\ref{alg:try_partition} uses the variable $\widetilde H_{ij}$ to store the approximate halfspace in which $d_i \in \mathcal{D}$ is ``supposedly better'' than $d_j \in \mathcal{D}$, in the sense that, for every contract in such a halfspace, each action associated with $d_i$ provides (approximately) higher utility to the agent than all the actions associated with $d_j$.
+%\footnote{For ease of exposition, in this section and in Algorithm~\ref{alg:try_partition} we assume w.l.o.g.~that the meta-actions in $\mathcal{D}$ are indexed by natural numbers, so that $\mathcal{D} = \left\{ d_1, \ldots, d_{|\mathcal{D}|} \right\}$. Moreover, with an abuse of notation, in Algorithm~\ref{alg:try_partition} we use the convention that, whenever the variables $d_j$ and $d_k$ (defined in Lines~\ref{line:d_j}~and~\ref{line:d_k}) refer to meta-actions (notice that they could be equal to $\bot$), they correspond to the $j$-th and the $k$-th meta-action, respectively.}
+%
+Then, the approximate best-response region for $d_i \in \mathcal{D}$ is built by intersecting a suitably-defined group of $\widetilde H_{ij}$, for some $d_j \in \mathcal{D}$ with $j \neq i$.
+%
+In order to ease the construction of the approximate halfspaces in the \texttt{Find-HS} procedure, Algorithm~\ref{alg:try_partition} also keeps some variables $\Delta \widetilde{c}_{ij}$, which represent estimates of the difference between the costs $c(d_i)$ and $c(d_j)$ of $d_i$ and $d_j$, respectively.
+%
+These are needed to easily compute the intercept values of the hyperplanes defining $\widetilde H_{ij}$.
+%
+% the intercept value of the hyperplane defining $\widetilde H_{ij}$ in a suitable variable $\Delta \widetilde{c}_{ij}$, as this is needed by \texttt{Find-HS} (see Appendix~\ref{sec:hyperplane} for additional details).
+%
+%Notice that, for ease of presentation,
+%In the following, we assume that all the variables in Algorithm~\ref{alg:try_partition} are also accessible from the sub-procedure \texttt{Find-HS}.
+%
+%
+% In Algorithm~\ref{alg:try_partition}, we use the variable $\widetilde H_{ij}$ to define the halfspace identified by the approximate separating hyperplane found by the algorithm as a boundary for $\mathcal{L}_{d_i}$ when compared with $\mathcal{L}_{d_j}$, where, for ease of presentation, we assume that the meta-actions in $\mathcal{D}$ are indexed by natural numbers.
+%
+% In particular, $\widetilde H_{ij}$ represents the halfspace of contracts under which the meta-action $d_i$ is ``supposedly better'' than $d_j$.
+%
+%
+%
+%In Algorithm~\ref{alg:try_partition}, we use the symbol $\widetilde H_{ij}$ to denote the approximate separating hyperplane (as well as the halfspace it identifies, obtained  by turning `$=$' into `$\geq $' in tis definition) found by the algorithm as a boundary between $\mathcal{L}_{d_i}$ and $\mathcal{L}_{d_j}$, where, for ease of presentation, we assume that the meta-actions in $\mathcal{D}$ are indexed by natural numbers.
+%%
+%Such approximate separating hyperplanes are found in Line~\ref{line:find_hp} by means of another procedure called \texttt{Find-HP} (Algorithm~\ref{alg:find_hyperplane}), whose detailed description and analysis is deferred to Appendix~\ref{sec:hyperplane}.
+%%
+%Intuitively, such a procedure searches for a suitable approximate separating hyperplane by performing a binary search (with parameter $\eta$) on the line connecting two given contracts, by calling the \texttt{Action-Oracle} procedure on the contract representing the middle point of the line at each iteration.
+%%\bac{Dire che i parametro della binary serach è $\eta$ se non non si capisce a cosa serva..}
+%%
+%The procedure may either find a suitable approximate separating hyperplane or terminate with the empty set $\varnothing$.
+%%
+%The latter case occurs any time a call to \texttt{Action-Oracle} internal to \texttt{Find-HP} returned the special value $\bot$.
+%%
+%Then, \texttt{Try-Partition} immediately returns $\varnothing$ (see Line~\ref{line:rollback_2}).
+
+%\mat{ma se $H$ hiperpiani e $\tilde H$ halfspace?}
+
+
+Next, we describe the procedure used by Algorithm~\ref{alg:try_partition} to reach the desired termination.
+%
+In the following, for clarity of exposition, we omit all the cases in which the algorithm ends prematurely after a call to \texttt{Action-Oracle}.
+%
+Algorithm~\ref{alg:try_partition} works by tracking all the $d \in \mathcal{D}$ that still need to be processed, \emph{i.e.}, those such that $\mathcal{L}_{d} \neq \mathcal{U}_{d}$, into a set $\mathcal{C}$.
+%
+At the beginning of the algorithm (Lines~\ref{line:init_start}--\ref{line:init_end}), all the variables are properly initialized.
+% 
+In particular, all the upper bounds are initialized to the set $\mathcal{P}$, while all the lower bounds are set to $\varnothing$.
+%
+The set $\mathcal{C}$ is initialized to contain a $d \in \mathcal{D}$ obtained by calling \texttt{Action-Oracle} for any contract $p \in \mathcal{P}$, with the lower bound $\mathcal{L}_{d}$ being updated to the singleton $\{ p \}$.
+%
+Moreover, Algorithm~\ref{alg:try_partition} also maintains some subsets $\mathcal{D}_d \subseteq \mathcal{D}$ of meta-actions, one for each $d \in \mathcal{D}$.  
+%
+For any $d_i \in \mathcal{D}$, the set $\mathcal{D}_{d_i}$ is updated so as to contain all the $d_j \in \mathcal{D}$ such that the halfspace $\widetilde{H}_{i j}$ has already been computed.
+%
+Each set $\mathcal{D}_d$ is initialized to be equal to $\{ d \}$, as this is useful to simplify the pseudocode of the algorithm.
+% 
+The main loop of the algorithm (Line~\ref{line:partition_loop1}) iterates over the meta-actions in $\mathcal{C}$ until such a set becomes empty.
+%
+For every $d_i \in \mathcal{C}$, the algorithm tries to ``close the gap'' between the lower bound $\mathcal{L}_{d_i}$ and the upper bound $\mathcal{U}_{d_i}$ by using the loop in Line~\ref{line:partition_loop2}
+%
+In particular, the algorithm does so by iterating over all the vertices $V(\mathcal{U}_{d_i})$ of the polytope defining the upper bound $\mathcal{U}_{d_i}$ (see Line~\ref{line:loop_vertex}).
+% that do \emph{not} already belong to the lower bound $\mathcal{L}_{d_i}$.
+%
+For every $p \in V(\mathcal{U}_{d_i})$, the algorithm first calls \texttt{Action-Oracle} with $p$ as input.
+%
+Then:
+
+%
+\begin{itemize}[leftmargin=3mm]
+	%
+	\item If the returned $d_j$ belongs to $\mathcal{D}_{d_i}$, then the algorithm takes the convex hull between the current lower bound $\mathcal{L}_{d_i}$ and $p$ as a new lower bound for $d_i$.
+	%
+	This may happen when either $d_j = d_i$ (recall that $d_i \in \mathcal{D}_{d_i}$ by construction) or $d_j \neq d_i$.
+	%
+	Intuitively, in the former case the lower bound can be ``safely expanded'' to match the upper bound at the currently-considered vertex $p$, while in the latter case such ``matching'' the upper bound may introduce additional errors in the definition of $\mathcal{L}_{d_i}$.
+	%
+	Nevertheless, such an operation is done in both cases, since this \emph{not} hinders the guarantees of the algorithm, as we formally show in Lemma~\ref{lem:epsilonbr}.
+	%
+	%Such an operation is performed in both these two cases, since this \emph{not} hinder the guarantees of the algorithm, as we formally show in Lemma~\ref{lem:epsilonbr}.
+	%
+	Notice that handling the case $d_j \neq d_i$ as in Algorithm~\ref{alg:try_partition} is crucial to avoid that multiple versions of the approximate halfspace $\widetilde{H}_{ij}$ are created during the execution of the algorithm.
+	%
+	\item If the returned $d_j$ does \emph{not} belong to $\mathcal{D}_{d_i}$, the algorithm calls the \texttt{Find-HS} procedure to find a new approximate halfspace.
+	%
+	Whenever the procedure is successful, it returns an approximate halfspace $\widetilde H$ that identifies an area of $\mathcal{P}$ in which $d_i$ is ``supposedly better'' than another meta-action $d_k \in \mathcal{D} \setminus \mathcal{D}_{d_i}$, which is returned by the \texttt{Find-HS} procedure as well.
+	%
+	Then, the returned halfspace $\widetilde H$ is copied into the variable $\widetilde H_{ik}$ (Line~\ref{line:switch}), and the upper bound $\mathcal{U}_{d_i}$ is intersected with the latter (Line~\ref{line:upper_bounds}).
+	%
+	Moreover, $d_k$ is added to $\mathcal{D}_{d_i}$ (Line~\ref{line:add_di}), in order to record that the halfspace $\widetilde H_{ik}$ has been found.
+	%
+	After that, the loop over vertexes is re-started, as the upper bound has been updated. 
+\end{itemize}
+%
+Whenever the loop in Line~\ref{line:partition_loop2} terminates, $\mathcal{L}_{d_i} = \mathcal{U}_{d_i}$ for the current meta-action $d_i$, and, thus, $d_i$ is removed from $\mathcal{C}$.
+%
+Moreover, if a call to \texttt{Action-Oracle} returns a meta-action $d_j \in \mathcal{D}$ such that $d_j \notin \mathcal{C}$ and $\mathcal{L}_{d_j} = \varnothing$, then $d_j$ is added to $\mathcal{C}$ and $\mathcal{L}_{d_j}$ is set to $\{ p \}$, where $p \in \mathcal{P}$ is the contract given to \texttt{Action-Oracle} (see Lines~\ref{line:add_1}--\ref{line:add_2}).
+%
+This ensures that all the meta-actions are eventually considered.
+%Then, the main loop of the algorithm (Line~\ref{line:partition_loop1}) iterates over the meta-actions in $\mathcal{C}$ until such a set becomes empty.
+%%
+%For every meta-action $d_i \in \mathcal{C}$, the algorithm tries to ``close the gap'' between the lower bound $\mathcal{L}_{d_i}$ and the upper bound $\mathcal{U}_{d_i}$ by using the loop in Line~\ref{line:partition_loop2}
+%%
+%In particular, the algorithm does so by iterating over all the vertices $V(\mathcal{U}_{d_i})$ of the polytope defining the upper bound $\mathcal{U}_{d_i}$ (see Line~\ref{line:loop_vertex}).
+%% that do \emph{not} already belong to the lower bound $\mathcal{L}_{d_i}$.
+%%
+%For every vertex $p \in V(\mathcal{U}_{d_i})$, the algorithm first calls the \texttt{Action-Oracle} procedure with $p$ as input.
+%%
+%Then:
+%\begin{itemize}[leftmargin=8mm]
+%	\item If either the returned meta-action $d_j \in \mathcal{D}$ coincides with $d_i$ or the vertex $p$ belongs to $\widetilde{H}_{ij}$ (\emph{i.e.}, the halfspace in which $d_i$ is ``supposedly better'' than $d_j$),
+%	% approximate separating hyperplane between $\mathcal{L}_{d_i}$ and $\mathcal{L}_{d_j}$), 
+%	then the algorithm takes the convex hull between the current lower bound $\mathcal{L}_{d_i}$ and $p$ as a new lower bound for $d_i$.
+%	%
+%	Intuitively, the first condition corresponds to the case in which the lower bound can be ``safely expanded'' to match the upper bound, while the second condition ensures that $\widetilde{H}_{ij}$ is computed only one time.
+%	%
+%	In the latter case, additional errors may be introduced in the definition of the sets $\mathcal{L}_{d}$.
+%	%
+%	However, these do \emph{not} hinder the guarantees of the algorithm, as we formally show in Lemma~\ref{lem:epsilonbr}.
+%	%
+%	\item Otherwise, whenever the returned meta-action $d_j \in \mathcal{D}$ is different from $d_i$ and $p \notin\widetilde{H}_{ij}$, the algorithm calls the \texttt{Find-HP} procedure to find a new approximate separating hyperplane.
+%	%
+%	Such a procedure returns an hyperplane $\widetilde H$ that identifies a suitable boundary between the lower bound $\mathcal{L}_{d_i}$ of the current meta-action $d_i$ and the lower bound $\mathcal{L}_{d_k}$ of another meta-action $d_k \in \mathcal{D}$ different from $d_j$.
+%	%
+%	Then, $\widetilde{H}_{i k}$ is set to $\widetilde{H}^+$, which denotes the halfspace in which \texttt{Find-HP} recognized that $d_i$ provides a better agent's utility than $d_k$, while $\widetilde{H}_{ki}$ is set to $\widetilde{H}^-$, representing the halfspace in which \texttt{Find-HP} recognized $d_k$ better than $d_i$ (Line~\ref{line:switch}).
+%	%
+%	After a new hyperplane is found, the loop over vertexes is re-started, and the upper bounds $\mathcal{U}_{d_i}$ and $\mathcal{U}_{d_k}$ of $d_i$ and $d_k$ are updated (Line~\ref{line:upper_bounds}).
+%	%
+%	In particular, $\mathcal{U}_{d_i}$ is intersected with $\widetilde H_{ik}$, while $\mathcal{U}_{d_k}$ with $\widetilde H_{ki} $.
+%	%	
+%	%	
+%	%	
+%	%	
+%	%	
+%	%	
+%	%	
+%	%	Such a procedure returns a new hyperplane $\widetilde H_{ik}$ which identifies a suitable boundary between the lower bound $\mathcal{L}_{d_i}$ of the current meta-action $d_i$ and the lower bound $\mathcal{L}_{d_k}$ of another meta-action $d_k \in \mathcal{D}$ different from $d_j$.
+%	%	%
+%	%	After a new hyperplane is found, the loop iterating over vertexes is re-started, and the hyperplane is used to update the upper bounds $\mathcal{U}_{d_i}$ and $\mathcal{U}_{d_k}$ of $d_i$ and $d_k$, respectively (Line~\ref{line:upper_bounds}).
+%	%	%
+%	%	In particular, $\mathcal{U}_{d_i}$ is intersected with the halfspace identified by $\widetilde H_{ik}$, while $\mathcal{U}_{d_k}$ is intersected with that identified by the hyperplane $\widetilde H_{ki} $, which is obtained by switching the sign of the coefficients of the original hyperplane (Line~\ref{line:switch}).
+%\end{itemize}
+%%
+%% if either the returned meta-action $d_j \in \mathcal{D}$ coincides with $d_i$ or the vertex $p$ lies on the (previously-computed) approximate separating hyperplane $\widetilde{H}_{ij}$, the algorithm takes the convex hull between the current lower bound $\mathcal{L}_{d_i}$ and $p$ as a new lower bound for $d_i$.
+%%
+%% Otherwise, the algorithm calls the \texttt{Find-HP} procedure to find a new approximate separating hyperplane.
+%%
+%% Such a procedure returns a new hyperplane $\widetilde H_{ik}$ which identifies a suitable boundary between the lower bound $\mathcal{L}_{d_i}$ of the current meta-action $d_i$ and the lower bound $\mathcal{L}_{d_k}$ of another meta-action $d_k \in \mathcal{D}$ different from $d_j$.
+%%
+%% The hyperplane is then used to update the upper bounds $\mathcal{U}_{d_i}$ and $\mathcal{U}_{d_k}$ of $d_i$ and $d_k$, respectively.
+%%
+%% In particular, $\mathcal{U}_{d_i}$ is intersected with the halfspace identified by $\widetilde H_{ik}$, while $\mathcal{U}_{d_k}$ is intersected with its complement (identified by the hyperplane with opposite coefficients $\widetilde H_{ki} = -\widetilde H_{ik}$).
+%%
+%%Then, \texttt{TRY-PARTITION} checks if the discovered action $d_i \in \mathcal{D}$ is implemented in each vertex of the region $\mathcal{U}_{d_i}$. Then, if the action implemented in a vertex $p \in V(\mathcal{U}_{d_i})$ coincides with $d_i \in \mathcal{D}$ or coincides with $d_{j} \in \mathcal{D}$ and $p \in H_{ij}$, we take the convex hull between the vertex $p \in V(\mathcal{U}_{d_i})$ and the lower bound $\mathcal{L}_{d}$. On the contrary, it computes an (approximate) separating half-space between the action implemented in $p$ and the lower bound $\mathcal{L}_{d}$. To compute a separating hyperplane, we rely on the \texttt{FIND-HALFSPACE} algorithm (see Appendix~\ref{sec:hyperplane}). Whenever an approximate half-space is found, we stop checking among the vertices of the region $\mathcal{U}_{d_i}$ and update the upper bounds of such regions. We repeat this procedure until the lower bound $\mathcal{L}_{d_i}$ coincides with $\mathcal{U}_{d_i}$. During the execution of \texttt{TRY-PARTITION}, we maintain the set $\mathcal{C}$ updated, which contains all the discovered actions whose lower bound does not coincide with their upper bound and therefore need to be updated.
+%%
+%Whenever the loop in Line~\ref{line:partition_loop2} terminates, $\mathcal{L}_{d_i} = \mathcal{U}_{d_i}$ for the current meta-action $d_i$, and, thus, $d_i$ is removed from $\mathcal{C}$.
+%%
+%Moreover, if a call to \texttt{Action-Oracle} returns a meta-action $d_j \in \mathcal{D}$ such that $d_j \notin \mathcal{C}$ and $\mathcal{L}_{d_j} = \varnothing$, then $d_j$ is added to $\mathcal{C}$ and $\mathcal{L}_{d_j}$ is set to $\{ p \}$, where $p \in \mathcal{P}$ is the contract given to \texttt{Action-Oracle} (see Lines~\ref{line:add_1}--\ref{line:add_2}).
+%%
+%This ensures that all the meta-actions are eventually considered.
+% As previously observed, the \texttt{TRY-PARTITION} algorithm may stop for two different reasons. First, when the \texttt{ACTION-ORACLE} returns the tuple $(\widetilde{F}, \bot)$, indicating that the set of discovered actions needs to be updated. In this case, \texttt{TRY-PARTITION} returns the tuple $(\tilde F, \{\mathcal{F}_d \}_{d \in \mathcal{D}}, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$. On the contrary, when \texttt{TRY-PARTITION} returns the tuple $(\bot , \{\mathcal{F}_d \}_{d \in \mathcal{D}}, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$, it means that it has fully partitioned the space of contracts with the set of discovered actions $\mathcal{D}$.
+Next, we prove two crucial properties which are satisfied by Algorithm~\ref{alg:try_partition} whenever it returns $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} }$.
+%
+The first one is formally stated in the following lemma:
+%
+\begin{restatable}{lemma}{lowerbounds}\label{lem:lowerbounds}
+	Under the event $\mathcal{E}_\epsilon$, when Algorithm~\ref{alg:try_partition} returns $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} }$, it holds that $\bigcup_{d \in \mathcal{D}} \mathcal{L}_d ={\mathcal{P}}$.
+\end{restatable}
+%
+Intuitively, Lemma~\ref{lem:lowerbounds} states that Algorithm~\ref{alg:try_partition} terminates with a correct cover of $\mathcal{P}$, and it follows from the fact that, at the end of the algorithm, $\bigcup_{d \in \mathcal{D}} \ureg_{d} = \preg$ and $\lreg_d=\ureg_d$ for every $d \in \dreg$.
+%
+%The lemma follows by observing that, when algorithms, for each actions $d \in \dreg$ we have: $\bigcup_{d \in \mathcal{D}} \ureg_{d} = \preg$ and $\lreg_d=\ureg_d$ for each $d \in \dreg$.
+The second crucial lemma states the following:
+%
+%
+\begin{restatable}{lemma}{epsilonbregions}\label{lem:epsilonbr}
+	Under the event $\mathcal{E}_\epsilon$, when Algorithm~\ref{alg:try_partition} returns $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} }$, for every meta-action $d \in \mathcal{D}$, contract $p \in \mathcal{L}_{d}$ and action $a' \in A(d)$, there exists a $\gamma$ that polynomially depends on $m$, $n$, $\epsilon$, and $B$ such that:
+	\begin{equation*}
+	\sum_{\omega \in \Omega } {F}_{a', \omega} \, p_{\omega} - c_{a'} \ge
+	\sum_{\omega \in \Omega } F_{a, \omega} \, p_{\omega}- c_{a} - \gamma \quad \forall a \in \mathcal{A}.
+	\vspace{-3mm}
+	\end{equation*}
+	%where $\gamma$ polynomially depends on $m$, $n$, $\epsilon$, and $B$.
+	%where $\epsilon' := 14 \epsilon m n$.
+%	
+%	Under $\mathcal{E}_\epsilon$, if \textnormal{\texttt{TRY-PARTITION} }reutrns the tuple $(\bot,\{\mathcal{F}_d \}_{d \in \mathcal{D}},\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )$, then for every discovered action $d \in \mathcal{D}$, contract $p \in \mathcal{L}_{d}$, and action $a_i \in I(d)$, it holds:
+%	\begin{equation*}
+%		\sum_{\omega \in \Omega } p_{\omega}F_{a, \omega} - c_{a} \ge
+%		\sum_{\omega \in \Omega } p_{\omega}F_{a', \omega} - c_{a'} -  \epsilon',
+%	\end{equation*}
+%	for every action $a' \in \mathcal{A}$, where $\epsilon' = 14 \epsilon m n$.
+\end{restatable}
+%\bac{$\epsilon= poly(m,n,B)$}
+%
+%\bac{$a_i \in I(d)$ è un $\epsilon$-br si puo introdurre questa definzione da qualche parte?}
+%
+%
+Lemma~\ref{lem:epsilonbr} states that $\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} }$ defines a cover of $\mathcal{P}$ made of suitable approximate best-response regions for the meta-actions in $\mathcal{D}$.
+%
+Indeed, for every meta-action $d \in \dreg$ and contract $p \in \mathcal{L}_d$, playing any $a \in A(d)$ associated with $d$ is an ``approximate best response'' for the agent, in the sense that the agent's utility only decreases by a small amount with respect to playing the (true) best response $a^\star(p)$.
+%
+%The proof of Lemma~\ref{lem:epsilonbr} follows from the observation that, during the execution of the algorithm, a vertex $p \in V(\mathcal{U}_{d_i})$ of the upper bound of $d_i \in \mathcal{D}$ is ``added'' to the lower bound $\mathcal{L}_{d_i}$ only when either \texttt{Action-Oracle} returns the meta-action $d_i$ or it outputs another meta-action $d_j \in \mathcal{D}$ such that $d_j \in \mathcal{D}_{d_i}$.
+%
+%In the latter case, ``adding'' $p$ to the lower bound $ \mathcal{L}_{d_i}$ of $d_i$ only introduces a small error, since it can be shown that the agent's expected utility by playing actions in $ A(d_i)$ is ``close'' to that obtained with actions in $A(d_j)$ under contract $p$.
+%
+% Despite the fact that $\widetilde H_{ij}$ is approximate, we can prove that the actions $a \in I(d)$ only lead the agent to incur in small loss compared to playing a best response.
+%
+%
+%The lemma follows from the observation that, when Algorithm~\ref{alg:try_partition} terminates, for every vertex $p \in V(\ureg_{d_i})$, either $\texttt{ACTION-ORACLE}$ returns $d_i \in \mathcal{D}$, or it returns a different action $d_j \in \mathcal{D}$ belonging to an approximate hyperplane $\tilde H_{ij}$ that defines the boundaries of $\mathcal{U}_{d_i}$. In the latter case, we still consider the contract $p \in \mathcal{U}_{d_i}$ as an element of $ \mathcal{L}_{d_i}$, since the hyperplane $\tilde H_{ij}$ computed by $\texttt{FIND-HALFSPACE}$ may differ from the actual one due to the errors introduced during the estimation of the empirical distributions over outcomes $\widetilde{F}_{d_i},\widetilde{F}_{d_j}$. However, we prove that these errors can be bounded, and consequently the agent's expected utility achieved by playing actions $a_i \in I(d)$ results sufficiently close to the utility achieved by playing action $a_i \in I(d_j)$ in each $p \in V(\mathcal{L}_{d_i})$.
+Finally, the following lemma bounds the number of rounds required by Algorithm~\ref{alg:try_partition}.
+%
+% \bac{parlo solo della sample complexity o anche del numero di iterazioni.. che poi sono le stesse.}
+%
+\begin{restatable}{lemma}{partitioncomplexity}\label{lem:part_compl}
+	Under event $\mathcal{E}_\epsilon$, Algorithm~\ref{alg:try_partition} requires at most
+	%$\widetilde{\mathcal{O}}( m^n \cdot \mathcal{I} \cdot \nicefrac{1}{\rho^4} \log (\nicefrac{1}{\delta}))$ 
+	$\mathcal{O} \left( n^2 q \left( \log \left(\nicefrac{Bm}{\eta}\right) + \binom{ m + n +1}{m} \right) \right)$ rounds. 
+	%where $\mathcal{I}$ is a term that depends polynomially on $m$, $n$, and $B$.
+	%$\mathcal{O}(m^{n }) $ rounds.
+\end{restatable}
+% \bac{$\mathcal{I}$ dipende anch da $m$ in teoria...}
+%
+Lemma~\ref{lem:part_compl} follows from the observation that the main cost, in terms of number of rounds, incurred by Algorithm~\ref{alg:try_partition} is to check all the vertexes of the upper bounds $\mathcal{U}_d$.
+%
+The number of such vertexes can be bound by $\binom{n + m + 1}{m} $, thanks to the fact that the set $\mathcal{P}$ being covered by Algorithm~\ref{alg:try_partition} has $m+1$ vertexes.
+%
+Notice that, using $\mathcal{P}$ instead of $[0,B]^m$ is necessary, since the latter has a number vertexes which is exponential in $m$.
+%
+Nevertheless, Algorithm~\ref{alg:final_algorithm} returns a contract $p \in [0,B]^m$ by means of the \texttt{Find-Contract} procedure, which we are going to describe in the following subsection.  
+%
+% The lemma follows by observing that the main cost required to execute the \texttt{Try-artition} algorithms lieas in the check of all the vertices of the regions $\mathcal{U}_{d}$ that is bounded by $\binom{h_\preg + n + m }{m} $. 
+
+
+
+%\begin{algorithm}
+%	\caption{\texttt{Try-Partition}}\label{alg:try_partition}
+%	\begin{algorithmic}[1]
+%		\State $\mathcal{L}_d \gets \varnothing$ for all $d \in \mathcal{D}$
+%		\State Randomly take a contract $p \in \mathcal{P}$
+%		\State $(d, \widetilde F) \leftarrow\texttt{Action-Oracle}(p)$
+%		\State $\mathcal{U}_{d}\leftarrow\mathcal{P}$, $\mathcal{L}_{d}\leftarrow\{p\}$
+%		\If {$d = \bot$}
+%		\State \Return $(\widetilde F, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$
+%		\EndIf
+%		\State $\mathcal{C} \gets \{ d \}$
+%		\While{$\mathcal{C} \ne \varnothing $ }\label{line:partition_loop1}
+%		\State Take any $d_i \in \mathcal{C}$
+%		\While{$\mathcal{L}_{d_i} \ne \mathcal{U}_{d_i}$}\label{line:partition_loop2}
+%		\State $V_{d_i} \gets V(\mathcal{U}_{d_i})$
+%		\While {$V_{d_i} \neq \varnothing$}\label{line:partition_loop3}
+%		\State Take any $p \in V_{d_i}$
+%		\State $(d_j, \widetilde F) \leftarrow \texttt{Action-Oracle}(p)$
+%		\If {$d_j = \bot$}
+%		\State \Return $(\widetilde F, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$
+%		\EndIf
+%		\If {$d_j \notin \mathcal{C} \wedge \mathcal{L}_{d_j} = \varnothing$}
+%		\State $\mathcal{L}_{d_j} \gets \{ p \}$
+%		\State $\mathcal{C} \gets \mathcal{C} \cup \{d_j\}$
+%		\EndIf
+%		\If {$d_i = d_j \lor p  \in H_{ij}$} 
+%		\State $\mathcal{L}_{d_i} \gets \text{co}(\mathcal{L}_{d_i}, p)$
+%		\Else
+%		\State $(H_{ik}, d_k, \widetilde F) \gets \texttt{Find-Halfspace} (\mathcal{L}_{d_i},p)$
+%		\If {$d_k = \bot$}
+%		\State \Return $(\widetilde F,  \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$
+%		\EndIf
+%		\State $H_{ki} \gets - H_{ik}$ %\Comment{Complement halfspace}
+%		\EndIf
+%		\State $V_{d_i} \gets V_{d_i} \setminus \{p\}$
+%		\EndWhile
+%		\State $\mathcal{U}_{d_i} \leftarrow \mathcal{U}_{d_i} \cap H_{ik} $, $\mathcal{U}_{d_k} \leftarrow \mathcal{U}_{d_k} \cap H_{ki} $
+%		\EndWhile
+%		\State $\mathcal{C} \leftarrow \mathcal{C} \setminus \{d_i\}$
+%		\EndWhile
+%		\State \Return  $(\bot,\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )$
+%	\end{algorithmic}
+%	\begin{algorithmic}[1]
+%		\Require $\mathcal{D}$, $\{\mathcal{F}_d \}_{d \in \mathcal{D}}$
+%		\State Initialize $\mathcal{L}_d \gets \varnothing$ for every $d \in \mathcal{D}$
+%		\State Randomly commit to a contract $p \in \mathcal{P}$
+%		\State $(d_i, \tilde F) \leftarrow\texttt{ACTION-ORACLE}(p, \mathcal{D}, \{ \mathcal{F}_d \}_{d \in \mathcal{D}})$
+%		\State $\mathcal{U}_{d_i}\leftarrow\mathcal{P}$, $\mathcal{L}_{d_i}\leftarrow\{p\}$
+%		\If {$d_i = \bot$}
+%		\State \Return $(\tilde F, \{\mathcal{F}_d \}_{d \in \mathcal{D}}, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$
+%		\EndIf
+%		\State $\mathcal{F}_{d_i} \gets \mathcal{F}_{d_i} \cup \{ \tilde F \}$
+%		\State $\mathcal{C} \gets \{ d_i \}$
+%		\While{$\mathcal{C} \ne \varnothing $ }
+%		\State Take any $d_i \in \mathcal{C}$
+%		\While{$\mathcal{L}_{d_i} \ne \mathcal{U}_{d_i}$}
+%		\State $V_{d_i} \gets \mathcal{V}(\mathcal{U}_{d_i})$
+%		\While {$V_{d_i} \neq \varnothing$}
+%		\State Take any $p \in V_{d_i}$
+%		\State $(d_j, \tilde F) \leftarrow \texttt{ACTION-ORACLE}(p, \mathcal{D}, \{ \mathcal{F}_d \}_{d \in \mathcal{D}})$
+%		\If {$d_j = \bot$}
+%		\State \Return $(\tilde F, \{\mathcal{F}_d \}_{d \in \mathcal{D}}, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$
+%		\EndIf
+%		\If {$d_i = d_j \lor p  \in H_{ij}$} 
+%		\State $\mathcal{L}_{d_i} \gets \text{co}(\mathcal{L}_{d_i}, p)$
+%		\Else
+%		\State $(H_{ik}, d_l, \tilde F, \{\mathcal{F}_d \}_{d \in \mathcal{D}}) \gets \texttt{FIND-HALFSPACE} (\mathcal{L}_{d_i},p, \mathcal{D}, \{\mathcal{F}_d \}_{d \in \mathcal{D}})$
+%		\If {$d_l = \bot$}
+%		\State \Return $(\tilde F, \{\mathcal{F}_d \}_{d \in \mathcal{D}}, \{ \mathcal{L}_d \}_{d \in \mathcal{D}}  )$
+%		\EndIf
+%		\State $H_{ki} \gets - H_{ik}$ \Comment{Complement halfspace}
+%		\EndIf
+%		\State $V_{d_i} \gets V_{d_i} \setminus \{p\}$
+%		\EndWhile
+%		\State $\mathcal{U}_{d_i} \leftarrow \mathcal{U}_{d_i} \cap H_{ik} $, $\mathcal{U}_{d_k} \leftarrow \mathcal{U}_{d_k} \cap H_{ki} $
+%		\EndWhile
+%		\State $\mathcal{C} \leftarrow \mathcal{C} \setminus \{d_i\}$
+%		\EndWhile
+%		\State \Return  $(\bot,\{\mathcal{F}_d \}_{d \in \mathcal{D}},\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )$
+%	\end{algorithmic}
+%\end{algorithm}
+
+
+
+\begin{comment}
+	\subsection{The \separate Algorithm}\label{sec:separate}
+	We now present a generalization of the algorithm proposed by~\citeauthor{Peng2019}~\citeyear{Peng2019}
+	for learning the optimal leader's strategy in repeated Stackelberg games. The main idea behind Algorithm is to maintain an upper bound $\mathcal{U}_{d_i}$ which approximately contains each feasibility region $\mathcal{P}_{a_i}$ for each action $a_i \in I(d_i)$ and $d_i  \in \mathcal{D}$. To do that Algorithm checks if the discovered action $d_i \in \mathcal{D}$ is implemented in each vertex of the region $\mathcal{U}_{d_i}$. Then, if the action implemented in a vertex $p \in V(\mathcal{U}_{d_i})$ either coincides with $d_i$ or coincides with $d_j \in \mathcal{D}$ but $p \in H_{ij}$ for some disovered hyperplane $H_{i,j}$, we take the convex hull between the vertex $p \in V(\mathcal{U}_{d})$ and the lower bound $\mathcal{L}_{d}$. On the contrary, the algorithm computes an approximate separating hyperplane between $\ureg_{d_i}$ and $\ureg_{d_i}$. To compute an approximate separting hyperplane we employ the $\texttt{FIND-SEPARATE-HYPERPLANE}$ algorithm (See Appendix~\ref{sec:hyperplane}).
+	Whenever an hyperplane is found we update the upper bounds of the regions ad we repeat the latter procedure until the lower bound $\mathcal{L}_{d}$ coincides with $\mathcal{U}_{d}$. Finally, this procedure is repeated for each discovered action that has not been added to $\mathcal{D}$. During the execution of the algorithm we keep track of the action which we need to check in a set $\mathcal{C}$. 
+	
+	\begin{restatable}{lemma}{complexity}
+		With probability of at least, Algorithm terminates with at most $ \mathcal{O}(m^{n+h(\preg) })$ samples. 
+	\end{restatable}
+	\mat{$h(p)$ è definito?}
+	
+	As previously discussed, Algorithm~\ref{alg:separate_search} does not guarantee that the action implemented in each vertex $p \in V(\mathcal{L}_d)$ coincides with the corresponding action $d \in \mathcal{D}$. However, we can prove that for each $d \in \mathcal{D}$ and each $p \in \mathcal{L}_d$, every $a \in I(d)$ is an $\epsilon'$-best-response for a suitable defined $\epsilon' > 0$. Formally, the following lemma holds.
+	
+	\begin{restatable}{lemma}{epslowerbounds}
+		When algorithm terminates we have that for each action $d \in \mathcal{D}$ and for each $p \in V(\mathcal{L}_{d})$ it holds:
+		\begin{equation*}
+			\sum_{\omega \in \Omega } p_{\omega}F_{a_i, \omega} - c_{a_i} \ge
+			\sum_{\omega \in \Omega } p_{\omega}F_{a_j, \omega} - c_{a_j} -  \epsilon',
+		\end{equation*}
+		for each action $a_j \in \mathcal{A}$ and action $a_i \in I(d)$, with $\epsilon' = 14 \epsilon m n$.
+	\end{restatable}
+	
+	The lemma follows from the observation that, when Algorithm~\ref{alg:separate_search} terminates, for every vertex $p \in V(\ureg_{d_i})$, either $\texttt{ACTION-ORACLE}$ returns $d_i \in \mathcal{D}$, or it returns a different action $d_j \in \mathcal{D}$ belonging to a hyperplane $H_{ij}$ that defines the boundaries of $\mathcal{U}_{d_i}$. In the latter case, we still consider such a contract as an element of $ \mathcal{L}_{d_i}$, since the hyperplane $H_{ij}$ computed by $\texttt{FIND-SEPARATE-HYPERPALNE}$ may differ from the actual one due to the errors introduced during the estimation of the empirical distributions over outcomes $\widetilde{F}_{d_i},\widetilde{F}_{d_j}$ and the errors introduced when performing the binary search. However, we prove that these errors can be bounded, and consequently the discovered action $d_i$ results an $\epsilon'$-best respinse in each $p \in V(\lreg_{d_i})$ and consequently in each $p \in V(\lreg_{d_i})$ as long as $\lreg_{d_i}$ is a convex region.
+\end{comment}
+
+
+%\begin{algorithm}
+%\caption{\separate}\label{alg:separate_search}
+%\begin{algorithmic}[1]
+%\Require $\mathcal{P} \subseteq \mathbb{R}^m_{+}$, $\epsilon>0$,
+%\State Initialize $\mathcal{D}$
+%\State The principal randomly commit to contract $p \in \mathcal{P}$
+%\State Set $d_i\leftarrow\texttt{ACTION-ORACLE}(p)$, $\mathcal{U}_{d_i}\leftarrow\mathcal{P}$, $\mathcal{L}_{d_i}\leftarrow\{p\}$
+%\mat{$C.ADD(d_i)$ Bisogna definire le funzioni della queue}
+%\While{$\mathcal{C} \ne \emptyset $ }
+%    \State $d_i \leftarrow \mathcal{C} . \texttt{NEXT-ELEMENT}$$()$
+%    \While{$\mathcal{L}_{d_i} \ne \mathcal{U}_{d_i}$}
+%     \State $V_{d_i} \leftarrow \texttt{ENUMERATE-VERTECES}(\mathcal{U}_{d_i})$
+%        \Do
+%            \State $p \leftarrow V_{d_i} . \texttt{NEXT-ELEMENT}$$()$
+%            \State $d_j \leftarrow \texttt{ACTION-ORACLE}$$(p)$
+%            \mat{ ACTION ORACLE DEVE PRENDERE IN INPUT $\mathcal{D}$}
+%                \If{$d_i \ne d_j $ and $d_j \not \in H_{ij}$ for some $j \in \mathcal{D}$ \mat{$d_j$ dovrebbe essere fissato, for some?}}
+%                    \State $H_{ik} \leftarrow $ \texttt{FIND-SEPARATE-HYPERPLANE} $(\mathcal{L}_{d_i},p, \eta)$
+%                \Else
+%                    \State $\mathcal{L}_{d_i} \leftarrow co(\mathcal{L}_{d_i}, p)$
+%                \EndIf
+%        \doWhile{$d_j=d_i$}
+%        \State $\mathcal{U}_{d_i} \leftarrow \mathcal{U}_{d_i} \cap H_{ik} $ and $\mathcal{U}_{d_k} \leftarrow \mathcal{U}_{d_k} \cap H_{ki} $
+%    \EndWhile
+%    \State $\mathcal{C} \leftarrow \mathcal{C} \setminus \{d_i\}$
+%\EndWhile
+%\State \textbf{return} $\{\lreg_d, \widetilde{F}_d\}_{d \in \mathcal{D}}$ 
+%
+%\mat{quando viene rimpolpato $\mathcal{C}$?, cosa succete se mentro sto testando un azione viene unita con un altra?}
+%\end{algorithmic}
+%\end{algorithm}
+

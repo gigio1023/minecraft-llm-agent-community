@@ -21,7 +21,7 @@
 
 ## Interpretation (labeled inference)
 
-- Blau's "unilateral benefit → obligation → power asymmetry" is the exact
+- Blau's "unilateral benefit -> obligation -> power asymmetry" is the exact
   mechanism behind the repo's first scenario `borrowed_tool_with_return_or_debt_v1`:
   Alice lends, Bob owes, and until Bob returns/repairs, the relationship is
   imbalanced. Trust rises on reciprocation, the lender gains standing on repeated
@@ -35,8 +35,8 @@
 - Mechanically useful: the obligation/credit ledger is literally Blau's exchange
   bookkeeping. The repo's `ObligationLedgerEntry` (kind ∈ {promise, loan, debt,
   repair, favor, ...}, status ∈ {open, fulfilled, refused, violated, ...}) is a
-  faithful operationalization. A predictable delta: `lend_item` → open loan
-  obligation created; `return_item` → obligation fulfilled + trust up; loss →
+  faithful operationalization. A predictable delta: `lend_item` -> open loan
+  obligation created; `return_item` -> obligation fulfilled + trust up; loss ->
   obligation violated + trust/friction down. Power asymmetry is observable as a
   standing net-creditor balance in the ledger.
 - Avoid / overclaim: do NOT claim "felt indebtedness" or "felt gratitude." Record
