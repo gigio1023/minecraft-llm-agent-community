@@ -53,6 +53,7 @@ const config = {
         },
         blog: {
           showReadingTime: true,
+          blogSidebarCount: 0,
           editUrl:
             'https://github.com/naem1023/minecraft-llm-agent-community/tree/main/docs/',
         },
