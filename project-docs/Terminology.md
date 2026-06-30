@@ -32,30 +32,58 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
    they were the research contribution. Runtime checking and audit artifacts are
    experiment hygiene unless the project is explicitly studying verifier models.
 
-## Advisory Social-Material WAM
+## Action-Consequence And Advisory Predictor Names
 
-An **advisory social-material World Action Model** is a predictor of the
-physical, material, and social consequences of candidate embodied Minecraft
-actions.
+The active central plan has not selected one research headline yet. New active
+direction docs should prefer concrete names over the historical **WAM** banner:
 
-It predicts deltas before an action and is scored after the action against
-runtime-observed deltas. It does not select the executed action, fill missing
-arguments, declare progress, close obligations, mutate actor state, or override
-runtime checks.
+- **action-consequence model** for F-native style action -> consequence learning;
+- **advisory consequence predictor** for F-loop style prediction outside
+  runtime authority;
+- **social-material transition model** when discussing physical/material/social
+  deltas as the object of analysis;
+- `transition-row/v1` when discussing the current no-regret core data unit.
 
-Use **advisory WAM** or **social-material WAM** after the first full mention.
+**Advisory social-material WAM** is historical shorthand and a possible F-loop
+branch reference. It should not be used as the current project headline. If it
+appears in older docs, read it through
+`Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`.
+
+An advisory consequence predictor predicts deltas before an action and is scored
+after the action against runtime-observed deltas. It does not select the executed
+action, fill missing arguments, declare progress, close obligations, mutate actor
+state, or override runtime checks.
 
 Do not use **structured-state WAM** as the headline. Structured state is the
 representation choice, not the research contribution.
 
-## Social-Material Transition
+## Transition Row
 
-A **social-material transition** is a typed before/action/after record where an
+A **transition row** is the current no-regret core data unit. It is an
+independent before/action/after record for one executed Minecraft action:
+
+```text
+state_before
+executed_action
+observed_delta
+other_actor_response_window when present
+evidence_refs
+actor/model/provider/seed/run metadata
+cost/latency/token/action-count metadata
+```
+
+Use `transition-row/v1` for current docs and runtime artifacts.
+
+A transition row may later support social-material consequence modeling when an
 embodied Minecraft action changes physical state, possession, access, claims,
 public affordances, obligations, relationship state, memory commitments, or
-future action opportunities.
+future action opportunities. Do not use the actor's self-declared
+`expected_outcome` as the target label.
 
-The preferred dataset unit is `social-material-transition/v1`:
+`social-material-transition/v1` is an older WAM-era dataset name. Keep it in
+archive references, but translate new work to `transition-row/v1`.
+
+Archived WAM-era fields were shaped as:
 
 ```text
 state_before

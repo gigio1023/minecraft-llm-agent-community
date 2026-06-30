@@ -20,12 +20,13 @@ When documents disagree, use this order:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CLAUDE.md` and `GEMINI.md`, subordinate to `AGENTS.md`
-4. `project-docs/Specification/*`
-5. `project-docs/Terminology.md`
-6. `project-docs/Agent-Search-Index.md`
-7. active architecture docs under `project-docs/Architecture/`
-8. current handoff, audit, setup, and future-work docs
-9. internal review docs and research archives
+4. current research spine docs under `project-docs/Architecture/`
+5. `project-docs/Specification/*`
+6. `project-docs/Terminology.md`
+7. `project-docs/Agent-Search-Index.md`
+8. active runtime support docs under `project-docs/Architecture/`
+9. current handoff, audit, setup, and future-work docs
+10. internal review docs and research archives
 
 Do not fix a conflict by silently rewriting the spec. If the conflict changes
 long-term direction, get explicit user approval first.
@@ -99,6 +100,26 @@ Orientation:
 - `project-docs/Agent-Search-Index.md`
 - `project-docs/Terminology.md`
 
+Current research spine:
+
+- `project-docs/Architecture/Research-Documentation-Hierarchy.md`
+- `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+- `project-docs/Architecture/Research-Value-Harness.md`
+- `project-docs/Architecture/Prior-Work-Proximity-Current-Spine-2026-06-29.md`
+- `project-docs/Architecture/No-Regret-Core-Research-Protocol.md`
+- `project-docs/Architecture/Transition-Row-V1-Contract.md`
+- `project-docs/Architecture/Seed-Reset-Record-V1-Contract.md`
+- `project-docs/Architecture/Transition-Row-Label-Codebook.md`
+- `project-docs/Architecture/No-Regret-Core-Scenario-Catalog.md`
+- `project-docs/Architecture/Goldilocks-Preflight-Protocol.md`
+- `project-docs/Architecture/Society-Observable-Preflight.md`
+- `project-docs/Architecture/Research-Decision-Current-Spine-2026-06-29.md`
+
+Read these before changing runtime, benchmark, provider, predictor, or
+experiment direction. They supersede older WAM-headline and phase-order wording
+where there is a conflict, while preserving older literature work as reference
+material.
+
 Long-term spec:
 
 - `project-docs/Specification/Advisory-Social-Material-WAM.md`
@@ -111,6 +132,10 @@ Long-term spec:
 Architecture:
 
 - `project-docs/Architecture/SPEC.md`
+- `project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`
+- `project-docs/Architecture/No-Regret-Core-Implementation-Campaign.md`
+- `project-docs/Architecture/No-Regret-Core-Current-Status-2026-06-29.md`
+- `project-docs/Architecture/Natural-Village-Model-Comparison-Plan-2026-06-29.md`
 - `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
 - `project-docs/Architecture/Runtime-Loop-And-Verification.md`
 - `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
@@ -191,6 +216,10 @@ shape active implementation or public docs navigation:
   `research-archive/2026-06-16/deep-social-wam-literature-review/`.
 - focused WAM/autoresearch positioning studies such as
   `research-archive/2026-06-17/sdk-autoresearch-social-wam-positioning/`.
+- WAM direction stress tests and reframe reports such as
+  `research-archive/2026-06-27/wam-direction-stress-test-and-reframe/`.
+- dated plan-realignment material such as
+  `research-archive/2026-06-29/research-plan-realignment/`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
@@ -214,10 +243,10 @@ maintainers, but they should not be treated as top-level product direction:
 - `Social-Cycle-LLM-Input-Cleanup-Plan.md`
 - `Current-Architecture-And-Implementation-Audit.md`
 
-These documents must remain subordinate to the Soul/LifeGoal social runtime and
-the advisory social-material WAM spine. They must not make benchmark progress,
-diamond acquisition, generic autonomy, verification, screenshots, or evidence
-collection look like the product goal.
+These documents must remain subordinate to the current research spine and the
+Soul/LifeGoal social runtime. They must not make benchmark progress, diamond
+acquisition, generic autonomy, verification, screenshots, or evidence collection
+look like the product goal.
 
 ## Cleanup Rules
 
