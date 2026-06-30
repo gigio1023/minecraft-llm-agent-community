@@ -12,7 +12,7 @@ monthly form.
 
 ### 1. Docusaurus Blog Post / Rich Visual Report
 
-Title: A Minecraft Natural Village Model Run: Visual 30-Cycle Field Report
+Title: A Minecraft Natural Village Model Run
 
 Public link:
 `<PUBLIC_DOCUSARUS_RICH_VISUAL_REPORT_URL>`
