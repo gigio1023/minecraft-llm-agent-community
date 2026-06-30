@@ -42,6 +42,16 @@ not counted as progress.
 All three completed lanes passed the visual evidence audit and captured 96
 images each.
 
+Visual caveat: Qwen Max `cycle-0030` `third_person_follow` and
+`third_person_high` show a terrain cross-section because the current report
+camera can clip near underground geometry. The bot was at approximately
+`{x:13.3,y:103,z:15.37}` after mining local `stone`; runtime evidence for
+`cycle-0030-action-01-mine_block.json` records `stone` at
+`{x:14,y:103,z:15}`, `cobblestone` increasing from `4` to `6`, and
+`blockRemoved:true`. Do not interpret those third-person pixels as model
+perception, xray access, or block-identity evidence. Use the first-person frame
+and same-cycle runtime evidence for that final state.
+
 ## Provider Feasibility
 
 Preflight artifacts are in `preflight/`.

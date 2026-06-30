@@ -70,6 +70,14 @@
 
 These images are prismarine-viewer review evidence only. Do not use pixels as block identity authority; pair each suspicious image with same-cycle or neighboring observe/worldStateSummary/world-state-scan artifacts.
 
+Visual caveat: `cycle-0030` `third_person_follow` and `third_person_high`
+show a terrain cross-section caused by the report camera clipping near
+underground geometry. This is a `camera artifact`, not xray-like actor
+perception. The same-cycle runtime evidence records local `stone` mining at
+`{x:14,y:103,z:15}` with `cobblestone` increasing from `4` to `6`; use the
+first-person frame plus `evidence/cycle-0030-action-01-mine_block.json` for the
+final-state interpretation.
+
 ### cycle-0028 cycle_end
 
 ![cycle-0028 cycle_end](data/actors/social-runs/social-cycle-0504dd1e-1be2-40d7-a577-1834ec160a82/npc_b/visual-evidence/cycle-0028-cycle-end-first-person.png)
